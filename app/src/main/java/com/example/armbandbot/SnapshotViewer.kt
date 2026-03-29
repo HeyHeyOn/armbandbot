@@ -64,7 +64,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     val author = if (uid.isNotEmpty()) "$nick($uid)" else if (ip.isNotEmpty()) "$nick($ip)" else nick
 
     val date = doc.select(".gall_date").first()?.attr("title") ?: ""
-    val viewCount = doc.select(".gall_count").text()
+    val viewCount = Regex("[0-9,]+").find(doc.select(".gall_count").text())?.value ?: ""
 
     val bodyEl = doc.select(".write_div").first()
     val bodyText = bodyEl?.text() ?: ""
@@ -89,7 +89,10 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
 
     val comments = doc.select("#snapshot-comments .s-cmt").map { el ->
         val isReply = el.hasClass("s-cmt-reply")
-        val dcconUrls = el.select("img.s-dccon").mapNotNull { img ->
+        val dcconUrls = el.select("img").filter { img ->
+            val src = img.attr("src")
+            src.contains("dccon.php") || src.contains("dcimg")
+        }.mapNotNull { img ->
             val src = img.attr("src")
             when {
                 src.startsWith("http") -> src

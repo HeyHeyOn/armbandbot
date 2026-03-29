@@ -1107,17 +1107,15 @@ class BotService : Service() {
                     cmtDiv.appendChild(textP)
 
                     if (vrPlayerTag.isNotEmpty()) {
-                        val dcconImg = org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("img").first()
-                        val rawSrc = dcconImg?.attr("src") ?: ""
-                        val dcconSrc = when {
-                            rawSrc.startsWith("//") -> "https:$rawSrc"
-                            else -> rawSrc
-                        }
-                        if (dcconSrc.isNotEmpty()) {
-                            val dcconImgEl = org.jsoup.nodes.Element("img")
-                            dcconImgEl.attr("src", dcconSrc)
-                            dcconImgEl.addClass("s-dccon")
-                            cmtDiv.appendChild(dcconImgEl)
+                        org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("img").forEach { dcconImg ->
+                            val rawSrc = dcconImg.attr("src")
+                            if (rawSrc.contains("dccon.php") || rawSrc.contains("viewimage.php")) {
+                                val dcconSrc = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
+                                val dcconImgEl = org.jsoup.nodes.Element("img")
+                                dcconImgEl.attr("src", dcconSrc)
+                                dcconImgEl.addClass("s-dccon")
+                                cmtDiv.appendChild(dcconImgEl)
+                            }
                         }
                     }
 
