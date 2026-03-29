@@ -1068,9 +1068,60 @@ class BotService : Service() {
         var dbSnapshotPath: String? = null
         var isPostBlocked = false
 
-        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document) {
+        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null) {
             if (!config.isExpertMode) return
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
+
+            if (comments != null && comments.length() > 0) {
+                val commentsDiv = org.jsoup.nodes.Element("div")
+                commentsDiv.attr("id", "snapshot-comments")
+                for (i in 0 until comments.length()) {
+                    val cmt = comments.getJSONObject(i)
+                    val depth = cmt.optInt("depth", 0)
+                    val nick = cmt.optString("name", "")
+                    val uid = cmt.optString("user_id", "")
+                    val ip = cmt.optString("ip", "")
+                    val author = if (uid.isNotEmpty()) "$nick($uid)" else if (ip.isNotEmpty()) "$nick($ip)" else nick
+                    val date = cmt.optString("reg_date", "")
+                    val memo = cmt.optString("memo", "")
+                    val vrPlayerTag = cmt.optString("vr_player_tag", "")
+
+                    val cmtDiv = org.jsoup.nodes.Element("div")
+                    cmtDiv.addClass("s-cmt")
+                    if (depth == 1) cmtDiv.addClass("s-cmt-reply")
+
+                    val nickSpan = org.jsoup.nodes.Element("span")
+                    nickSpan.addClass("s-cmt-nick")
+                    nickSpan.text(author)
+
+                    val dateSpan = org.jsoup.nodes.Element("span")
+                    dateSpan.addClass("s-cmt-date")
+                    dateSpan.text(date)
+
+                    val textP = org.jsoup.nodes.Element("p")
+                    textP.addClass("s-cmt-text")
+                    textP.html(memo)
+
+                    cmtDiv.appendChild(nickSpan)
+                    cmtDiv.appendChild(dateSpan)
+                    cmtDiv.appendChild(textP)
+
+                    if (vrPlayerTag.isNotEmpty()) {
+                        val dcconImg = org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("img").first()
+                        val dcconSrc = dcconImg?.attr("src") ?: ""
+                        if (dcconSrc.isNotEmpty()) {
+                            val dcconImgEl = org.jsoup.nodes.Element("img")
+                            dcconImgEl.attr("src", dcconSrc)
+                            dcconImgEl.addClass("s-dccon")
+                            cmtDiv.appendChild(dcconImgEl)
+                        }
+                    }
+
+                    commentsDiv.appendChild(cmtDiv)
+                }
+                doc.body()?.appendChild(commentsDiv)
+            }
+
             val html = buildSnapshotHtml(
                 botId = botId,
                 gallType = gallType,
@@ -1103,7 +1154,7 @@ class BotService : Service() {
         if (config.isExpertMode && config.isSnapshotAll) {
             if (GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
                 try {
-                    saveSnapshotFromDoc(postDoc)
+                    saveSnapshotFromDoc(postDoc, commentsArray)
                     if (dbSnapshotPath != null) {
                         GlobalBotState.getDb()?.postDao()
                             ?.updateSnapshotPath(gallType, gallId, postNumStr, dbSnapshotPath!!)
