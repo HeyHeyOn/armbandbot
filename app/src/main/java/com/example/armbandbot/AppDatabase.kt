@@ -95,6 +95,9 @@ interface PostDao {
     @Query("UPDATE checked_posts SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
     fun updateSnapshotPath(gallType: String, gallId: String, postNum: String, path: String)
 
+    @Query("UPDATE block_history SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
+    fun updateBlockHistorySnapshotPath(gallType: String, gallId: String, postNum: String, path: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertBlockHistory(history: BlockHistory)
 

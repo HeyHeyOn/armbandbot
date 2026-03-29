@@ -1103,6 +1103,10 @@ class BotService : Service() {
                 GlobalBotState.enqueueSnapshot {
                     try {
                         capturePrunedSnapshot()
+                        if (dbSnapshotPath != null) {
+                            GlobalBotState.getDb()?.postDao()
+                                ?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, dbSnapshotPath!!)
+                        }
                     } finally {
                         GlobalBotState.unlockGeneralSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
                     }
@@ -1907,6 +1911,7 @@ class BotService : Service() {
                         val path = captureBlockSnapshot(capturedBotId, capturedGallType, capturedGallId, capturedPostNumStr, capturedCookie)
                         if (path != null) {
                             GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
+                            GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
                         }
                     } finally {
                         GlobalBotState.unlockBlockSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
@@ -2039,6 +2044,7 @@ class BotService : Service() {
                         val path = captureBlockSnapshot(capturedBotId, capturedGallType, capturedGallId, capturedPostNumStr, capturedCookie)
                         if (path != null) {
                             GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
+                            GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
                         }
                     } finally {
                         GlobalBotState.unlockBlockSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
