@@ -1069,7 +1069,8 @@ class BotService : Service() {
         var isPostBlocked = false
 
         fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document) {
-            if (!config.isExpertMode || dbSnapshotPath != null) return
+            if (!config.isExpertMode) return
+            sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
             val html = buildSnapshotHtml(
                 botId = botId,
                 gallType = gallType,
@@ -1101,20 +1102,14 @@ class BotService : Service() {
 
         if (config.isExpertMode && config.isSnapshotAll) {
             if (GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
-                val capturedGallType = gallType
-                val capturedGallId = gallId
-                val capturedPostNumStr = postNumStr
-                val capturedDoc = postDoc
-                GlobalBotState.enqueueSnapshot {
-                    try {
-                        saveSnapshotFromDoc(capturedDoc)
-                        if (dbSnapshotPath != null) {
-                            GlobalBotState.getDb()?.postDao()
-                                ?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, dbSnapshotPath!!)
-                        }
-                    } finally {
-                        GlobalBotState.unlockGeneralSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
+                try {
+                    saveSnapshotFromDoc(postDoc)
+                    if (dbSnapshotPath != null) {
+                        GlobalBotState.getDb()?.postDao()
+                            ?.updateSnapshotPath(gallType, gallId, postNumStr, dbSnapshotPath!!)
                     }
+                } finally {
+                    GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
                 }
             }
         }
