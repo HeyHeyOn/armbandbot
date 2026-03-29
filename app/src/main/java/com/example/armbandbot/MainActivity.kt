@@ -92,6 +92,30 @@ object GlobalBotState {
     private val generalSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val blockSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+    // 스냅샷 큐 워커
+    private val snapshotQueue = java.util.concurrent.LinkedBlockingQueue<suspend () -> Unit>()
+    private var snapshotWorkerStarted = false
+
+    fun enqueueSnapshot(task: suspend () -> Unit) {
+        snapshotQueue.offer(task)
+    }
+
+    fun startSnapshotWorker(scope: kotlinx.coroutines.CoroutineScope) {
+        if (snapshotWorkerStarted) return
+        snapshotWorkerStarted = true
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            while (true) {
+                val task = snapshotQueue.take()
+                try {
+                    task()
+                } catch (e: Exception) {
+                    // 스냅샷 실패해도 큐 계속 처리
+                }
+                kotlinx.coroutines.delay(2000L)
+            }
+        }
+    }
+
     fun tryLockGeneralSnapshot(gallType: String, gallId: String, postNum: String): Boolean {
         return generalSnapshotInProgress.add(gallType + '_' + gallId + '_' + postNum)
     }

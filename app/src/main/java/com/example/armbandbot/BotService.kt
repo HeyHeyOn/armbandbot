@@ -503,6 +503,7 @@ class BotService : Service() {
         botPref: android.content.SharedPreferences
     ) {
         GlobalBotState.initDb(this@BotService)
+        GlobalBotState.startSnapshotWorker(this)
         sendLog("[복구 점검] runBotLoop 시작 완료", botId)
 
         while (isActive) {
@@ -1096,10 +1097,15 @@ class BotService : Service() {
 
         if (config.isExpertMode && config.isSnapshotAll) {
             if (GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
-                try {
-                    capturePrunedSnapshot()
-                } finally {
-                    GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
+                val capturedGallType = gallType
+                val capturedGallId = gallId
+                val capturedPostNumStr = postNumStr
+                GlobalBotState.enqueueSnapshot {
+                    try {
+                        capturePrunedSnapshot()
+                    } finally {
+                        GlobalBotState.unlockGeneralSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
+                    }
                 }
             }
         }
@@ -1888,18 +1894,25 @@ class BotService : Service() {
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
             val existingSnapshot = GlobalBotState.getDb()?.postDao()?.getPost(gallType, gallId, postNumStr)?.snapshotPath
-            val blockSnapshotPath = if (existingSnapshot != null) {
-                existingSnapshot
+            if (existingSnapshot != null) {
+                dbSnapshotPath = existingSnapshot
             } else if (GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                try {
-                    captureBlockSnapshot(botId, gallType, gallId, postNumStr, cookie)
-                } finally {
-                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
+                val capturedBotId = botId
+                val capturedGallType = gallType
+                val capturedGallId = gallId
+                val capturedPostNumStr = postNumStr
+                val capturedCookie = cookie
+                GlobalBotState.enqueueSnapshot {
+                    try {
+                        val path = captureBlockSnapshot(capturedBotId, capturedGallType, capturedGallId, capturedPostNumStr, capturedCookie)
+                        if (path != null) {
+                            GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
+                        }
+                    } finally {
+                        GlobalBotState.unlockBlockSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
+                    }
                 }
-            } else {
-                null
             }
-            dbSnapshotPath = blockSnapshotPath
         }
 
         GlobalBotState.saveBlockHistory(
@@ -2013,18 +2026,25 @@ class BotService : Service() {
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
             val existingSnapshot = GlobalBotState.getDb()?.postDao()?.getPost(gallType, gallId, postNumStr)?.snapshotPath
-            val blockSnapshotPath = if (existingSnapshot != null) {
-                existingSnapshot
+            if (existingSnapshot != null) {
+                dbSnapshotPath = existingSnapshot
             } else if (GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                try {
-                    captureBlockSnapshot(botId, gallType, gallId, postNumStr, cookie)
-                } finally {
-                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
+                val capturedBotId = botId
+                val capturedGallType = gallType
+                val capturedGallId = gallId
+                val capturedPostNumStr = postNumStr
+                val capturedCookie = cookie
+                GlobalBotState.enqueueSnapshot {
+                    try {
+                        val path = captureBlockSnapshot(capturedBotId, capturedGallType, capturedGallId, capturedPostNumStr, capturedCookie)
+                        if (path != null) {
+                            GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
+                        }
+                    } finally {
+                        GlobalBotState.unlockBlockSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
+                    }
                 }
-            } else {
-                null
             }
-            dbSnapshotPath = blockSnapshotPath
         }
 
         GlobalBotState.saveBlockHistory(

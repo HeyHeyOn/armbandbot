@@ -92,6 +92,9 @@ interface PostDao {
     @Query("SELECT * FROM checked_posts ORDER BY checkTime DESC LIMIT 100")
     fun getRecentPosts(): List<CheckedPost>
 
+    @Query("UPDATE checked_posts SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
+    fun updateSnapshotPath(gallType: String, gallId: String, postNum: String, path: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertBlockHistory(history: BlockHistory)
 
