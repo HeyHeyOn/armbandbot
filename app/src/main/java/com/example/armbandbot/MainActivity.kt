@@ -89,6 +89,22 @@ object GlobalBotState {
     val lastCheckedNumbers = mutableMapOf<String, Int>()
     private var db: AppDatabase? = null
 
+    private val generalSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val blockSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    fun tryLockGeneralSnapshot(gallType: String, gallId: String, postNum: String): Boolean {
+        return generalSnapshotInProgress.add(gallType + '_' + gallId + '_' + postNum)
+    }
+    fun unlockGeneralSnapshot(gallType: String, gallId: String, postNum: String) {
+        generalSnapshotInProgress.remove(gallType + '_' + gallId + '_' + postNum)
+    }
+    fun tryLockBlockSnapshot(gallType: String, gallId: String, postNum: String): Boolean {
+        return blockSnapshotInProgress.add(gallType + '_' + gallId + '_' + postNum)
+    }
+    fun unlockBlockSnapshot(gallType: String, gallId: String, postNum: String) {
+        blockSnapshotInProgress.remove(gallType + '_' + gallId + '_' + postNum)
+    }
+
     @Synchronized
     fun initDb(context: Context) {
         if (db == null) {
