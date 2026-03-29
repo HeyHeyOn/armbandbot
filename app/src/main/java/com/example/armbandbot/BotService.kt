@@ -860,16 +860,20 @@ class BotService : Service() {
         gallId: String,
         postNumStr: String,
         cookie: String,
-        debugLabel: String = "스냅샷"
+        debugLabel: String = "스냅샷",
+        existingDoc: org.jsoup.nodes.Document? = null
     ): String? {
         return try {
-            val snapshotUrl = buildSnapshotUrl(gallType, gallId, postNumStr)
-            sendLog("[디버그] $debugLabel 시도 URL: $snapshotUrl", botId)
-
-            val snapshotDoc = Jsoup.connect(snapshotUrl)
-                .userAgent("Mozilla/5.0 (Linux; Android 10; SM-G981B)")
-                .header("Cookie", cookie)
-                .get()
+            val snapshotDoc = if (existingDoc != null) {
+                existingDoc.clone()
+            } else {
+                val snapshotUrl = buildSnapshotUrl(gallType, gallId, postNumStr)
+                sendLog("[디버그] $debugLabel 시도 URL: $snapshotUrl", botId)
+                Jsoup.connect(snapshotUrl)
+                    .userAgent("Mozilla/5.0 (Linux; Android 10; SM-G981B)")
+                    .header("Cookie", cookie)
+                    .get()
+            }
 
             snapshotDoc.select(
                 "header.header, nav.nav, footer.footer, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share"
@@ -1064,34 +1068,34 @@ class BotService : Service() {
         var dbSnapshotPath: String? = null
         var isPostBlocked = false
 
-        fun capturePrunedSnapshot() {
-            if (config.isExpertMode && dbSnapshotPath == null) {
-                val html = buildSnapshotHtml(
-                    botId = botId,
-                    gallType = gallType,
-                    gallId = gallId,
-                    postNumStr = postNumStr,
-                    cookie = cookie,
-                    debugLabel = "스냅샷"
-                ) ?: return
+        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document) {
+            if (!config.isExpertMode || dbSnapshotPath != null) return
+            val html = buildSnapshotHtml(
+                botId = botId,
+                gallType = gallType,
+                gallId = gallId,
+                postNumStr = postNumStr,
+                cookie = cookie,
+                debugLabel = "스냅샷",
+                existingDoc = doc
+            ) ?: return
 
-                try {
-                    val cacheDir = File(cacheDir, "snapshots_$botId")
-                    if (!cacheDir.exists()) cacheDir.mkdirs()
+            try {
+                val cacheDir = File(cacheDir, "snapshots_$botId")
+                if (!cacheDir.exists()) cacheDir.mkdirs()
 
-                    val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
-                    val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
+                val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
+                val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
 
-                    latestFile.writeText(html)
-                    if (!initialFile.exists()) {
-                        initialFile.writeText(html)
-                    }
-
-                    dbSnapshotPath = latestFile.absolutePath
-                } catch (e: Exception) {
-                    Log.e("BotService", "[$botId] snapshot save failed", e)
-                    sendLog("[경고] 스냅샷 파일 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
+                latestFile.writeText(html)
+                if (!initialFile.exists()) {
+                    initialFile.writeText(html)
                 }
+
+                dbSnapshotPath = latestFile.absolutePath
+            } catch (e: Exception) {
+                Log.e("BotService", "[$botId] snapshot save failed", e)
+                sendLog("[경고] 스냅샷 파일 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
             }
         }
 
@@ -1100,9 +1104,10 @@ class BotService : Service() {
                 val capturedGallType = gallType
                 val capturedGallId = gallId
                 val capturedPostNumStr = postNumStr
+                val capturedDoc = postDoc
                 GlobalBotState.enqueueSnapshot {
                     try {
-                        capturePrunedSnapshot()
+                        saveSnapshotFromDoc(capturedDoc)
                         if (dbSnapshotPath != null) {
                             GlobalBotState.getDb()?.postDao()
                                 ?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, dbSnapshotPath!!)

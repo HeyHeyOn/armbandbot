@@ -907,6 +907,19 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             if (url.startsWith("http")) { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))); return true }
                                             return false
                                         }
+                                        override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                                            super.onPageFinished(view, url)
+                                            view?.evaluateJavascript("""
+                                                (function() {
+                                                    ['header.header','nav.nav','.side-box','.ad-wrap','.adv-group','.adv-groupno','.adv-groupin','.ad-md','.pwlink','.con-search-box','.outside-search-box','.view-btm-con','.reco-search','#singoPopup','#blockLayer','#voice_share','#sns_share'].forEach(function(s){document.querySelectorAll(s).forEach(function(e){e.style.display='none';});});
+                                                    document.body.style.maxWidth='100%';
+                                                    document.body.style.fontSize='14px';
+                                                    document.body.style.wordBreak='break-all';
+                                                    document.querySelectorAll('img,video').forEach(function(e){e.style.maxWidth='100%';e.style.height='auto';});
+                                                    document.querySelectorAll('.write_div').forEach(function(e){e.style.lineHeight='1.6';});
+                                                })();
+                                            """.trimIndent(), null)
+                                        }
                                     }
                                 }
                             },
