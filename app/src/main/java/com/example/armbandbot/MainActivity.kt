@@ -93,19 +93,20 @@ object GlobalBotState {
     private val blockSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     // 스냅샷 큐 워커
-    private val snapshotQueue = java.util.concurrent.LinkedBlockingQueue<suspend () -> Unit>()
+    private val snapshotChannel = kotlinx.coroutines.channels.Channel<suspend () -> Unit>(
+        capacity = kotlinx.coroutines.channels.Channel.UNLIMITED
+    )
     private var snapshotWorkerStarted = false
 
     fun enqueueSnapshot(task: suspend () -> Unit) {
-        snapshotQueue.offer(task)
+        snapshotChannel.trySend(task)
     }
 
     fun startSnapshotWorker(scope: kotlinx.coroutines.CoroutineScope) {
         if (snapshotWorkerStarted) return
         snapshotWorkerStarted = true
         scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            while (true) {
-                val task = snapshotQueue.take()
+            for (task in snapshotChannel) {
                 try {
                     task()
                 } catch (e: Exception) {
