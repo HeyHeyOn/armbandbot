@@ -67,6 +67,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
+import com.example.armbandbot.ui.LocalIsDarkMode
 import com.example.armbandbot.ui.theme.MyFirstAppTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -79,10 +80,7 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
 
-// 🌟 글로벌 다크모드 상태를 앱 전체에 전달하기 위한 CompositionLocal 정의
-val LocalIsDarkMode = compositionLocalOf { false }
-
-// Colors moved to ui/BotColors.kt
+// Colors and LocalIsDarkMode moved to ui/ package
 
 
 

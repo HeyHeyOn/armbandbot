@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.armbandbot.ui.LocalIsDarkMode
 import com.example.armbandbot.ui.PastelNavy
 import com.example.armbandbot.ui.PastelNavyLight
 import com.example.armbandbot.ui.botColors
