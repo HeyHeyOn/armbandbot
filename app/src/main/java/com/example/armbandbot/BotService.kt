@@ -1068,8 +1068,8 @@ class BotService : Service() {
         var dbSnapshotPath: String? = null
         var isPostBlocked = false
 
-        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null) {
-            if (!config.isExpertMode) return
+        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null): String? {
+            if (!config.isExpertMode) return null
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
             if (comments != null && comments.length() > 0) {
@@ -1108,7 +1108,11 @@ class BotService : Service() {
 
                     if (vrPlayerTag.isNotEmpty()) {
                         val dcconImg = org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("img").first()
-                        val dcconSrc = dcconImg?.attr("src") ?: ""
+                        val rawSrc = dcconImg?.attr("src") ?: ""
+                        val dcconSrc = when {
+                            rawSrc.startsWith("//") -> "https:$rawSrc"
+                            else -> rawSrc
+                        }
                         if (dcconSrc.isNotEmpty()) {
                             val dcconImgEl = org.jsoup.nodes.Element("img")
                             dcconImgEl.attr("src", dcconSrc)
@@ -1130,9 +1134,9 @@ class BotService : Service() {
                 cookie = cookie,
                 debugLabel = "스냅샷",
                 existingDoc = doc
-            ) ?: return
+            ) ?: return null
 
-            try {
+            return try {
                 val cacheDir = File(cacheDir, "snapshots_$botId")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
 
@@ -1144,10 +1148,11 @@ class BotService : Service() {
                     initialFile.writeText(html)
                 }
 
-                dbSnapshotPath = latestFile.absolutePath
+                latestFile.absolutePath.also { dbSnapshotPath = it }
             } catch (e: Exception) {
                 Log.e("BotService", "[$botId] snapshot save failed", e)
                 sendLog("[경고] 스냅샷 파일 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
+                null
             }
         }
 
@@ -1198,7 +1203,8 @@ class BotService : Service() {
                 suspiciousUrlInPost = suspiciousUrlInPost,
                 spamCodeMatchPost = spamCodeMatchPost,
                 notifyIfEnabled = notifyIfEnabled,
-                debugDetail = postAnalysis.debugDetail
+                debugDetail = postAnalysis.debugDetail,
+                saveSnapshotFn = { saveSnapshotFromDoc(postDoc, commentsArray) }
             )
 
             dbBlockReason = postBlockResult.blockReason
@@ -1271,8 +1277,8 @@ class BotService : Service() {
                             suspiciousUrlInComment = suspiciousUrlInComment,
                             spamCodeMatchComment = spamCodeMatchComment,
                             notifyIfEnabled = notifyIfEnabled,
-                            debugDetail = commentAnalysis.debugDetail
-
+                            debugDetail = commentAnalysis.debugDetail,
+                            saveSnapshotFn = { saveSnapshotFromDoc(postDoc, commentsArray) }
                         )
 
                         dbBlockReason = commentBlockResult.blockReason
@@ -1919,6 +1925,7 @@ class BotService : Service() {
         spamCodeMatchPost: String?,
         notifyIfEnabled: (String, String, String) -> Unit,
         debugDetail: String?,
+        saveSnapshotFn: (() -> String?)? = null,
     ): BlockExecutionResult {
         var dbBlockReason: String? = null
         var dbSnapshotPath: String? = null
@@ -1951,22 +1958,16 @@ class BotService : Service() {
             val existingSnapshot = GlobalBotState.getDb()?.postDao()?.getPost(gallType, gallId, postNumStr)?.snapshotPath
             if (existingSnapshot != null) {
                 dbSnapshotPath = existingSnapshot
-            } else if (GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                val capturedBotId = botId
-                val capturedGallType = gallType
-                val capturedGallId = gallId
-                val capturedPostNumStr = postNumStr
-                val capturedCookie = cookie
-                GlobalBotState.enqueueSnapshot {
-                    try {
-                        val path = captureBlockSnapshot(capturedBotId, capturedGallType, capturedGallId, capturedPostNumStr, capturedCookie)
-                        if (path != null) {
-                            GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
-                            GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
-                        }
-                    } finally {
-                        GlobalBotState.unlockBlockSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
+            } else if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+                try {
+                    val path = saveSnapshotFn()
+                    if (path != null) {
+                        dbSnapshotPath = path
+                        GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
                     }
+                } finally {
+                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
                 }
             }
         }
@@ -2055,6 +2056,7 @@ class BotService : Service() {
         spamCodeMatchComment: String?,
         notifyIfEnabled: (String, String, String) -> Unit,
         debugDetail: String?,
+        saveSnapshotFn: (() -> String?)? = null,
     ): BlockExecutionResult {
         var dbBlockReason: String? = null
         var dbSnapshotPath: String? = null
@@ -2084,22 +2086,16 @@ class BotService : Service() {
             val existingSnapshot = GlobalBotState.getDb()?.postDao()?.getPost(gallType, gallId, postNumStr)?.snapshotPath
             if (existingSnapshot != null) {
                 dbSnapshotPath = existingSnapshot
-            } else if (GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                val capturedBotId = botId
-                val capturedGallType = gallType
-                val capturedGallId = gallId
-                val capturedPostNumStr = postNumStr
-                val capturedCookie = cookie
-                GlobalBotState.enqueueSnapshot {
-                    try {
-                        val path = captureBlockSnapshot(capturedBotId, capturedGallType, capturedGallId, capturedPostNumStr, capturedCookie)
-                        if (path != null) {
-                            GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
-                            GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(capturedGallType, capturedGallId, capturedPostNumStr, path)
-                        }
-                    } finally {
-                        GlobalBotState.unlockBlockSnapshot(capturedGallType, capturedGallId, capturedPostNumStr)
+            } else if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+                try {
+                    val path = saveSnapshotFn()
+                    if (path != null) {
+                        dbSnapshotPath = path
+                        GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
                     }
+                } finally {
+                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
                 }
             }
         }

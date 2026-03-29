@@ -45,6 +45,7 @@ data class SnapshotData(
     val title: String,
     val author: String,
     val date: String,
+    val viewCount: String = "",
     val bodyText: String,
     val imageUrls: List<String>,
     val comments: List<SnapshotComment>,
@@ -59,9 +60,11 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     val writerEl = doc.select(".gall_writer").first()
     val nick = writerEl?.attr("data-nick") ?: ""
     val uid = writerEl?.attr("data-uid") ?: ""
-    val author = if (uid.isNotEmpty()) "$nick($uid)" else nick
+    val ip = writerEl?.attr("data-ip") ?: ""
+    val author = if (uid.isNotEmpty()) "$nick($uid)" else if (ip.isNotEmpty()) "$nick($ip)" else nick
 
     val date = doc.select(".gall_date").first()?.attr("title") ?: ""
+    val viewCount = doc.select(".gall_count").text()
 
     val bodyEl = doc.select(".write_div").first()
     val bodyText = bodyEl?.text() ?: ""
@@ -87,7 +90,12 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     val comments = doc.select("#snapshot-comments .s-cmt").map { el ->
         val isReply = el.hasClass("s-cmt-reply")
         val dcconUrls = el.select("img.s-dccon").mapNotNull { img ->
-            img.attr("src").takeIf { it.startsWith("http") }
+            val src = img.attr("src")
+            when {
+                src.startsWith("http") -> src
+                src.startsWith("//") -> "https:$src"
+                else -> null
+            }
         }
         val contentEl = el.select(".s-cmt-text").first()
         val content = contentEl?.let { p ->
@@ -103,7 +111,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
         )
     }
 
-    return SnapshotData(title, author, date, bodyText, imageUrls, comments, bodyElements)
+    return SnapshotData(title, author, date, viewCount, bodyText, imageUrls, comments, bodyElements)
 }
 
 private fun buildMentionAnnotatedString(text: String, textColor: Color): AnnotatedString = buildAnnotatedString {
@@ -225,6 +233,9 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(d.author, fontSize = 13.sp, color = subTextColor)
                         Text(d.date, fontSize = 13.sp, color = subTextColor)
+                        if (d.viewCount.isNotBlank()) {
+                            Text("조회 ${d.viewCount}", fontSize = 13.sp, color = subTextColor)
+                        }
                     }
                     HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
                 }
