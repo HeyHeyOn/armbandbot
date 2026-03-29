@@ -1,4 +1,4 @@
-package com.example.armbandbot
+package com.heyheyon.armbandbot
 
 import android.content.Context
 import android.content.Intent
@@ -35,9 +35,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import com.example.armbandbot.ui.LocalIsDarkMode
-import com.example.armbandbot.ui.PastelNavy
-import com.example.armbandbot.ui.botColors
+import com.heyheyon.armbandbot.ui.LocalIsDarkMode
+import com.heyheyon.armbandbot.ui.PastelNavy
+import com.heyheyon.armbandbot.ui.botColors
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.roundToInt

@@ -1,5 +1,6 @@
-package com.example.armbandbot
+package com.heyheyon.armbandbot
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,14 +23,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.armbandbot.ui.LocalIsDarkMode
-import com.example.armbandbot.ui.PastelNavy
-import com.example.armbandbot.ui.PastelNavyLight
-import com.example.armbandbot.ui.botColors
+import com.heyheyon.armbandbot.ui.LocalIsDarkMode
+import com.heyheyon.armbandbot.ui.PastelNavy
+import com.heyheyon.armbandbot.ui.PastelNavyLight
+import com.heyheyon.armbandbot.ui.botColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

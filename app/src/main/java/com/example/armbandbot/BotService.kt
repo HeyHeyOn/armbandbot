@@ -1,4 +1,4 @@
-package com.example.armbandbot
+package com.heyheyon.armbandbot
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -137,7 +137,7 @@ class BotService : Service() {
     )
 
     companion object {
-        private const val ACTION_RESTART_BOTS = "com.example.armbandbot.ACTION_RESTART_BOTS"
+        private const val ACTION_RESTART_BOTS = "com.heyheyon.armbandbot.ACTION_RESTART_BOTS"
 
         private val URL_REGEX = Regex("(?i)(?:https?://|www\\.)[-a-zA-Z0-9@:%._+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*)")
         private val SEARCH_PARAM_CLEANER_REGEX = Regex("&s_type=[^&]*|&s_keyword=[^&]*|&search_pos=[^&]*")

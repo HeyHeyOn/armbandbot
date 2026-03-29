@@ -1,4 +1,4 @@
-package com.example.armbandbot
+package com.heyheyon.armbandbot
 
 import android.Manifest
 import android.content.BroadcastReceiver
@@ -67,8 +67,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
-import com.example.armbandbot.ui.LocalIsDarkMode
-import com.example.armbandbot.ui.theme.MyFirstAppTheme
+import com.heyheyon.armbandbot.ui.LocalIsDarkMode
+import com.heyheyon.armbandbot.ui.theme.MyFirstAppTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

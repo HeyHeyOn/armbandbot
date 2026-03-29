@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.armbandbot"
+    namespace = "com.heyheyon.armbandbot"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.armbandbot"
+        applicationId = "com.heyheyon.armbandbot"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -18,10 +18,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("original") {
+            storeFile = file("signing.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("original")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("original")
         }
     }
     compileOptions {

@@ -1,4 +1,4 @@
-package com.example.armbandbot
+package com.heyheyon.armbandbot
 
 import android.content.BroadcastReceiver
 import android.content.Context

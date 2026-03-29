@@ -1,4 +1,4 @@
-package com.example.armbandbot
+package com.heyheyon.armbandbot
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,7 +9,7 @@ class AutoRestartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         Log.d("AutoRestartReceiver", "onReceive 호출됨 / action=${intent?.action}")
 
-        if (intent?.action != "com.example.armbandbot.ACTION_RESTART_BOTS") {
+        if (intent?.action != "com.heyheyon.armbandbot.ACTION_RESTART_BOTS") {
             Log.d("AutoRestartReceiver", "액션 불일치로 종료")
             return
         }

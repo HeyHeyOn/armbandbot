@@ -1,4 +1,4 @@
-package com.example.armbandbot.ui
+package com.heyheyon.armbandbot.ui
 
 import android.webkit.CookieManager
 import android.webkit.WebView

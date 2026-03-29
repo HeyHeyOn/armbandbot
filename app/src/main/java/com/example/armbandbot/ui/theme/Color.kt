@@ -1,4 +1,4 @@
-package com.example.armbandbot.ui.theme
+package com.heyheyon.armbandbot.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,4 +1,4 @@
-package com.example.armbandbot.ui.theme
+package com.heyheyon.armbandbot.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
