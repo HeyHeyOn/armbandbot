@@ -238,7 +238,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         ) { activeSubScreen ->
             if (activeSubScreen != null) {
                 if (activeSubScreen == "DB_DASHBOARD") {
-                    DbDashboardScreen(botId = botId, onBack = { currentSubScreen = null }, onViewSnapshot = { path -> htmlSnapshotPathToView = path })
+                    DbDashboardScreen(botId = botId, onBack = { currentSubScreen = null })
                 } else {
                     Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
                         Row(modifier = Modifier.fillMaxWidth().background(topBarColor).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

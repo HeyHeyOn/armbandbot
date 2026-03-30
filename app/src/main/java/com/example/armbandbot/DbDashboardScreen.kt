@@ -8,6 +8,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import java.io.File
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,7 +44,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DbDashboardScreen(botId: String, onBack: () -> Unit, onViewSnapshot: (String) -> Unit) {
+fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
@@ -76,6 +81,10 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit, onViewSnapshot: (String
 
     var generalPosts by remember { mutableStateOf<List<CheckedPost>>(emptyList()) }
     var blockPosts by remember { mutableStateOf<List<BlockHistory>>(emptyList()) }
+    val generalListState = rememberLazyListState()
+    val blockListState = rememberLazyListState()
+
+    var htmlSnapshotPathToView by remember { mutableStateOf<String?>(null) }
 
     val postDao = GlobalBotState.getDb()?.postDao()
 
@@ -112,6 +121,83 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit, onViewSnapshot: (String
 
     LaunchedEffect(tabIndex, selectedGall, selectedBlockType, sortField, isAscending, searchQuery, generalLimit, blockLimit) {
         if (tabIndex == 0) loadGeneralData() else loadBlockData()
+    }
+
+    if (htmlSnapshotPathToView != null) {
+        var isShowingInitial by remember { mutableStateOf(false) }
+        val currentPath = remember(htmlSnapshotPathToView, isShowingInitial) {
+            if (isShowingInitial && htmlSnapshotPathToView!!.endsWith("_latest.html")) htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html") else htmlSnapshotPathToView!!
+        }
+        val initialFileExists = remember(htmlSnapshotPathToView) {
+            if (htmlSnapshotPathToView!!.endsWith("_latest.html")) File(htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html")).exists() else false
+        }
+
+        Dialog(onDismissRequest = { htmlSnapshotPathToView = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Surface(modifier = Modifier.fillMaxSize(), color = if (isDarkMode) Color.Black else Color.White) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E2329)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Close, contentDescription = "닫기", modifier = Modifier.clickable { htmlSnapshotPathToView = null }.padding(end = 16.dp), tint = Color.White)
+                        Text(text = if (isShowingInitial) "최초 스냅샷 확인" else "최신 스냅샷 뷰어", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                        if (initialFileExists) {
+                            Button(
+                                onClick = { isShowingInitial = !isShowingInitial },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isShowingInitial) Color(0xFFD32F2F) else Color(0xFF7F8C8D)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)
+                            ) { Text(text = if (isShowingInitial) "최신 스냅샷" else "최초 스냅샷", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                        }
+                    }
+                    AndroidView(
+                        factory = { ctx ->
+                            android.webkit.WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.useWideViewPort = true
+                                settings.loadWithOverviewMode = true
+                                settings.setSupportZoom(true)
+                                settings.builtInZoomControls = true
+                                settings.displayZoomControls = false
+                                settings.mediaPlaybackRequiresUserGesture = false
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                    android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                }
+                                webChromeClient = android.webkit.WebChromeClient()
+                                webViewClient = object : android.webkit.WebViewClient() {
+                                    override fun shouldOverrideUrlLoading(view: android.webkit.WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                                        val url = request?.url?.toString() ?: return false
+                                        if (url.startsWith("http")) { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))); return true }
+                                        return false
+                                    }
+                                    override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        view?.evaluateJavascript("""
+                                            (function() {
+                                                ['header.header','nav.nav','.side-box','.ad-wrap','.adv-group','.adv-groupno','.adv-groupin','.ad-md','.pwlink','.con-search-box','.outside-search-box','.view-btm-con','.reco-search','#singoPopup','#blockLayer','#voice_share','#sns_share'].forEach(function(s){document.querySelectorAll(s).forEach(function(e){e.style.display='none';});});
+                                                document.body.style.maxWidth='100%';
+                                                document.body.style.fontSize='14px';
+                                                document.body.style.wordBreak='break-all';
+                                                document.querySelectorAll('img,video').forEach(function(e){e.style.maxWidth='100%';e.style.height='auto';});
+                                                document.querySelectorAll('.write_div').forEach(function(e){e.style.lineHeight='1.6';});
+                                            })();
+                                        """.trimIndent(), null)
+                                    }
+                                }
+                            }
+                        },
+                        update = { webView ->
+                            val file = File(currentPath)
+                            if (file.exists()) {
+                                val htmlData = file.readText()
+                                val parts = file.nameWithoutExtension.split("_")
+                                val spoofedBaseUrl = if (parts.size >= 2) "https://gall.dcinside.com/board/view/?id=${parts[0]}&no=${parts[1]}" else "https://gall.dcinside.com/"
+                                webView.loadDataWithBaseURL(spoofedBaseUrl, htmlData, "text/html", "UTF-8", null)
+                            } else webView.loadDataWithBaseURL(null, "<h3 style='padding:20px; text-align:center;'>스냅샷 파일이 삭제되었거나 존재하지 않습니다.</h3>", "text/html", "UTF-8", null)
+                        },
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    )
+                }
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
@@ -269,11 +355,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit, onViewSnapshot: (String
                     )
                 }
                 else {
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
+                    LazyColumn(state = generalListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
                         items(generalPosts) { post ->
                             val checkTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(post.checkTime))
                             Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (post.snapshotPath != null) onViewSnapshot(post.snapshotPath!!) else Toast.makeText(context, "스냅샷이 기록되지 않은 게시물입니다.", Toast.LENGTH_SHORT).show() },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (post.snapshotPath != null) htmlSnapshotPathToView = post.snapshotPath!! else Toast.makeText(context, "스냅샷이 기록되지 않은 게시물입니다.", Toast.LENGTH_SHORT).show() },
                                 colors = CardDefaults.cardColors(containerColor = cardBgColor)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
@@ -305,12 +391,12 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit, onViewSnapshot: (String
                     )
                 }
                 else {
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
+                    LazyColumn(state = blockListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
                         items(blockPosts) { history ->
                             val blockTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(history.blockTime))
                             val detailedReason = history.blockReason
                             Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) onViewSnapshot(history.snapshotPath!!) else Toast.makeText(context, "스냅샷이 기록되지 않은 게시물입니다.", Toast.LENGTH_SHORT).show() },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) htmlSnapshotPathToView = history.snapshotPath!! else Toast.makeText(context, "스냅샷이 기록되지 않은 게시물입니다.", Toast.LENGTH_SHORT).show() },
                                 colors = CardDefaults.cardColors(containerColor = blockCardBgColor)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
