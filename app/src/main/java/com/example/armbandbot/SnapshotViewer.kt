@@ -1,5 +1,6 @@
 package com.heyheyon.armbandbot
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -89,10 +91,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
 
     val comments = doc.select("#snapshot-comments .s-cmt").map { el ->
         val isReply = el.hasClass("s-cmt-reply")
-        val dcconUrls = el.select("img").filter { img ->
-            val src = img.attr("src")
-            src.contains("dccon.php") || src.contains("dcimg")
-        }.mapNotNull { img ->
+        val dcconUrls = el.select(".s-dccon-wrap img.s-dccon").mapNotNull { img ->
             val src = img.attr("src")
             when {
                 src.startsWith("http") -> src
@@ -101,10 +100,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
             }
         }
         val contentEl = el.select(".s-cmt-text").first()
-        val content = contentEl?.let { p ->
-            p.select("a.mention").forEach { a -> a.replaceWith(org.jsoup.nodes.TextNode(a.text())) }
-            p.text()
-        } ?: ""
+        val content = contentEl?.text() ?: ""
         SnapshotComment(
             author = el.select(".s-cmt-nick").text(),
             date = el.select(".s-cmt-date").text(),
@@ -140,6 +136,8 @@ private fun buildMentionAnnotatedString(text: String, textColor: Color): Annotat
 
 @Composable
 fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
+    BackHandler(enabled = true) { onBack() }
+
     val isDarkMode = LocalIsDarkMode.current
     val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF1F3F5)
     val topBarColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
@@ -299,25 +297,26 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                 Text(comment.date, fontSize = 11.sp, color = subTextColor)
                             }
                             Spacer(Modifier.height(4.dp))
-                            if (comment.dcconUrls.isNotEmpty()) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                ) {
-                                    comment.dcconUrls.forEach { url ->
-                                        AsyncImage(
-                                            model = url,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
-                                }
-                            }
                             if (comment.content.isNotBlank()) {
                                 Text(
                                     buildMentionAnnotatedString(comment.content, textColor),
                                     fontSize = 13.sp
                                 )
+                            }
+                            if (comment.dcconUrls.isNotEmpty()) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    comment.dcconUrls.forEach { url ->
+                                        AsyncImage(
+                                            model = url,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(64.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+                                }
                             }
                         }
                         Spacer(Modifier.height(4.dp))

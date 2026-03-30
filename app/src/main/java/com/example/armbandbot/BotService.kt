@@ -1098,23 +1098,47 @@ class BotService : Service() {
                     dateSpan.addClass("s-cmt-date")
                     dateSpan.text(date)
 
+                    // memo에서 dccon img 추출
+                    val memoDoc = org.jsoup.Jsoup.parseBodyFragment(memo)
+                    val dcconImgs = memoDoc.select("img.written_dccon, img[src*=dccon.php]")
+
                     val textP = org.jsoup.nodes.Element("p")
                     textP.addClass("s-cmt-text")
-                    textP.html(memo)
+                    memoDoc.select("img").remove()
+                    textP.text(memoDoc.body().text())
 
                     cmtDiv.appendChild(nickSpan)
                     cmtDiv.appendChild(dateSpan)
                     cmtDiv.appendChild(textP)
 
-                    if (vrPlayerTag.isNotEmpty()) {
-                        org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("img").forEach { dcconImg ->
+                    // memo의 dccon img 삽입
+                    if (dcconImgs.isNotEmpty()) {
+                        val dcconWrap = org.jsoup.nodes.Element("div")
+                        dcconWrap.addClass("s-dccon-wrap")
+                        dcconImgs.forEach { dcconImg ->
                             val rawSrc = dcconImg.attr("src")
-                            if (rawSrc.contains("dccon.php") || rawSrc.contains("viewimage.php")) {
+                            if (rawSrc.isNotEmpty()) {
                                 val dcconSrc = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
                                 val dcconImgEl = org.jsoup.nodes.Element("img")
                                 dcconImgEl.attr("src", dcconSrc)
                                 dcconImgEl.addClass("s-dccon")
-                                cmtDiv.appendChild(dcconImgEl)
+                                dcconWrap.appendChild(dcconImgEl)
+                            }
+                        }
+                        cmtDiv.appendChild(dcconWrap)
+                    } else if (vrPlayerTag.isNotEmpty()) {
+                        // fallback: vr_player_tag에서 dccon 추출
+                        org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("img").forEach { dcconImg ->
+                            val rawSrc = dcconImg.attr("src")
+                            if (rawSrc.contains("dccon.php") || rawSrc.contains("viewimage.php")) {
+                                val dcconSrc = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
+                                val dcconWrap = org.jsoup.nodes.Element("div")
+                                dcconWrap.addClass("s-dccon-wrap")
+                                val dcconImgEl = org.jsoup.nodes.Element("img")
+                                dcconImgEl.attr("src", dcconSrc)
+                                dcconImgEl.addClass("s-dccon")
+                                dcconWrap.appendChild(dcconImgEl)
+                                cmtDiv.appendChild(dcconWrap)
                             }
                         }
                     }
