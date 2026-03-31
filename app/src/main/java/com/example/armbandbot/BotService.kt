@@ -429,12 +429,13 @@ class BotService : Service() {
 
     private fun String.removeCommentAndTrim() = this.substringBefore("#").trim()
     private fun convertToPcUrl(rawUrl: String): String {
-        var url = rawUrl.trim()
-        val miniMatch = Regex("m\\.dcinside\\.com/mini/([^/?&]+)").find(url)
-        if (miniMatch != null) return "https://gall.dcinside.com/mini/board/lists/?id=${miniMatch.groupValues[1]}"
-        val minorMatch = Regex("m\\.dcinside\\.com/board/([^/?&]+)").find(url)
-        if (minorMatch != null) return "https://gall.dcinside.com/mgallery/board/lists/?id=${minorMatch.groupValues[1]}"
-        return url
+        val url = rawUrl.trim()
+        val idMatch = Regex("id=([^&]+)").find(url) ?: return url
+        val gallId = idMatch.groupValues[1]
+        return if (url.contains("/mini"))
+            "https://gall.dcinside.com/mini/board/lists/?id=$gallId"
+        else
+            "https://gall.dcinside.com/mgallery/board/lists/?id=$gallId"
     }
 
     private fun parseTargetUrl(rawUrl: String): ParsedTargetUrl? {
