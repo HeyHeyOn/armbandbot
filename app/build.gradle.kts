@@ -13,8 +13,8 @@ android {
         applicationId = "com.heyheyon.armbandbot"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "1.0.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -69,6 +69,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     implementation("org.jsoup:jsoup:1.17.2")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")

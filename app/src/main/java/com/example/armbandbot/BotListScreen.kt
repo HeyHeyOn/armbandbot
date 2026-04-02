@@ -120,7 +120,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.0.1", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.0.5", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
             }
