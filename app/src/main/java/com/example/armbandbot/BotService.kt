@@ -912,86 +912,6 @@ class BotService : Service() {
                 "header.header, nav.nav, footer.footer, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share"
             ).remove()
 
-            snapshotDoc.select(".lazy, .dc_mv, .written_dccon, img, video").forEach { element ->
-                var targetUrl = ""
-
-                for (attr in element.attributes()) {
-                    val value = attr.value
-                    if ((value.contains("viewimage.php") || value.contains("dccon.php")) &&
-                        (value.startsWith("http") || value.startsWith("//"))
-                    ) {
-                        targetUrl = value.replace("&amp;", "&")
-                        if (targetUrl.startsWith("//")) targetUrl = "https:$targetUrl"
-                        break
-                    }
-                }
-
-                if (targetUrl.isEmpty()) {
-                    element.select("source").forEach { source ->
-                        for (attr in source.attributes()) {
-                            val value = attr.value
-                            if ((value.contains("viewimage.php") || value.contains("dccon.php")) &&
-                                (value.startsWith("http") || value.startsWith("//"))
-                            ) {
-                                targetUrl = value.replace("&amp;", "&")
-                                if (targetUrl.startsWith("//")) targetUrl = "https:$targetUrl"
-                                break
-                            }
-                        }
-                    }
-                }
-
-                if (targetUrl.isEmpty()) {
-                    val fallback = element.attr("data-original")
-                        .ifEmpty { element.attr("data-src") }
-                        .ifEmpty { element.attr("ori-data") }
-
-                    if (fallback.startsWith("http") && !fallback.contains("base64")) {
-                        targetUrl = fallback.replace("&amp;", "&")
-                    }
-                }
-
-                if (targetUrl.isNotEmpty() && !element.hasAttr("data-bot-processed")) {
-                    val isDccon = element.hasClass("written_dccon") || targetUrl.contains("dccon.php")
-
-                    val containerStyle = if (isDccon) {
-                        "text-align: left; margin: 2px 0;"
-                    } else {
-                        "text-align: center; background-color: #f8f9fa; padding: 4px; border-radius: 8px; margin: 8px 0;"
-                    }
-
-                    val styleBlock = if (isDccon) {
-                        "display: inline-block !important; width: 100px !important; height: 100px !important; margin: 2px;"
-                    } else {
-                        "max-width: 100% !important; height: auto !important; display: block !important; margin: 10px auto;"
-                    }
-
-                    val container = org.jsoup.nodes.Element("div")
-                    container.attr("data-bot-processed", "true")
-                    container.attr("style", containerStyle)
-
-                    val videoTag = org.jsoup.nodes.Element("video")
-                    videoTag.attr("src", targetUrl)
-                    videoTag.attr("controls", "controls")
-                    videoTag.attr("autoplay", "autoplay")
-                    videoTag.attr("loop", "loop")
-                    videoTag.attr("muted", "muted")
-                    videoTag.attr("playsinline", "playsinline")
-                    videoTag.attr("style", styleBlock)
-                    videoTag.attr("onerror", "this.style.display='none'")
-
-                    val imgTag = org.jsoup.nodes.Element("img")
-                    imgTag.attr("src", targetUrl)
-                    imgTag.attr("style", styleBlock)
-                    imgTag.attr("onerror", "this.style.display='none'")
-
-                    container.appendChild(videoTag)
-                    container.appendChild(imgTag)
-
-                    element.replaceWith(container)
-                }
-            }
-
             snapshotDoc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
             snapshotDoc.html()
         } catch (e: Exception) {
@@ -1115,7 +1035,7 @@ class BotService : Service() {
         var dbSnapshotPath: String? = null
         var isPostBlocked = false
 
-        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null): String? {
+        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null, blockedCommentNo: String? = null): String? {
             if (!config.isExpertMode) return null
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
@@ -1133,9 +1053,15 @@ class BotService : Service() {
                     val memo = cmt.optString("memo", "")
                     val vrPlayerTag = cmt.optString("vr_player_tag", "")
 
+                    val no = cmt.optString("no", "")
+
                     val cmtDiv = org.jsoup.nodes.Element("div")
                     cmtDiv.addClass("s-cmt")
                     if (depth == 1) cmtDiv.addClass("s-cmt-reply")
+                    if (blockedCommentNo != null && no == blockedCommentNo) {
+                        cmtDiv.addClass("s-cmt-blocked")
+                        cmtDiv.attr("style", "border-left: 4px solid red; background: #fff0f0;")
+                    }
 
                     val nickSpan = org.jsoup.nodes.Element("span")
                     nickSpan.addClass("s-cmt-nick")
@@ -1192,6 +1118,7 @@ class BotService : Service() {
 
                     commentsDiv.appendChild(cmtDiv)
                 }
+                doc.select(".cmt_list, .cmt-box, #comment_dirc, .reply, .comment_wrap, [class*=cmt_list], [class*=comment_list]").remove()
                 doc.body()?.appendChild(commentsDiv)
             }
 
@@ -1355,7 +1282,10 @@ class BotService : Service() {
                             spamCodeMatchComment = spamCodeMatchComment,
                             notifyIfEnabled = notifyIfEnabled,
                             debugDetail = commentAnalysis.debugDetail,
-                            saveSnapshotFn = { saveSnapshotFromDoc(postDoc, commentsArray) }
+                            saveSnapshotFn = {
+                                val blockCommentNo = commentNo
+                                saveSnapshotFromDoc(postDoc, commentsArray, blockedCommentNo = blockCommentNo)
+                            }
                         )
 
                         dbBlockReason = commentBlockResult.blockReason
