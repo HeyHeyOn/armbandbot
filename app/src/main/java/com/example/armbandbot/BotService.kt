@@ -2032,10 +2032,7 @@ class BotService : Service() {
         )
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
-            val existingSnapshot = GlobalBotState.getDb()?.postDao()?.getPost(gallType, gallId, postNumStr)?.snapshotPath
-            if (existingSnapshot != null) {
-                dbSnapshotPath = existingSnapshot
-            } else if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
                 try {
                     val path = saveSnapshotFn()
                     if (path != null) {
@@ -2166,10 +2163,7 @@ class BotService : Service() {
         )
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
-            val existingSnapshot = GlobalBotState.getDb()?.postDao()?.getPost(gallType, gallId, postNumStr)?.snapshotPath
-            if (existingSnapshot != null) {
-                dbSnapshotPath = existingSnapshot
-            } else if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
                 try {
                     val path = saveSnapshotFn()
                     if (path != null) {
