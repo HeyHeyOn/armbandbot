@@ -1035,7 +1035,7 @@ class BotService : Service() {
         var dbSnapshotPath: String? = null
         var isPostBlocked = false
 
-        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null, blockedCommentNo: String? = null): String? {
+        fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null, blockedCommentNo: String? = null, blockedTs: String? = null): String? {
             if (!config.isExpertMode) return null
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
@@ -1138,16 +1138,21 @@ class BotService : Service() {
                 val cacheDir = File(cacheDir, "snapshots_$botId")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
 
-                val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
-                val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
                 val html = doc.html()
 
-                latestFile.writeText(html)
-                if (!initialFile.exists()) {
-                    initialFile.writeText(html)
+                if (blockedTs != null) {
+                    val blockedFile = File(cacheDir, "${gallId}_${postNumStr}_blocked_${blockedTs}.html")
+                    blockedFile.writeText(html)
+                    blockedFile.absolutePath
+                } else {
+                    val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
+                    val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
+                    latestFile.writeText(html)
+                    if (!initialFile.exists()) {
+                        initialFile.writeText(html)
+                    }
+                    latestFile.absolutePath.also { dbSnapshotPath = it }
                 }
-
-                latestFile.absolutePath.also { dbSnapshotPath = it }
             } catch (e: Exception) {
                 Log.e("BotService", "[$botId] snapshot save failed", e)
                 sendLog("[경고] 스냅샷 파일 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
@@ -1203,7 +1208,10 @@ class BotService : Service() {
                 spamCodeMatchPost = spamCodeMatchPost,
                 notifyIfEnabled = notifyIfEnabled,
                 debugDetail = postAnalysis.debugDetail,
-                saveSnapshotFn = { saveSnapshotFromDoc(postDoc, commentsArray) }
+                saveSnapshotFn = {
+                    val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                    saveSnapshotFromDoc(postDoc, commentsArray, blockedTs = ts)
+                }
             )
 
             dbBlockReason = postBlockResult.blockReason
@@ -1286,8 +1294,8 @@ class BotService : Service() {
                             notifyIfEnabled = notifyIfEnabled,
                             debugDetail = commentAnalysis.debugDetail,
                             saveSnapshotFn = {
-                                val blockCommentNo = commentNo
-                                saveSnapshotFromDoc(postDoc, commentsArray, blockedCommentNo = blockCommentNo)
+                                val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                saveSnapshotFromDoc(postDoc, commentsArray, blockedCommentNo = commentNo, blockedTs = ts)
                             }
                         )
 
@@ -2031,21 +2039,8 @@ class BotService : Service() {
                 try {
                     val path = saveSnapshotFn()
                     if (path != null) {
-                        dbSnapshotPath = path
-                        GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
-                        var blockedPath: String? = null
-                        try {
-                            val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                            val srcFile = File(path)
-                            val blockedFile = srcFile.parentFile?.let {
-                                File(it, "${gallId}_${postNumStr}_blocked_${ts}.html")
-                            }
-                            blockedFile?.writeText(srcFile.readText())
-                            blockedPath = blockedFile?.absolutePath
-                        } catch (e: Exception) { /* 무시 */ }
-                        val snapshotForHistory = blockedPath ?: path
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, snapshotForHistory)
-                        blockHistorySnapshotPath = snapshotForHistory
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
+                        blockHistorySnapshotPath = path
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
@@ -2178,21 +2173,8 @@ class BotService : Service() {
                 try {
                     val path = saveSnapshotFn()
                     if (path != null) {
-                        dbSnapshotPath = path
-                        GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
-                        var blockedPath: String? = null
-                        try {
-                            val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                            val srcFile = File(path)
-                            val blockedFile = srcFile.parentFile?.let {
-                                File(it, "${gallId}_${postNumStr}_blocked_${ts}.html")
-                            }
-                            blockedFile?.writeText(srcFile.readText())
-                            blockedPath = blockedFile?.absolutePath
-                        } catch (e: Exception) { /* 무시 */ }
-                        val snapshotForHistory = blockedPath ?: path
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, snapshotForHistory)
-                        blockHistorySnapshotPath = snapshotForHistory
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
+                        blockHistorySnapshotPath = path
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
