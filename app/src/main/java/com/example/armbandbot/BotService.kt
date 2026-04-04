@@ -1039,13 +1039,23 @@ class BotService : Service() {
             if (!config.isExpertMode) return null
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
-            // 1. 광고/네비/헤더 등 불필요 요소 제거 (댓글 영역은 건드리지 않음)
+            // 1. 광고/네비/헤더 등 불필요 요소 제거
             doc.select(
                 "header.header, nav.nav, footer.footer, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share"
             ).remove()
             doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
-            // 2. commentsArray로 별도 styled HTML 블록 생성
+            // 2. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments는 제외)
+            doc.select(".cmt_wrap, .cmt_write, #cmt_write, .reply, .reply_box, [id*=cmt], [class*=cmt_write], [class*=comment_write], .view_reply, #reply_w")
+                .filter { it.id() != "bot-comments" && !it.parents().any { p -> p.id() == "bot-comments" } }
+                .forEach { it.remove() }
+
+            // 3. 댓글 API JS 요청 차단 (comment/cmt/reply_w 포함 script 제거)
+            doc.select("script").filter {
+                it.html().contains("comment") || it.html().contains("cmt") || it.html().contains("reply_w")
+            }.forEach { it.remove() }
+
+            // 4. commentsArray로 별도 styled HTML 블록 생성
             if (comments != null && comments.length() > 0) {
                 doc.select("#bot-comments").remove()
                 val botCommentsDiv = org.jsoup.nodes.Element("div")
@@ -1127,13 +1137,13 @@ class BotService : Service() {
                     botCommentsDiv.appendChild(cmtDiv)
                 }
 
-                // 3. view_content_wrap 또는 body 맨 마지막에 삽입
+                // 5. view_content_wrap 또는 body 맨 마지막에 삽입
                 val anchor = doc.selectFirst(".view_content_wrap, #container, .view-container")
                 if (anchor != null) anchor.appendChild(botCommentsDiv)
                 else doc.body()?.appendChild(botCommentsDiv)
             }
 
-            // 4. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
+            // 6. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
             return try {
                 val cacheDir = File(cacheDir, "snapshots_$botId")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
