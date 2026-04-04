@@ -417,7 +417,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         items(generalPosts) { post ->
                             val checkTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(post.checkTime))
                             Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (post.snapshotPath != null) htmlSnapshotPathToView = post.snapshotPath!! else Toast.makeText(context, "스냅샷이 기록되지 않은 게시물입니다.", Toast.LENGTH_SHORT).show() },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (post.snapshotPath != null) htmlSnapshotPathToView = post.snapshotPath!! else Toast.makeText(context, "스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
                                 colors = CardDefaults.cardColors(containerColor = cardBgColor)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
@@ -462,7 +462,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                             val blockTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(history.blockTime))
                             val detailedReason = history.blockReason
                             Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) htmlSnapshotPathToView = history.snapshotPath!! else Toast.makeText(context, "스냅샷이 기록되지 않은 게시물입니다.", Toast.LENGTH_SHORT).show() },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) htmlSnapshotPathToView = history.snapshotPath!! else Toast.makeText(context, "차단 스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
                                 colors = CardDefaults.cardColors(containerColor = blockCardBgColor)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {

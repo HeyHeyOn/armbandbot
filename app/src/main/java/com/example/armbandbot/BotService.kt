@@ -1996,6 +1996,7 @@ class BotService : Service() {
     ): BlockExecutionResult {
         var dbBlockReason: String? = null
         var dbSnapshotPath: String? = null
+        var blockHistorySnapshotPath: String? = null
 
         val presentation = buildPostBlockPresentation(
             postNumStr = postNumStr,
@@ -2031,7 +2032,7 @@ class BotService : Service() {
                     if (path != null) {
                         dbSnapshotPath = path
                         GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
+                        var blockedPath: String? = null
                         try {
                             val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                             val srcFile = File(path)
@@ -2039,7 +2040,11 @@ class BotService : Service() {
                                 File(it, "${gallId}_${postNumStr}_blocked_${ts}.html")
                             }
                             blockedFile?.writeText(srcFile.readText())
+                            blockedPath = blockedFile?.absolutePath
                         } catch (e: Exception) { /* 무시 */ }
+                        val snapshotForHistory = blockedPath ?: path
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, snapshotForHistory)
+                        blockHistorySnapshotPath = snapshotForHistory
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
@@ -2055,7 +2060,7 @@ class BotService : Service() {
             targetAuthor = postDisplayAuthor,
             targetContent = postTitle,
             blockReason = dbBlockReason ?: "알 수 없음",
-            snapshotPath = dbSnapshotPath,
+            snapshotPath = blockHistorySnapshotPath ?: dbSnapshotPath,
             creationDate = postDate
         )
 
@@ -2141,6 +2146,7 @@ class BotService : Service() {
     ): BlockExecutionResult {
         var dbBlockReason: String? = null
         var dbSnapshotPath: String? = null
+        var blockHistorySnapshotPath: String? = null
 
         val presentation = buildCommentBlockPresentation(
             cmtDisplayAuthor = cmtDisplayAuthor,
@@ -2173,7 +2179,7 @@ class BotService : Service() {
                     if (path != null) {
                         dbSnapshotPath = path
                         GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
+                        var blockedPath: String? = null
                         try {
                             val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                             val srcFile = File(path)
@@ -2181,7 +2187,11 @@ class BotService : Service() {
                                 File(it, "${gallId}_${postNumStr}_blocked_${ts}.html")
                             }
                             blockedFile?.writeText(srcFile.readText())
+                            blockedPath = blockedFile?.absolutePath
                         } catch (e: Exception) { /* 무시 */ }
+                        val snapshotForHistory = blockedPath ?: path
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, snapshotForHistory)
+                        blockHistorySnapshotPath = snapshotForHistory
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
@@ -2197,7 +2207,7 @@ class BotService : Service() {
             targetAuthor = cmtDisplayAuthor,
             targetContent = commentMemo,
             blockReason = dbBlockReason ?: "알 수 없음",
-            snapshotPath = dbSnapshotPath,
+            snapshotPath = blockHistorySnapshotPath ?: dbSnapshotPath,
             creationDate = commentDate
         )
 
