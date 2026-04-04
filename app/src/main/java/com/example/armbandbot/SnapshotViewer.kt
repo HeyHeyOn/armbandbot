@@ -186,12 +186,23 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
         val isBlocked = li.hasClass("dc-blocked-cmt")
 
         val hasVr = infoDiv.select("iframe[src*=voice], .voice_wrap").isNotEmpty()
-        val mentionText = infoDiv.selectFirst("a.mention")?.text() ?: ""
+        // a.mention은 p.usertxt 안에 있을 수 있으므로, p 전체 파싱 후 mention 따로 분리
         val pEl = infoDiv.selectFirst("p.usertxt")
-        val rawText = if (pEl != null) {
-            val modHtml = pEl.html().replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
-            Jsoup.parseBodyFragment(modHtml).body()?.text()?.replace("⏎", "\n") ?: pEl.text()
-        } else ""
+        val mentionText: String
+        val rawText: String
+        if (pEl != null) {
+            val pClone = pEl.clone()
+            // mention 추출 후 제거해서 중복 방지
+            val mentionEl = pClone.selectFirst("a.mention")
+            mentionText = mentionEl?.text()?.trim() ?: ""
+            mentionEl?.remove()
+            val modHtml = pClone.html().replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
+            rawText = (Jsoup.parseBodyFragment(modHtml).body()?.text()?.replace("⏎", "\n") ?: pClone.text()).trim()
+        } else {
+            // p.usertxt 없는 경우 (디시콘만/보이스리플만): mention을 txtbox에서 직접 찾음
+            mentionText = infoDiv.selectFirst("a.mention")?.text()?.trim() ?: ""
+            rawText = ""
+        }
         val textContent = when {
             mentionText.isNotEmpty() && rawText.isNotEmpty() -> "$mentionText $rawText"
             mentionText.isNotEmpty() -> mentionText

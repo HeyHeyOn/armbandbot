@@ -1095,9 +1095,7 @@ class BotService : Service() {
 .reply.show{display:block!important}
 .reply_list{display:block!important}
 .reply_list li.ub-content{display:block!important}
-li.dc-blocked-cmt{background:#fff5f5!important;border-left:3px solid #D32F2F!important}
-html.darkmode li.dc-blocked-cmt{background:#3b1a1a!important;border-left-color:#ef5350!important}
-.dc-blocked-label{color:#D32F2F;font-weight:bold;font-size:12px;margin-left:4px}
+/* 차단 강조는 스냅샷 뷰어에서만 표시 */
 .voice_wrap iframe{max-width:100%}
 img.written_dccon{max-width:80px;max-height:80px}
 </style>""")
@@ -1241,12 +1239,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         } else {
                             pEl.html(bodyText)
                         }
-                        if (isBlocked) {
-                            val bl = org.jsoup.nodes.Element("span")
-                            bl.addClass("dc-blocked-label")
-                            bl.text(" [차단됨]")
-                            pEl.appendChild(bl)
-                        }
+                        // 차단 표시는 HTML에 넣지 않음 (뷰어에서만 표시)
                         txtBox.appendChild(pEl)
                     }
                     return txtBox
@@ -1271,7 +1264,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         // li.ub-content > div.cmt_info.clear
                         val li = org.jsoup.nodes.Element("li")
                         li.addClass("ub-content")
-                        if (isBlocked) li.addClass("dc-blocked-cmt")
+                        // 차단 강조 HTML 표시 제거
                         li.attr("id", "comment_li_$no")
                         li.attr("style", "display:block")
 
@@ -1333,7 +1326,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                                 val rLi = org.jsoup.nodes.Element("li")
                                 rLi.addClass("ub-content")
-                                if (rBlocked) rLi.addClass("dc-blocked-cmt")
+                                // 차단 강조 HTML 표시 제거
                                 rLi.attr("id", "reply_li_$rNo")
                                 rLi.attr("style", "display:block")
 
