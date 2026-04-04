@@ -152,55 +152,43 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     )
 
     if (htmlSnapshotPathToView != null) {
-        var isShowingInitial by remember { mutableStateOf(false) }
-        var isShowingBlocked by remember { mutableStateOf(false) }
-        val blockedFile = remember(htmlSnapshotPathToView) {
-            if (htmlSnapshotPathToView!!.endsWith("_latest.html")) {
-                val latestFile = File(htmlSnapshotPathToView!!)
-                val dir = latestFile.parentFile ?: return@remember null
-                val base = latestFile.nameWithoutExtension.removeSuffix("_latest")
-                dir.listFiles { f -> f.name.startsWith("${base}_blocked_") && f.name.endsWith(".html") }
-                    ?.maxByOrNull { it.lastModified() }
-            } else null
+        val isBlockedSnapshot = htmlSnapshotPathToView!!.contains("_blocked_")
+        val isLatestSnapshot = htmlSnapshotPathToView!!.endsWith("_latest.html")
+        var snapshotTabIndex by remember { mutableStateOf(0) }
+        val initialFileExists = remember(htmlSnapshotPathToView) {
+            if (isLatestSnapshot) File(htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html")).exists() else false
         }
-        val currentPath = remember(htmlSnapshotPathToView, isShowingInitial, isShowingBlocked) {
+        val currentPath = remember(htmlSnapshotPathToView, snapshotTabIndex) {
             when {
-                isShowingBlocked && blockedFile != null -> blockedFile.absolutePath
-                isShowingInitial && htmlSnapshotPathToView!!.endsWith("_latest.html") -> htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html")
+                isBlockedSnapshot -> htmlSnapshotPathToView!!
+                snapshotTabIndex == 1 -> htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html")
                 else -> htmlSnapshotPathToView!!
             }
-        }
-        val initialFileExists = remember(htmlSnapshotPathToView) {
-            if (htmlSnapshotPathToView!!.endsWith("_latest.html")) File(htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html")).exists() else false
         }
 
         Dialog(onDismissRequest = { htmlSnapshotPathToView = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Surface(modifier = Modifier.fillMaxSize(), color = if (isDarkMode) Color.Black else Color.White) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E2329)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Close, contentDescription = "닫기", modifier = Modifier.clickable { htmlSnapshotPathToView = null }.padding(end = 16.dp), tint = Color.White)
+                    Row(modifier = Modifier.fillMaxWidth().background(topBarColor).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Close, contentDescription = "닫기", modifier = Modifier.clickable { htmlSnapshotPathToView = null }.padding(end = 16.dp), tint = PastelNavy)
                         Text(
-                            text = when {
-                                isShowingBlocked -> "차단 시점 스냅샷"
-                                isShowingInitial -> "최초 스냅샷 확인"
-                                else -> "최신 스냅샷 뷰어"
-                            },
-                            fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f)
+                            text = if (isBlockedSnapshot) "차단 시점 스냅샷" else "스냅샷 뷰어",
+                            fontWeight = FontWeight.Bold, color = textColor, fontSize = 18.sp, modifier = Modifier.weight(1f)
                         )
-                        if (blockedFile != null) {
-                            Button(
-                                onClick = { isShowingBlocked = !isShowingBlocked; if (isShowingBlocked) isShowingInitial = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = if (isShowingBlocked) Color(0xFFD32F2F) else Color(0xFFBF360C)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)
-                            ) { Text(text = if (isShowingBlocked) "최신 스냅샷" else "차단 스냅샷", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        if (initialFileExists) {
-                            Button(
-                                onClick = { isShowingInitial = !isShowingInitial; if (isShowingInitial) isShowingBlocked = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = if (isShowingInitial) Color(0xFFD32F2F) else Color(0xFF7F8C8D)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)
-                            ) { Text(text = if (isShowingInitial) "최신 스냅샷" else "최초 스냅샷", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                    }
+                    if (isLatestSnapshot) {
+                        TabRow(selectedTabIndex = snapshotTabIndex, containerColor = topBarColor, contentColor = PastelNavy) {
+                            Tab(
+                                selected = snapshotTabIndex == 0,
+                                onClick = { snapshotTabIndex = 0 },
+                                text = { Text("최신 스냅샷", fontWeight = FontWeight.Bold, color = if (snapshotTabIndex == 0) PastelNavy else subTextColor) }
+                            )
+                            Tab(
+                                selected = snapshotTabIndex == 1,
+                                onClick = { if (initialFileExists) snapshotTabIndex = 1 },
+                                enabled = initialFileExists,
+                                text = { Text("최초 스냅샷", fontWeight = FontWeight.Bold, color = if (snapshotTabIndex == 1) PastelNavy else subTextColor) }
+                            )
                         }
                     }
                     AndroidView(

@@ -1047,6 +1047,7 @@ class BotService : Service() {
 
             // 2. commentsArray로 별도 styled HTML 블록 생성
             if (comments != null && comments.length() > 0) {
+                doc.select("#bot-comments").remove()
                 val botCommentsDiv = org.jsoup.nodes.Element("div")
                 botCommentsDiv.attr("id", "bot-comments")
                 botCommentsDiv.attr("style", "max-width:760px;margin:32px auto;padding:16px;border-top:3px solid #4A6583;font-family:system-ui,sans-serif;")
