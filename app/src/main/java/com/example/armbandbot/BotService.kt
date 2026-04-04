@@ -431,12 +431,24 @@ class BotService : Service() {
     private fun String.removeCommentAndTrim() = this.substringBefore("#").trim()
     private fun convertToPcUrl(rawUrl: String): String {
         val url = rawUrl.trim()
-        val idMatch = Regex("id=([^&]+)").find(url) ?: return url
-        val gallId = idMatch.groupValues[1]
-        return if (url.contains("/mini"))
-            "https://gall.dcinside.com/mini/board/lists/?id=$gallId"
-        else
-            "https://gall.dcinside.com/mgallery/board/lists/?id=$gallId"
+        val idMatch = Regex("id=([^&]+)").find(url)
+        if (idMatch != null) {
+            val gallId = idMatch.groupValues[1]
+            return if (url.contains("/mini/"))
+                "https://gall.dcinside.com/mini/board/lists/?id=$gallId"
+            else
+                "https://gall.dcinside.com/mgallery/board/lists/?id=$gallId"
+        }
+        // id= 파라미터 없을 때: 경로 마지막 세그먼트를 gallId로 추출
+        val pathMatch = Regex("gall\\.dcinside\\.com/([^?#]+)").find(url) ?: return url
+        val segments = pathMatch.groupValues[1].trimEnd('/').split("/").filter { it.isNotEmpty() }
+        if (segments.isEmpty()) return url
+        val lastSegment = segments.last()
+        return when {
+            url.contains("/mini/") -> "https://gall.dcinside.com/mini/board/lists/?id=$lastSegment"
+            url.contains("/mgallery/") || url.contains("/board/") -> "https://gall.dcinside.com/mgallery/board/lists/?id=$lastSegment"
+            else -> url
+        }
     }
 
     private fun parseTargetUrl(rawUrl: String): ParsedTargetUrl? {
@@ -1132,11 +1144,28 @@ class BotService : Service() {
                     // memo에서 dccon img 추출 후 텍스트와 이미지 분리
                     val memoDoc = org.jsoup.Jsoup.parseBodyFragment(memo)
                     val dcconImgs = memoDoc.select("img.written_dccon, img[src*=dccon.php]")
+                    // @멘션 추출 (a.mention 또는 @로 시작하는 텍스트)
+                    val mentionEls = memoDoc.select("a.mention")
+                    val mentionTexts = mentionEls.map { el ->
+                        val t = el.text().trim()
+                        if (t.startsWith("@")) t else "@$t"
+                    }
+                    mentionEls.remove()
                     memoDoc.select("img").remove()
 
                     val textP = org.jsoup.nodes.Element("p")
                     textP.addClass("usertxt")
-                    textP.text(memoDoc.body().text())
+                    val bodyText = memoDoc.body().text().trim()
+                    if (mentionTexts.isNotEmpty()) {
+                        val mentionLine = mentionTexts.joinToString(" ")
+                        textP.appendText(mentionLine)
+                        if (bodyText.isNotEmpty()) {
+                            textP.append("<br/>")
+                            textP.appendText(bodyText)
+                        }
+                    } else {
+                        textP.text(bodyText)
+                    }
                     if (isBlocked) {
                         val blockedSpan = org.jsoup.nodes.Element("span")
                         blockedSpan.attr("style", "color:#D32F2F;font-weight:bold;margin-left:4px;")
@@ -1198,7 +1227,7 @@ class BotService : Service() {
                 viewCommentDiv.attr("style", "display:block;")
                 commentWrap.attr("style", "display:block;")
                 cmtList.attr("style", "display:block;")
-                doc.head().append("""<style>
+                doc.body()?.append("""<style>
 .view_comment, .comment_wrap, .cmt_list { display:block !important; }
 .cmt_list li { display:block !important; }
 </style>""")

@@ -155,8 +155,13 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
                     }
                 }
                 else -> {
-                    val text = child.text()
+                    // <br> 태그를 \n으로 변환하여 줄바꿈 보존
+                    val rawHtml = child.html()
+                        .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
+                    val tempBody = Jsoup.parseBodyFragment(rawHtml).body()
+                    val text = tempBody?.text()?.replace("⏎", "\n") ?: child.text()
                     if (text.isNotBlank()) add(BodyElement.TextElement(text))
+                    else add(BodyElement.TextElement("")) // 빈 단락 구분용
                 }
             }
         }
@@ -188,7 +193,17 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
         val baseContent = when {
             dcconImgs.isNotEmpty() -> "[디시콘]"
             hasDcconInSrc -> "[디시콘]"
-            else -> contentWrap.select("p.usertxt").text().ifEmpty { contentWrap.text() }
+            else -> {
+                    val pEl = contentWrap.select("p.usertxt").first()
+                    if (pEl != null) {
+                        val modHtml = pEl.html()
+                            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
+                        val tempBody = Jsoup.parseBodyFragment(modHtml).body()
+                        (tempBody?.text()?.replace("⏎", "\n") ?: pEl.text()).ifEmpty { contentWrap.text() }
+                    } else {
+                        contentWrap.text()
+                    }
+                }
         }
         // 수정3: 보이스리플이면 기존 텍스트에 추가 (교체 아님, 이미 포함된 경우 그대로)
         val content = if (hasVr) {
@@ -366,12 +381,17 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
 
                     items(d.bodyElements) { element ->
                         when (element) {
-                            is BodyElement.TextElement -> Text(
-                                element.text,
-                                fontSize = 14.sp,
-                                lineHeight = 22.4.sp,
-                                color = textColor
-                            )
+                            is BodyElement.TextElement -> if (element.text.isEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                            } else {
+                                Text(
+                                    element.text,
+                                    fontSize = 14.sp,
+                                    lineHeight = 22.4.sp,
+                                    color = textColor,
+                                    softWrap = true
+                                )
+                            }
                             is BodyElement.ImageElement -> if (element.isDccon) {
                                 AsyncImage(
                                     model = element.url,
