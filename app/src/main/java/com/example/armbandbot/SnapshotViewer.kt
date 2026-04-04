@@ -170,92 +170,71 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     var lastDepth0Index: Int? = null
     val comments = mutableListOf<SnapshotComment>()
 
-    // bot-comment-block 구조(bc-* 클래스) 우선 파싱, 없으면 기존 cmt_list 구조 fallback
-    val commentItems = doc.select("#bot-comment-block li.bc-item").let {
-        if (it.isNotEmpty()) it else doc.select("ul.cmt_list > li.ub-content")
-    }
-    val isBotBlock = doc.selectFirst("#bot-comment-block") != null
+    // DC 원본 구조 파싱: 상위댓글(cmt_info) + 답글(reply_info) 모두 수집
+    // li.ub-content[id^=comment_li] → 상위댓글
+    // li.ub-content[id^=reply_li] → 답글
+    fun parseDcLi(li: Element, isReply: Boolean, idx: Int): SnapshotComment? {
+        val infoDiv = li.selectFirst(".cmt_info, .reply_info") ?: return null
+        val nickEl = infoDiv.selectFirst(".gall_writer")
+        val nick = nickEl?.attr("data-nick") ?: infoDiv.selectFirst(".nickname em")?.text() ?: ""
+        val uid = nickEl?.attr("data-uid") ?: ""
+        val ip = nickEl?.attr("data-ip") ?: ""
+        if (nick == "댓글돌이" && uid.isEmpty() && ip.isEmpty()) return null
+        val ipUid = uid.ifEmpty { ip }
+        val commentAuthor = if (ipUid.isNotEmpty()) "$nick($ipUid)" else nick
+        val commentDate = infoDiv.selectFirst(".date_time")?.text() ?: ""
+        val isBlocked = li.hasClass("dc-blocked-cmt")
 
-    commentItems.forEachIndexed { idx, li ->
-        if (isBotBlock) {
-            // bc-* 구조 파싱
-            val isReply = li.hasClass("reply")
-            val isBlocked = li.hasClass("bc-blocked")
-            val nick_c = li.select(".bc-nick").text()
-            val ipUid = li.select(".bc-ip").text()
-            if (nick_c == "댓글돌이" && ipUid.isEmpty()) {
-                if (!isReply) lastDepth0Index = idx
-                return@forEachIndexed
+        val hasVr = infoDiv.select("iframe[src*=voice], .voice_wrap").isNotEmpty()
+        val mentionText = infoDiv.selectFirst("a.mention")?.text() ?: ""
+        val pEl = infoDiv.selectFirst("p.usertxt")
+        val rawText = if (pEl != null) {
+            val modHtml = pEl.html().replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
+            Jsoup.parseBodyFragment(modHtml).body()?.text()?.replace("⏎", "\n") ?: pEl.text()
+        } else ""
+        val textContent = when {
+            mentionText.isNotEmpty() && rawText.isNotEmpty() -> "$mentionText $rawText"
+            mentionText.isNotEmpty() -> mentionText
+            else -> rawText
+        }
+        val dcconUrls = infoDiv.select("img.written_dccon, img[src*=dccon.php]").mapNotNull { img ->
+            val src = img.attr("src").ifEmpty { img.attr("data-src") }
+            when { src.startsWith("http") -> src; src.startsWith("//") -> "https:$src"; else -> null }
+        }.distinct()
+        val content = when {
+            hasVr && textContent.isBlank() -> "[🔊 보이스리플]"
+            hasVr -> "$textContent\n[🔊 보이스리플]"
+            else -> textContent
+        }
+        return SnapshotComment(
+            author = commentAuthor, date = commentDate, content = content,
+            isReply = isReply, isBlocked = isBlocked,
+            dcconUrls = dcconUrls, commentIndex = idx, parentIndex = if (isReply) lastDepth0Index else null
+        )
+    }
+
+    var cmtIdx = 0
+    // 상위댓글: ul.cmt_list > li[id^=comment_li]
+    // 답글: ul.reply_list > li[id^=reply_li]
+    doc.select(".cmt_list").forEach { cmt_list ->
+        cmt_list.children().forEach { child ->
+            // 상위댓글 li
+            val commentLi = if (child.tagName() == "li" && child.id().startsWith("comment_li")) child else null
+            if (commentLi != null) {
+                parseDcLi(commentLi, false, cmtIdx)?.let {
+                    lastDepth0Index = cmtIdx
+                    comments.add(it)
+                    cmtIdx++
+                }
             }
-            val commentAuthor = if (ipUid.isNotEmpty()) "$nick_c($ipUid)" else nick_c
-            val commentDate = li.select(".bc-date").text()
-            // 텍스트: p.bc-text
-            val pEl = li.select("p.bc-text").first()
-            val textContent = if (pEl != null) {
-                val modHtml = pEl.html().replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
-                val tempBody = Jsoup.parseBodyFragment(modHtml).body()
-                tempBody?.text()?.replace("⏎", "\n") ?: pEl.text()
-            } else li.text()
-            // dccon
-            val extractedDcconUrls = li.select("img.bc-dccon").mapNotNull { img ->
-                val src = img.attr("src").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-                when { src.startsWith("http") -> src; src.startsWith("//") -> "https:$src"; else -> null }
-            }.distinct()
-            // 보이스리플: iframe 존재 여부로 표시 (뷰어는 "[🔊 보이스리플]" 텍스트)
-            val hasVr = li.select("iframe[src*=voice]").isNotEmpty()
-            val content = when {
-                hasVr && textContent.isBlank() -> "[🔊 보이스리플]"
-                hasVr -> "$textContent\n[🔊 보이스리플]"
-                else -> textContent
+            // 답글 묶음 li (div.reply.show 포함)
+            val replyListLis = child.select("ul.reply_list > li.ub-content")
+            replyListLis.forEach { rLi ->
+                parseDcLi(rLi, true, cmtIdx)?.let {
+                    comments.add(it)
+                    cmtIdx++
+                }
             }
-            val parentIdx = if (isReply) lastDepth0Index else null
-            if (!isReply) lastDepth0Index = idx
-            comments.add(SnapshotComment(
-                author = commentAuthor, date = commentDate, content = content,
-                isReply = isReply, isBlocked = isBlocked,
-                dcconUrls = extractedDcconUrls, commentIndex = idx, parentIndex = parentIdx
-            ))
-        } else {
-            // 기존 cmt_list 구조 파싱 (fallback)
-            val isReply = li.hasClass("reply_cont")
-            val liStyle = li.attr("style")
-            val isBlocked = liStyle.contains("fff5f5", ignoreCase = true) || liStyle.contains("D32F2F", ignoreCase = true)
-            val nick_c = li.select(".info_lay .nickname em").text()
-            val ipUid = li.select(".info_lay .ip").text()
-            if (nick_c == "댓글돌이" && ipUid.isEmpty()) {
-                if (!isReply) lastDepth0Index = idx
-                return@forEachIndexed
-            }
-            val commentAuthor = if (ipUid.isNotEmpty()) "$nick_c($ipUid)" else nick_c
-            val commentDate = li.select(".info_lay .date_time").text()
-            val contentWrap = li.select(".usertxt.ub-word")
-            val memoHtml = li.html()
-            val hasVr = contentWrap.select("iframe[src*=voice], span.voice-reple-text").isNotEmpty()
-                || memoHtml.contains("voice_wrap") || memoHtml.contains("voice/player")
-            val pEl = contentWrap.select("p.usertxt").first()
-            val textContent = if (pEl != null) {
-                val modHtml = pEl.html().replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
-                val tempBody = Jsoup.parseBodyFragment(modHtml).body()
-                (tempBody?.text()?.replace("⏎", "\n") ?: pEl.text()).ifEmpty { contentWrap.text() }
-            } else contentWrap.text()
-            val extractedDcconUrls = (contentWrap.select("img.s-dccon") + contentWrap.select("img.written_dccon") +
-                contentWrap.select("img").filter { it.attr("src").contains("dccon.php") })
-                .mapNotNull { img ->
-                    val src = img.attr("src").takeIf { it.isNotEmpty() } ?: img.attr("data-src").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-                    when { src.startsWith("http") -> src; src.startsWith("//") -> "https:$src"; else -> null }
-                }.distinct()
-            val content = when {
-                hasVr && textContent.isBlank() -> "[🔊 보이스리플]"
-                hasVr -> "$textContent\n[🔊 보이스리플]"
-                else -> textContent
-            }
-            val parentIdx = if (isReply) lastDepth0Index else null
-            if (!isReply) lastDepth0Index = idx
-            comments.add(SnapshotComment(
-                author = commentAuthor, date = commentDate, content = content,
-                isReply = isReply, isBlocked = isBlocked,
-                dcconUrls = extractedDcconUrls, commentIndex = idx, parentIndex = parentIdx
-            ))
         }
     }
 
