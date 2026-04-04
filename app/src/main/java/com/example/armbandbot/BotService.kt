@@ -1087,6 +1087,7 @@ class BotService : Service() {
                     val date = cmt.optString("reg_date", "")
                     val memo = cmt.optString("memo", "")
                     val vrPlayerTag = cmt.optString("vr_player_tag", "")
+                    val isVoiceReple = memo.contains("voice_wrap") || memo.contains("voice/player") || vrPlayerTag.isNotEmpty()
                     val no = cmt.optString("no", "")
                     val isBlocked = blockedCommentNo != null && no == blockedCommentNo
 
@@ -1144,6 +1145,15 @@ class BotService : Service() {
                     }
                     usertxtDiv.appendChild(textP)
 
+                    // 보이스리플 span 삽입 (p.usertxt 다음)
+                    if (isVoiceReple) {
+                        val voiceSpan = org.jsoup.nodes.Element("span")
+                        voiceSpan.addClass("voice-reple-text")
+                        voiceSpan.attr("style", "display:inline-block;background:#f0f4ff;border-radius:4px;padding:2px 8px;font-size:12px;color:#4A6583;margin-top:4px;")
+                        voiceSpan.text("[🔊 보이스리플]")
+                        usertxtDiv.appendChild(voiceSpan)
+                    }
+
                     // dccon 이미지 삽입 (p 다음에 img 태그)
                     if (dcconImgs.isNotEmpty()) {
                         dcconImgs.forEach { dcconImg ->
@@ -1183,6 +1193,15 @@ class BotService : Service() {
                 commentWrap.appendChild(commentCount)
                 commentWrap.appendChild(cmtList)
                 viewCommentDiv.appendChild(commentWrap)
+
+                // 댓글창 display:block 인라인 스타일 강제 적용 (디시 CSS 오버라이드)
+                viewCommentDiv.attr("style", "display:block;")
+                commentWrap.attr("style", "display:block;")
+                cmtList.attr("style", "display:block;")
+                doc.head().append("""<style>
+.view_comment, .comment_wrap, .cmt_list { display:block !important; }
+.cmt_list li { display:block !important; }
+</style>""")
 
                 // 5. .view_comment 또는 #focus_cmt가 있으면 replaceWith, 없으면 기존 위치 로직
                 val existingComment = doc.selectFirst(".view_comment") ?: doc.getElementById("focus_cmt")

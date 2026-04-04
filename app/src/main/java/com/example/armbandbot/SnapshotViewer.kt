@@ -180,7 +180,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
         val contentWrap = li.select(".usertxt.ub-word")
         val memoHtml = li.html()
         // 수정3: memo(li HTML) 및 vr_player_tag 포함 여부도 체크
-        val hasVr = contentWrap.select(".vr_player, .vr_player_tag, div.voice_wrap, iframe[src*=voice/player]").isNotEmpty()
+        val hasVr = contentWrap.select(".vr_player, .vr_player_tag, div.voice_wrap, iframe[src*=voice/player], span.voice-reple-text").isNotEmpty()
             || contentWrap.html().contains("voice_wrap") || contentWrap.html().contains("voice/player")
             || memoHtml.contains("voice_wrap") || memoHtml.contains("voice/player")
         val dcconImgs = contentWrap.select("img.written_dccon")
@@ -190,9 +190,13 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
             hasDcconInSrc -> "[디시콘]"
             else -> contentWrap.select("p.usertxt").text().ifEmpty { contentWrap.text() }
         }
-        // 수정3: 보이스리플이면 기존 텍스트에 추가 (교체 아님)
+        // 수정3: 보이스리플이면 기존 텍스트에 추가 (교체 아님, 이미 포함된 경우 그대로)
         val content = if (hasVr) {
-            if (baseContent.isBlank()) "[보이스리플]" else "$baseContent\n[보이스리플]"
+            when {
+                baseContent.contains("[🔊 보이스리플]") -> baseContent
+                baseContent.isBlank() -> "[🔊 보이스리플]"
+                else -> "$baseContent\n[🔊 보이스리플]"
+            }
         } else baseContent
         val parentIdx = if (isReply) lastDepth0Index else null
         if (!isReply) lastDepth0Index = idx
