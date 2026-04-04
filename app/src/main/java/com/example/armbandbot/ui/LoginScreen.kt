@@ -76,7 +76,7 @@ fun BotLoginScreen(
                             }
 
                             view?.evaluateJavascript(
-                                "(function() { return document.body.innerText.includes('로그아웃'); })();"
+                                "(function() { var t = document.body.innerText; return t.includes('로그아웃') || t.includes('비밀번호 변경') || t.includes('30일 후') || t.includes('나중에 변경') || t.includes('비밀번호를 변경'); })();"
                             ) { result ->
                                 if (result == "true") {
                                     val c = CookieManager.getInstance().getCookie("https://dcinside.com")
@@ -277,7 +277,7 @@ fun BotLoginScreen(
                                 }
 
                                 view?.evaluateJavascript(
-                                    "(function() { return document.body.innerText.includes('로그아웃'); })();"
+                                    "(function() { var t = document.body.innerText; return t.includes('로그아웃') || t.includes('비밀번호 변경') || t.includes('30일 후') || t.includes('나중에 변경') || t.includes('비밀번호를 변경'); })();"
                                 ) { result ->
                                     if (result == "true") {
                                         handler.removeCallbacks(timeoutRunnable)
