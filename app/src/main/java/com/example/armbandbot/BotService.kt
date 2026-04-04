@@ -1058,24 +1058,24 @@ class BotService : Service() {
             ).remove()
             doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
-            // 2. 외부 CSS 링크 제거 및 최소 필요 스타일 직접 삽입
-            doc.select("link[rel=stylesheet]").remove()
-            doc.head().append("""<style>
-body{font-family:sans-serif;background:#fff;color:#333}
-.view_comment,.comment_wrap,.cmt_list{display:block!important}
-.cmt_list li{display:block!important;padding:8px 0;border-bottom:1px solid #eee}
-.inner.clear{display:flex;flex-direction:column;gap:4px}
-.info_lay{font-size:12px;color:#888}
-.nickname em{font-weight:bold;color:#333;font-style:normal}
-.ip{color:#aaa;margin-left:4px}
-.date_time{color:#aaa;margin-left:8px}
-.usertxt.ub-word{padding:4px 0}
-p.usertxt{margin:0;line-height:1.5}
-.voice-reple-text{display:inline-block;background:#f0f4ff;border-radius:4px;padding:2px 8px;font-size:12px;color:#4A6583}
-.write_div{max-width:100%;overflow:hidden}
-img{max-width:100%;height:auto}
-.written_dccon{width:80px;height:80px}
-.voice_wrap iframe{max-width:100%}
+            // 2. 외부 CSS는 유지 (원본 디자인 보존), body 끝에 강제 오버라이드 스타일만 추가
+            doc.body()?.append("""<style>
+/* 댓글창 강제 표시 */
+.view_comment,.comment_wrap,.cmt_list{display:block!important;visibility:visible!important;opacity:1!important}
+.view_comment *,.comment_wrap *{visibility:visible!important}
+.cmt_list>.ub-content{display:block!important}
+/* 다크모드 댓글 닉네임/날짜 텍스트 밝게 */
+html.darkmode .cmt_list .nickname em{color:#8bb8f0!important}
+html.darkmode .cmt_list .ip{color:#7a9ec0!important}
+html.darkmode .cmt_list .date_time{color:#7a9ec0!important}
+html.darkmode .cmt_list .usertxt{color:#d0d8e8!important}
+html.darkmode .cmt_list .info_lay{color:#8faec8!important}
+/* 보이스리플 뱃지 */
+.voice-reple-text{display:inline-block!important}
+/* 디시콘 이미지 크기 */
+img.s-dccon{width:60px;height:60px;display:inline-block!important}
+/* 본문 이미지 */
+.write_div img{max-width:100%;height:auto}
 </style>""")
 
             // 3. 모든 script 제거 (JS 간섭 방지)
