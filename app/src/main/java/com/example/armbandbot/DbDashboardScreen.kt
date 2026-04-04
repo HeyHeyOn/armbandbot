@@ -318,7 +318,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                         Text("[${post.gallId}] 글 번호: ${post.postNum} (${post.gallType})", fontWeight = FontWeight.Bold, color = PastelNavy)
-                                        Text("댓글: ${post.commentCount}", fontSize = 12.sp, color = PastelNavy)
+                                        Text("댓글: ${post.commentCount.toString().split('/').firstOrNull()?.trim() ?: post.commentCount.toString()}", fontSize = 12.sp, color = PastelNavy)
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                     if (post.title != null) Text("제목: ${post.title}", fontSize = 14.sp, color = textColor, maxLines = 2, overflow = TextOverflow.Ellipsis)

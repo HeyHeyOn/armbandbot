@@ -125,7 +125,9 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     val bodyElements: List<BodyElement> = buildList {
         bodyEl?.children()?.forEach { child ->
             if (child.hasClass("vr_player") || child.hasClass("vr_player_tag") ||
-                child.select(".vr_player, .vr_player_tag").isNotEmpty()
+                child.hasClass("voice_wrap") ||
+                child.select(".vr_player, .vr_player_tag, div.voice_wrap, iframe[src*=voice/player]").isNotEmpty() ||
+                child.html().contains("voice/player")
             ) {
                 add(BodyElement.TextElement("[보이스리플]"))
                 return@forEach
@@ -158,13 +160,15 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     var lastDepth0Index: Int? = null
     val comments = doc.select("ul.cmt_list > li.ub-content").mapIndexed { idx, li ->
         val isReply = li.hasClass("reply_cont")
-        val isBlocked = li.hasClass("s-cmt-blocked")
+        val liStyle = li.attr("style")
+        val isBlocked = liStyle.contains("fff5f5", ignoreCase = true) || liStyle.contains("D32F2F", ignoreCase = true)
         val nick_c = li.select(".info_lay .nickname em").text()
         val ipUid = li.select(".info_lay .ip").text()
         val commentAuthor = if (ipUid.isNotEmpty()) "$nick_c($ipUid)" else nick_c
         val commentDate = li.select(".info_lay .date_time").text()
         val contentWrap = li.select(".usertxt.ub-word")
-        val hasVr = contentWrap.select(".vr_player, .vr_player_tag").isNotEmpty()
+        val hasVr = contentWrap.select(".vr_player, .vr_player_tag, div.voice_wrap, iframe[src*=voice/player]").isNotEmpty()
+            || contentWrap.html().contains("voice_wrap") || contentWrap.html().contains("voice/player")
         val dcconImgs = contentWrap.select("img.written_dccon")
         val hasDcconInSrc = contentWrap.select("img").any { it.attr("src").contains("dccon.php") }
         val content = when {
@@ -464,7 +468,14 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                             settings.builtInZoomControls = true
                             settings.displayZoomControls = false
                             webViewClient = WebViewClient()
-                            loadUrl("file://$currentPath")
+                            val html = try { File(currentPath).readText() } catch (e: Exception) { "<html><body>파일을 읽을 수 없습니다.</body></html>" }
+                            val fileName = File(currentPath).name
+                            val noSuffix = fileName.removeSuffix("_initial.html").removeSuffix("_latest.html")
+                            val lastUnderscore = noSuffix.lastIndexOf('_')
+                            val extractedGallId = if (lastUnderscore > 0) noSuffix.substring(0, lastUnderscore) else noSuffix
+                            val extractedPostNum = if (lastUnderscore > 0) noSuffix.substring(lastUnderscore + 1) else ""
+                            val baseUrl = "https://gall.dcinside.com/board/view/?id=$extractedGallId&no=$extractedPostNum"
+                            loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
                         }
                     },
                     modifier = Modifier.fillMaxSize()
