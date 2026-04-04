@@ -1058,7 +1058,30 @@ class BotService : Service() {
             ).remove()
             doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
-            // 2. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments / .view_comment는 제외)
+            // 2. 외부 CSS 링크 제거 및 최소 필요 스타일 직접 삽입
+            doc.select("link[rel=stylesheet]").remove()
+            doc.head().append("""<style>
+body{font-family:sans-serif;background:#fff;color:#333}
+.view_comment,.comment_wrap,.cmt_list{display:block!important}
+.cmt_list li{display:block!important;padding:8px 0;border-bottom:1px solid #eee}
+.inner.clear{display:flex;flex-direction:column;gap:4px}
+.info_lay{font-size:12px;color:#888}
+.nickname em{font-weight:bold;color:#333;font-style:normal}
+.ip{color:#aaa;margin-left:4px}
+.date_time{color:#aaa;margin-left:8px}
+.usertxt.ub-word{padding:4px 0}
+p.usertxt{margin:0;line-height:1.5}
+.voice-reple-text{display:inline-block;background:#f0f4ff;border-radius:4px;padding:2px 8px;font-size:12px;color:#4A6583}
+.write_div{max-width:100%;overflow:hidden}
+img{max-width:100%;height:auto}
+.written_dccon{width:80px;height:80px}
+.voice_wrap iframe{max-width:100%}
+</style>""")
+
+            // 3. 모든 script 제거 (JS 간섭 방지)
+            doc.select("script").remove()
+
+            // 4. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments / .view_comment는 제외)
             doc.select(".cmt_wrap, .cmt_write, #cmt_write, .reply_box, [class*=cmt_write], [class*=comment_list], .view_reply, #reply_w")
                 .filter { el ->
                     el.id() != "bot-comments" &&
@@ -1066,11 +1089,6 @@ class BotService : Service() {
                     !el.parents().any { p -> p.id() == "bot-comments" }
                 }
                 .forEach { it.remove() }
-
-            // 3. 댓글 API JS 요청 차단 (comment/cmt/reply_w 포함 script 제거)
-            doc.select("script").filter {
-                it.html().contains("comment") || it.html().contains("cmt") || it.html().contains("reply_w")
-            }.forEach { it.remove() }
 
             // 4. commentsArray로 디시 구조 HTML 블록 생성 (항상 view_comment 교체)
             run {
@@ -1227,10 +1245,6 @@ class BotService : Service() {
                 viewCommentDiv.attr("style", "display:block;")
                 commentWrap.attr("style", "display:block;")
                 cmtList.attr("style", "display:block;")
-                doc.body()?.append("""<style>
-.view_comment, .comment_wrap, .cmt_list { display:block !important; }
-.cmt_list li { display:block !important; }
-</style>""")
 
                 // 5. .view_comment 또는 #focus_cmt가 있으면 replaceWith, 없으면 기존 위치 로직
                 val existingComment = doc.selectFirst(".view_comment") ?: doc.getElementById("focus_cmt")

@@ -184,28 +184,35 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
         val commentDate = li.select(".info_lay .date_time").text()
         val contentWrap = li.select(".usertxt.ub-word")
         val memoHtml = li.html()
-        // 수정3: memo(li HTML) 및 vr_player_tag 포함 여부도 체크
+        // 보이스리플 여부 체크
         val hasVr = contentWrap.select(".vr_player, .vr_player_tag, div.voice_wrap, iframe[src*=voice/player], span.voice-reple-text").isNotEmpty()
             || contentWrap.html().contains("voice_wrap") || contentWrap.html().contains("voice/player")
             || memoHtml.contains("voice_wrap") || memoHtml.contains("voice/player")
-        val dcconImgs = contentWrap.select("img.written_dccon")
-        val hasDcconInSrc = contentWrap.select("img").any { it.attr("src").contains("dccon.php") }
-        val baseContent = when {
-            dcconImgs.isNotEmpty() -> "[디시콘]"
-            hasDcconInSrc -> "[디시콘]"
-            else -> {
-                    val pEl = contentWrap.select("p.usertxt").first()
-                    if (pEl != null) {
-                        val modHtml = pEl.html()
-                            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
-                        val tempBody = Jsoup.parseBodyFragment(modHtml).body()
-                        (tempBody?.text()?.replace("⏎", "\n") ?: pEl.text()).ifEmpty { contentWrap.text() }
-                    } else {
-                        contentWrap.text()
-                    }
-                }
+        // p.usertxt 텍스트 추출 (멘션 포함, @로 시작하는 텍스트도 유지)
+        val pEl = contentWrap.select("p.usertxt").first()
+        val textContent = if (pEl != null) {
+            val modHtml = pEl.html()
+                .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
+            val tempBody = Jsoup.parseBodyFragment(modHtml).body()
+            (tempBody?.text()?.replace("⏎", "\n") ?: pEl.text()).ifEmpty { contentWrap.text() }
+        } else {
+            contentWrap.text()
         }
-        // 수정3: 보이스리플이면 기존 텍스트에 추가 (교체 아님, 이미 포함된 경우 그대로)
+        // img.s-dccon src 추출 -> dcconUrls
+        val extractedDcconUrls = (contentWrap.select("img.s-dccon") + contentWrap.select("img.written_dccon") +
+            contentWrap.select("img").filter { it.attr("src").contains("dccon.php") })
+            .mapNotNull { img ->
+                val src = img.attr("src").takeIf { it.isNotEmpty() }
+                    ?: img.attr("data-src").takeIf { it.isNotEmpty() }
+                    ?: return@mapNotNull null
+                when {
+                    src.startsWith("http") -> src
+                    src.startsWith("//") -> "https:$src"
+                    else -> null
+                }
+            }.distinct()
+        val baseContent = textContent
+        // 보이스리플이면 기존 텍스트에 추가
         val content = if (hasVr) {
             when {
                 baseContent.contains("[🔊 보이스리플]") -> baseContent
@@ -221,7 +228,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
             content = content,
             isReply = isReply,
             isBlocked = isBlocked,
-            dcconUrls = emptyList(),
+            dcconUrls = extractedDcconUrls,
             commentIndex = idx,
             parentIndex = parentIdx
         ))
@@ -488,7 +495,6 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                             Text(comment.date, fontSize = 11.sp, color = subTextColor)
                                         }
                                         Spacer(Modifier.height(4.dp))
-                                        // 수정1: 차단 댓글도 실제 content 표시 (강조 스타일은 유지)
                                         if (comment.content.isNotBlank()) {
                                             Text(
                                                 buildMentionAnnotatedString(
@@ -496,6 +502,13 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                                     textColor
                                                 ),
                                                 fontSize = 13.sp
+                                            )
+                                        }
+                                        if (comment.dcconUrls.isNotEmpty()) {
+                                            Text(
+                                                "[디시콘]",
+                                                fontSize = 13.sp,
+                                                color = Color(0xFF4A6583)
                                             )
                                         }
                                     }
