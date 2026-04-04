@@ -1,5 +1,7 @@
 package com.heyheyon.armbandbot
 
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
@@ -22,17 +25,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import java.io.File
 
 sealed class BodyElement {
     data class TextElement(val text: String) : BodyElement()
-    data class ImageElement(val url: String) : BodyElement()
+    data class ImageElement(val url: String, val isDccon: Boolean = false) : BodyElement()
 }
 
 data class SnapshotComment(
@@ -40,19 +45,63 @@ data class SnapshotComment(
     val date: String,
     val content: String,
     val isReply: Boolean = false,
-    val dcconUrls: List<String> = emptyList()
+    val isBlocked: Boolean = false,
+    val dcconUrls: List<String> = emptyList(),
+    val commentIndex: Int = 0,
+    val parentIndex: Int? = null
 )
 
 data class SnapshotData(
-    val title: String,
-    val author: String,
-    val date: String,
+    val title: String = "",
+    val author: String = "",
+    val date: String = "",
     val viewCount: String = "",
-    val bodyText: String,
-    val imageUrls: List<String>,
-    val comments: List<SnapshotComment>,
-    val bodyElements: List<BodyElement> = emptyList()
+    val bodyElements: List<BodyElement> = emptyList(),
+    val comments: List<SnapshotComment> = emptyList()
 )
+
+enum class CommentSort { ORIGINAL, LATEST, REPLIES }
+
+private fun sortComments(comments: List<SnapshotComment>, sort: CommentSort): List<SnapshotComment> {
+    val depth0 = comments.filter { !it.isReply }
+    val depth1 = comments.filter { it.isReply }
+    val repliesByParent = depth1.groupBy { it.parentIndex }
+    return when (sort) {
+        CommentSort.ORIGINAL -> comments
+        CommentSort.LATEST -> {
+            val result = mutableListOf<SnapshotComment>()
+            depth0.reversed().forEach { parent ->
+                result.add(parent)
+                repliesByParent[parent.commentIndex]?.forEach { result.add(it) }
+            }
+            result
+        }
+        CommentSort.REPLIES -> {
+            val result = mutableListOf<SnapshotComment>()
+            val sorted = depth0.sortedWith(
+                compareByDescending<SnapshotComment> { repliesByParent[it.commentIndex]?.size ?: 0 }
+                    .thenBy { it.commentIndex }
+            )
+            sorted.forEach { parent ->
+                result.add(parent)
+                repliesByParent[parent.commentIndex]?.forEach { result.add(it) }
+            }
+            result
+        }
+    }
+}
+
+private fun resolveImgSrc(img: Element): String? {
+    val src = img.attr("src").takeIf { it.isNotEmpty() }
+        ?: img.attr("data-original").takeIf { it.isNotEmpty() }
+        ?: img.attr("data-src").takeIf { it.isNotEmpty() }
+        ?: return null
+    return when {
+        src.startsWith("http") -> src
+        src.startsWith("//") -> "https:$src"
+        else -> null
+    }
+}
 
 fun parseSnapshot(htmlPath: String): SnapshotData {
     val doc = Jsoup.parse(File(htmlPath), "UTF-8")
@@ -63,54 +112,82 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     val nick = writerEl?.attr("data-nick") ?: ""
     val uid = writerEl?.attr("data-uid") ?: ""
     val ip = writerEl?.attr("data-ip") ?: ""
-    val author = if (uid.isNotEmpty()) "$nick($uid)" else if (ip.isNotEmpty()) "$nick($ip)" else nick
+    val author = when {
+        uid.isNotEmpty() -> "$nick($uid)"
+        ip.isNotEmpty() -> "$nick($ip)"
+        else -> nick
+    }
 
     val date = doc.select(".gall_date").first()?.attr("title") ?: ""
     val viewCount = Regex("[0-9,]+").find(doc.select(".gall_count").text())?.value ?: ""
 
     val bodyEl = doc.select(".write_div").first()
-    val bodyText = bodyEl?.text() ?: ""
-
-    val imageUrls = bodyEl?.select("img")?.mapNotNull { img ->
-        val src = img.attr("src").ifEmpty { img.attr("data-original") }
-        src.takeIf { it.startsWith("http") }
-    } ?: emptyList()
-
-    val bodyElements: List<BodyElement> = bodyEl?.children()?.flatMap { child ->
-        val imgs = child.select("img")
-        if (imgs.isNotEmpty()) {
-            imgs.mapNotNull { img ->
-                val src = img.attr("src").ifEmpty { img.attr("data-original") }
-                src.takeIf { it.startsWith("http") }?.let { BodyElement.ImageElement(it) }
+    val bodyElements: List<BodyElement> = buildList {
+        bodyEl?.children()?.forEach { child ->
+            if (child.hasClass("vr_player") || child.hasClass("vr_player_tag") ||
+                child.select(".vr_player, .vr_player_tag").isNotEmpty()
+            ) {
+                add(BodyElement.TextElement("[보이스리플]"))
+                return@forEach
             }
-        } else {
-            val text = child.text()
-            if (text.isNotBlank()) listOf(BodyElement.TextElement(text)) else emptyList()
-        }
-    } ?: emptyList()
-
-    val comments = doc.select("#snapshot-comments .s-cmt").map { el ->
-        val isReply = el.hasClass("s-cmt-reply")
-        val dcconUrls = el.select(".s-dccon-wrap img.s-dccon").mapNotNull { img ->
-            val src = img.attr("src")
+            val dccons = child.select("img.written_dccon")
+            val allImgs = child.select("img")
             when {
-                src.startsWith("http") -> src
-                src.startsWith("//") -> "https:$src"
-                else -> null
+                dccons.isNotEmpty() -> dccons.forEach { img ->
+                    val alt = img.attr("alt").takeIf { it.isNotEmpty() } ?: "디시콘"
+                    add(BodyElement.TextElement("[디시콘: $alt]"))
+                }
+                allImgs.isNotEmpty() -> allImgs.forEach { img ->
+                    val src = img.attr("src").ifEmpty { img.attr("data-original") }
+                        .ifEmpty { img.attr("data-src") }
+                    if (src.contains("dccon.php")) {
+                        val alt = img.attr("alt").takeIf { it.isNotEmpty() } ?: "디시콘"
+                        add(BodyElement.TextElement("[디시콘: $alt]"))
+                    } else {
+                        resolveImgSrc(img)?.let { add(BodyElement.ImageElement(it, isDccon = false)) }
+                    }
+                }
+                else -> {
+                    val text = child.text()
+                    if (text.isNotBlank()) add(BodyElement.TextElement(text))
+                }
             }
         }
-        val contentEl = el.select(".s-cmt-text").first()
-        val content = contentEl?.text() ?: ""
+    }
+
+    var lastDepth0Index: Int? = null
+    val comments = doc.select("ul.cmt_list > li.ub-content").mapIndexed { idx, li ->
+        val isReply = li.hasClass("reply_cont")
+        val isBlocked = li.hasClass("s-cmt-blocked")
+        val nick_c = li.select(".info_lay .nickname em").text()
+        val ipUid = li.select(".info_lay .ip").text()
+        val commentAuthor = if (ipUid.isNotEmpty()) "$nick_c($ipUid)" else nick_c
+        val commentDate = li.select(".info_lay .date_time").text()
+        val contentWrap = li.select(".usertxt.ub-word")
+        val hasVr = contentWrap.select(".vr_player, .vr_player_tag").isNotEmpty()
+        val dcconImgs = contentWrap.select("img.written_dccon")
+        val hasDcconInSrc = contentWrap.select("img").any { it.attr("src").contains("dccon.php") }
+        val content = when {
+            hasVr -> "[보이스리플]"
+            dcconImgs.isNotEmpty() -> "[디시콘]"
+            hasDcconInSrc -> "[디시콘]"
+            else -> contentWrap.select("p.usertxt").text().ifEmpty { contentWrap.text() }
+        }
+        val parentIdx = if (isReply) lastDepth0Index else null
+        if (!isReply) lastDepth0Index = idx
         SnapshotComment(
-            author = el.select(".s-cmt-nick").text(),
-            date = el.select(".s-cmt-date").text(),
+            author = commentAuthor,
+            date = commentDate,
             content = content,
             isReply = isReply,
-            dcconUrls = dcconUrls
+            isBlocked = isBlocked,
+            dcconUrls = emptyList(),
+            commentIndex = idx,
+            parentIndex = parentIdx
         )
     }
 
-    return SnapshotData(title, author, date, viewCount, bodyText, imageUrls, comments, bodyElements)
+    return SnapshotData(title, author, date, viewCount, bodyElements, comments)
 }
 
 private fun buildMentionAnnotatedString(text: String, textColor: Color): AnnotatedString = buildAnnotatedString {
@@ -122,21 +199,20 @@ private fun buildMentionAnnotatedString(text: String, textColor: Color): Annotat
                 append(text.substring(lastIndex, match.range.first))
             }
         }
-        withStyle(SpanStyle(color = PastelNavy)) {
-            append(match.value)
-        }
+        withStyle(SpanStyle(color = PastelNavy)) { append(match.value) }
         lastIndex = match.range.last + 1
     }
     if (lastIndex < text.length) {
-        withStyle(SpanStyle(color = textColor)) {
-            append(text.substring(lastIndex))
-        }
+        withStyle(SpanStyle(color = textColor)) { append(text.substring(lastIndex)) }
     }
 }
 
 @Composable
 fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
+    var showWebView by remember { mutableStateOf(false) }
+
     BackHandler(enabled = true) { onBack() }
+    BackHandler(enabled = showWebView) { showWebView = false }
 
     val isDarkMode = LocalIsDarkMode.current
     val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF1F3F5)
@@ -157,6 +233,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
 
     var currentPath by remember { mutableStateOf(snapshotPath) }
     var data by remember { mutableStateOf<SnapshotData?>(null) }
+    var sortOption by remember { mutableStateOf(CommentSort.ORIGINAL) }
 
     LaunchedEffect(currentPath) {
         data = null
@@ -165,83 +242,85 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(topBarColor)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Filled.ArrowBack,
-                contentDescription = "뒤로",
-                modifier = Modifier.clickable { onBack() }.padding(end = 16.dp),
-                tint = PastelNavy
-            )
-            Text("스냅샷 뷰어", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
-        }
+    val displayComments = remember(data, sortOption) {
+        val comments = data?.comments ?: emptyList()
+        sortComments(comments, sortOption)
+    }
 
-        if (hasInitial) {
-            val isShowingLatest = currentPath.endsWith("_latest.html")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(topBarColor)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(
-                    onClick = { if (isShowingLatest) currentPath = initialPath!! },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (!isShowingLatest) PastelNavy else Color.Gray.copy(alpha = 0.2f),
-                        contentColor = if (!isShowingLatest) Color.White else textColor
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("최초 스냅샷", fontSize = 13.sp)
-                }
-                Button(
-                    onClick = { if (!isShowingLatest) currentPath = snapshotPath },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isShowingLatest) PastelNavy else Color.Gray.copy(alpha = 0.2f),
-                        contentColor = if (isShowingLatest) Color.White else textColor
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("최신 스냅샷", fontSize = 13.sp)
-                }
-            }
-        }
-
-        if (data == null) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = PastelNavy
+                Icon(
+                    Icons.Filled.ArrowBack,
+                    contentDescription = "뒤로",
+                    modifier = Modifier.clickable { onBack() }.padding(end = 16.dp),
+                    tint = PastelNavy
                 )
-            }
-        } else {
-            val d = data!!
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    Text(d.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(d.author, fontSize = 13.sp, color = subTextColor)
-                        Text(d.date, fontSize = 13.sp, color = subTextColor)
-                        if (d.viewCount.isNotBlank()) {
-                            Text("조회 ${d.viewCount}", fontSize = 13.sp, color = subTextColor)
-                        }
-                    }
-                    HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
+                Text("스냅샷 뷰어", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { showWebView = true }) {
+                    Text("원본 HTML", color = PastelNavy, fontSize = 13.sp)
                 }
+            }
 
-                if (d.bodyElements.isNotEmpty()) {
+            if (hasInitial) {
+                val isShowingLatest = currentPath.endsWith("_latest.html")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(topBarColor)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { if (isShowingLatest) currentPath = initialPath!! },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (!isShowingLatest) PastelNavy else Color.Gray.copy(alpha = 0.2f),
+                            contentColor = if (!isShowingLatest) Color.White else textColor
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("최초 스냅샷", fontSize = 13.sp) }
+                    Button(
+                        onClick = { if (!isShowingLatest) currentPath = snapshotPath },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isShowingLatest) PastelNavy else Color.Gray.copy(alpha = 0.2f),
+                            contentColor = if (isShowingLatest) Color.White else textColor
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("최신 스냅샷", fontSize = 13.sp) }
+                }
+            }
+
+            if (data == null) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = PastelNavy)
+                }
+            } else {
+                val d = data!!
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        Text(d.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(d.author, fontSize = 13.sp, color = subTextColor)
+                            Text(d.date, fontSize = 13.sp, color = subTextColor)
+                            if (d.viewCount.isNotBlank()) {
+                                Text("조회 ${d.viewCount}", fontSize = 13.sp, color = subTextColor)
+                            }
+                        }
+                        HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
+                    }
+
                     items(d.bodyElements) { element ->
                         when (element) {
                             is BodyElement.TextElement -> Text(
@@ -250,78 +329,146 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                 lineHeight = 22.4.sp,
                                 color = textColor
                             )
-                            is BodyElement.ImageElement -> AsyncImage(
-                                model = element.url,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                } else {
-                    item {
-                        Text(d.bodyText, fontSize = 14.sp, lineHeight = 22.4.sp, color = textColor)
-                    }
-                    items(d.imageUrls) { url ->
-                        AsyncImage(
-                            model = url,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-
-                if (d.comments.isNotEmpty()) {
-                    item {
-                        HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
-                        Text(
-                            "댓글 ${d.comments.size}개",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = textColor,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-                    items(d.comments) { comment ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = if (comment.isReply) 24.dp else 0.dp)
-                                .background(commentBgColor, RoundedCornerShape(8.dp))
-                                .padding(10.dp)
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(comment.author, fontSize = 12.sp, color = PastelNavy, fontWeight = FontWeight.Bold)
-                                Text(comment.date, fontSize = 11.sp, color = subTextColor)
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            if (comment.content.isNotBlank()) {
-                                Text(
-                                    buildMentionAnnotatedString(comment.content, textColor),
-                                    fontSize = 13.sp
+                            is BodyElement.ImageElement -> if (element.isDccon) {
+                                AsyncImage(
+                                    model = element.url,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(80.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = element.url,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
-                            if (comment.dcconUrls.isNotEmpty()) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(top = 4.dp)
-                                ) {
-                                    comment.dcconUrls.forEach { url ->
-                                        AsyncImage(
-                                            model = url,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(64.dp),
-                                            contentScale = ContentScale.Fit
+                        }
+                    }
+
+                    if (d.comments.isNotEmpty()) {
+                        item {
+                            HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "댓글 ${d.comments.size}개",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = textColor,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                listOf(
+                                    CommentSort.ORIGINAL to "등록순",
+                                    CommentSort.LATEST to "최신순",
+                                    CommentSort.REPLIES to "답글순"
+                                ).forEach { (sort, label) ->
+                                    TextButton(
+                                        onClick = { sortOption = sort },
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            label,
+                                            fontSize = 12.sp,
+                                            color = if (sortOption == sort) PastelNavy else subTextColor,
+                                            fontWeight = if (sortOption == sort) FontWeight.Bold else FontWeight.Normal
                                         )
                                     }
                                 }
                             }
                         }
-                        Spacer(Modifier.height(4.dp))
+                        items(displayComments) { comment ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                if (comment.isReply) {
+                                    Spacer(Modifier.width(24.dp))
+                                    Text(
+                                        "ㄴ",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = PastelNavy,
+                                        modifier = Modifier.padding(end = 4.dp, top = 10.dp)
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (comment.isBlocked) Color(0xFFFFEBEE) else commentBgColor
+                                        )
+                                ) {
+                                    if (comment.isBlocked) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(4.dp)
+                                                .fillMaxHeight()
+                                                .background(Color(0xFFD32F2F))
+                                        )
+                                    }
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(10.dp)
+                                    ) {
+                                        if (comment.isBlocked) {
+                                            Text(
+                                                "🚫 차단됨",
+                                                fontSize = 12.sp,
+                                                color = Color(0xFFD32F2F),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Spacer(Modifier.height(2.dp))
+                                        }
+                                        Row(
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(comment.author, fontSize = 12.sp, color = PastelNavy, fontWeight = FontWeight.Bold)
+                                            Text(comment.date, fontSize = 11.sp, color = subTextColor)
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                        when {
+                                            comment.isBlocked -> Text(
+                                                "차단된 댓글입니다.",
+                                                fontSize = 13.sp,
+                                                color = Color(0xFFCC0000)
+                                            )
+                                            comment.content.isNotBlank() -> Text(
+                                                buildMentionAnnotatedString(comment.content, textColor),
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
                     }
                 }
+            }
+        }
+
+        if (showWebView) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            settings.useWideViewPort = true
+                            settings.loadWithOverviewMode = true
+                            settings.setSupportZoom(true)
+                            settings.builtInZoomControls = true
+                            settings.displayZoomControls = false
+                            webViewClient = WebViewClient()
+                            loadUrl("file://$currentPath")
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
