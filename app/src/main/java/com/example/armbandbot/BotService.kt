@@ -544,6 +544,9 @@ class BotService : Service() {
             }
 
             sendLog("[백그라운드] $botName 사이클 시작!", botId)
+            if (config.isDebugMode) {
+                sendLog("[디버그][사이클] 대상 URL 목록 (${urlList.size}개): ${urlList.joinToString(", ")}", botId)
+            }
 
             if (!isSessionValid(cookie)) {
                 botPref.edit()
@@ -572,6 +575,9 @@ class BotService : Service() {
 
             for ((urlIndex, rawUrl) in urlList.withIndex()) {
                 if (!isActive) break
+                if (config.isDebugMode) {
+                    sendLog("[디버그][사이클] URL 처리 시작 (${urlIndex + 1}/${urlList.size}): $rawUrl", botId)
+                }
 
                 val canContinue = processTargetUrl(
                     config = config,
@@ -618,11 +624,17 @@ class BotService : Service() {
         delChk: String,
         notifyIfEnabled: (String, String, String) -> Unit
     ): PageProcessResult {
+        if (config.isDebugMode) {
+            sendLog("[디버그][페이지] 페이지 URL 접근 시작: $pageUrl", botId)
+        }
         val document = Jsoup.connect(pageUrl)
             .userAgent("Mozilla/5.0")
             .header("Cookie", cookie)
             .get()
         val managerPermission = hasManagerPermission(document)
+        if (config.isDebugMode) {
+            sendLog("[디버그][페이지] 관리자 권한 확인 결과: ${if (managerPermission) "있음" else "없음"}", botId)
+        }
         if (!managerPermission) {
             return PageProcessResult(
                 firstPostNumOfThisPage = "",
@@ -634,6 +646,9 @@ class BotService : Service() {
 
         val ciToken = document.select("input[name=ci_t]").attr("value")
         val postRows = document.select(".ub-content")
+        if (config.isDebugMode) {
+            sendLog("[디버그][페이지] 발견한 게시글 수: ${postRows.size}", botId)
+        }
 
         var firstPostNumOfThisPage = ""
         var isPageEmpty = true
@@ -673,7 +688,13 @@ class BotService : Service() {
 
                 val savedCommentCount = GlobalBotState.getCommentCount(gallType, gallId, postNumStr)
                 if (savedCommentCount != -1 && savedCommentCount == currentCommentCount) {
+                    if (config.isDebugMode) {
+                        sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변화 없음 (저장: $savedCommentCount, 현재: $currentCommentCount) → 스킵", botId)
+                    }
                     continue
+                }
+                if (config.isDebugMode) {
+                    sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변화 감지 (저장: $savedCommentCount, 현재: $currentCommentCount) → 처리 시작", botId)
                 }
 
                 try {
@@ -1002,6 +1023,9 @@ class BotService : Service() {
         delChk: String,
         notifyIfEnabled: (String, String, String) -> Unit
     ) {
+        if (config.isDebugMode) {
+            sendLog("[디버그][게시글] 게시글 상세 접근 시작: 번호 $postNumStr", botId)
+        }
         if (!config.isSearchMode) {
             synchronized(GlobalBotState) {
                 val currentLast = GlobalBotState.lastCheckedNumbers[botId] ?: 0
@@ -1052,10 +1076,14 @@ class BotService : Service() {
             .execute()
 
         val commentsArray = org.json.JSONObject(commentResponse.body()).optJSONArray("comments")
+        if (config.isDebugMode) {
+            sendLog("[디버그][게시글] 번호: $postNumStr / 댓글 수 (API): ${commentsArray?.length() ?: 0}", botId)
+        }
         val postText = "$text $contentText"
 
         val postAnalysis = analyzePost(
             config = config,
+            botId = botId,
             postAuthor = postAuthor,
             postNick = postNick,
             postUid = postUid,
@@ -1066,6 +1094,13 @@ class BotService : Service() {
             tokenToUse = tokenToUse,
             cookie = cookie
         )
+        if (config.isDebugMode) {
+            if (postAnalysis.isBadPost) {
+                sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 차단 대상 → ${postAnalysis.debugDetail}", botId)
+            } else {
+                sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 정상${if (postAnalysis.isWhitelistedUser) " (화이트리스트 통과)" else ""}", botId)
+            }
+        }
 
         val isBlacklistedUserId = postAnalysis.isBlacklistedUserId
         val isBlacklistedUserNick = postAnalysis.isBlacklistedUserNick
@@ -1261,6 +1296,7 @@ class BotService : Service() {
 
                     val commentAnalysis = analyzeComment(
                         config = config,
+                        botId = botId,
                         cmtAuthor = cmtAuthor,
                         cmtNick = cmtNick,
                         cmtUid = cmtUid,
@@ -1269,6 +1305,13 @@ class BotService : Service() {
                         tokenToUse = tokenToUse,
                         cookie = cookie
                     )
+                    if (config.isDebugMode) {
+                        if (commentAnalysis.isBadComment) {
+                            sendLog("[디버그][댓글] 작성자: $cmtDisplayAuthor / 분석 결과: 차단 대상 → ${commentAnalysis.debugDetail}", botId)
+                        } else {
+                            sendLog("[디버그][댓글] 작성자: $cmtDisplayAuthor / 분석 결과: 정상${if (commentAnalysis.isWhitelistedUser) " (화이트리스트 통과)" else ""}", botId)
+                        }
+                    }
 
                     val isBlacklistedCmtUserId = commentAnalysis.isBlacklistedUserId
                     val isBlacklistedCmtUserNick = commentAnalysis.isBlacklistedUserNick
@@ -1440,13 +1483,18 @@ class BotService : Service() {
         gallogCache: MutableMap<String, Pair<Int, Int>>,
         tokenToUse: String,
         cookie: String,
-        logTag: String
+        logTag: String,
+        botId: String = "",
+        isDebugMode: Boolean = false
     ): GallogStats {
         if (userId.isBlank()) {
             return GallogStats(postCount = 0, commentCount = 0)
         }
 
         gallogCache[userId]?.let { cached ->
+            if (isDebugMode && botId.isNotEmpty()) {
+                sendLog("[디버그][갤로그] userId: $userId / 캐시 결과 사용 → 글: ${cached.first}, 댓글: ${cached.second}", botId)
+            }
             return GallogStats(
                 postCount = cached.first,
                 commentCount = cached.second
@@ -1469,6 +1517,10 @@ class BotService : Service() {
             val commentCount = parts.getOrNull(1)?.toIntOrNull() ?: 100
 
             gallogCache[userId] = Pair(postCount, commentCount)
+
+            if (isDebugMode && botId.isNotEmpty()) {
+                sendLog("[디버그][갤로그] userId: $userId / API 결과 → 글: $postCount, 댓글: $commentCount", botId)
+            }
 
             GallogStats(
                 postCount = postCount,
@@ -1642,6 +1694,7 @@ class BotService : Service() {
     }
     private fun analyzePost(
         config: BotConfig,
+        botId: String = "",
         postAuthor: String,
         postNick: String,
         postUid: String,
@@ -1656,6 +1709,10 @@ class BotService : Service() {
         val isBlacklistedUserId = userFilter.isBlacklistedUserId
         val isBlacklistedUserNick = userFilter.isBlacklistedUserNick
         val isWhitelistedUser = userFilter.isWhitelistedUser
+
+        if (config.isDebugMode && botId.isNotEmpty()) {
+            sendLog("[디버그][필터/유저] 작성자: $postAuthor / 닉: $postNick → 블랙(ID): $isBlacklistedUserId, 블랙(닉): $isBlacklistedUserNick, 화이트: $isWhitelistedUser", botId)
+        }
 
         var isBadPost = isBlacklistedUserId || isBlacklistedUserNick
         var suspiciousUrlInPost: String? = null
@@ -1674,8 +1731,15 @@ class BotService : Service() {
 
         val spamCodeRegex = buildSpamCodeRegex(config)
 
+        if (isWhitelistedUser && config.isDebugMode && botId.isNotEmpty()) {
+            sendLog("[디버그][필터/화이트] 화이트리스트 유저 → 이후 모든 필터 통과", botId)
+        }
+
         if (!isBadPost && !isWhitelistedUser) {
             val isYudong = postUid.isEmpty()
+            if (config.isDebugMode && botId.isNotEmpty()) {
+                sendLog("[디버그][필터/유동] 유동 여부: $isYudong", botId)
+            }
 
             if (isYudong) {
                 if (config.isYudongPostBlock) {
@@ -1703,7 +1767,9 @@ class BotService : Service() {
                     gallogCache = gallogCache,
                     tokenToUse = tokenToUse,
                     cookie = cookie,
-                    logTag = "깡계 판별용 gallog 조회 실패"
+                    logTag = "깡계 판별용 gallog 조회 실패",
+                    botId = botId,
+                    isDebugMode = config.isDebugMode
                 )
 
                 val pCount = gallogStats.postCount
@@ -1743,6 +1809,12 @@ class BotService : Service() {
 
                 spamCodeMatchPost = spamCodeRegex?.find(postText)?.value
 
+                if (config.isDebugMode && botId.isNotEmpty()) {
+                    sendLog("[디버그][필터/keyword] 일반금지어: ${matchedNormalWord ?: "없음"} / 우회금지어: ${matchedBypassWord ?: "없음"}", botId)
+                    sendLog("[디버그][필터/url] 의심 URL: ${suspiciousUrlInPost ?: "없음"}", botId)
+                    sendLog("[디버그][필터/spam] 스팸코드: ${spamCodeMatchPost ?: "없음"}", botId)
+                }
+
                 isBadPost =
                     (matchedNormalWord != null) ||
                             (matchedBypassWord != null) ||
@@ -1771,6 +1843,9 @@ class BotService : Service() {
                         }
                         if (isBadPost) break
                     }
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[디버그][필터/image] 이미지 필터: ${if (matchedImageAlt != null) "차단 (alt=$matchedImageAlt)" else "통과"}", botId)
+                    }
                 }
 
                 if (!isBadPost && config.isVoiceFilterMode) {
@@ -1781,6 +1856,9 @@ class BotService : Service() {
                             debugDetail = "금지 보이스 ID 감지 ($vid)"
                             break
                         }
+                    }
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[디버그][필터/voice] 보이스 필터: ${if (matchedVoiceIdPost != null) "차단 (id=$matchedVoiceIdPost)" else "통과"}", botId)
                     }
                 }
             }
@@ -1803,6 +1881,7 @@ class BotService : Service() {
 
     private fun analyzeComment(
         config: BotConfig,
+        botId: String = "",
         cmtAuthor: String,
         cmtNick: String,
         cmtUid: String,
@@ -1815,6 +1894,10 @@ class BotService : Service() {
         val isBlacklistedUserId = userFilter.isBlacklistedUserId
         val isBlacklistedUserNick = userFilter.isBlacklistedUserNick
         val isWhitelistedUser = userFilter.isWhitelistedUser
+
+        if (config.isDebugMode && botId.isNotEmpty()) {
+            sendLog("[디버그][필터/유저] 댓글 작성자: $cmtAuthor / 닉: $cmtNick → 블랙(ID): $isBlacklistedUserId, 블랙(닉): $isBlacklistedUserNick, 화이트: $isWhitelistedUser", botId)
+        }
 
         var isBadComment = isBlacklistedUserId || isBlacklistedUserNick
         var suspiciousUrlInComment: String? = null
@@ -1831,8 +1914,15 @@ class BotService : Service() {
 
         val spamCodeRegex = buildSpamCodeRegex(config)
 
+        if (isWhitelistedUser && config.isDebugMode && botId.isNotEmpty()) {
+            sendLog("[디버그][필터/화이트] 화이트리스트 댓글 작성자 → 이후 모든 필터 통과", botId)
+        }
+
         if (!isBadComment && !isWhitelistedUser) {
             val isYudongComment = cmtUid.isEmpty()
+            if (config.isDebugMode && botId.isNotEmpty()) {
+                sendLog("[디버그][필터/유동] 댓글 유동 여부: $isYudongComment", botId)
+            }
 
             if (isYudongComment) {
                 if (config.isYudongCommentBlock) {
@@ -1853,7 +1943,9 @@ class BotService : Service() {
                     gallogCache = gallogCache,
                     tokenToUse = tokenToUse,
                     cookie = cookie,
-                    logTag = "댓글 깡계 판별용 gallog 조회 실패"
+                    logTag = "댓글 깡계 판별용 gallog 조회 실패",
+                    botId = botId,
+                    isDebugMode = config.isDebugMode
                 )
 
                 val pCount = gallogStats.postCount
@@ -1889,6 +1981,12 @@ class BotService : Service() {
 
                 spamCodeMatchComment = spamCodeRegex?.find(commentMemo)?.value
 
+                if (config.isDebugMode && botId.isNotEmpty()) {
+                    sendLog("[디버그][필터/keyword] 댓글 일반금지어: ${matchedNormalWord ?: "없음"} / 우회금지어: ${matchedBypassWord ?: "없음"}", botId)
+                    sendLog("[디버그][필터/url] 댓글 의심 URL: ${suspiciousUrlInComment ?: "없음"}", botId)
+                    sendLog("[디버그][필터/spam] 댓글 스팸코드: ${spamCodeMatchComment ?: "없음"}", botId)
+                }
+
                 isBadComment =
                     (matchedNormalWord != null) ||
                             (matchedBypassWord != null) ||
@@ -1913,6 +2011,9 @@ class BotService : Service() {
                             debugDetail = "댓글 금지 보이스 ID 감지 ($vid)"
                             break
                         }
+                    }
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[디버그][필터/voice] 댓글 보이스 필터: ${if (matchedVoiceIdComment != null) "차단 (id=$matchedVoiceIdComment)" else "통과"}", botId)
                     }
                 }
             }
@@ -2026,6 +2127,9 @@ class BotService : Service() {
             creationDate = postDate
         )
 
+        if (config.isDebugMode) {
+            sendLog("[디버그][차단요청] 게시글 차단 요청 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: blockReasonText}", botId)
+        }
         executeBlockRequest(
             cookie = cookie,
             pcPostDetailUrl = pcPostDetailUrl,
@@ -2038,6 +2142,9 @@ class BotService : Service() {
             delChk = delChk,
             gallType = gallType
         )
+        if (config.isDebugMode) {
+            sendLog("[디버그][차단요청] 게시글 차단 요청 완료 → 번호: $postNumStr", botId)
+        }
 
         return BlockExecutionResult(
             blockReason = dbBlockReason,
@@ -2162,6 +2269,9 @@ class BotService : Service() {
             creationDate = commentDate
         )
 
+        if (config.isDebugMode) {
+            sendLog("[디버그][차단요청] 댓글 차단 요청 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: blockReasonText}", botId)
+        }
         executeBlockRequest(
             cookie = cookie,
             pcPostDetailUrl = pcPostDetailUrl,
@@ -2174,6 +2284,9 @@ class BotService : Service() {
             delChk = delChk,
             gallType = gallType
         )
+        if (config.isDebugMode) {
+            sendLog("[디버그][차단요청] 댓글 차단 요청 완료 → 번호: $commentNo", botId)
+        }
 
         return BlockExecutionResult(
             blockReason = dbBlockReason,

@@ -91,6 +91,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var isDevModeUnlocked by remember { mutableStateOf(masterPref.getBoolean("dev_mode_unlocked", false)) }
     var botName by remember { mutableStateOf(botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇") }
     var myCookie by remember { mutableStateOf(botPref.getString("saved_cookie", null)) }
+    var isAutoLoginInProgress by remember { mutableStateOf(false) }
 
     var editDialogType by remember { mutableStateOf<String?>(null) }
     var tempEditText by remember { mutableStateOf("") }
@@ -103,14 +104,26 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var extractVoiceText by remember { mutableStateOf("") }
     var extractedVoiceResult by remember { mutableStateOf<String?>(null) }
 
-    if (myCookie == null) {
-        Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
-            Row(modifier = Modifier.fillMaxWidth().background(topBarColor).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "뒤로가기", modifier = Modifier.clickable { onBack() }.padding(end=16.dp), tint = PastelNavy)
-                Text("디시인사이드 로그인", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
-            }
-            LoginScreen(onLoginSuccess = { extractedCookie -> botPref.edit().putString("saved_cookie", extractedCookie).apply(); myCookie = extractedCookie })
-        }
+    if (myCookie == null || isAutoLoginInProgress) {
+        BotLoginScreen(
+            botId = botId,
+            onLoginSuccess = { extractedCookie ->
+                botPref.edit().putString("saved_cookie", extractedCookie).apply()
+                myCookie = extractedCookie
+                if (isAutoLoginInProgress) {
+                    isAutoLoginInProgress = false
+                    val serviceIntent = Intent(context, BotService::class.java).apply {
+                        putExtra("BOT_ID", botId)
+                        putExtra("COOKIE", extractedCookie)
+                        action = "START"
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(serviceIntent)
+                    else context.startService(serviceIntent)
+                    botPref.edit().putBoolean("is_running", true).putBoolean("should_restore_after_restart", true).apply()
+                }
+            },
+            onBack = { if (isAutoLoginInProgress) isAutoLoginInProgress = false else onBack() }
+        )
     } else {
         val coroutineScope = rememberCoroutineScope()
         var selectedTabIndex by remember { mutableStateOf(0) }
@@ -226,6 +239,19 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             }
             ContextCompat.registerReceiver(context, receiver, IntentFilter("BOT_LOG_EVENT"), ContextCompat.RECEIVER_NOT_EXPORTED)
             onDispose { context.unregisterReceiver(receiver) }
+        }
+
+        DisposableEffect(context) {
+            val sessionReceiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    if (intent?.getStringExtra("BOT_ID") == botId) {
+                        isRunning = false
+                        isAutoLoginInProgress = true
+                    }
+                }
+            }
+            ContextCompat.registerReceiver(context, sessionReceiver, IntentFilter("BOT_SESSION_EXPIRED"), ContextCompat.RECEIVER_NOT_EXPORTED)
+            onDispose { context.unregisterReceiver(sessionReceiver) }
         }
 
         AnimatedContent(
