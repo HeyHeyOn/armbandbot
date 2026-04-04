@@ -1057,18 +1057,25 @@ class BotService : Service() {
 
                     val cmtDiv = org.jsoup.nodes.Element("div")
                     cmtDiv.addClass("s-cmt")
-                    if (depth == 1) cmtDiv.addClass("s-cmt-reply")
+                    val cmtStyle = StringBuilder("padding:8px 0; border-bottom:1px solid #f0f0f0;")
+                    if (depth == 1) {
+                        cmtDiv.addClass("s-cmt-reply")
+                        cmtStyle.append(" padding-left:24px;")
+                    }
                     if (blockedCommentNo != null && no == blockedCommentNo) {
                         cmtDiv.addClass("s-cmt-blocked")
-                        cmtDiv.attr("style", "border-left: 4px solid red; background: #fff0f0;")
+                        cmtStyle.append(" border-left:4px solid red; background:#fff0f0; padding-left:8px;")
                     }
+                    cmtDiv.attr("style", cmtStyle.toString())
 
                     val nickSpan = org.jsoup.nodes.Element("span")
                     nickSpan.addClass("s-cmt-nick")
+                    nickSpan.attr("style", "font-weight:bold; margin-right:8px;")
                     nickSpan.text(author)
 
                     val dateSpan = org.jsoup.nodes.Element("span")
                     dateSpan.addClass("s-cmt-date")
+                    dateSpan.attr("style", "color:gray; font-size:12px; margin-right:8px;")
                     dateSpan.text(date)
 
                     // memo에서 dccon img 추출
@@ -1077,6 +1084,7 @@ class BotService : Service() {
 
                     val textP = org.jsoup.nodes.Element("p")
                     textP.addClass("s-cmt-text")
+                    textP.attr("style", "display:block; margin-top:4px;")
                     memoDoc.select("img").remove()
                     textP.text(memoDoc.body().text())
 
@@ -1118,7 +1126,8 @@ class BotService : Service() {
 
                     commentsDiv.appendChild(cmtDiv)
                 }
-                doc.select(".cmt_list, .cmt-box, #comment_dirc, .reply, .comment_wrap, [class*=cmt_list], [class*=comment_list]").remove()
+                doc.select(".cmt_list, .cmt-box, #comment_dirc, .comment_wrap, [class*=comment_list]").remove()
+                commentsDiv.attr("style", "max-width:800px; margin:20px auto; padding:16px; font-family:sans-serif; border-top:2px solid #eee;")
                 doc.body()?.appendChild(commentsDiv)
             }
 
