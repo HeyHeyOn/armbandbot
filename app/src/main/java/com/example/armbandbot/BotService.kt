@@ -1045,11 +1045,10 @@ class BotService : Service() {
             ).remove()
             doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
-            // 2. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments / .view_comment / #focus_cmt는 제외)
-            doc.select(".cmt_wrap, .cmt_write, #cmt_write, .reply, .reply_box, [id*=cmt], [class*=cmt_write], [class*=comment_write], .view_reply, #reply_w")
+            // 2. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments / .view_comment는 제외)
+            doc.select(".cmt_wrap, .cmt_write, #cmt_write, .reply_box, [class*=cmt_write], [class*=comment_list], .view_reply, #reply_w")
                 .filter { el ->
                     el.id() != "bot-comments" &&
-                    el.id() != "focus_cmt" &&
                     !el.hasClass("view_comment") &&
                     !el.parents().any { p -> p.id() == "bot-comments" }
                 }
@@ -1060,8 +1059,8 @@ class BotService : Service() {
                 it.html().contains("comment") || it.html().contains("cmt") || it.html().contains("reply_w")
             }.forEach { it.remove() }
 
-            // 4. commentsArray로 디시 구조 HTML 블록 생성
-            if (comments != null && comments.length() > 0) {
+            // 4. commentsArray로 디시 구조 HTML 블록 생성 (항상 view_comment 교체)
+            run {
                 // 디시 댓글 구조: div.view_comment#focus_cmt > div.comment_wrap > (div.comment_count + ul.cmt_list)
                 val viewCommentDiv = org.jsoup.nodes.Element("div")
                 viewCommentDiv.addClass("view_comment")
@@ -1072,11 +1071,12 @@ class BotService : Service() {
 
                 val commentCount = org.jsoup.nodes.Element("div")
                 commentCount.addClass("comment_count")
-                commentCount.text("댓글 ${comments.length()}개")
+                commentCount.text("댓글 ${comments?.length() ?: 0}개")
 
                 val cmtList = org.jsoup.nodes.Element("ul")
                 cmtList.addClass("cmt_list")
 
+                if (comments != null && comments.length() > 0) {
                 for (i in 0 until comments.length()) {
                     val cmt = comments.getJSONObject(i)
                     val depth = cmt.optInt("depth", 0)
@@ -1172,6 +1172,11 @@ class BotService : Service() {
                     innerDiv.appendChild(usertxtDiv)
                     li.appendChild(innerDiv)
                     cmtList.appendChild(li)
+                }
+                } else {
+                    val emptyLi = org.jsoup.nodes.Element("li")
+                    emptyLi.text("댓글이 없습니다.")
+                    cmtList.appendChild(emptyLi)
                 }
 
                 commentWrap.appendChild(commentCount)
