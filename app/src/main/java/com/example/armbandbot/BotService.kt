@@ -1058,54 +1058,55 @@ class BotService : Service() {
             ).remove()
             doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
-            // 2. 외부 CSS는 유지 (원본 디자인 보존), body 끝에 강제 오버라이드 스타일만 추가
-            doc.body()?.append("""<style>
-/* 댓글창 강제 표시 */
-.view_comment,.comment_wrap,.cmt_list{display:block!important;visibility:visible!important;opacity:1!important}
-.view_comment *,.comment_wrap *{visibility:visible!important}
-.cmt_list>.ub-content{display:block!important}
-/* 다크모드 댓글 닉네임/날짜 텍스트 밝게 */
-html.darkmode .cmt_list .nickname em{color:#8bb8f0!important}
-html.darkmode .cmt_list .ip{color:#7a9ec0!important}
-html.darkmode .cmt_list .date_time{color:#7a9ec0!important}
-html.darkmode .cmt_list .usertxt{color:#d0d8e8!important}
-html.darkmode .cmt_list .info_lay{color:#8faec8!important}
-/* 보이스리플 뱃지 */
-.voice-reple-text{display:inline-block!important}
-/* 디시콘 이미지 크기 */
-img.s-dccon{width:60px;height:60px;display:inline-block!important}
-/* 본문 이미지 */
-.write_div img{max-width:100%;height:auto}
-</style>""")
-
-            // 3. 모든 script 제거 (JS 간섭 방지)
+            // 2. 모든 script 제거 (JS 간섭 방지)
             doc.select("script").remove()
 
-            // 4. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments / .view_comment는 제외)
-            doc.select(".cmt_wrap, .cmt_write, #cmt_write, .reply_box, [class*=cmt_write], [class*=comment_list], .view_reply, #reply_w")
-                .filter { el ->
-                    el.id() != "bot-comments" &&
-                    !el.hasClass("view_comment") &&
-                    !el.parents().any { p -> p.id() == "bot-comments" }
-                }
-                .forEach { it.remove() }
+            // 3. 원본 댓글 영역 완전 제거 (JS/CSS가 hide하는 것 자체를 없앰)
+            doc.select(".view_comment, #focus_cmt, .comment_wrap, .cmt_list, #cmt_list, .reply_box, .cmt_write, #cmt_write, [class*=comment_list], .view_reply, #reply_w").remove()
 
-            // 4. commentsArray로 디시 구조 HTML 블록 생성 (항상 view_comment 교체)
+            // 4. commentsArray로 자체 스타일 완비한 독립 댓글 블록 생성 후 body 끝에 append
             run {
-                // 디시 댓글 구조: div.view_comment#focus_cmt > div.comment_wrap > (div.comment_count + ul.cmt_list)
                 val viewCommentDiv = org.jsoup.nodes.Element("div")
-                viewCommentDiv.addClass("view_comment")
-                viewCommentDiv.attr("id", "focus_cmt")
+                viewCommentDiv.attr("id", "bot-comment-block")
+                viewCommentDiv.attr("style", """
+                    display:block;margin-top:20px;padding:0 10px;font-family:sans-serif;
+                """.trimIndent())
+
+                // 자체 스타일 삽입 (외부 CSS 간섭 없음)
+                val styleEl = org.jsoup.nodes.Element("style")
+                styleEl.text("""
+#bot-comment-block{display:block;margin-top:20px;padding:0 10px;font-family:sans-serif}
+#bot-comment-block .bc-header{font-size:15px;font-weight:bold;padding:10px 0 8px;border-bottom:2px solid #4a6583;color:#2c3e50}
+html.darkmode #bot-comment-block .bc-header{color:#c8d8e8;border-bottom-color:#6a96b8}
+#bot-comment-block .bc-item{display:block;padding:10px 0;border-bottom:1px solid #e8ecef}
+html.darkmode #bot-comment-block .bc-item{border-bottom-color:#333}
+#bot-comment-block .bc-item.reply{padding-left:24px}
+#bot-comment-block .bc-info{font-size:12px;margin-bottom:4px}
+#bot-comment-block .bc-nick{font-weight:bold;color:#4a6583}
+html.darkmode #bot-comment-block .bc-nick{color:#8bb8f0}
+#bot-comment-block .bc-ip{color:#999;margin-left:4px}
+html.darkmode #bot-comment-block .bc-ip{color:#7a9ec0}
+#bot-comment-block .bc-date{color:#aaa;margin-left:8px;font-size:11px}
+html.darkmode #bot-comment-block .bc-date{color:#7a9ec0}
+#bot-comment-block .bc-text{font-size:14px;color:#333;line-height:1.5;margin:0}
+html.darkmode #bot-comment-block .bc-text{color:#d0d8e8}
+#bot-comment-block .bc-voice{display:inline-block;background:#f0f4ff;border-radius:4px;padding:2px 8px;font-size:12px;color:#4a6583;margin-top:4px}
+html.darkmode #bot-comment-block .bc-voice{background:#1e2e44;color:#8bb8f0}
+#bot-comment-block img.bc-dccon{width:60px;height:60px;vertical-align:middle;margin-top:4px}
+#bot-comment-block .bc-blocked{background:#fff5f5;border-left:3px solid #D32F2F}
+html.darkmode #bot-comment-block .bc-blocked{background:#3b1a1a;border-left-color:#ef5350}
+#bot-comment-block .bc-blocked-label{color:#D32F2F;font-weight:bold;font-size:12px;margin-left:4px}
+""")
+                viewCommentDiv.appendChild(styleEl)
 
                 val commentWrap = org.jsoup.nodes.Element("div")
-                commentWrap.addClass("comment_wrap")
 
                 val commentCount = org.jsoup.nodes.Element("div")
-                commentCount.addClass("comment_count")
+                commentCount.addClass("bc-header")
                 commentCount.text("댓글 ${comments?.length() ?: 0}개")
 
                 val cmtList = org.jsoup.nodes.Element("ul")
-                cmtList.addClass("cmt_list")
+                cmtList.attr("style", "list-style:none;margin:0;padding:0")
 
                 if (comments != null && comments.length() > 0) {
                 for (i in 0 until comments.length()) {
@@ -1121,48 +1122,38 @@ img.s-dccon{width:60px;height:60px;display:inline-block!important}
                     val no = cmt.optString("no", "")
                     val isBlocked = blockedCommentNo != null && no == blockedCommentNo
 
-                    // li.ub-content[data-no] (reply_cont 클래스: depth==1)
+                    // li (독립 bc-* 클래스 사용)
                     val li = org.jsoup.nodes.Element("li")
-                    li.addClass("ub-content")
-                    if (depth == 1) li.addClass("reply_cont")
+                    li.addClass(if (isBlocked) "bc-item bc-blocked" else "bc-item")
+                    if (depth == 1) li.addClass("reply")
                     li.attr("data-no", no)
-                    if (isBlocked) {
-                        li.attr("style", "background:#fff5f5;border-left:3px solid #D32F2F;")
-                    }
 
-                    val innerDiv = org.jsoup.nodes.Element("div")
-                    innerDiv.addClass("inner clear")
-
-                    // div.info_lay: span.nickname>em + span.ip + span.date_time
+                    // info 행
                     val infoLay = org.jsoup.nodes.Element("div")
-                    infoLay.addClass("info_lay")
+                    infoLay.addClass("bc-info")
 
                     val nicknameSpan = org.jsoup.nodes.Element("span")
-                    nicknameSpan.addClass("nickname")
-                    val nickEm = org.jsoup.nodes.Element("em")
-                    nickEm.text(nick)
-                    nicknameSpan.appendChild(nickEm)
+                    nicknameSpan.addClass("bc-nick")
+                    nicknameSpan.text(nick)
 
                     val ipSpan = org.jsoup.nodes.Element("span")
-                    ipSpan.addClass("ip")
+                    ipSpan.addClass("bc-ip")
                     ipSpan.text(if (uid.isNotEmpty()) uid else ip)
 
                     val dateSpan = org.jsoup.nodes.Element("span")
-                    dateSpan.addClass("date_time")
+                    dateSpan.addClass("bc-date")
                     dateSpan.text(date)
 
                     infoLay.appendChild(nicknameSpan)
                     infoLay.appendChild(ipSpan)
                     infoLay.appendChild(dateSpan)
 
-                    // div.usertxt.ub-word: p.usertxt + dccon img
+                    // 텍스트/dccon 영역
                     val usertxtDiv = org.jsoup.nodes.Element("div")
-                    usertxtDiv.addClass("usertxt ub-word")
 
-                    // memo에서 dccon img 추출 후 텍스트와 이미지 분리
+                    // memo 파싱
                     val memoDoc = org.jsoup.Jsoup.parseBodyFragment(memo)
                     val dcconImgs = memoDoc.select("img.written_dccon, img[src*=dccon.php]")
-                    // @멘션 추출 (a.mention 또는 @로 시작하는 텍스트)
                     val mentionEls = memoDoc.select("a.mention")
                     val mentionTexts = mentionEls.map { el ->
                         val t = el.text().trim()
@@ -1172,7 +1163,7 @@ img.s-dccon{width:60px;height:60px;display:inline-block!important}
                     memoDoc.select("img").remove()
 
                     val textP = org.jsoup.nodes.Element("p")
-                    textP.addClass("usertxt")
+                    textP.addClass("bc-text")
                     val bodyText = memoDoc.body().text().trim()
                     if (mentionTexts.isNotEmpty()) {
                         val mentionLine = mentionTexts.joinToString(" ")
@@ -1186,22 +1177,21 @@ img.s-dccon{width:60px;height:60px;display:inline-block!important}
                     }
                     if (isBlocked) {
                         val blockedSpan = org.jsoup.nodes.Element("span")
-                        blockedSpan.attr("style", "color:#D32F2F;font-weight:bold;margin-left:4px;")
+                        blockedSpan.addClass("bc-blocked-label")
                         blockedSpan.text("[차단됨]")
                         textP.appendChild(blockedSpan)
                     }
                     usertxtDiv.appendChild(textP)
 
-                    // 보이스리플 span 삽입 (p.usertxt 다음)
+                    // 보이스리플
                     if (isVoiceReple) {
                         val voiceSpan = org.jsoup.nodes.Element("span")
-                        voiceSpan.addClass("voice-reple-text")
-                        voiceSpan.attr("style", "display:inline-block;background:#f0f4ff;border-radius:4px;padding:2px 8px;font-size:12px;color:#4A6583;margin-top:4px;")
+                        voiceSpan.addClass("bc-voice")
                         voiceSpan.text("[🔊 보이스리플]")
                         usertxtDiv.appendChild(voiceSpan)
                     }
 
-                    // dccon 이미지 삽입 (p 다음에 img 태그)
+                    // dccon 이미지
                     if (dcconImgs.isNotEmpty()) {
                         dcconImgs.forEach { dcconImg ->
                             val rawSrc = dcconImg.attr("src")
@@ -1209,7 +1199,7 @@ img.s-dccon{width:60px;height:60px;display:inline-block!important}
                                 val src = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
                                 val img = org.jsoup.nodes.Element("img")
                                 img.attr("src", src)
-                                img.addClass("s-dccon")
+                                img.addClass("bc-dccon")
                                 usertxtDiv.appendChild(img)
                             }
                         }
@@ -1220,19 +1210,19 @@ img.s-dccon{width:60px;height:60px;display:inline-block!important}
                                 val src = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
                                 val img = org.jsoup.nodes.Element("img")
                                 img.attr("src", src)
-                                img.addClass("s-dccon")
+                                img.addClass("bc-dccon")
                                 usertxtDiv.appendChild(img)
                             }
                         }
                     }
 
-                    innerDiv.appendChild(infoLay)
-                    innerDiv.appendChild(usertxtDiv)
-                    li.appendChild(innerDiv)
+                    li.appendChild(infoLay)
+                    li.appendChild(usertxtDiv)
                     cmtList.appendChild(li)
                 }
                 } else {
                     val emptyLi = org.jsoup.nodes.Element("li")
+                    emptyLi.addClass("bc-item")
                     emptyLi.text("댓글이 없습니다.")
                     cmtList.appendChild(emptyLi)
                 }
@@ -1241,21 +1231,8 @@ img.s-dccon{width:60px;height:60px;display:inline-block!important}
                 commentWrap.appendChild(cmtList)
                 viewCommentDiv.appendChild(commentWrap)
 
-                // 댓글창 display:block 인라인 스타일 강제 적용 (디시 CSS 오버라이드)
-                viewCommentDiv.attr("style", "display:block;")
-                commentWrap.attr("style", "display:block;")
-                cmtList.attr("style", "display:block;")
-
-                // 5. .view_comment 또는 #focus_cmt가 있으면 replaceWith, 없으면 기존 위치 로직
-                val existingComment = doc.selectFirst(".view_comment") ?: doc.getElementById("focus_cmt")
-                val gallExposure = doc.selectFirst("div.gall_exposure")
-                val contentWrap = doc.selectFirst(".gallview_contents, .view_content_wrap")
-                when {
-                    existingComment != null -> existingComment.replaceWith(viewCommentDiv)
-                    gallExposure != null -> gallExposure.after(viewCommentDiv)
-                    contentWrap != null -> contentWrap.after(viewCommentDiv)
-                    else -> doc.body()?.appendChild(viewCommentDiv)
-                }
+                // body 끝에 append (원본 댓글 영역은 이미 제거됨)
+                doc.body()?.appendChild(viewCommentDiv)
             }
 
             // 6. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)

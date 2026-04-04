@@ -491,7 +491,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Text(comment.author, fontSize = 12.sp, color = PastelNavy, fontWeight = FontWeight.Bold)
+                                            Text(comment.author, fontSize = 12.sp, color = if (isDarkMode) Color(0xFF8BB8F0) else PastelNavy, fontWeight = FontWeight.Bold)
                                             Text(comment.date, fontSize = 11.sp, color = subTextColor)
                                         }
                                         Spacer(Modifier.height(4.dp))
