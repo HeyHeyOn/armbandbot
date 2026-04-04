@@ -1045,9 +1045,14 @@ class BotService : Service() {
             ).remove()
             doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
-            // 2. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments는 제외)
+            // 2. 디시 댓글창 관련 요소 제거 (동적 댓글 로드 방지, #bot-comments / .view_comment / #focus_cmt는 제외)
             doc.select(".cmt_wrap, .cmt_write, #cmt_write, .reply, .reply_box, [id*=cmt], [class*=cmt_write], [class*=comment_write], .view_reply, #reply_w")
-                .filter { it.id() != "bot-comments" && !it.parents().any { p -> p.id() == "bot-comments" } }
+                .filter { el ->
+                    el.id() != "bot-comments" &&
+                    el.id() != "focus_cmt" &&
+                    !el.hasClass("view_comment") &&
+                    !el.parents().any { p -> p.id() == "bot-comments" }
+                }
                 .forEach { it.remove() }
 
             // 3. 댓글 API JS 요청 차단 (comment/cmt/reply_w 포함 script 제거)
@@ -1055,17 +1060,22 @@ class BotService : Service() {
                 it.html().contains("comment") || it.html().contains("cmt") || it.html().contains("reply_w")
             }.forEach { it.remove() }
 
-            // 4. commentsArray로 별도 styled HTML 블록 생성
+            // 4. commentsArray로 디시 구조 HTML 블록 생성
             if (comments != null && comments.length() > 0) {
-                doc.select("#bot-comments").remove()
-                val botCommentsDiv = org.jsoup.nodes.Element("div")
-                botCommentsDiv.attr("id", "bot-comments")
-                botCommentsDiv.attr("style", "max-width:760px;margin:32px auto;padding:16px;border-top:3px solid #4A6583;font-family:system-ui,sans-serif;")
+                // 디시 댓글 구조: div.view_comment#focus_cmt > div.comment_wrap > (div.comment_count + ul.cmt_list)
+                val viewCommentDiv = org.jsoup.nodes.Element("div")
+                viewCommentDiv.addClass("view_comment")
+                viewCommentDiv.attr("id", "focus_cmt")
 
-                val header = org.jsoup.nodes.Element("h3")
-                header.attr("style", "color:#4A6583;margin-bottom:12px;")
-                header.text("댓글 (${comments.length()}개)")
-                botCommentsDiv.appendChild(header)
+                val commentWrap = org.jsoup.nodes.Element("div")
+                commentWrap.addClass("comment_wrap")
+
+                val commentCount = org.jsoup.nodes.Element("div")
+                commentCount.addClass("comment_count")
+                commentCount.text("댓글 ${comments.length()}개")
+
+                val cmtList = org.jsoup.nodes.Element("ul")
+                cmtList.addClass("cmt_list")
 
                 for (i in 0 until comments.length()) {
                     val cmt = comments.getJSONObject(i)
@@ -1073,40 +1083,67 @@ class BotService : Service() {
                     val nick = cmt.optString("name", "")
                     val uid = cmt.optString("user_id", "")
                     val ip = cmt.optString("ip", "")
-                    val author = if (uid.isNotEmpty()) "$nick($uid)" else if (ip.isNotEmpty()) "$nick($ip)" else nick
                     val date = cmt.optString("reg_date", "")
                     val memo = cmt.optString("memo", "")
                     val vrPlayerTag = cmt.optString("vr_player_tag", "")
                     val no = cmt.optString("no", "")
+                    val isBlocked = blockedCommentNo != null && no == blockedCommentNo
 
-                    val cmtStyle = StringBuilder("padding:10px 0;border-bottom:1px solid #eee;")
-                    if (depth == 1) cmtStyle.append("padding-left:24px;")
-                    if (blockedCommentNo != null && no == blockedCommentNo) {
-                        cmtStyle.append("border-left:4px solid #D32F2F;background:#fff5f5;padding-left:8px;")
+                    // li.ub-content[data-no] (reply_cont 클래스: depth==1)
+                    val li = org.jsoup.nodes.Element("li")
+                    li.addClass("ub-content")
+                    if (depth == 1) li.addClass("reply_cont")
+                    li.attr("data-no", no)
+                    if (isBlocked) {
+                        li.attr("style", "background:#fff5f5;border-left:3px solid #D32F2F;")
                     }
 
-                    val cmtDiv = org.jsoup.nodes.Element("div")
-                    cmtDiv.addClass("cmt-item")
-                    cmtDiv.attr("style", cmtStyle.toString())
+                    val innerDiv = org.jsoup.nodes.Element("div")
+                    innerDiv.addClass("inner clear")
 
-                    val nickSpan = org.jsoup.nodes.Element("span")
-                    nickSpan.attr("style", "font-weight:bold;")
-                    nickSpan.text(author)
+                    // div.info_lay: span.nickname>em + span.ip + span.date_time
+                    val infoLay = org.jsoup.nodes.Element("div")
+                    infoLay.addClass("info_lay")
+
+                    val nicknameSpan = org.jsoup.nodes.Element("span")
+                    nicknameSpan.addClass("nickname")
+                    val nickEm = org.jsoup.nodes.Element("em")
+                    nickEm.text(nick)
+                    nicknameSpan.appendChild(nickEm)
+
+                    val ipSpan = org.jsoup.nodes.Element("span")
+                    ipSpan.addClass("ip")
+                    ipSpan.text(if (uid.isNotEmpty()) uid else ip)
 
                     val dateSpan = org.jsoup.nodes.Element("span")
-                    dateSpan.attr("style", "color:#aaa;font-size:12px;margin-left:8px;")
+                    dateSpan.addClass("date_time")
                     dateSpan.text(date)
+
+                    infoLay.appendChild(nicknameSpan)
+                    infoLay.appendChild(ipSpan)
+                    infoLay.appendChild(dateSpan)
+
+                    // div.usertxt.ub-word: p.usertxt + dccon img
+                    val usertxtDiv = org.jsoup.nodes.Element("div")
+                    usertxtDiv.addClass("usertxt ub-word")
 
                     // memo에서 dccon img 추출 후 텍스트와 이미지 분리
                     val memoDoc = org.jsoup.Jsoup.parseBodyFragment(memo)
                     val dcconImgs = memoDoc.select("img.written_dccon, img[src*=dccon.php]")
                     memoDoc.select("img").remove()
 
-                    val contentDiv = org.jsoup.nodes.Element("div")
-                    contentDiv.attr("style", "margin-top:4px;")
-                    contentDiv.text(memoDoc.body().text())
+                    val textP = org.jsoup.nodes.Element("p")
+                    textP.addClass("usertxt")
+                    textP.text(memoDoc.body().text())
+                    if (isBlocked) {
+                        val blockedSpan = org.jsoup.nodes.Element("span")
+                        blockedSpan.attr("style", "color:#D32F2F;font-weight:bold;margin-left:4px;")
+                        blockedSpan.text("[차단됨]")
+                        textP.appendChild(blockedSpan)
+                    }
+                    usertxtDiv.appendChild(textP)
 
-                    // dccon 이미지 삽입
+                    // dccon 이미지 삽입 (p 다음에 img 태그)
                     if (dcconImgs.isNotEmpty()) {
                         dcconImgs.forEach { dcconImg ->
                             val rawSrc = dcconImg.attr("src")
@@ -1115,7 +1152,7 @@ class BotService : Service() {
                                 val img = org.jsoup.nodes.Element("img")
                                 img.attr("src", src)
                                 img.addClass("s-dccon")
-                                contentDiv.appendChild(img)
+                                usertxtDiv.appendChild(img)
                             }
                         }
                     } else if (vrPlayerTag.isNotEmpty()) {
@@ -1126,24 +1163,30 @@ class BotService : Service() {
                                 val img = org.jsoup.nodes.Element("img")
                                 img.attr("src", src)
                                 img.addClass("s-dccon")
-                                contentDiv.appendChild(img)
+                                usertxtDiv.appendChild(img)
                             }
                         }
                     }
 
-                    cmtDiv.appendChild(nickSpan)
-                    cmtDiv.appendChild(dateSpan)
-                    cmtDiv.appendChild(contentDiv)
-                    botCommentsDiv.appendChild(cmtDiv)
+                    innerDiv.appendChild(infoLay)
+                    innerDiv.appendChild(usertxtDiv)
+                    li.appendChild(innerDiv)
+                    cmtList.appendChild(li)
                 }
 
-                // 5. 디시 원본 댓글 컨테이너(div.gall_exposure) 다음에 삽입, 없으면 view_content_wrap 다음 형제로, 없으면 body 마지막에
+                commentWrap.appendChild(commentCount)
+                commentWrap.appendChild(cmtList)
+                viewCommentDiv.appendChild(commentWrap)
+
+                // 5. .view_comment 또는 #focus_cmt가 있으면 replaceWith, 없으면 기존 위치 로직
+                val existingComment = doc.selectFirst(".view_comment") ?: doc.getElementById("focus_cmt")
                 val gallExposure = doc.selectFirst("div.gall_exposure")
                 val contentWrap = doc.selectFirst(".gallview_contents, .view_content_wrap")
                 when {
-                    gallExposure != null -> gallExposure.after(botCommentsDiv)
-                    contentWrap != null -> contentWrap.after(botCommentsDiv)
-                    else -> doc.body()?.appendChild(botCommentsDiv)
+                    existingComment != null -> existingComment.replaceWith(viewCommentDiv)
+                    gallExposure != null -> gallExposure.after(viewCommentDiv)
+                    contentWrap != null -> contentWrap.after(viewCommentDiv)
+                    else -> doc.body()?.appendChild(viewCommentDiv)
                 }
             }
 
