@@ -1061,8 +1061,21 @@ class BotService : Service() {
             // 2. 모든 script 제거 (JS 간섭 방지)
             doc.select("script").remove()
 
-            // 3. 원본 댓글 영역 완전 제거 (JS/CSS가 hide하는 것 자체를 없앰)
-            doc.select(".view_comment, #focus_cmt, .comment_wrap, .cmt_list, #cmt_list, .reply_box, .cmt_write, #cmt_write, [class*=comment_list], .view_reply, #reply_w").remove()
+            // 3. 댓글창 + 댓글창 이후 모든 요소 제거 (하단 글목록, 버튼, 검색창 포함)
+            val commentAnchor = doc.selectFirst(".view_comment, #focus_cmt, #jquery_jplayer")
+            if (commentAnchor != null) {
+                // 댓글창부터 body 끝까지 모든 형제 요소 제거
+                var next = commentAnchor.nextElementSibling()
+                while (next != null) {
+                    val toRemove = next
+                    next = next.nextElementSibling()
+                    toRemove.remove()
+                }
+                commentAnchor.remove()
+            } else {
+                // fallback: 하단 관련 요소 직접 제거
+                doc.select(".view_comment, #focus_cmt, .comment_wrap, .cmt_list, #cmt_list, .reply_box, .cmt_write, #cmt_write, [class*=comment_list], .view_reply, #reply_w, #bottom_listwrap, .view_bottom_btnbox, .gall_listwrap, .bottom_paging_wrap, form[name=frmSearch]").remove()
+            }
 
             // 4. commentsArray로 자체 스타일 완비한 독립 댓글 블록 생성 후 body 끝에 append
             run {
@@ -1083,15 +1096,10 @@ html.darkmode #bot-comment-block .bc-item{border-bottom-color:#333}
 #bot-comment-block .bc-item.reply{padding-left:24px}
 #bot-comment-block .bc-info{font-size:12px;margin-bottom:4px}
 #bot-comment-block .bc-nick{font-weight:bold;color:#4a6583}
-html.darkmode #bot-comment-block .bc-nick{color:#8bb8f0}
 #bot-comment-block .bc-ip{color:#999;margin-left:4px}
-html.darkmode #bot-comment-block .bc-ip{color:#7a9ec0}
 #bot-comment-block .bc-date{color:#aaa;margin-left:8px;font-size:11px}
-html.darkmode #bot-comment-block .bc-date{color:#7a9ec0}
 #bot-comment-block .bc-text{font-size:14px;color:#333;line-height:1.5;margin:0}
-html.darkmode #bot-comment-block .bc-text{color:#d0d8e8}
 #bot-comment-block .bc-voice{display:inline-block;background:#f0f4ff;border-radius:4px;padding:2px 8px;font-size:12px;color:#4a6583;margin-top:4px}
-html.darkmode #bot-comment-block .bc-voice{background:#1e2e44;color:#8bb8f0}
 #bot-comment-block img.bc-dccon{width:60px;height:60px;vertical-align:middle;margin-top:4px}
 #bot-comment-block .bc-blocked{background:#fff5f5;border-left:3px solid #D32F2F}
 html.darkmode #bot-comment-block .bc-blocked{background:#3b1a1a;border-left-color:#ef5350}
@@ -1183,12 +1191,37 @@ html.darkmode #bot-comment-block .bc-blocked{background:#3b1a1a;border-left-colo
                     }
                     usertxtDiv.appendChild(textP)
 
-                    // 보이스리플
+                    // 보이스리플: 실제 iframe 플레이어 삽입
                     if (isVoiceReple) {
-                        val voiceSpan = org.jsoup.nodes.Element("span")
-                        voiceSpan.addClass("bc-voice")
-                        voiceSpan.text("[🔊 보이스리플]")
-                        usertxtDiv.appendChild(voiceSpan)
+                        // vr_player_tag에 iframe이 있으면 그대로 사용, 없으면 memo에서 추출
+                        val vrIframes = if (vrPlayerTag.isNotEmpty())
+                            org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("iframe")
+                        else
+                            org.jsoup.Jsoup.parseBodyFragment(memo).select("iframe[src*=voice]")
+                        if (vrIframes.isNotEmpty()) {
+                            val wrapDiv = org.jsoup.nodes.Element("div")
+                            wrapDiv.attr("style", "margin-top:4px")
+                            vrIframes.forEach { iframe ->
+                                val src = iframe.attr("src").let {
+                                    if (it.startsWith("//")) "https:$it" else it
+                                }
+                                val iframeEl = org.jsoup.nodes.Element("iframe")
+                                iframeEl.attr("src", src)
+                                iframeEl.attr("width", "280")
+                                iframeEl.attr("height", "54")
+                                iframeEl.attr("frameborder", "0")
+                                iframeEl.attr("scrolling", "no")
+                                iframeEl.attr("style", "max-width:100%")
+                                wrapDiv.appendChild(iframeEl)
+                            }
+                            usertxtDiv.appendChild(wrapDiv)
+                        } else {
+                            // iframe 정보 없을 때 최소 표시
+                            val voiceSpan = org.jsoup.nodes.Element("span")
+                            voiceSpan.addClass("bc-voice")
+                            voiceSpan.text("[🔊 보이스리플]")
+                            usertxtDiv.appendChild(voiceSpan)
+                        }
                     }
 
                     // dccon 이미지
