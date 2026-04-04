@@ -9,6 +9,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -42,7 +46,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
@@ -84,34 +88,37 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     val generalListState = rememberLazyListState()
     val blockListState = rememberLazyListState()
 
+    var isGeneralRefreshing by remember { mutableStateOf(false) }
+    var isBlockRefreshing by remember { mutableStateOf(false) }
+
     var htmlSnapshotPathToView by remember { mutableStateOf<String?>(null) }
 
     val postDao = GlobalBotState.getDb()?.postDao()
 
-    fun loadGeneralData() {
-        coroutineScope.launch(Dispatchers.IO) {
-            val data = when {
+    suspend fun loadGeneralData() {
+        val data = withContext(Dispatchers.IO) {
+            when {
                 sortField == "CHECK" && !isAscending -> postDao?.getPostsCheckDesc(selectedGall, searchQuery, generalLimit, 0)
                 sortField == "CHECK" && isAscending -> postDao?.getPostsCheckAsc(selectedGall, searchQuery, generalLimit, 0)
                 sortField == "CREATE" && !isAscending -> postDao?.getPostsCreateDesc(selectedGall, searchQuery, generalLimit, 0)
                 sortField == "CREATE" && isAscending -> postDao?.getPostsCreateAsc(selectedGall, searchQuery, generalLimit, 0)
                 else -> emptyList()
             }
-            generalPosts = data ?: emptyList()
         }
+        generalPosts = data ?: emptyList()
     }
 
-    fun loadBlockData() {
-        coroutineScope.launch(Dispatchers.IO) {
-            val data = when {
+    suspend fun loadBlockData() {
+        val data = withContext(Dispatchers.IO) {
+            when {
                 sortField == "CHECK" && !isAscending -> postDao?.getBlockHistoryCheckDesc(selectedBlockType, searchQuery, blockLimit, 0)
                 sortField == "CHECK" && isAscending -> postDao?.getBlockHistoryCheckAsc(selectedBlockType, searchQuery, blockLimit, 0)
                 sortField == "CREATE" && !isAscending -> postDao?.getBlockHistoryCreateDesc(selectedBlockType, searchQuery, blockLimit, 0)
                 sortField == "CREATE" && isAscending -> postDao?.getBlockHistoryCreateAsc(selectedBlockType, searchQuery, blockLimit, 0)
                 else -> emptyList()
             }
-            blockPosts = data ?: emptyList()
         }
+        blockPosts = data ?: emptyList()
     }
 
     LaunchedEffect(botId) {
@@ -123,10 +130,45 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         if (tabIndex == 0) loadGeneralData() else loadBlockData()
     }
 
+    val generalPullRefreshState = rememberPullRefreshState(
+        refreshing = isGeneralRefreshing,
+        onRefresh = {
+            coroutineScope.launch {
+                isGeneralRefreshing = true
+                loadGeneralData()
+                isGeneralRefreshing = false
+            }
+        }
+    )
+    val blockPullRefreshState = rememberPullRefreshState(
+        refreshing = isBlockRefreshing,
+        onRefresh = {
+            coroutineScope.launch {
+                isBlockRefreshing = true
+                loadBlockData()
+                isBlockRefreshing = false
+            }
+        }
+    )
+
     if (htmlSnapshotPathToView != null) {
         var isShowingInitial by remember { mutableStateOf(false) }
-        val currentPath = remember(htmlSnapshotPathToView, isShowingInitial) {
-            if (isShowingInitial && htmlSnapshotPathToView!!.endsWith("_latest.html")) htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html") else htmlSnapshotPathToView!!
+        var isShowingBlocked by remember { mutableStateOf(false) }
+        val blockedFile = remember(htmlSnapshotPathToView) {
+            if (htmlSnapshotPathToView!!.endsWith("_latest.html")) {
+                val latestFile = File(htmlSnapshotPathToView!!)
+                val dir = latestFile.parentFile ?: return@remember null
+                val base = latestFile.nameWithoutExtension.removeSuffix("_latest")
+                dir.listFiles { f -> f.name.startsWith("${base}_blocked_") && f.name.endsWith(".html") }
+                    ?.maxByOrNull { it.lastModified() }
+            } else null
+        }
+        val currentPath = remember(htmlSnapshotPathToView, isShowingInitial, isShowingBlocked) {
+            when {
+                isShowingBlocked && blockedFile != null -> blockedFile.absolutePath
+                isShowingInitial && htmlSnapshotPathToView!!.endsWith("_latest.html") -> htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html")
+                else -> htmlSnapshotPathToView!!
+            }
         }
         val initialFileExists = remember(htmlSnapshotPathToView) {
             if (htmlSnapshotPathToView!!.endsWith("_latest.html")) File(htmlSnapshotPathToView!!.replace("_latest.html", "_initial.html")).exists() else false
@@ -137,10 +179,25 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E2329)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Close, contentDescription = "닫기", modifier = Modifier.clickable { htmlSnapshotPathToView = null }.padding(end = 16.dp), tint = Color.White)
-                        Text(text = if (isShowingInitial) "최초 스냅샷 확인" else "최신 스냅샷 뷰어", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                        Text(
+                            text = when {
+                                isShowingBlocked -> "차단 시점 스냅샷"
+                                isShowingInitial -> "최초 스냅샷 확인"
+                                else -> "최신 스냅샷 뷰어"
+                            },
+                            fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f)
+                        )
+                        if (blockedFile != null) {
+                            Button(
+                                onClick = { isShowingBlocked = !isShowingBlocked; if (isShowingBlocked) isShowingInitial = false },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isShowingBlocked) Color(0xFFD32F2F) else Color(0xFFBF360C)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)
+                            ) { Text(text = if (isShowingBlocked) "최신 스냅샷" else "차단 스냅샷", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
                         if (initialFileExists) {
                             Button(
-                                onClick = { isShowingInitial = !isShowingInitial },
+                                onClick = { isShowingInitial = !isShowingInitial; if (isShowingInitial) isShowingBlocked = false },
                                 colors = ButtonDefaults.buttonColors(containerColor = if (isShowingInitial) Color(0xFFD32F2F) else Color(0xFF7F8C8D)),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)
                             ) { Text(text = if (isShowingInitial) "최신 스냅샷" else "최초 스냅샷", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
@@ -347,6 +404,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
         Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
             if (tabIndex == 0) {
+                Box(modifier = Modifier.fillMaxSize().pullRefresh(generalPullRefreshState)) {
                 if (generalPosts.isEmpty()) {
                     Text(
                         "조건에 맞는 공용 기록이 없습니다.",
@@ -382,7 +440,15 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         item { Button(onClick = { generalLimit += 100 }, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("더 보기 (현재 $generalLimit 개)") } }
                     }
                 }
+                PullRefreshIndicator(
+                    refreshing = isGeneralRefreshing,
+                    state = generalPullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    contentColor = PastelNavy
+                )
+                } // end generalPullRefreshBox
             } else {
+                Box(modifier = Modifier.fillMaxSize().pullRefresh(blockPullRefreshState)) {
                 if (blockPosts.isEmpty()) {
                     Text(
                         "조건에 맞는 공용 차단 기록이 없습니다.",
@@ -426,6 +492,13 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         item { Button(onClick = { blockLimit += 100 }, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF5D4037) else Color(0xFFFFCDD2), contentColor = if(isDarkMode) Color.White else warningRed)) { Text("더 보기 (현재 $blockLimit 개)") } }
                     }
                 }
+                PullRefreshIndicator(
+                    refreshing = isBlockRefreshing,
+                    state = blockPullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    contentColor = PastelNavy
+                )
+                } // end blockPullRefreshBox
             }
         }
     }
