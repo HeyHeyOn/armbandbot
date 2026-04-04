@@ -64,12 +64,23 @@ fun BotLoginScreen(
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
+
+                            val leftMsign = url?.contains("dcinside.com") == true &&
+                                    url.contains("msign.dcinside.com") == false
+                            val cookies = CookieManager.getInstance().getCookie("https://dcinside.com")
+                            val hasCiC = cookies?.contains("ci_c=") == true
+
+                            if (leftMsign || hasCiC) {
+                                if (cookies != null) onLoginSuccess(cookies)
+                                return
+                            }
+
                             view?.evaluateJavascript(
                                 "(function() { return document.body.innerText.includes('로그아웃'); })();"
                             ) { result ->
                                 if (result == "true") {
-                                    val cookies = CookieManager.getInstance().getCookie("https://dcinside.com")
-                                    if (cookies != null) onLoginSuccess(cookies)
+                                    val c = CookieManager.getInstance().getCookie("https://dcinside.com")
+                                    if (c != null) onLoginSuccess(c)
                                 }
                             }
                         }
@@ -229,8 +240,8 @@ fun BotLoginScreen(
                                     val js = """
                                         (function() {
                                           try {
-                                            var codeField = document.querySelector('input[name="code"]');
-                                            var pwField = document.querySelector('input[name="password"]');
+                                            var codeField = document.querySelector('input[name="code"], input#code');
+                                            var pwField = document.querySelector('input[name="password"], input#password');
                                             if (codeField && pwField) {
                                               var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                                               setter.call(codeField, '$escapedId');
@@ -238,7 +249,11 @@ fun BotLoginScreen(
                                               setter.call(pwField, '$escapedPw');
                                               pwField.dispatchEvent(new Event('input', { bubbles: true }));
                                               var form = codeField.closest('form');
-                                              if (form) form.submit();
+                                              if (form) {
+                                                var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+                                                if (submitBtn) submitBtn.click();
+                                                form.submit();
+                                              }
                                             }
                                           } catch(e) {}
                                         })();
@@ -246,16 +261,31 @@ fun BotLoginScreen(
                                     view?.evaluateJavascript(js, null)
                                 }
 
+                                val leftMsign = url?.contains("dcinside.com") == true &&
+                                        url.contains("msign.dcinside.com") == false
+                                val cookies = CookieManager.getInstance().getCookie("https://dcinside.com")
+                                val hasCiC = cookies?.contains("ci_c=") == true
+
+                                if (leftMsign || hasCiC) {
+                                    handler.removeCallbacks(timeoutRunnable)
+                                    if (cookies != null) {
+                                        isLoadingState.value = false
+                                        triggerLoginState.value = false
+                                        onLoginSuccess(cookies)
+                                    }
+                                    return
+                                }
+
                                 view?.evaluateJavascript(
                                     "(function() { return document.body.innerText.includes('로그아웃'); })();"
                                 ) { result ->
                                     if (result == "true") {
                                         handler.removeCallbacks(timeoutRunnable)
-                                        val cookies = CookieManager.getInstance().getCookie("https://dcinside.com")
-                                        if (cookies != null) {
+                                        val c = CookieManager.getInstance().getCookie("https://dcinside.com")
+                                        if (c != null) {
                                             isLoadingState.value = false
                                             triggerLoginState.value = false
-                                            onLoginSuccess(cookies)
+                                            onLoginSuccess(c)
                                         }
                                     }
                                 }
