@@ -683,6 +683,7 @@ class BotService : Service() {
 
                 val replyBox = row.selectFirst(".reply_numbox")
                 val currentCommentCount = replyBox?.text()
+                    ?.split("/")?.firstOrNull()
                     ?.replace(Regex("[^0-9]"), "")
                     ?.toIntOrNull() ?: 0
 

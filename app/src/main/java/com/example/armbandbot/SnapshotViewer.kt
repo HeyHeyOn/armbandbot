@@ -2,7 +2,10 @@ package com.heyheyon.armbandbot
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
@@ -225,18 +230,8 @@ private fun buildMentionAnnotatedString(text: String, textColor: Color): Annotat
 
 @Composable
 fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
+    val context = LocalContext.current
     var showWebView by remember { mutableStateOf(false) }
-
-    BackHandler(enabled = true) { onBack() }
-    BackHandler(enabled = showWebView) { showWebView = false }
-
-    val isDarkMode = LocalIsDarkMode.current
-    val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF1F3F5)
-    val topBarColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
-    val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
-    val subTextColor = if (isDarkMode) Color(0xFFAAAEB3) else Color.Gray
-    val dividerColor = if (isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE)
-    val commentBgColor = if (isDarkMode) Color(0xFF2C323A) else Color(0xFFF8F9FA)
 
     val initialPath = remember(snapshotPath) {
         if (snapshotPath.endsWith("_latest.html"))
@@ -248,6 +243,28 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
     }
 
     var currentPath by remember { mutableStateOf(snapshotPath) }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(File(currentPath).readBytes()) }
+                Toast.makeText(context, "추출 완료", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "추출 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    BackHandler(enabled = true) { onBack() }
+    BackHandler(enabled = showWebView) { showWebView = false }
+
+    val isDarkMode = LocalIsDarkMode.current
+    val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF1F3F5)
+    val topBarColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
+    val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
+    val subTextColor = if (isDarkMode) Color(0xFFAAAEB3) else Color.Gray
+    val dividerColor = if (isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE)
+    val commentBgColor = if (isDarkMode) Color(0xFF2C323A) else Color(0xFFF8F9FA)
     var data by remember { mutableStateOf<SnapshotData?>(null) }
     var sortOption by remember { mutableStateOf(CommentSort.ORIGINAL) }
 
@@ -280,6 +297,12 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                 )
                 Text("스냅샷 뷰어", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
                 Spacer(Modifier.weight(1f))
+                IconButton(onClick = {
+                    val suggestedFileName = File(currentPath).name
+                    exportLauncher.launch(suggestedFileName)
+                }) {
+                    Icon(Icons.Filled.Save, contentDescription = "추출", tint = PastelNavy)
+                }
                 TextButton(onClick = { showWebView = true }) {
                     Text("원본 HTML", color = PastelNavy, fontSize = 13.sp)
                 }
@@ -433,15 +456,6 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                             .weight(1f)
                                             .padding(10.dp)
                                     ) {
-                                        if (comment.isBlocked) {
-                                            Text(
-                                                "🚫 차단됨",
-                                                fontSize = 12.sp,
-                                                color = Color(0xFFD32F2F),
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Spacer(Modifier.height(2.dp))
-                                        }
                                         Row(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             modifier = Modifier.fillMaxWidth()
@@ -455,7 +469,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                             Text(
                                                 buildMentionAnnotatedString(
                                                     comment.content,
-                                                    if (comment.isBlocked) Color(0xFFCC0000) else textColor
+                                                    textColor
                                                 ),
                                                 fontSize = 13.sp
                                             )
