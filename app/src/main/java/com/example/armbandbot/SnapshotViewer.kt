@@ -158,28 +158,40 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     }
 
     var lastDepth0Index: Int? = null
-    val comments = doc.select("ul.cmt_list > li.ub-content").mapIndexed { idx, li ->
+    val comments = mutableListOf<SnapshotComment>()
+    doc.select("ul.cmt_list > li.ub-content").forEachIndexed { idx, li ->
         val isReply = li.hasClass("reply_cont")
         val liStyle = li.attr("style")
         val isBlocked = liStyle.contains("fff5f5", ignoreCase = true) || liStyle.contains("D32F2F", ignoreCase = true)
         val nick_c = li.select(".info_lay .nickname em").text()
         val ipUid = li.select(".info_lay .ip").text()
+        // 수정4: 닉네임이 '댓글돌이'이고 uid/ip가 없는 광고 댓글 스킵
+        if (nick_c == "댓글돌이" && ipUid.isEmpty()) {
+            if (!isReply) lastDepth0Index = idx
+            return@forEachIndexed
+        }
         val commentAuthor = if (ipUid.isNotEmpty()) "$nick_c($ipUid)" else nick_c
         val commentDate = li.select(".info_lay .date_time").text()
         val contentWrap = li.select(".usertxt.ub-word")
+        val memoHtml = li.html()
+        // 수정3: memo(li HTML) 및 vr_player_tag 포함 여부도 체크
         val hasVr = contentWrap.select(".vr_player, .vr_player_tag, div.voice_wrap, iframe[src*=voice/player]").isNotEmpty()
             || contentWrap.html().contains("voice_wrap") || contentWrap.html().contains("voice/player")
+            || memoHtml.contains("voice_wrap") || memoHtml.contains("voice/player")
         val dcconImgs = contentWrap.select("img.written_dccon")
         val hasDcconInSrc = contentWrap.select("img").any { it.attr("src").contains("dccon.php") }
-        val content = when {
-            hasVr -> "[보이스리플]"
+        val baseContent = when {
             dcconImgs.isNotEmpty() -> "[디시콘]"
             hasDcconInSrc -> "[디시콘]"
             else -> contentWrap.select("p.usertxt").text().ifEmpty { contentWrap.text() }
         }
+        // 수정3: 보이스리플이면 기존 텍스트에 추가 (교체 아님)
+        val content = if (hasVr) {
+            if (baseContent.isBlank()) "[보이스리플]" else "$baseContent\n[보이스리플]"
+        } else baseContent
         val parentIdx = if (isReply) lastDepth0Index else null
         if (!isReply) lastDepth0Index = idx
-        SnapshotComment(
+        comments.add(SnapshotComment(
             author = commentAuthor,
             date = commentDate,
             content = content,
@@ -188,7 +200,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
             dcconUrls = emptyList(),
             commentIndex = idx,
             parentIndex = parentIdx
-        )
+        ))
     }
 
     return SnapshotData(title, author, date, viewCount, bodyElements, comments)
@@ -403,7 +415,9 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(
-                                            if (comment.isBlocked) Color(0xFFFFEBEE) else commentBgColor
+                                            if (comment.isBlocked) {
+                                                if (isDarkMode) Color(0xFF3B1A1A) else Color(0xFFFFEBEE)
+                                            } else commentBgColor
                                         )
                                 ) {
                                     if (comment.isBlocked) {
@@ -436,14 +450,13 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                             Text(comment.date, fontSize = 11.sp, color = subTextColor)
                                         }
                                         Spacer(Modifier.height(4.dp))
-                                        when {
-                                            comment.isBlocked -> Text(
-                                                "차단된 댓글입니다.",
-                                                fontSize = 13.sp,
-                                                color = Color(0xFFCC0000)
-                                            )
-                                            comment.content.isNotBlank() -> Text(
-                                                buildMentionAnnotatedString(comment.content, textColor),
+                                        // 수정1: 차단 댓글도 실제 content 표시 (강조 스타일은 유지)
+                                        if (comment.content.isNotBlank()) {
+                                            Text(
+                                                buildMentionAnnotatedString(
+                                                    comment.content,
+                                                    if (comment.isBlocked) Color(0xFFCC0000) else textColor
+                                                ),
                                                 fontSize = 13.sp
                                             )
                                         }
