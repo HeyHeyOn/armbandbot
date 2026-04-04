@@ -1052,19 +1052,26 @@ class BotService : Service() {
             if (!config.isExpertMode) return null
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
-            // 1. 광고/네비/헤더 등 불필요 요소 제거
+            // 1. 광고/네비/헤더/푸터/사이드바 등 불필요 요소 제거
             doc.select(
-                "header.header, nav.nav, footer.footer, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share"
+                "header.header, nav.nav, footer.dcfoot, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share, #bottom_listwrap, .section.right_content, .right_content, .stickyunit"
             ).remove()
             doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
             // 2. 모든 script 제거 (JS 간섭 방지)
             doc.select("script").remove()
 
-            // 3. 댓글창 + 댓글창 이후 모든 요소 제거 (하단 글목록, 버튼, 검색창 포함)
-            val commentAnchor = doc.selectFirst(".view_comment, #focus_cmt, #jquery_jplayer")
+            // 3. 댓글창 + 댓글창 이후 불필요 요소 제거
+            // 기준 앵커: #jquery_jplayer (댓글창 바로 앞 요소) 또는 .view_comment
+            val commentParent = doc.selectFirst(".view_content_wrap, article.gallview_contents, .gallview_contents")
+            val commentAnchor = doc.selectFirst(".view_comment, #focus_cmt")
+            val jplayer = doc.getElementById("jquery_jplayer")
+
+            // jplayer 제거
+            jplayer?.remove()
+
+            // 댓글창 이후 형제 요소 제거 (글쓰기 버튼 영역 등)
             if (commentAnchor != null) {
-                // 댓글창부터 body 끝까지 모든 형제 요소 제거
                 var next = commentAnchor.nextElementSibling()
                 while (next != null) {
                     val toRemove = next
@@ -1073,8 +1080,7 @@ class BotService : Service() {
                 }
                 commentAnchor.remove()
             } else {
-                // fallback: 하단 관련 요소 직접 제거
-                doc.select(".view_comment, #focus_cmt, .comment_wrap, .cmt_list, #cmt_list, .reply_box, .cmt_write, #cmt_write, [class*=comment_list], .view_reply, #reply_w, #bottom_listwrap, .view_bottom_btnbox, .gall_listwrap, .bottom_paging_wrap, form[name=frmSearch]").remove()
+                doc.select(".view_comment, #focus_cmt, .view_bottom_btnbox").remove()
             }
 
             // 4. commentsArray로 실제 DC 렌더링 구조로 댓글 블록 생성 후 body 끝에 append
@@ -1368,7 +1374,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                 commentBox.appendChild(cmtList)
                 commentWrap.appendChild(commentBox)
                 viewCommentDiv.appendChild(commentWrap)
-                doc.body()?.appendChild(viewCommentDiv)
+
+                // 원본 댓글창 위치(view_content_wrap 내부)에 삽입, 없으면 body 끝
+                if (commentParent != null) {
+                    commentParent.appendChild(viewCommentDiv)
+                } else {
+                    doc.body()?.appendChild(viewCommentDiv)
+                }
             }
 
             // 6. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
