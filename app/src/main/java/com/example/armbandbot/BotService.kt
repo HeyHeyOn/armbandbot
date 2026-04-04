@@ -394,10 +394,11 @@ class BotService : Service() {
         }
 
         val existingJob = activeBots[botId]
-        if (existingJob != null && existingJob.isActive) {
+        if (existingJob != null && existingJob.isActive && !existingJob.isCancelled) {
             sendLog("[복구 점검] 이미 실행 중인 Job이 있어 START를 건너뜁니다.", botId)
             return START_STICKY
         }
+        // 취소됐거나 완료된 잡은 정리 후 새 Job 생성
         activeBots.remove(botId)
 
         botPref.edit()
@@ -549,7 +550,17 @@ class BotService : Service() {
                     .putBoolean("should_restore_after_restart", false)
                     .putBoolean("is_running", false)
                     .apply()
-                sendLog("🚨 로그인 세션이 만료되었습니다. 봇을 종료합니다.", botId)
+                val autoLoginEnabled = botPref.getBoolean("auto_login_enabled", false)
+                if (autoLoginEnabled) {
+                    sendLog("🔄 세션이 만료되었습니다. 자동 로그인을 시도합니다.", botId)
+                    val sessionExpiredIntent = Intent("BOT_SESSION_EXPIRED").apply {
+                        putExtra("BOT_ID", botId)
+                        setPackage(applicationContext.packageName)
+                    }
+                    sendBroadcast(sessionExpiredIntent)
+                } else {
+                    sendLog("🚨 로그인 세션이 만료되었습니다. 봇을 종료합니다.", botId)
+                }
                 break
             }
 
@@ -1988,6 +1999,14 @@ class BotService : Service() {
                         dbSnapshotPath = path
                         GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
                         GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
+                        try {
+                            val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                            val srcFile = File(path)
+                            val blockedFile = srcFile.parentFile?.let {
+                                File(it, "${gallId}_${postNumStr}_blocked_${ts}.html")
+                            }
+                            blockedFile?.writeText(srcFile.readText())
+                        } catch (e: Exception) { /* 무시 */ }
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
@@ -2116,6 +2135,14 @@ class BotService : Service() {
                         dbSnapshotPath = path
                         GlobalBotState.getDb()?.postDao()?.updateSnapshotPath(gallType, gallId, postNumStr, path)
                         GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
+                        try {
+                            val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                            val srcFile = File(path)
+                            val blockedFile = srcFile.parentFile?.let {
+                                File(it, "${gallId}_${postNumStr}_blocked_${ts}.html")
+                            }
+                            blockedFile?.writeText(srcFile.readText())
+                        } catch (e: Exception) { /* 무시 */ }
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
