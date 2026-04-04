@@ -1137,10 +1137,14 @@ class BotService : Service() {
                     botCommentsDiv.appendChild(cmtDiv)
                 }
 
-                // 5. view_content_wrap 또는 body 맨 마지막에 삽입
-                val anchor = doc.selectFirst(".view_content_wrap, #container, .view-container")
-                if (anchor != null) anchor.appendChild(botCommentsDiv)
-                else doc.body()?.appendChild(botCommentsDiv)
+                // 5. 디시 원본 댓글 컨테이너(div.gall_exposure) 다음에 삽입, 없으면 view_content_wrap 다음 형제로, 없으면 body 마지막에
+                val gallExposure = doc.selectFirst("div.gall_exposure")
+                val contentWrap = doc.selectFirst(".gallview_contents, .view_content_wrap")
+                when {
+                    gallExposure != null -> gallExposure.after(botCommentsDiv)
+                    contentWrap != null -> contentWrap.after(botCommentsDiv)
+                    else -> doc.body()?.appendChild(botCommentsDiv)
+                }
             }
 
             // 6. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
@@ -2041,20 +2045,6 @@ class BotService : Service() {
             presentation.notificationMessage
         )
 
-        if (config.isExpertMode && config.isSnapshotBlocked) {
-            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                try {
-                    val path = saveSnapshotFn()
-                    if (path != null) {
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
-                        blockHistorySnapshotPath = path
-                    }
-                } finally {
-                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
-                }
-            }
-        }
-
         GlobalBotState.saveBlockHistory(
             gallType = gallType,
             gallId = gallId,
@@ -2063,9 +2053,24 @@ class BotService : Service() {
             targetAuthor = postDisplayAuthor,
             targetContent = postTitle,
             blockReason = dbBlockReason ?: "알 수 없음",
-            snapshotPath = blockHistorySnapshotPath ?: dbSnapshotPath,
+            snapshotPath = null,
             creationDate = postDate
         )
+
+        if (config.isExpertMode && config.isSnapshotBlocked) {
+            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+                try {
+                    val lastId = GlobalBotState.getDb()?.postDao()?.getLastBlockHistoryId()
+                    val path = saveSnapshotFn()
+                    if (lastId != null && path != null) {
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPathById(lastId, path)
+                        blockHistorySnapshotPath = path
+                    }
+                } finally {
+                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
+                }
+            }
+        }
 
         if (config.isDebugMode) {
             sendLog("[디버그][차단요청] 게시글 차단 요청 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: blockReasonText}", botId)
@@ -2172,20 +2177,6 @@ class BotService : Service() {
             presentation.notificationMessage
         )
 
-        if (config.isExpertMode && config.isSnapshotBlocked) {
-            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                try {
-                    val path = saveSnapshotFn()
-                    if (path != null) {
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPath(gallType, gallId, postNumStr, path)
-                        blockHistorySnapshotPath = path
-                    }
-                } finally {
-                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
-                }
-            }
-        }
-
         GlobalBotState.saveBlockHistory(
             gallType = gallType,
             gallId = gallId,
@@ -2194,9 +2185,24 @@ class BotService : Service() {
             targetAuthor = cmtDisplayAuthor,
             targetContent = commentMemo,
             blockReason = dbBlockReason ?: "알 수 없음",
-            snapshotPath = blockHistorySnapshotPath ?: dbSnapshotPath,
+            snapshotPath = null,
             creationDate = commentDate
         )
+
+        if (config.isExpertMode && config.isSnapshotBlocked) {
+            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+                try {
+                    val lastId = GlobalBotState.getDb()?.postDao()?.getLastBlockHistoryId()
+                    val path = saveSnapshotFn()
+                    if (lastId != null && path != null) {
+                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPathById(lastId, path)
+                        blockHistorySnapshotPath = path
+                    }
+                } finally {
+                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
+                }
+            }
+        }
 
         if (config.isDebugMode) {
             sendLog("[디버그][차단요청] 댓글 차단 요청 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: blockReasonText}", botId)

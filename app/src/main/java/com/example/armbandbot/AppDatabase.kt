@@ -98,8 +98,14 @@ interface PostDao {
     @Query("UPDATE block_history SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
     fun updateBlockHistorySnapshotPath(gallType: String, gallId: String, postNum: String, path: String)
 
+    @Query("UPDATE block_history SET snapshotPath = :path WHERE id = :id")
+    fun updateBlockHistorySnapshotPathById(id: Int, path: String)
+
+    @Query("SELECT id FROM block_history ORDER BY id DESC LIMIT 1")
+    fun getLastBlockHistoryId(): Int?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertBlockHistory(history: BlockHistory)
+    fun insertBlockHistory(history: BlockHistory): Long
 
     @Query("DELETE FROM block_history")
     fun clearAllBlockHistory()
