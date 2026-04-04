@@ -1039,9 +1039,23 @@ class BotService : Service() {
             if (!config.isExpertMode) return null
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
+            // 1. 광고/네비/헤더 등 불필요 요소 제거 (댓글 영역은 건드리지 않음)
+            doc.select(
+                "header.header, nav.nav, footer.footer, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share"
+            ).remove()
+            doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
+
+            // 2. commentsArray로 별도 styled HTML 블록 생성
             if (comments != null && comments.length() > 0) {
-                val commentsDiv = org.jsoup.nodes.Element("div")
-                commentsDiv.attr("id", "snapshot-comments")
+                val botCommentsDiv = org.jsoup.nodes.Element("div")
+                botCommentsDiv.attr("id", "bot-comments")
+                botCommentsDiv.attr("style", "max-width:760px;margin:32px auto;padding:16px;border-top:3px solid #4A6583;font-family:system-ui,sans-serif;")
+
+                val header = org.jsoup.nodes.Element("h3")
+                header.attr("style", "color:#4A6583;margin-bottom:12px;")
+                header.text("댓글 (${comments.length()}개)")
+                botCommentsDiv.appendChild(header)
+
                 for (i in 0 until comments.length()) {
                     val cmt = comments.getJSONObject(i)
                     val depth = cmt.optInt("depth", 0)
@@ -1052,101 +1066,80 @@ class BotService : Service() {
                     val date = cmt.optString("reg_date", "")
                     val memo = cmt.optString("memo", "")
                     val vrPlayerTag = cmt.optString("vr_player_tag", "")
-
                     val no = cmt.optString("no", "")
 
-                    val cmtDiv = org.jsoup.nodes.Element("div")
-                    cmtDiv.addClass("s-cmt")
-                    val cmtStyle = StringBuilder("padding:8px 0; border-bottom:1px solid #f0f0f0;")
-                    if (depth == 1) {
-                        cmtDiv.addClass("s-cmt-reply")
-                        cmtStyle.append(" padding-left:24px;")
-                    }
+                    val cmtStyle = StringBuilder("padding:10px 0;border-bottom:1px solid #eee;")
+                    if (depth == 1) cmtStyle.append("padding-left:24px;")
                     if (blockedCommentNo != null && no == blockedCommentNo) {
-                        cmtDiv.addClass("s-cmt-blocked")
-                        cmtStyle.append(" border-left:4px solid red; background:#fff0f0; padding-left:8px;")
+                        cmtStyle.append("border-left:4px solid #D32F2F;background:#fff5f5;padding-left:8px;")
                     }
+
+                    val cmtDiv = org.jsoup.nodes.Element("div")
+                    cmtDiv.addClass("cmt-item")
                     cmtDiv.attr("style", cmtStyle.toString())
 
                     val nickSpan = org.jsoup.nodes.Element("span")
-                    nickSpan.addClass("s-cmt-nick")
-                    nickSpan.attr("style", "font-weight:bold; margin-right:8px;")
+                    nickSpan.attr("style", "font-weight:bold;")
                     nickSpan.text(author)
 
                     val dateSpan = org.jsoup.nodes.Element("span")
-                    dateSpan.addClass("s-cmt-date")
-                    dateSpan.attr("style", "color:gray; font-size:12px; margin-right:8px;")
+                    dateSpan.attr("style", "color:#aaa;font-size:12px;margin-left:8px;")
                     dateSpan.text(date)
 
-                    // memo에서 dccon img 추출
+                    // memo에서 dccon img 추출 후 텍스트와 이미지 분리
                     val memoDoc = org.jsoup.Jsoup.parseBodyFragment(memo)
                     val dcconImgs = memoDoc.select("img.written_dccon, img[src*=dccon.php]")
-
-                    val textP = org.jsoup.nodes.Element("p")
-                    textP.addClass("s-cmt-text")
-                    textP.attr("style", "display:block; margin-top:4px;")
                     memoDoc.select("img").remove()
-                    textP.text(memoDoc.body().text())
 
-                    cmtDiv.appendChild(nickSpan)
-                    cmtDiv.appendChild(dateSpan)
-                    cmtDiv.appendChild(textP)
+                    val contentDiv = org.jsoup.nodes.Element("div")
+                    contentDiv.attr("style", "margin-top:4px;")
+                    contentDiv.text(memoDoc.body().text())
 
-                    // memo의 dccon img 삽입
+                    // dccon 이미지 삽입
                     if (dcconImgs.isNotEmpty()) {
-                        val dcconWrap = org.jsoup.nodes.Element("div")
-                        dcconWrap.addClass("s-dccon-wrap")
                         dcconImgs.forEach { dcconImg ->
                             val rawSrc = dcconImg.attr("src")
                             if (rawSrc.isNotEmpty()) {
-                                val dcconSrc = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
-                                val dcconImgEl = org.jsoup.nodes.Element("img")
-                                dcconImgEl.attr("src", dcconSrc)
-                                dcconImgEl.addClass("s-dccon")
-                                dcconWrap.appendChild(dcconImgEl)
+                                val src = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
+                                val img = org.jsoup.nodes.Element("img")
+                                img.attr("src", src)
+                                img.addClass("s-dccon")
+                                contentDiv.appendChild(img)
                             }
                         }
-                        cmtDiv.appendChild(dcconWrap)
                     } else if (vrPlayerTag.isNotEmpty()) {
-                        // fallback: vr_player_tag에서 dccon 추출
                         org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("img").forEach { dcconImg ->
                             val rawSrc = dcconImg.attr("src")
                             if (rawSrc.contains("dccon.php") || rawSrc.contains("viewimage.php")) {
-                                val dcconSrc = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
-                                val dcconWrap = org.jsoup.nodes.Element("div")
-                                dcconWrap.addClass("s-dccon-wrap")
-                                val dcconImgEl = org.jsoup.nodes.Element("img")
-                                dcconImgEl.attr("src", dcconSrc)
-                                dcconImgEl.addClass("s-dccon")
-                                dcconWrap.appendChild(dcconImgEl)
-                                cmtDiv.appendChild(dcconWrap)
+                                val src = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
+                                val img = org.jsoup.nodes.Element("img")
+                                img.attr("src", src)
+                                img.addClass("s-dccon")
+                                contentDiv.appendChild(img)
                             }
                         }
                     }
 
-                    commentsDiv.appendChild(cmtDiv)
+                    cmtDiv.appendChild(nickSpan)
+                    cmtDiv.appendChild(dateSpan)
+                    cmtDiv.appendChild(contentDiv)
+                    botCommentsDiv.appendChild(cmtDiv)
                 }
-                doc.select(".cmt_list, .cmt-box, #comment_dirc, .comment_wrap, [class*=comment_list]").remove()
-                commentsDiv.attr("style", "max-width:800px; margin:20px auto; padding:16px; font-family:sans-serif; border-top:2px solid #eee;")
-                doc.body()?.appendChild(commentsDiv)
+
+                // 3. view_content_wrap 또는 body 맨 마지막에 삽입
+                val anchor = doc.selectFirst(".view_content_wrap, #container, .view-container")
+                if (anchor != null) anchor.appendChild(botCommentsDiv)
+                else doc.body()?.appendChild(botCommentsDiv)
             }
 
-            val html = buildSnapshotHtml(
-                botId = botId,
-                gallType = gallType,
-                gallId = gallId,
-                postNumStr = postNumStr,
-                cookie = cookie,
-                debugLabel = "스냅샷",
-                existingDoc = doc
-            ) ?: return null
-
+            // 4. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
             return try {
                 val cacheDir = File(cacheDir, "snapshots_$botId")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
 
                 val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
                 val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
+                val html = doc.html()
 
                 latestFile.writeText(html)
                 if (!initialFile.exists()) {
