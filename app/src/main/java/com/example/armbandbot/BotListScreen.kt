@@ -161,7 +161,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.1.1-beta3", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.1.1-beta4", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
             }
@@ -228,7 +228,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                                     ?.trim()
                                     ?.ifBlank { "bot" }
                                     ?: "bot"
-                                exportLauncher.launch("${botName}_settings_1.1.1-beta3.json")
+                                exportLauncher.launch("${botName}_settings_1.1.1-beta4.json")
                             },
                             onDuplicateRequest = { swipedBotId = null; botToDuplicate = botId },
                             onDeleteRequest = { swipedBotId = null; botToDelete = botId }

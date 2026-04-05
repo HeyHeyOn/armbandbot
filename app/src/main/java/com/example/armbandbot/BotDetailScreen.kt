@@ -656,7 +656,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         FilledTonalButton(
                             onClick = {
                                 val safeName = botName.replace(Regex("[\\/:*?\"<>|]"), "_").trim().ifBlank { "bot" }
-                                exportLauncher.launch("${safeName}_settings_1.1.1-beta3.json")
+                                exportLauncher.launch("${safeName}_settings_1.1.1-beta4.json")
                             },
                             shape = RoundedCornerShape(50),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),

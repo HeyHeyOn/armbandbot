@@ -9,16 +9,17 @@ import java.io.InputStreamReader
 import java.util.UUID
 
 private const val BOT_SETTINGS_EXPORT_VERSION = 1
+private const val BOT_SETTINGS_APP_VERSION = "1.1.1-beta4"
 private const val BOT_SETTINGS_FILE_TYPE = "armbandbot_bot_settings"
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 
-private val EXPORTABLE_STRING_KEYS = listOf(
+internal val EXPORTABLE_STRING_KEYS = listOf(
     "target_urls",
     "search_type",
     "block_reason_text"
 )
 
-private val EXPORTABLE_BOOLEAN_KEYS = listOf(
+internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block",
     "is_search_mode", "is_user_filter_mode", "is_nickname_filter_mode",
@@ -28,24 +29,25 @@ private val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
 
-private val EXPORTABLE_INT_KEYS = listOf(
+internal val EXPORTABLE_INT_KEYS = listOf(
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days"
 )
 
-private val EXPORTABLE_FLOAT_KEYS = listOf(
+internal val EXPORTABLE_FLOAT_KEYS = listOf(
     "delay_post_min_sec", "delay_post_max_sec", "delay_page_min_sec",
     "delay_page_max_sec", "delay_cycle_min_sec", "delay_cycle_max_sec"
 )
 
-private val EXPORTABLE_STRING_SET_KEYS = listOf(
+internal val EXPORTABLE_STRING_SET_KEYS = listOf(
     "normal", "bypass", "search_keywords", "user_blacklist", "user_whitelist",
     "nickname_blacklist", "nickname_whitelist", "url_whitelist", "image_alt_blacklist", "voice_blacklist"
 )
 
 data class BotSettingsExport(
+    val schemaVersion: Int = BOT_SETTINGS_CURRENT_SCHEMA_VERSION,
     val exportVersion: Int = BOT_SETTINGS_EXPORT_VERSION,
-    val appVersion: String = "1.1.1-beta3",
+    val exportedByAppVersion: String = BOT_SETTINGS_APP_VERSION,
     val botName: String,
     val strings: Map<String, String>,
     val booleans: Map<String, Boolean>,
@@ -90,7 +92,9 @@ fun importBotSettingsAsNewBot(context: Context, uriString: String): String {
         BufferedReader(InputStreamReader(input, Charsets.UTF_8)).readText()
     } ?: error("파일을 읽을 수 없습니다.")
 
-    val imported = parseBotSettingsExport(JSONObject(jsonText))
+    val json = JSONObject(jsonText)
+    validateBotSettingsFileType(json)
+    val imported = parseAndMigrateBotSettingsExport(json)
     val newBotId = "bot_${UUID.randomUUID()}"
     val botPref = context.getSharedPreferences("bot_prefs_$newBotId", Context.MODE_PRIVATE)
     applyImportedSettings(botPref, imported)
@@ -130,8 +134,10 @@ private fun applyImportedSettings(botPref: SharedPreferences, imported: BotSetti
 
 private fun BotSettingsExport.toJson(): JSONObject = JSONObject().apply {
     put("type", BOT_SETTINGS_FILE_TYPE)
+    put("schemaVersion", schemaVersion)
     put("exportVersion", exportVersion)
-    put("appVersion", appVersion)
+    put("exportedByAppVersion", exportedByAppVersion)
+    put("appVersion", exportedByAppVersion)
     put("botName", botName)
     put("strings", JSONObject(strings))
     put("booleans", JSONObject(booleans))
@@ -140,23 +146,12 @@ private fun BotSettingsExport.toJson(): JSONObject = JSONObject().apply {
     put("stringSets", JSONObject(stringSets.mapValues { JSONArray(it.value) }))
 }
 
-private fun parseBotSettingsExport(json: JSONObject): BotSettingsExport {
+private fun validateBotSettingsFileType(json: JSONObject) {
     val type = json.optString("type", "")
     require(type == BOT_SETTINGS_FILE_TYPE) { "완장봇 설정 파일이 아닙니다." }
-
-    return BotSettingsExport(
-        exportVersion = json.optInt("exportVersion", 1),
-        appVersion = json.optString("appVersion", ""),
-        botName = json.optString("botName", "가져온 봇"),
-        strings = json.optJSONObject("strings").toStringMap(EXPORTABLE_STRING_KEYS),
-        booleans = json.optJSONObject("booleans").toBooleanMap(EXPORTABLE_BOOLEAN_KEYS),
-        ints = json.optJSONObject("ints").toIntMap(EXPORTABLE_INT_KEYS),
-        floats = json.optJSONObject("floats").toFloatMap(EXPORTABLE_FLOAT_KEYS),
-        stringSets = json.optJSONObject("stringSets").toStringListMap(EXPORTABLE_STRING_SET_KEYS)
-    )
 }
 
-private fun JSONObject?.toStringMap(keys: List<String>): Map<String, String> =
+internal fun JSONObject?.toStringMap(keys: List<String>): Map<String, String> =
     keys.mapNotNull { key ->
         val obj = this ?: return@mapNotNull null
         if (!obj.has(key) || obj.isNull(key)) return@mapNotNull null
@@ -164,16 +159,16 @@ private fun JSONObject?.toStringMap(keys: List<String>): Map<String, String> =
         if (value.isEmpty()) null else key to value
     }.toMap()
 
-private fun JSONObject?.toBooleanMap(keys: List<String>): Map<String, Boolean> =
+internal fun JSONObject?.toBooleanMap(keys: List<String>): Map<String, Boolean> =
     keys.associateWith { key -> this?.optBoolean(key, defaultBooleanValue(key)) ?: defaultBooleanValue(key) }
 
-private fun JSONObject?.toIntMap(keys: List<String>): Map<String, Int> =
+internal fun JSONObject?.toIntMap(keys: List<String>): Map<String, Int> =
     keys.associateWith { key -> this?.optInt(key, defaultIntValue(key)) ?: defaultIntValue(key) }
 
-private fun JSONObject?.toFloatMap(keys: List<String>): Map<String, Float> =
+internal fun JSONObject?.toFloatMap(keys: List<String>): Map<String, Float> =
     keys.associateWith { key -> (this?.optDouble(key, defaultFloatValue(key).toDouble()) ?: defaultFloatValue(key).toDouble()).toFloat() }
 
-private fun JSONObject?.toStringListMap(keys: List<String>): Map<String, List<String>> =
+internal fun JSONObject?.toStringListMap(keys: List<String>): Map<String, List<String>> =
     keys.associateWith { key ->
         val array = this?.optJSONArray(key)
         if (array == null) {
