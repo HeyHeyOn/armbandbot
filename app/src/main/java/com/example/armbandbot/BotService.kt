@@ -14,8 +14,11 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import org.jsoup.Jsoup
 import java.io.File
+import java.net.URI
+import java.net.URLDecoder
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.LinkedHashMap
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
@@ -461,6 +464,85 @@ class BotService : Service() {
         )
     }
 
+    private fun parseQueryParams(url: String): Map<String, String> {
+        val query = try {
+            URI(url).rawQuery
+        } catch (_: Exception) {
+            null
+        } ?: return emptyMap()
+
+        return query.split("&")
+            .mapNotNull { part ->
+                if (part.isBlank()) return@mapNotNull null
+                val pieces = part.split("=", limit = 2)
+                val key = URLDecoder.decode(pieces[0], Charsets.UTF_8.name())
+                val value = URLDecoder.decode(pieces.getOrElse(1) { "" }, Charsets.UTF_8.name())
+                key to value
+            }
+            .toMap()
+    }
+
+    private fun buildUrlWithParams(baseUrl: String, params: Map<String, String>): String {
+        val baseWithoutQuery = baseUrl.substringBefore("?")
+        val query = params.entries.joinToString("&") { (key, value) ->
+            "${java.net.URLEncoder.encode(key, "UTF-8")}=${java.net.URLEncoder.encode(value, "UTF-8")}"
+        }
+        return if (query.isBlank()) baseWithoutQuery else "$baseWithoutQuery?$query"
+    }
+
+    private fun buildSearchPageUrl(cleanBaseUrl: String, searchType: String, keyword: String, page: Int, searchPos: String? = null): String {
+        val params = LinkedHashMap(parseQueryParams(cleanBaseUrl))
+        params["page"] = page.toString()
+        params["s_type"] = searchType
+        params["s_keyword"] = keyword
+        if (searchPos.isNullOrBlank()) params.remove("search_pos") else params["search_pos"] = searchPos
+        return buildUrlWithParams(cleanBaseUrl, params)
+    }
+
+    private fun resolveAbsoluteUrl(baseUrl: String, href: String): String? {
+        if (href.isBlank() || href.startsWith("javascript:", ignoreCase = true)) return null
+        return try {
+            URI(baseUrl).resolve(href).toString()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun normalizeSearchUrlForTraversal(candidateUrl: String, cleanBaseUrl: String, searchType: String, keyword: String): String {
+        val params = LinkedHashMap(parseQueryParams(candidateUrl))
+        params["page"] = params["page"]?.takeIf { it.isNotBlank() } ?: "1"
+        params["s_type"] = searchType
+        params["s_keyword"] = keyword
+        if (params["search_pos"].isNullOrBlank()) params.remove("search_pos")
+        return buildUrlWithParams(cleanBaseUrl, params)
+    }
+
+    private fun extractSearchNavigation(document: org.jsoup.nodes.Document, cleanBaseUrl: String, searchType: String, keyword: String): SearchNavigation {
+        val currentPageUrl = normalizeSearchUrlForTraversal(document.location(), cleanBaseUrl, searchType, keyword)
+        val currentParams = parseQueryParams(currentPageUrl)
+        val currentPage = currentParams["page"]?.toIntOrNull() ?: 1
+        val currentSearchPos = currentParams["search_pos"].orEmpty()
+
+        val pagingLinks = document.select(".bottom_paging_box a[href]")
+            .mapNotNull { anchor ->
+                val resolved = resolveAbsoluteUrl(document.location(), anchor.attr("href")) ?: return@mapNotNull null
+                val normalized = normalizeSearchUrlForTraversal(resolved, cleanBaseUrl, searchType, keyword)
+                val params = parseQueryParams(normalized)
+                SearchLinkCandidate(anchor.text().trim(), normalized, params["page"]?.toIntOrNull(), params["search_pos"].orEmpty())
+            }
+            .distinctBy { it.url }
+
+        val nextPageUrl = pagingLinks
+            .filter { it.page != null && it.page > currentPage && it.searchPos == currentSearchPos }
+            .minByOrNull { it.page ?: Int.MAX_VALUE }
+            ?.url
+
+        val nextSearchChunkUrl = pagingLinks.firstOrNull { it.text.contains("?? ??") }?.url
+            ?: pagingLinks.firstOrNull { it.page == 1 && it.searchPos.isNotBlank() && it.searchPos != currentSearchPos }?.url
+
+        return SearchNavigation(currentPageUrl, currentSearchPos, nextPageUrl, nextSearchChunkUrl)
+    }
+
     private fun evaluateManagerPermission(document: org.jsoup.nodes.Document): ManagerPermissionStatus {
         val location = document.location().lowercase()
         val bodyText = document.body()?.text().orEmpty()
@@ -687,6 +769,8 @@ class BotService : Service() {
         gallId: String,
         pageUrl: String,
         ciTokenFallbackAllowed: Boolean = true,
+        searchBaseUrl: String? = null,
+        searchKeyword: String? = null,
         gallogCache: MutableMap<String, Pair<Int, Int>>,
         blockDuration: String,
         blockReason: String,
@@ -694,7 +778,7 @@ class BotService : Service() {
         notifyIfEnabled: (String, String, String) -> Unit
     ): PageProcessResult {
         if (config.isDebugMode) {
-            sendLog("[디버그][페이지] 페이지 URL 접근 시작: $pageUrl", botId)
+            sendLog("[???][???] ??? URL ?? ??: $pageUrl", botId)
         }
         val document = Jsoup.connect(pageUrl)
             .userAgent("Mozilla/5.0")
@@ -702,23 +786,16 @@ class BotService : Service() {
             .get()
         val managerPermissionStatus = evaluateManagerPermission(document)
         if (config.isDebugMode) {
-            sendLog("[\uB514\uBC84\uADF8][\uD398\uC774\uC9C0] \uAD00\uB9AC\uC790 \uAD8C\uD55C \uD655\uC778 \uACB0\uACFC: ${managerPermissionStatus.logLabel}", botId)
+            sendLog("[???][???] ??? ?? ?? ??: ${managerPermissionStatus.logLabel}", botId)
         }
-        if (managerPermissionStatus == ManagerPermissionStatus.LOGIN_REQUIRED ||
-            managerPermissionStatus == ManagerPermissionStatus.NO_PERMISSION
-        ) {
-            return PageProcessResult(
-                firstPostNumOfThisPage = "",
-                isPageEmpty = true,
-                hiddenSearchPos = "",
-                managerPermissionStatus = managerPermissionStatus
-            )
+        if (managerPermissionStatus == ManagerPermissionStatus.LOGIN_REQUIRED || managerPermissionStatus == ManagerPermissionStatus.NO_PERMISSION) {
+            return PageProcessResult("", true, "", managerPermissionStatus = managerPermissionStatus)
         }
 
         val ciToken = document.select("input[name=ci_t]").attr("value")
         val postRows = document.select(".ub-content")
         if (config.isDebugMode) {
-            sendLog("[디버그][페이지] 발견한 게시글 수: ${postRows.size}", botId)
+            sendLog("[???][???] ??? ??? ?: ${postRows.size}", botId)
         }
 
         var firstPostNumOfThisPage = ""
@@ -728,88 +805,47 @@ class BotService : Service() {
             val titleElement = row.selectFirst(".gall_tit a:not(.reply_numbox)") ?: continue
             val text = titleElement.text()
             val link = titleElement.attr("href")
-
-            if (text.isNotBlank() && link.contains("no=")) {
-                isPageEmpty = false
-
-                val postNumStr = Regex("no=([0-9]+)").find(link)?.groupValues?.get(1) ?: "0"
-                val postNumber = postNumStr.toIntOrNull() ?: 0
-
-                val writerElement = row.selectFirst(".gall_writer")
-                val postUid = writerElement?.attr("data-uid") ?: ""
-                val postIp = writerElement?.attr("data-ip") ?: ""
-                val postNick = writerElement?.attr("data-nick") ?: ""
-                val postAuthor = postUid.ifEmpty { postIp }
-                val postDisplayAuthor = if (postAuthor.isNotEmpty()) "$postNick($postAuthor)" else postNick
-
-                val dateElement = row.selectFirst(".gall_date")
-                val rawPostDate = dateElement?.attr("title")?.takeIf { it.isNotBlank() }
-                    ?: dateElement?.text()
-                    ?: ""
-                val postDate = normalizeCreationDate(rawPostDate)
-
-                if (firstPostNumOfThisPage.isEmpty()) {
-                    firstPostNumOfThisPage = postNumStr
-                }
-
-                val replyBox = row.selectFirst(".reply_numbox")
-                val currentCommentCount = replyBox?.text()
-                    ?.split("/")?.firstOrNull()
-                    ?.replace(Regex("[^0-9]"), "")
-                    ?.toIntOrNull() ?: 0
-
-                val savedCommentCount = GlobalBotState.getCommentCount(gallType, gallId, postNumStr)
-                if (savedCommentCount != -1 && savedCommentCount == currentCommentCount) {
-                    if (config.isDebugMode) {
-                        sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변화 없음 (저장: $savedCommentCount, 현재: $currentCommentCount) → 스킵", botId)
-                    }
-                    continue
-                }
-                if (config.isDebugMode) {
-                    sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변화 감지 (저장: $savedCommentCount, 현재: $currentCommentCount) → 처리 시작", botId)
-                }
-
-                try {
-                    processSinglePost(
-                        config = config,
-                        botId = botId,
-                        cookie = cookie,
-                        gallType = gallType,
-                        gallId = gallId,
-                        postNumStr = postNumStr,
-                        postNumber = postNumber,
-                        text = text,
-                        postUid = postUid,
-                        postAuthor = postAuthor,
-                        postNick = postNick,
-                        postDisplayAuthor = postDisplayAuthor,
-                        postDate = postDate,
-                        currentCommentCount = currentCommentCount,
-                        ciToken = ciToken,
-                        gallogCache = gallogCache,
-                        blockDuration = blockDuration,
-                        blockReason = blockReason,
-                        delChk = delChk,
-                        notifyIfEnabled = notifyIfEnabled
-                    )
-                } catch (e: Exception) {
-                    sendLog("[읽기 실패] 번호: $postNumStr", botId)
-                }
-
-                delay(randomDelay(config.postMinMs, config.postMaxMs))
+            if (text.isBlank() || !link.contains("no=")) continue
+            isPageEmpty = false
+            val postNumStr = Regex("no=([0-9]+)").find(link)?.groupValues?.get(1) ?: "0"
+            val postNumber = postNumStr.toIntOrNull() ?: 0
+            val writerElement = row.selectFirst(".gall_writer")
+            val postUid = writerElement?.attr("data-uid") ?: ""
+            val postIp = writerElement?.attr("data-ip") ?: ""
+            val postNick = writerElement?.attr("data-nick") ?: ""
+            val postAuthor = postUid.ifEmpty { postIp }
+            val postDisplayAuthor = if (postAuthor.isNotEmpty()) "$postNick($postAuthor)" else postNick
+            val dateElement = row.selectFirst(".gall_date")
+            val rawPostDate = dateElement?.attr("title")?.takeIf { it.isNotBlank() } ?: dateElement?.text() ?: ""
+            val postDate = normalizeCreationDate(rawPostDate)
+            if (firstPostNumOfThisPage.isEmpty()) firstPostNumOfThisPage = postNumStr
+            val replyBox = row.selectFirst(".reply_numbox")
+            val currentCommentCount = replyBox?.text()?.split("/")?.firstOrNull()?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0
+            val savedCommentCount = GlobalBotState.getCommentCount(gallType, gallId, postNumStr)
+            if (savedCommentCount != -1 && savedCommentCount == currentCommentCount) {
+                if (config.isDebugMode) sendLog("[???][???] ??: $postNumStr / ?? ? ?? ?? (??: $savedCommentCount, ??: $currentCommentCount) ? ??", botId)
+                continue
             }
+            if (config.isDebugMode) sendLog("[???][???] ??: $postNumStr / ?? ? ?? ?? (??: $savedCommentCount, ??: $currentCommentCount) ? ?? ??", botId)
+            try {
+                processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, notifyIfEnabled)
+            } catch (e: Exception) {
+                sendLog("[?? ??] ??: $postNumStr", botId)
+            }
+            delay(randomDelay(config.postMinMs, config.postMaxMs))
         }
 
-        val hiddenSearchPos = if (ciTokenFallbackAllowed) {
-            document.select("input[name=search_pos]").attr("value")
-        } else {
-            ""
-        }
+        val searchNavigation = if (ciTokenFallbackAllowed && searchBaseUrl != null && searchKeyword != null) {
+            extractSearchNavigation(document, searchBaseUrl, config.searchType, searchKeyword)
+        } else null
 
         return PageProcessResult(
             firstPostNumOfThisPage = firstPostNumOfThisPage,
             isPageEmpty = isPageEmpty,
-            hiddenSearchPos = hiddenSearchPos
+            hiddenSearchPos = searchNavigation?.currentSearchPos.orEmpty(),
+            nextPageUrl = searchNavigation?.nextPageUrl,
+            nextSearchChunkUrl = searchNavigation?.nextSearchChunkUrl,
+            currentPageUrl = searchNavigation?.currentPageUrl
         )
     }
 
@@ -829,37 +865,23 @@ class BotService : Service() {
         val gallType = parsedTarget.gallType
 
         var cleanBaseUrl = rawUrl.replace(Regex("&page=[0-9]+"), "")
-        if (config.isSearchMode) {
-            cleanBaseUrl = cleanBaseUrl.replace(SEARCH_PARAM_CLEANER_REGEX, "")
-        }
+        if (config.isSearchMode) cleanBaseUrl = cleanBaseUrl.replace(SEARCH_PARAM_CLEANER_REGEX, "")
 
-        val activeKeywords =
-            if (config.isSearchMode && config.searchKeywords.isNotEmpty()) {
-                config.searchKeywords
-            } else {
-                listOf("")
-            }
+        val activeKeywords = if (config.isSearchMode && config.searchKeywords.isNotEmpty()) config.searchKeywords else listOf("")
 
         for ((keywordIndex, keyword) in activeKeywords.withIndex()) {
             if (!serviceScope.isActive) break
-
-            val pageMatch = Regex("&page=([0-9]+)").find(rawUrl)
+            val pageMatch = Regex("[?&]page=([0-9]+)").find(rawUrl)
             var currentPage = pageMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
-            var currentSearchPos = ""
+            var currentSearchPos = parseQueryParams(rawUrl)["search_pos"].orEmpty()
             var logicalPageCount = 0
             var previousPageFirstPostNum = ""
+            var currentPageUrl = if (config.isSearchMode) buildSearchPageUrl(cleanBaseUrl, config.searchType, keyword, currentPage, currentSearchPos.ifBlank { null }) else "$cleanBaseUrl&page=$currentPage"
+            val visitedSearchUrls = mutableSetOf<String>()
 
             while (logicalPageCount < config.scanPageCount && serviceScope.isActive) {
-                var pageUrl = "$cleanBaseUrl&page=$currentPage"
-
-                if (config.isSearchMode) {
-                    val encodedKeyword = java.net.URLEncoder.encode(keyword, "UTF-8")
-                    pageUrl += "&s_type=${config.searchType}&s_keyword=$encodedKeyword"
-                    if (currentSearchPos.isNotEmpty()) {
-                        pageUrl += "&search_pos=$currentSearchPos"
-                    }
-                }
-
+                val pageUrl = if (config.isSearchMode) normalizeSearchUrlForTraversal(currentPageUrl, cleanBaseUrl, config.searchType, keyword) else currentPageUrl
+                if (config.isSearchMode && !visitedSearchUrls.add(pageUrl)) break
                 try {
                     val pageResult = processPage(
                         config = config,
@@ -869,6 +891,8 @@ class BotService : Service() {
                         gallId = gallId,
                         pageUrl = pageUrl,
                         ciTokenFallbackAllowed = config.isSearchMode,
+                        searchBaseUrl = if (config.isSearchMode) cleanBaseUrl else null,
+                        searchKeyword = if (config.isSearchMode) keyword else null,
                         gallogCache = gallogCache,
                         blockDuration = blockDuration,
                         blockReason = blockReason,
@@ -876,71 +900,42 @@ class BotService : Service() {
                         notifyIfEnabled = notifyIfEnabled
                     )
                     when (pageResult.managerPermissionStatus) {
-                        ManagerPermissionStatus.LOGIN_REQUIRED -> {
-                            sendLog("\uD83D\uDEA8 [$gallId] \uB85C\uADF8\uC778 \uD398\uC774\uC9C0\uB85C \uC774\uB3D9\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC138\uC158 \uB9CC\uB8CC \uAC00\uB2A5\uC131\uC774 \uC788\uC5B4 \uBD07\uC744 \uC911\uC9C0\uD569\uB2C8\uB2E4.", botId)
-                            sendBlockNotification(
-                                botId = botId,
-                                botName = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-                                    .getString("bot_name", "\uC774\uB984 \uC5C6\uB294 \uBD07") ?: "\uC774\uB984 \uC5C6\uB294 \uBD07",
-                                title = "\uB85C\uADF8\uC778 \uD544\uC694",
-                                message = "[$gallId] \uB85C\uADF8\uC778 \uD398\uC774\uC9C0\uB85C \uC774\uB3D9\uB418\uC5B4 \uC138\uC158 \uB9CC\uB8CC \uAC00\uB2A5\uC131\uC73C\uB85C \uBD07\uC744 \uC911\uC9C0\uD588\uC2B5\uB2C8\uB2E4."
-                            )
-                            return false
-                        }
-                        ManagerPermissionStatus.NO_PERMISSION -> {
-                            sendLog("\uD83D\uDEA8 [$gallId] \uD604\uC7AC \uB85C\uADF8\uC778\uB41C \uACC4\uC815\uC5D0 \uAD00\uB9AC\uC790 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD07 \uC791\uB3D9\uC744 \uC911\uC9C0\uD569\uB2C8\uB2E4.", botId)
-                            sendBlockNotification(
-                                botId = botId,
-                                botName = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-                                    .getString("bot_name", "\uC774\uB984 \uC5C6\uB294 \uBD07") ?: "\uC774\uB984 \uC5C6\uB294 \uBD07",
-                                title = "\uAD00\uB9AC \uAD8C\uD55C \uC5C6\uC74C",
-                                message = "[$gallId] \uAC24\uB7EC\uB9AC\uC758 \uAD00\uB9AC\uC790 \uAD8C\uD55C\uC774 \uD655\uC778\uB418\uC9C0 \uC54A\uC544 \uBD07\uC744 \uC911\uC9C0\uD588\uC2B5\uB2C8\uB2E4."
-                            )
-                            return false
-                        }
-                        ManagerPermissionStatus.AMBIGUOUS -> {
-                            sendLog("\u26A0\uFE0F [$gallId] \uAD00\uB9AC\uC790 \uAD8C\uD55C \uD655\uC778 DOM\uC774 \uBD88\uBA85\uD655\uD569\uB2C8\uB2E4. \uAC80\uC0C9 \uD398\uC774\uC9C0 \uD2B9\uC774 \uCF00\uC774\uC2A4\uB85C \uBCF4\uACE0 \uC774\uBC88 \uD398\uC774\uC9C0\uB294 \uACC4\uC18D \uC9C4\uD589\uD569\uB2C8\uB2E4.", botId)
-                        }
-                        ManagerPermissionStatus.CONFIRMED -> Unit
+                        ManagerPermissionStatus.LOGIN_REQUIRED -> return false
+                        ManagerPermissionStatus.NO_PERMISSION -> return false
+                        ManagerPermissionStatus.AMBIGUOUS, ManagerPermissionStatus.CONFIRMED -> Unit
                     }
 
-                    val firstPostNumOfThisPage = pageResult.firstPostNumOfThisPage
-                    val isPageEmpty = pageResult.isPageEmpty
-                    val hiddenPos = pageResult.hiddenSearchPos
-
-                    if (config.isSearchMode &&
-                        (isPageEmpty || (logicalPageCount > 0 && firstPostNumOfThisPage == previousPageFirstPostNum))
-                    ) {
-                        if (hiddenPos.isNotEmpty()) {
-                            val nextPos = hiddenPos.toInt() + 10000
-                            currentSearchPos = nextPos.toString()
-                            currentPage = 1
-                            previousPageFirstPostNum = ""
-                            sendLog("[1만 개 단위 돌파!] 다음 검색 덩어리($nextPos)로 점프합니다.", botId)
-
-                            delay(randomDelay(config.pageMinMs, config.pageMaxMs))
-                            continue
-                        } else {
-                            break
+                    val shouldAdvanceChunk = config.isSearchMode && (pageResult.isPageEmpty || (logicalPageCount > 0 && pageResult.firstPostNumOfThisPage == previousPageFirstPostNum))
+                    if (shouldAdvanceChunk) {
+                        val nextChunkUrl = pageResult.nextSearchChunkUrl
+                        if (nextChunkUrl.isNullOrBlank()) break
+                        currentPageUrl = nextChunkUrl
+                        currentPage = parseQueryParams(nextChunkUrl)["page"]?.toIntOrNull() ?: 1
+                        currentSearchPos = parseQueryParams(nextChunkUrl)["search_pos"].orEmpty()
+                        previousPageFirstPostNum = ""
+                    } else {
+                        previousPageFirstPostNum = pageResult.firstPostNumOfThisPage
+                        if (config.isSearchMode) {
+                            val nextPageUrl = pageResult.nextPageUrl ?: pageResult.nextSearchChunkUrl
+                            if (nextPageUrl.isNullOrBlank()) break
+                            currentPageUrl = nextPageUrl
+                            currentPage = parseQueryParams(nextPageUrl)["page"]?.toIntOrNull() ?: (currentPage + 1)
+                            currentSearchPos = parseQueryParams(nextPageUrl)["search_pos"].orEmpty()
                         }
                     }
-
-                    previousPageFirstPostNum = firstPostNumOfThisPage
                 } catch (e: Exception) {
-                    sendLog("[$currentPage 페이지] 읽기 실패.", botId)
+                    sendLog("[$currentPage ???] ?? ??.", botId)
                 }
 
                 logicalPageCount++
-                currentPage++
-
-                if (logicalPageCount < config.scanPageCount) {
-                    delay(randomDelay(config.pageMinMs, config.pageMaxMs))
+                if (!config.isSearchMode) {
+                    currentPage++
+                    currentPageUrl = "$cleanBaseUrl&page=$currentPage"
                 }
+                if (logicalPageCount < config.scanPageCount) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
             }
 
-            if (config.isSearchMode && keywordIndex < activeKeywords.size - 1) {
-                delay(randomDelay(config.pageMinMs, config.pageMaxMs))
-            }
+            if (config.isSearchMode && keywordIndex < activeKeywords.size - 1) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
         }
         return true
     }
@@ -2413,7 +2408,24 @@ img.written_dccon{max-width:80px;max-height:80px}
         val firstPostNumOfThisPage: String,
         val isPageEmpty: Boolean,
         val hiddenSearchPos: String,
+        val nextPageUrl: String? = null,
+        val nextSearchChunkUrl: String? = null,
+        val currentPageUrl: String? = null,
         val managerPermissionStatus: ManagerPermissionStatus = ManagerPermissionStatus.CONFIRMED
+    )
+
+    private data class SearchNavigation(
+        val currentPageUrl: String,
+        val currentSearchPos: String,
+        val nextPageUrl: String?,
+        val nextSearchChunkUrl: String?
+    )
+
+    private data class SearchLinkCandidate(
+        val text: String,
+        val url: String,
+        val page: Int?,
+        val searchPos: String
     )
 
     private data class ParsedTargetUrl(
