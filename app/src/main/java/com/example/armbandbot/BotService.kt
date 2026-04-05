@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import org.jsoup.Jsoup
+import org.jsoup.Connection
 import java.io.File
 import java.net.URI
 import java.net.URLDecoder
@@ -27,6 +28,9 @@ class BotService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private val activeBots = ConcurrentHashMap<String, Job>()
     private var wakeLock: PowerManager.WakeLock? = null
+    private val autoLoginCooldownMs = 10 * 60 * 1000L
+    private val autoLoginMaxAttempts = 3
+    private val dcUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     private data class BotConfig(
         val isDebugMode: Boolean,
         val isExpertMode: Boolean,
@@ -547,15 +551,152 @@ class BotService : Service() {
     }
 
     private fun isSessionValid(cookie: String): Boolean {
+        if (cookie.isBlank()) return false
         return try {
             val sessionCheckDoc = Jsoup.connect("https://m.dcinside.com/")
-                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                .userAgent(dcUserAgent)
                 .header("Cookie", cookie)
                 .get()
 
             sessionCheckDoc.text().contains("로그아웃")
         } catch (e: Exception) {
             true
+        }
+    }
+
+    private fun mergeCookieStrings(vararg cookieSources: String?): String {
+        val ordered = LinkedHashMap<String, String>()
+        cookieSources.filterNotNull().forEach { source ->
+            source.split(';')
+                .map { it.trim() }
+                .filter { it.contains('=') }
+                .forEach { part ->
+                    val index = part.indexOf('=')
+                    if (index > 0) {
+                        val key = part.substring(0, index).trim()
+                        val value = part.substring(index + 1).trim()
+                        if (key.isNotEmpty() && value.isNotEmpty()) {
+                            ordered[key] = value
+                        }
+                    }
+                }
+        }
+        return ordered.entries.joinToString("; ") { "${it.key}=${it.value}" }
+    }
+
+    private fun Map<String, String>.toCookieHeader(): String {
+        return entries.joinToString("; ") { "${it.key}=${it.value}" }
+    }
+
+    private fun canAttemptAutoLogin(botPref: android.content.SharedPreferences): Pair<Boolean, String?> {
+        val autoLoginEnabled = botPref.getBoolean("auto_login_enabled", false)
+        if (!autoLoginEnabled) return false to "자동 로그인이 꺼져 있습니다."
+
+        val loginId = botPref.getString("auto_login_id", "")?.trim().orEmpty()
+        val loginPw = botPref.getString("auto_login_pw", "")?.trim().orEmpty()
+        if (loginId.isBlank() || loginPw.isBlank()) {
+            return false to "저장된 자동 로그인 계정 정보가 없습니다."
+        }
+
+        val lastFailureAt = botPref.getLong("auto_login_last_failure_at", 0L)
+        val failureCount = botPref.getInt("auto_login_failure_count", 0)
+        val now = System.currentTimeMillis()
+        if (failureCount >= autoLoginMaxAttempts && now - lastFailureAt < autoLoginCooldownMs) {
+            val remainSec = ((autoLoginCooldownMs - (now - lastFailureAt)).coerceAtLeast(0L) / 1000L)
+            return false to "자동 로그인 쿨다운 중입니다. ${remainSec}초 후 다시 시도합니다."
+        }
+
+        return true to null
+    }
+
+    private fun recordAutoLoginFailure(botPref: android.content.SharedPreferences) {
+        val now = System.currentTimeMillis()
+        val lastFailureAt = botPref.getLong("auto_login_last_failure_at", 0L)
+        val nextCount = if (now - lastFailureAt > autoLoginCooldownMs) 1 else botPref.getInt("auto_login_failure_count", 0) + 1
+        botPref.edit()
+            .putInt("auto_login_failure_count", nextCount)
+            .putLong("auto_login_last_failure_at", now)
+            .apply()
+    }
+
+    private fun resetAutoLoginFailureState(botPref: android.content.SharedPreferences) {
+        botPref.edit()
+            .putInt("auto_login_failure_count", 0)
+            .putLong("auto_login_last_failure_at", 0L)
+            .apply()
+    }
+
+    private fun performAutoLogin(loginId: String, loginPw: String): String? {
+        val loginPageResponse = Jsoup.connect("https://msign.dcinside.com/login")
+            .userAgent(dcUserAgent)
+            .method(Connection.Method.GET)
+            .execute()
+
+        val loginDocument = loginPageResponse.parse()
+        val conKey = loginDocument.select("input[name=conKey]").attr("value")
+        val returnUrl = loginDocument.select("input[name=r_url]").attr("value").ifBlank { "https://m.dcinside.com" }
+        val token = loginDocument.select("input[name=_token]").attr("value")
+        val csrfToken = loginDocument.select("meta[name=csrf-token]").attr("content")
+
+        val loginResponse = Jsoup.connect("https://msign.dcinside.com/login")
+            .userAgent(dcUserAgent)
+            .referrer("https://msign.dcinside.com/login")
+            .header("Origin", "https://msign.dcinside.com")
+            .header("X-CSRF-TOKEN", csrfToken)
+            .cookies(loginPageResponse.cookies())
+            .data("code", loginId)
+            .data("password", loginPw)
+            .data("loginCash", "on")
+            .data("conKey", conKey)
+            .data("r_url", returnUrl)
+            .data("_token", token)
+            .method(Connection.Method.POST)
+            .followRedirects(false)
+            .ignoreContentType(true)
+            .execute()
+
+        val mergedCookie = mergeCookieStrings(
+            loginPageResponse.cookies().toCookieHeader(),
+            loginResponse.cookies().toCookieHeader()
+        )
+
+        if (mergedCookie.isBlank()) return null
+        return if (isSessionValid(mergedCookie)) mergedCookie else null
+    }
+
+    private fun tryRecoverSession(
+        botId: String,
+        botPref: android.content.SharedPreferences,
+        reason: String,
+        currentCookie: String
+    ): String? {
+        val (canAttempt, blockedReason) = canAttemptAutoLogin(botPref)
+        if (!canAttempt) {
+            sendLog("[자동 로그인 건너뜀] $blockedReason", botId)
+            return null
+        }
+
+        val loginId = botPref.getString("auto_login_id", "")?.trim().orEmpty()
+        val loginPw = botPref.getString("auto_login_pw", "")?.trim().orEmpty()
+
+        return try {
+            sendLog("[자동 로그인] $reason → 재로그인 시도", botId)
+            val refreshedCookie = performAutoLogin(loginId, loginPw)
+            if (refreshedCookie.isNullOrBlank()) {
+                recordAutoLoginFailure(botPref)
+                sendLog("[자동 로그인 실패] 로그인 응답은 받았지만 유효 세션을 확보하지 못했습니다.", botId)
+                null
+            } else {
+                val mergedCookie = mergeCookieStrings(currentCookie, refreshedCookie)
+                botPref.edit().putString("saved_cookie", mergedCookie).apply()
+                resetAutoLoginFailureState(botPref)
+                sendLog("[자동 로그인 성공] 새 세션을 저장했고 작업을 재개합니다.", botId)
+                mergedCookie
+            }
+        } catch (e: Exception) {
+            recordAutoLoginFailure(botPref)
+            sendLog("[자동 로그인 오류] ${e.message ?: "알 수 없는 오류"}", botId)
+            null
         }
     }
 
@@ -588,6 +729,7 @@ class BotService : Service() {
         cookie: String,
         botPref: android.content.SharedPreferences
     ) {
+        var currentCookie = cookie.ifBlank { botPref.getString("saved_cookie", "") ?: "" }
         GlobalBotState.initDb(this@BotService)
         GlobalBotState.startSnapshotWorker(this)
         sendLog("[복구 점검] runBotLoop 시작 완료", botId)
@@ -632,22 +774,28 @@ class BotService : Service() {
                 sendLog("[디버그][사이클] 대상 URL 목록 (${urlList.size}개): ${urlList.joinToString(", ")}", botId)
             }
 
-            if (!isSessionValid(cookie)) {
+            if (!isSessionValid(currentCookie)) {
+                val recoveredCookie = tryRecoverSession(
+                    botId = botId,
+                    botPref = botPref,
+                    reason = "세션 만료 감지",
+                    currentCookie = currentCookie
+                )
+                if (recoveredCookie != null) {
+                    currentCookie = recoveredCookie
+                    continue
+                }
+
                 botPref.edit()
                     .putBoolean("should_restore_after_restart", false)
                     .putBoolean("is_running", false)
                     .apply()
-                val autoLoginEnabled = botPref.getBoolean("auto_login_enabled", false)
-                if (autoLoginEnabled) {
-                    sendLog("🔄 세션이 만료되었습니다. 자동 로그인을 시도합니다.", botId)
-                    val sessionExpiredIntent = Intent("BOT_SESSION_EXPIRED").apply {
-                        putExtra("BOT_ID", botId)
-                        setPackage(applicationContext.packageName)
-                    }
-                    sendBroadcast(sessionExpiredIntent)
-                } else {
-                    sendLog("🚨 로그인 세션이 만료되었습니다. 봇을 종료합니다.", botId)
+                sendLog("🚨 로그인 세션이 만료되었고 자동 복구에 실패했습니다. 봇을 종료합니다.", botId)
+                val sessionExpiredIntent = Intent("BOT_SESSION_EXPIRED").apply {
+                    putExtra("BOT_ID", botId)
+                    setPackage(applicationContext.packageName)
                 }
+                sendBroadcast(sessionExpiredIntent)
                 break
             }
 
@@ -663,10 +811,10 @@ class BotService : Service() {
                     sendLog("[디버그][사이클] URL 처리 시작 (${urlIndex + 1}/${urlList.size}): $rawUrl", botId)
                 }
 
-                val canContinue = processTargetUrl(
+                val processOutcome = processTargetUrl(
                     config = config,
                     botId = botId,
-                    cookie = cookie,
+                    cookie = currentCookie,
                     rawUrl = rawUrl,
                     gallogCache = gallogCache,
                     blockDuration = blockDuration,
@@ -675,12 +823,34 @@ class BotService : Service() {
                     notifyIfEnabled = ::notifyIfEnabled
                 )
 
-                if (!canContinue) {
-                    botPref.edit()
-                        .putBoolean("should_restore_after_restart", false)
-                        .putBoolean("is_running", false)
-                        .apply()
-                    return
+                when (processOutcome) {
+                    UrlProcessOutcome.CONTINUE -> Unit
+                    UrlProcessOutcome.LOGIN_REQUIRED -> {
+                        val recoveredCookie = tryRecoverSession(
+                            botId = botId,
+                            botPref = botPref,
+                            reason = "페이지 접근 중 로그인 필요 판정",
+                            currentCookie = currentCookie
+                        )
+                        if (recoveredCookie != null) {
+                            currentCookie = recoveredCookie
+                            break
+                        }
+                        botPref.edit()
+                            .putBoolean("should_restore_after_restart", false)
+                            .putBoolean("is_running", false)
+                            .apply()
+                        sendLog("[인증 복구 실패] 로그인 필요 상태가 반복되어 봇을 종료합니다.", botId)
+                        return
+                    }
+                    UrlProcessOutcome.NO_PERMISSION -> {
+                        botPref.edit()
+                            .putBoolean("should_restore_after_restart", false)
+                            .putBoolean("is_running", false)
+                            .apply()
+                        sendLog("[권한 없음] 매니저 권한이 없어 작업을 중단합니다.", botId)
+                        return
+                    }
                 }
 
                 if (urlIndex < urlList.size - 1) {
@@ -792,8 +962,8 @@ class BotService : Service() {
         blockReason: String,
         delChk: String,
         notifyIfEnabled: (String, String, String) -> Unit
-    ): Boolean {
-        val parsedTarget = parseTargetUrl(rawUrl) ?: return true
+    ): UrlProcessOutcome {
+        val parsedTarget = parseTargetUrl(rawUrl) ?: return UrlProcessOutcome.CONTINUE
         val gallId = parsedTarget.gallId
         val gallType = parsedTarget.gallType
 
@@ -833,8 +1003,8 @@ class BotService : Service() {
                         notifyIfEnabled = notifyIfEnabled
                     )
                     when (pageResult.managerPermissionStatus) {
-                        ManagerPermissionStatus.LOGIN_REQUIRED -> return false
-                        ManagerPermissionStatus.NO_PERMISSION -> return false
+                        ManagerPermissionStatus.LOGIN_REQUIRED -> return UrlProcessOutcome.LOGIN_REQUIRED
+                        ManagerPermissionStatus.NO_PERMISSION -> return UrlProcessOutcome.NO_PERMISSION
                         ManagerPermissionStatus.AMBIGUOUS, ManagerPermissionStatus.CONFIRMED -> Unit
                     }
 
@@ -870,7 +1040,7 @@ class BotService : Service() {
 
             if (config.isSearchMode && keywordIndex < activeKeywords.size - 1) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
         }
-        return true
+        return UrlProcessOutcome.CONTINUE
     }
 
     private fun captureBlockSnapshot(
@@ -2370,6 +2540,12 @@ img.written_dccon{max-width:80px;max-height:80px}
         val postCount: Int,
         val commentCount: Int
     )
+
+    private enum class UrlProcessOutcome {
+        CONTINUE,
+        LOGIN_REQUIRED,
+        NO_PERMISSION
+    }
 
     private data class BlockPresentation(
         val blockReason: String,
