@@ -537,7 +537,7 @@ class BotService : Service() {
             .minByOrNull { it.page ?: Int.MAX_VALUE }
             ?.url
 
-        val nextSearchChunkUrl = pagingLinks.firstOrNull { it.text.contains("?? ??") }?.url
+        val nextSearchChunkUrl = pagingLinks.firstOrNull { it.text.contains("다음 검색") }?.url
             ?: pagingLinks.firstOrNull { it.page == 1 && it.searchPos.isNotBlank() && it.searchPos != currentSearchPos }?.url
 
         return SearchNavigation(currentPageUrl, currentSearchPos, nextPageUrl, nextSearchChunkUrl)
@@ -778,7 +778,7 @@ class BotService : Service() {
         notifyIfEnabled: (String, String, String) -> Unit
     ): PageProcessResult {
         if (config.isDebugMode) {
-            sendLog("[???][???] ??? URL ?? ??: $pageUrl", botId)
+            sendLog("[디버그][페이지] 처리 URL 접근 시작: $pageUrl", botId)
         }
         val document = Jsoup.connect(pageUrl)
             .userAgent("Mozilla/5.0")
@@ -786,7 +786,7 @@ class BotService : Service() {
             .get()
         val managerPermissionStatus = evaluateManagerPermission(document)
         if (config.isDebugMode) {
-            sendLog("[???][???] ??? ?? ?? ??: ${managerPermissionStatus.logLabel}", botId)
+            sendLog("[디버그][페이지] 매니저 권한 상태: ${managerPermissionStatus.logLabel}", botId)
         }
         if (managerPermissionStatus == ManagerPermissionStatus.LOGIN_REQUIRED || managerPermissionStatus == ManagerPermissionStatus.NO_PERMISSION) {
             return PageProcessResult("", true, "", managerPermissionStatus = managerPermissionStatus)
@@ -795,7 +795,7 @@ class BotService : Service() {
         val ciToken = document.select("input[name=ci_t]").attr("value")
         val postRows = document.select(".ub-content")
         if (config.isDebugMode) {
-            sendLog("[???][???] ??? ??? ?: ${postRows.size}", botId)
+            sendLog("[디버그][페이지] 게시글 행 수: ${postRows.size}", botId)
         }
 
         var firstPostNumOfThisPage = ""
@@ -823,14 +823,14 @@ class BotService : Service() {
             val currentCommentCount = replyBox?.text()?.split("/")?.firstOrNull()?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0
             val savedCommentCount = GlobalBotState.getCommentCount(gallType, gallId, postNumStr)
             if (savedCommentCount != -1 && savedCommentCount == currentCommentCount) {
-                if (config.isDebugMode) sendLog("[???][???] ??: $postNumStr / ?? ? ?? ?? (??: $savedCommentCount, ??: $currentCommentCount) ? ??", botId)
+                if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변경 없음 (저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
                 continue
             }
-            if (config.isDebugMode) sendLog("[???][???] ??: $postNumStr / ?? ? ?? ?? (??: $savedCommentCount, ??: $currentCommentCount) ? ?? ??", botId)
+            if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변경 감지 (저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
             try {
                 processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, notifyIfEnabled)
             } catch (e: Exception) {
-                sendLog("[?? ??] ??: $postNumStr", botId)
+                sendLog("[처리 오류] 번호: $postNumStr", botId)
             }
             delay(randomDelay(config.postMinMs, config.postMaxMs))
         }
@@ -924,7 +924,7 @@ class BotService : Service() {
                         }
                     }
                 } catch (e: Exception) {
-                    sendLog("[$currentPage ???] ?? ??.", botId)
+                    sendLog("[$currentPage 페이지] 처리 실패.", botId)
                 }
 
                 logicalPageCount++
