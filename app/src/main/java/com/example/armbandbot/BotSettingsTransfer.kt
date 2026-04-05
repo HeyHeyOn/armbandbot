@@ -45,7 +45,7 @@ private val EXPORTABLE_STRING_SET_KEYS = listOf(
 
 data class BotSettingsExport(
     val exportVersion: Int = BOT_SETTINGS_EXPORT_VERSION,
-    val appVersion: String = "1.1.1-beta1",
+    val appVersion: String = "1.1.1-beta2",
     val botName: String,
     val strings: Map<String, String>,
     val booleans: Map<String, Boolean>,

@@ -139,9 +139,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             runCatching {
                 writeBotSettingsJson(context, uri.toString(), exportBotSettings(context, botId))
             }.onSuccess {
-                Toast.makeText(context, "??? ??????.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "JSON 설정 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
             }.onFailure {
-                Toast.makeText(context, it.message ?: "?? ????? ??????.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, it.message ?: "JSON 설정 파일 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -655,7 +655,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(onClick = {
                             val safeName = botName.replace(Regex("[\\/:*?\"<>|]"), "_").trim().ifBlank { "bot" }
-                            exportLauncher.launch("${safeName}_settings_1.1.1-beta1.json")
+                            exportLauncher.launch("${safeName}_settings_1.1.1-beta2.json")
                         }, modifier = Modifier.size(40.dp)) {
                             Icon(Icons.Filled.FileDownload, contentDescription = "?? ????", tint = PastelNavy)
                         }

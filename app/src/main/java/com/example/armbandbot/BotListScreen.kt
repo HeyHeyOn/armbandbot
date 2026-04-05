@@ -95,9 +95,9 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                 .filter { id -> id.isNotBlank() }
             botIds.clear()
             botIds.addAll(savedIds)
-            Toast.makeText(context, "??? ? ??? ??????.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "설정 파일을 불러와 새 봇으로 추가했습니다.", Toast.LENGTH_SHORT).show()
         }.onFailure {
-            Toast.makeText(context, it.message ?: "?? ????? ??????.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, it.message ?: "설정 파일 불러오기에 실패했습니다.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -108,9 +108,9 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
         runCatching {
             writeBotSettingsJson(context, uri.toString(), exportBotSettings(context, botId))
         }.onSuccess {
-            Toast.makeText(context, "??? ??????.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "JSON 설정 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
         }.onFailure {
-            Toast.makeText(context, it.message ?: "?? ????? ??????.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, it.message ?: "JSON 설정 파일 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -151,9 +151,20 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                 Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                     Spacer(modifier = Modifier.width(16.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.1.0", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.1.1-beta2", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                    }
+                    FilledTonalButton(
+                        onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.18f),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Filled.FileUpload, contentDescription = "설정 파일 불러오기", modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("불러오기", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -176,7 +187,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("블록을 왼쪽으로 밀면 복사/삭제가 가능합니다.", fontSize = 13.sp, color = subTextColor)
+                        Text("블록을 왼쪽으로 밀면 내보내기/복사/삭제가 가능합니다.", fontSize = 13.sp, color = subTextColor)
                     }
                 }
             }
@@ -220,7 +231,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                                     ?.trim()
                                     ?.ifBlank { "bot" }
                                     ?: "bot"
-                                exportLauncher.launch("${botName}_settings_1.1.1-beta1.json")
+                                exportLauncher.launch("${botName}_settings_1.1.1-beta2.json")
                             },
                             onDuplicateRequest = { swipedBotId = null; botToDuplicate = botId },
                             onDeleteRequest = { swipedBotId = null; botToDelete = botId }
@@ -331,9 +342,9 @@ fun BotListItem(
         Row(modifier = Modifier.matchParentSize().padding(end = buttonGap).background(Color.Transparent), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(12.dp)).background(Color(0xFF2E7D6F)).clickable { onExportRequest() }, contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Icon(androidx.compose.material.icons.Icons.Filled.FileDownload, contentDescription = "????", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(androidx.compose.material.icons.Icons.Filled.FileDownload, contentDescription = "내보내기", tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("????", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("내보내기", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(modifier = Modifier.width(buttonGap))
