@@ -24,10 +24,12 @@ class AutoRestartReceiver : BroadcastReceiver() {
             return
         }
 
-        scheduleWatchdog(context)
-        Log.d("AutoRestartReceiver", "restoreRunningBots 호출 시작")
-        restoreRunningBots(context)
-        Log.d("AutoRestartReceiver", "restoreRunningBots 호출 완료")
+        Log.d("AutoRestartReceiver", "백그라운드 브로드캐스트에서는 즉시 복구 대신 pending/watchdog만 유지")
+        requestRestoreRunningBots(
+            context = context,
+            trigger = "AutoRestartReceiver",
+            allowImmediateStart = false
+        )
     }
 
     companion object {

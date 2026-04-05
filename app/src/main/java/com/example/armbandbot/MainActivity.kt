@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -317,7 +318,7 @@ fun hasRestorableBots(context: Context): Boolean {
 fun restoreRunningBots(context: Context) {
     val botIds = getRestorableBotIds(context)
 
-    android.util.Log.d("RestoreBots", "restoreRunningBots 시작 / botIds=$botIds")
+    Log.d("RestoreBots", "restoreRunningBots 시작 / botIds=$botIds")
 
     for (botId in botIds) {
         val botPref = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
@@ -325,7 +326,7 @@ fun restoreRunningBots(context: Context) {
         val wasRunning = botPref.getBoolean("is_running", false)
         val savedCookie = botPref.getString("saved_cookie", "") ?: ""
 
-        android.util.Log.d(
+        Log.d(
             "RestoreBots",
             "botId=$botId / shouldRestore=$shouldRestore / wasRunning=$wasRunning / hasCookie=${savedCookie.isNotBlank()}"
         )
@@ -337,7 +338,7 @@ fun restoreRunningBots(context: Context) {
                 action = "START"
             }
 
-            android.util.Log.d("RestoreBots", "botId=$botId START 요청 전송")
+            Log.d("RestoreBots", "botId=$botId START 요청 전송")
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent)
@@ -345,6 +346,43 @@ fun restoreRunningBots(context: Context) {
                 context.startService(serviceIntent)
             }
         }
+    }
+}
+
+fun requestRestoreRunningBots(
+    context: Context,
+    trigger: String,
+    allowImmediateStart: Boolean
+): Boolean {
+    val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
+    val hasRestorableBot = hasRestorableBots(context)
+
+    masterPref.edit()
+        .putBoolean("pending_restore_after_boot", hasRestorableBot)
+        .apply()
+
+    if (!hasRestorableBot) {
+        AutoRestartReceiver.cancelWatchdog(context)
+        Log.d("RestoreBots", "[$trigger] 복구 대상이 없어 pending/watchdog 정리")
+        return false
+    }
+
+    if (!allowImmediateStart) {
+        AutoRestartReceiver.scheduleWatchdog(context)
+        Log.d("RestoreBots", "[$trigger] 즉시 복구를 건너뛰고 pending/watchdog만 유지")
+        return false
+    }
+
+    return try {
+        restoreRunningBots(context)
+        masterPref.edit().putBoolean("pending_restore_after_boot", false).apply()
+        Log.d("RestoreBots", "[$trigger] 즉시 복구 요청 완료")
+        true
+    } catch (e: Exception) {
+        AutoRestartReceiver.scheduleWatchdog(context)
+        masterPref.edit().putBoolean("pending_restore_after_boot", true).apply()
+        Log.e("RestoreBots", "[$trigger] 즉시 복구 실패, pending/watchdog 유지", e)
+        false
     }
 }
 
@@ -356,8 +394,11 @@ class MainActivity : ComponentActivity() {
         val pendingRestoreAfterBoot = masterPref.getBoolean("pending_restore_after_boot", false)
 
         if (pendingRestoreAfterBoot) {
-            restoreRunningBots(this)
-            masterPref.edit().putBoolean("pending_restore_after_boot", false).apply()
+            requestRestoreRunningBots(
+                context = this,
+                trigger = "MainActivity.onCreate",
+                allowImmediateStart = true
+            )
         }
 
         enableEdgeToEdge()

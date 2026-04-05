@@ -114,3 +114,14 @@
 - BotService는 이제 복구 알람의 세부 구현을 직접 들고 있지 않고 watchdog 예약/취소만 위임
 - should_restore_after_restart 플래그가 남아 있는 동안 watchdog이 유지되어 강제 종료 테스트 기준 복구 가능성을 높임
 - beta8 debug/release 빌드 성공
+
+## 1.1.1 beta9
+
+### 주요 변화
+- BootReceiver/AutoRestartReceiver에서 백그라운드 즉시 복구를 중단하고 pending/watchdog 유지 방식으로 보수화
+- MainActivity가 포그라운드 진입 시에만 실제 복구를 시도하도록 변경
+- 즉시 복구 실패 시 예외를 삼켜 앱 크래시 루프 대신 pending/watchdog를 유지하도록 안전장치 추가
+
+### 기술 포인트
+- beta8의 브로드캐스트 직접 startForegroundService 경로가 Android 버전에 따라 예외를 유발할 수 있어 우선 안정화 방향으로 차단
+- 자동 복구는 더 보수적으로 동작하지만, 앱 '계속 중지됨' 현상 방지가 우선
