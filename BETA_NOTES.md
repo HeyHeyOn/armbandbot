@@ -102,3 +102,15 @@
 - 이번 깨짐은 런타임 인코딩 문제보다는 BotService.kt 내부 하드코딩 문자열 손상에 가까웠음
 - 다음 검색 링크 탐색 문자열도 함께 복구
 - beta7 release 빌드 성공
+
+## 1.1.1 beta8
+
+### 주요 변화
+- 자동 복구를 3초짜리 1회성 예약에서 60초 watchdog 재예약 구조로 변경
+- AutoRestartReceiver가 복구 대상 봇 유무를 직접 판단하고, 복구 필요 시 watchdog을 다시 걸도록 정리
+- 부팅/앱 업데이트 직후에도 MainActivity 실행을 기다리지 않고 복구 대상 봇을 즉시 복원하도록 보강
+
+### 기술 포인트
+- BotService는 이제 복구 알람의 세부 구현을 직접 들고 있지 않고 watchdog 예약/취소만 위임
+- should_restore_after_restart 플래그가 남아 있는 동안 watchdog이 유지되어 강제 종료 테스트 기준 복구 가능성을 높임
+- beta8 debug/release 빌드 성공

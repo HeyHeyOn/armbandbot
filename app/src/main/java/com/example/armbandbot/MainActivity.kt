@@ -301,10 +301,21 @@ fun copyToClipboard(context: Context, text: String, label: String = "복사된 �
 }
 
 
-fun restoreRunningBots(context: Context) {
+fun getRestorableBotIds(context: Context): List<String> {
     val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
     val botIdsStr = masterPref.getString("bot_ids_list", "") ?: ""
-    val botIds = botIdsStr.split(",").filter { it.isNotBlank() }
+    return botIdsStr.split(",").filter { it.isNotBlank() }
+}
+
+fun hasRestorableBots(context: Context): Boolean {
+    return getRestorableBotIds(context).any { botId ->
+        context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+            .getBoolean("should_restore_after_restart", false)
+    }
+}
+
+fun restoreRunningBots(context: Context) {
+    val botIds = getRestorableBotIds(context)
 
     android.util.Log.d("RestoreBots", "restoreRunningBots 시작 / botIds=$botIds")
 

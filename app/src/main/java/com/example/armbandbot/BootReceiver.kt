@@ -12,11 +12,18 @@ class BootReceiver : BroadcastReceiver() {
                 Intent.ACTION_BOOT_COMPLETED,
                 Intent.ACTION_MY_PACKAGE_REPLACED -> {
                     val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
+                    val hasRestorableBot = hasRestorableBots(context)
+
                     masterPref.edit()
-                        .putBoolean("pending_restore_after_boot", true)
+                        .putBoolean("pending_restore_after_boot", hasRestorableBot)
                         .apply()
 
-                    Log.d("BootReceiver", "부팅/업데이트 감지: 봇 자동 복구를 대기 상태로 표시함")
+                    if (hasRestorableBot) {
+                        Log.d("BootReceiver", "부팅/업데이트 감지: 복구 대상 봇이 있어 즉시 복구를 시도함")
+                        restoreRunningBots(context)
+                    } else {
+                        Log.d("BootReceiver", "부팅/업데이트 감지: 복구 대상 봇이 없어 대기 상태만 정리함")
+                    }
                 }
             }
         } catch (e: Exception) {

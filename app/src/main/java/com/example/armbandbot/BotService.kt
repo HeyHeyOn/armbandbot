@@ -22,7 +22,6 @@ import java.util.LinkedHashMap
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
-import android.app.AlarmManager
 
 class BotService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
@@ -140,8 +139,6 @@ class BotService : Service() {
     )
 
     companion object {
-        private const val ACTION_RESTART_BOTS = "com.heyheyon.armbandbot.ACTION_RESTART_BOTS"
-
         private val URL_REGEX = Regex("(?i)(?:https?://|www\\.)[-a-zA-Z0-9@:%._+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*)")
         private val SEARCH_PARAM_CLEANER_REGEX = Regex("&s_type=[^&]*|&s_keyword=[^&]*|&search_pos=[^&]*")
     }
@@ -245,77 +242,13 @@ class BotService : Service() {
     }
 
     private fun scheduleAutoRestart() {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(this, AutoRestartReceiver::class.java).apply {
-            action = ACTION_RESTART_BOTS
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            this,
-            1001,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val triggerAt = System.currentTimeMillis() + 3000L
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAt,
-                        pendingIntent
-                    )
-                    Log.d("BotService", "[복구 예약] exact alarm으로 3초 뒤 예약 완료")
-                } else {
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAt,
-                        pendingIntent
-                    )
-                    Log.d("BotService", "[복구 예약] exact alarm 권한 없음 → inexact alarm으로 대체 예약")
-                }
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
-                Log.d("BotService", "[복구 예약] exact alarm으로 3초 뒤 예약 완료")
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
-                Log.d("BotService", "[복구 예약] legacy exact alarm으로 3초 뒤 예약 완료")
-            }
-        } catch (e: SecurityException) {
-            Log.e("BotService", "[복구 예약] exact alarm 권한 부족, 일반 alarm으로 재시도", e)
-            alarmManager.set(
-                AlarmManager.RTC_WAKEUP,
-                triggerAt,
-                pendingIntent
-            )
-        }
+        AutoRestartReceiver.scheduleWatchdog(this)
+        Log.d("BotService", "[복구 예약] watchdog 재예약 완료")
     }
 
     private fun cancelAutoRestart() {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(this, AutoRestartReceiver::class.java).apply {
-            action = ACTION_RESTART_BOTS
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            this,
-            1001,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        alarmManager.cancel(pendingIntent)
-        Log.d("BotService", "[복구 예약] AutoRestartReceiver 예약 취소")
+        AutoRestartReceiver.cancelWatchdog(this)
+        Log.d("BotService", "[복구 예약] watchdog 예약 취소")
     }
 
     private fun finalizeBot(
