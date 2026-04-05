@@ -4,7 +4,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Process
 import android.webkit.CookieManager
 import android.widget.Toast
@@ -131,6 +134,16 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val coroutineScope = rememberCoroutineScope()
         var selectedTabIndex by remember { mutableStateOf(0) }
         var logFilterTab by remember { mutableStateOf("ALL") }
+        val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            runCatching {
+                writeBotSettingsJson(context, uri.toString(), exportBotSettings(context, botId))
+            }.onSuccess {
+                Toast.makeText(context, "??? ??????.", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, it.message ?: "?? ????? ??????.", Toast.LENGTH_LONG).show()
+            }
+        }
 
         LaunchedEffect(openBlockLogTrigger) {
             if (openBlockLogTrigger) { selectedTabIndex = 1; logFilterTab = "BLOCK"; onTriggerConsumed() }
@@ -640,6 +653,13 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = {
+                            val safeName = botName.replace(Regex("[\\/:*?\"<>|]"), "_").trim().ifBlank { "bot" }
+                            exportLauncher.launch("${safeName}_settings_1.1.1-beta1.json")
+                        }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Filled.FileDownload, contentDescription = "?? ????", tint = PastelNavy)
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
                         Switch(
                             checked = isRunning,
                             onCheckedChange = {

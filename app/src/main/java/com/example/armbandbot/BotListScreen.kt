@@ -2,8 +2,11 @@ package com.heyheyon.armbandbot
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -80,6 +83,36 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var dragDy by remember { mutableStateOf(0f) }
     var swipedBotId by remember { mutableStateOf<String?>(null) }
+    var pendingExportBotId by remember { mutableStateOf<String?>(null) }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            importBotSettingsAsNewBot(context, uri.toString())
+        }.onSuccess {
+            val savedIds = (masterPref.getString("bot_ids_list", "") ?: "")
+                .split(",")
+                .filter { id -> id.isNotBlank() }
+            botIds.clear()
+            botIds.addAll(savedIds)
+            Toast.makeText(context, "??? ? ??? ??????.", Toast.LENGTH_SHORT).show()
+        }.onFailure {
+            Toast.makeText(context, it.message ?: "?? ????? ??????.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        val botId = pendingExportBotId
+        pendingExportBotId = null
+        if (uri == null || botId == null) return@rememberLauncherForActivityResult
+        runCatching {
+            writeBotSettingsJson(context, uri.toString(), exportBotSettings(context, botId))
+        }.onSuccess {
+            Toast.makeText(context, "??? ??????.", Toast.LENGTH_SHORT).show()
+        }.onFailure {
+            Toast.makeText(context, it.message ?: "?? ????? ??????.", Toast.LENGTH_LONG).show()
+        }
+    }
 
     val density = LocalDensity.current
     val itemHeightPx = remember(density) { with(density) { 60.dp.toPx() } }
@@ -178,6 +211,17 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                                 }
                             },
                             onSettingsClick = { swipedBotId = null; onNavigateToSettings(botId) },
+                            onExportRequest = {
+                                swipedBotId = null
+                                pendingExportBotId = botId
+                                val botName = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                                    .getString("bot_name", "bot")
+                                    ?.replace(Regex("[\\/:*?\"<>|]"), "_")
+                                    ?.trim()
+                                    ?.ifBlank { "bot" }
+                                    ?: "bot"
+                                exportLauncher.launch("${botName}_settings_1.1.1-beta1.json")
+                            },
                             onDuplicateRequest = { swipedBotId = null; botToDuplicate = botId },
                             onDeleteRequest = { swipedBotId = null; botToDelete = botId }
                         )
@@ -195,7 +239,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     if (newBotName.isNotBlank()) {
                         val newBotId = "bot_${UUID.randomUUID()}"
                         val botPref = context.getSharedPreferences("bot_prefs_$newBotId", Context.MODE_PRIVATE)
-                        botPref.edit().putString("bot_name", newBotName).putStringSet("url_whitelist", setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")).apply()
+                        botPref.edit().putString("bot_name", newBotName).putStringSet("url_whitelist", defaultBotUrlWhitelist()).apply()
                         botIds.add(newBotId)
                         masterPref.edit().putString("bot_ids_list", botIds.joinToString(",")).apply()
                         newBotName = ""; showAddDialog = false
@@ -252,7 +296,7 @@ fun BotListItem(
     index: Int, botId: String, draggingIndex: Int?, dragDy: Float,
     isSwipedOpen: Boolean, onSwipeStateChange: (Boolean) -> Unit,
     onDragStart: (Int) -> Unit, onDragEnd: () -> Unit, onDrag: (Float) -> Unit,
-    onSettingsClick: () -> Unit, onDuplicateRequest: () -> Unit, onDeleteRequest: () -> Unit
+    onSettingsClick: () -> Unit, onExportRequest: () -> Unit, onDuplicateRequest: () -> Unit, onDeleteRequest: () -> Unit
 ) {
     val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -274,7 +318,7 @@ fun BotListItem(
 
     val buttonSize = 58.dp
     val buttonGap = 8.dp
-    val maxSwipePx = with(density) { -(buttonSize * 2 + buttonGap * 3).toPx() }
+    val maxSwipePx = with(density) { -(buttonSize * 3 + buttonGap * 4).toPx() }
     val swipeOffset = remember { androidx.compose.animation.core.Animatable(0f) }
 
     LaunchedEffect(isSwipedOpen) {
@@ -285,6 +329,14 @@ fun BotListItem(
 
     Box(modifier = Modifier.fillMaxWidth().offset(y = yOffset).zIndex(zIndex)) {
         Row(modifier = Modifier.matchParentSize().padding(end = buttonGap).background(Color.Transparent), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(12.dp)).background(Color(0xFF2E7D6F)).clickable { onExportRequest() }, contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Icon(androidx.compose.material.icons.Icons.Filled.FileDownload, contentDescription = "????", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("????", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(modifier = Modifier.width(buttonGap))
             Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(12.dp)).background(Color(0xFF4A6583)).clickable { onDuplicateRequest() }, contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(androidx.compose.material.icons.Icons.Filled.ContentCopy, contentDescription = "복사", tint = Color.White, modifier = Modifier.size(20.dp))
