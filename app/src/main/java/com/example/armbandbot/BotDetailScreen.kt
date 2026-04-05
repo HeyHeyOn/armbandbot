@@ -653,13 +653,23 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = {
-                            val safeName = botName.replace(Regex("[\\/:*?\"<>|]"), "_").trim().ifBlank { "bot" }
-                            exportLauncher.launch("${safeName}_settings_1.1.1-beta2.json")
-                        }, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Filled.FileDownload, contentDescription = "?? ????", tint = PastelNavy)
+                        FilledTonalButton(
+                            onClick = {
+                                val safeName = botName.replace(Regex("[\\/:*?\"<>|]"), "_").trim().ifBlank { "bot" }
+                                exportLauncher.launch("${safeName}_settings_1.1.1-beta3.json")
+                            },
+                            shape = RoundedCornerShape(50),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (isDarkMode) Color(0xFF2A3542) else Color(0xFFEAF1FF),
+                                contentColor = PastelNavy
+                            )
+                        ) {
+                            Icon(Icons.Filled.FileUpload, contentDescription = "내보내기", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("내보내기", fontWeight = FontWeight.SemiBold)
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Switch(
                             checked = isRunning,
                             onCheckedChange = {

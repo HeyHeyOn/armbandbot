@@ -130,6 +130,14 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크모드 전환")
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+                FloatingActionButton(
+                    onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                    containerColor = if (isDarkMode) Color(0xFF2A3542) else Color.White,
+                    contentColor = PastelNavy
+                ) {
+                    Icon(Icons.Filled.FileDownload, contentDescription = "설정 파일 불러오기")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 FloatingActionButton(onClick = { showAddDialog = true }, containerColor = PastelNavy, contentColor = Color.White) {
                     Icon(Icons.Filled.Add, contentDescription = "추가")
                 }
@@ -153,18 +161,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.1.1-beta2", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
-                    }
-                    FilledTonalButton(
-                        onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Color.White.copy(alpha = 0.18f),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(Icons.Filled.FileUpload, contentDescription = "설정 파일 불러오기", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("불러오기", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("버전: 1.1.1-beta3", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
             }
@@ -231,7 +228,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                                     ?.trim()
                                     ?.ifBlank { "bot" }
                                     ?: "bot"
-                                exportLauncher.launch("${botName}_settings_1.1.1-beta2.json")
+                                exportLauncher.launch("${botName}_settings_1.1.1-beta3.json")
                             },
                             onDuplicateRequest = { swipedBotId = null; botToDuplicate = botId },
                             onDeleteRequest = { swipedBotId = null; botToDelete = botId }
@@ -342,7 +339,7 @@ fun BotListItem(
         Row(modifier = Modifier.matchParentSize().padding(end = buttonGap).background(Color.Transparent), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(12.dp)).background(Color(0xFF2E7D6F)).clickable { onExportRequest() }, contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Icon(androidx.compose.material.icons.Icons.Filled.FileDownload, contentDescription = "내보내기", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(androidx.compose.material.icons.Icons.Filled.FileUpload, contentDescription = "내보내기", tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(2.dp))
                     Text("내보내기", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
