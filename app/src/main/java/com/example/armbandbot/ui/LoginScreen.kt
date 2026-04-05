@@ -52,6 +52,22 @@ fun BotLoginScreen(
 
     var showFallbackWebView by remember { mutableStateOf(false) }
 
+    val inputFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = colors.card,
+        unfocusedContainerColor = colors.card,
+        disabledContainerColor = colors.card,
+        focusedTextColor = colors.text,
+        unfocusedTextColor = colors.text,
+        disabledTextColor = colors.subText,
+        focusedLabelColor = PastelNavy,
+        unfocusedLabelColor = colors.subText,
+        focusedBorderColor = PastelNavy,
+        unfocusedBorderColor = colors.divider,
+        cursorColor = PastelNavy,
+        focusedTrailingIconColor = colors.iconTint,
+        unfocusedTrailingIconColor = colors.iconTint
+    )
+
     if (showFallbackWebView) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -117,7 +133,8 @@ fun BotLoginScreen(
             onValueChange = { loginId = it },
             label = { Text("식별코드") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = inputFieldColors
         )
 
         Spacer(Modifier.height(12.dp))
@@ -137,7 +154,8 @@ fun BotLoginScreen(
                     )
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = inputFieldColors
         )
 
         Spacer(Modifier.height(16.dp))

@@ -461,9 +461,66 @@ class BotService : Service() {
         )
     }
 
-    private fun hasManagerPermission(document: org.jsoup.nodes.Document): Boolean {
-        return document.select("a[onclick*=listSearchHead(999)]").any {
-            it.text().contains("매니저")
+    private fun evaluateManagerPermission(document: org.jsoup.nodes.Document): ManagerPermissionStatus {
+        val location = document.location().lowercase()
+        val bodyText = document.body()?.text().orEmpty()
+        val normalizedBodyText = bodyText.replace(Regex("\\s+"), " ")
+
+        val managerSelectors = listOf(
+            "a[onclick*=listSearchHead(999)]",
+            "a[href*=manager]",
+            "a[href*=minor_manager]",
+            "button[onclick*=manager]",
+            "form[action*=manager]",
+            ".btn_admin",
+            ".useradmin"
+        )
+        val managerEvidence = managerSelectors.any { selector ->
+            document.select(selector).any { element ->
+                val text = element.text().trim()
+                text.contains("\uB9E4\uB2C8\uC800") ||
+                    text.contains("\uAD00\uB9AC") ||
+                    element.attr("href").contains("manager", ignoreCase = true) ||
+                    element.attr("onclick").contains("manager", ignoreCase = true) ||
+                    element.attr("action").contains("manager", ignoreCase = true)
+            }
+        }
+        val ciTokenExists = document.select("input[name=ci_t]").attr("value").isNotBlank()
+
+        if (managerEvidence || ciTokenExists) {
+            return ManagerPermissionStatus.CONFIRMED
+        }
+
+        val loginIndicators = listOf(
+            "\uB85C\uADF8\uC778", "login", "\uC544\uC774\uB514", "\uBE44\uBC00\uBC88\uD638", "\uB514\uC2DC\uC778\uC0AC\uC774\uB4DC \uB85C\uADF8\uC778"
+        )
+        val loginFormExists = document.select("form[action*=login], input[name=user_id], input[name=pw], input[type=password]").isNotEmpty()
+        if (location.contains("login") || loginFormExists || loginIndicators.count { normalizedBodyText.contains(it, ignoreCase = true) } >= 2) {
+            return ManagerPermissionStatus.LOGIN_REQUIRED
+        }
+
+        val explicitNoPermissionPhrases = listOf(
+            "\uAD00\uB9AC\uC790 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
+            "\uB9E4\uB2C8\uC800 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
+            "\uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
+            "\uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
+            "\uC798\uBABB\uB41C \uC811\uADFC\uC785\uB2C8\uB2E4",
+            "\uAD8C\uD55C\uC774 \uC5C6\uB294",
+            "\uB9E4\uB2C8\uC800\uB9CC",
+            "\uAD00\uB9AC\uC790\uB9CC"
+        )
+        if (explicitNoPermissionPhrases.any { normalizedBodyText.contains(it) }) {
+            return ManagerPermissionStatus.NO_PERMISSION
+        }
+
+        val hasPostRows = document.select(".ub-content").isNotEmpty()
+        val hasSearchMarkers = document.select("input[name=search_pos], .bottom_paging_box, .sch_result, .sch_no_result").isNotEmpty() ||
+            location.contains("s_keyword=") || location.contains("search_pos=")
+
+        return if (hasPostRows || hasSearchMarkers) {
+            ManagerPermissionStatus.AMBIGUOUS
+        } else {
+            ManagerPermissionStatus.NO_PERMISSION
         }
     }
     private fun buildSnapshotUrl(gallType: String, gallId: String, postNum: String): String {
@@ -643,16 +700,18 @@ class BotService : Service() {
             .userAgent("Mozilla/5.0")
             .header("Cookie", cookie)
             .get()
-        val managerPermission = hasManagerPermission(document)
+        val managerPermissionStatus = evaluateManagerPermission(document)
         if (config.isDebugMode) {
-            sendLog("[디버그][페이지] 관리자 권한 확인 결과: ${if (managerPermission) "있음" else "없음"}", botId)
+            sendLog("[\uB514\uBC84\uADF8][\uD398\uC774\uC9C0] \uAD00\uB9AC\uC790 \uAD8C\uD55C \uD655\uC778 \uACB0\uACFC: ${managerPermissionStatus.logLabel}", botId)
         }
-        if (!managerPermission) {
+        if (managerPermissionStatus == ManagerPermissionStatus.LOGIN_REQUIRED ||
+            managerPermissionStatus == ManagerPermissionStatus.NO_PERMISSION
+        ) {
             return PageProcessResult(
                 firstPostNumOfThisPage = "",
                 isPageEmpty = true,
                 hiddenSearchPos = "",
-                hasManagerPermission = false
+                managerPermissionStatus = managerPermissionStatus
             )
         }
 
@@ -816,16 +875,33 @@ class BotService : Service() {
                         delChk = delChk,
                         notifyIfEnabled = notifyIfEnabled
                     )
-                    if (!pageResult.hasManagerPermission) {
-                        sendLog("🚨 [$gallId] 현재 로그인된 계정에 관리자 권한이 없습니다. 봇 작동을 중지합니다.", botId)
-                        sendBlockNotification(
-                            botId = botId,
-                            botName = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-                                .getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇",
-                            title = "관리 권한 없음",
-                            message = "[$gallId] 갤러리의 관리자 권한이 확인되지 않아 봇을 중지했습니다."
-                        )
-                        return false
+                    when (pageResult.managerPermissionStatus) {
+                        ManagerPermissionStatus.LOGIN_REQUIRED -> {
+                            sendLog("\uD83D\uDEA8 [$gallId] \uB85C\uADF8\uC778 \uD398\uC774\uC9C0\uB85C \uC774\uB3D9\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC138\uC158 \uB9CC\uB8CC \uAC00\uB2A5\uC131\uC774 \uC788\uC5B4 \uBD07\uC744 \uC911\uC9C0\uD569\uB2C8\uB2E4.", botId)
+                            sendBlockNotification(
+                                botId = botId,
+                                botName = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                                    .getString("bot_name", "\uC774\uB984 \uC5C6\uB294 \uBD07") ?: "\uC774\uB984 \uC5C6\uB294 \uBD07",
+                                title = "\uB85C\uADF8\uC778 \uD544\uC694",
+                                message = "[$gallId] \uB85C\uADF8\uC778 \uD398\uC774\uC9C0\uB85C \uC774\uB3D9\uB418\uC5B4 \uC138\uC158 \uB9CC\uB8CC \uAC00\uB2A5\uC131\uC73C\uB85C \uBD07\uC744 \uC911\uC9C0\uD588\uC2B5\uB2C8\uB2E4."
+                            )
+                            return false
+                        }
+                        ManagerPermissionStatus.NO_PERMISSION -> {
+                            sendLog("\uD83D\uDEA8 [$gallId] \uD604\uC7AC \uB85C\uADF8\uC778\uB41C \uACC4\uC815\uC5D0 \uAD00\uB9AC\uC790 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD07 \uC791\uB3D9\uC744 \uC911\uC9C0\uD569\uB2C8\uB2E4.", botId)
+                            sendBlockNotification(
+                                botId = botId,
+                                botName = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                                    .getString("bot_name", "\uC774\uB984 \uC5C6\uB294 \uBD07") ?: "\uC774\uB984 \uC5C6\uB294 \uBD07",
+                                title = "\uAD00\uB9AC \uAD8C\uD55C \uC5C6\uC74C",
+                                message = "[$gallId] \uAC24\uB7EC\uB9AC\uC758 \uAD00\uB9AC\uC790 \uAD8C\uD55C\uC774 \uD655\uC778\uB418\uC9C0 \uC54A\uC544 \uBD07\uC744 \uC911\uC9C0\uD588\uC2B5\uB2C8\uB2E4."
+                            )
+                            return false
+                        }
+                        ManagerPermissionStatus.AMBIGUOUS -> {
+                            sendLog("\u26A0\uFE0F [$gallId] \uAD00\uB9AC\uC790 \uAD8C\uD55C \uD655\uC778 DOM\uC774 \uBD88\uBA85\uD655\uD569\uB2C8\uB2E4. \uAC80\uC0C9 \uD398\uC774\uC9C0 \uD2B9\uC774 \uCF00\uC774\uC2A4\uB85C \uBCF4\uACE0 \uC774\uBC88 \uD398\uC774\uC9C0\uB294 \uACC4\uC18D \uC9C4\uD589\uD569\uB2C8\uB2E4.", botId)
+                        }
+                        ManagerPermissionStatus.CONFIRMED -> Unit
                     }
 
                     val firstPostNumOfThisPage = pageResult.firstPostNumOfThisPage
@@ -2326,11 +2402,18 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
     }
 
+    private enum class ManagerPermissionStatus(val logLabel: String) {
+        CONFIRMED("\uC788\uC74C"),
+        AMBIGUOUS("\uBD88\uBA85\uD655"),
+        LOGIN_REQUIRED("\uB85C\uADF8\uC778 \uD544\uC694"),
+        NO_PERMISSION("\uC5C6\uC74C")
+    }
+
     private data class PageProcessResult(
         val firstPostNumOfThisPage: String,
         val isPageEmpty: Boolean,
         val hiddenSearchPos: String,
-        val hasManagerPermission: Boolean = true
+        val managerPermissionStatus: ManagerPermissionStatus = ManagerPermissionStatus.CONFIRMED
     )
 
     private data class ParsedTargetUrl(
