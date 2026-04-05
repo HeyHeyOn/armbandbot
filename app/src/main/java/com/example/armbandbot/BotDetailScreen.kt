@@ -187,12 +187,32 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isNotiVoice by remember { mutableStateOf(botPref.getBoolean("noti_voice", true)) }
         var isNotiSpam by remember { mutableStateOf(botPref.getBoolean("noti_spam", true)) }
 
+        fun loadMultilineText(key: String): String {
+            return botPref.getString("${key}_text", null)
+                ?: botPref.getStringSet(key, emptySet())?.joinToString("\n")
+                ?: ""
+        }
+
+        fun persistMultilineText(key: String, rawText: String) {
+            val normalizedLines = rawText
+                .lines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            val normalizedText = normalizedLines.joinToString("\n")
+            val normalizedSet = LinkedHashSet(normalizedLines)
+
+            botPref.edit()
+                .putString("${key}_text", normalizedText)
+                .putStringSet(key, normalizedSet)
+                .commit()
+        }
+
         var targetUrlsText by remember { mutableStateOf(botPref.getString("target_urls", "") ?: "") }
         var isSearchMode by remember { mutableStateOf(botPref.getBoolean("is_search_mode", false)) }
         var searchType by remember { mutableStateOf(botPref.getString("search_type", "search_subject_memo") ?: "search_subject_memo") }
         var isSearchTypeDropdownExpanded by remember { mutableStateOf(false) }
         val searchTypeMap = mapOf("search_subject_memo" to "제목+내용", "search_subject" to "제목", "search_memo" to "내용", "search_name" to "글쓴이", "search_comment" to "댓글")
-        var searchWordsText by remember { mutableStateOf(botPref.getStringSet("search_keywords", setOf())?.joinToString("\n") ?: "") }
+        var searchWordsText by remember { mutableStateOf(loadMultilineText("search_keywords")) }
 
         var isUserFilterMode by remember { mutableStateOf(botPref.getBoolean("is_user_filter_mode", false)) }
         var userBlacklistText by remember { mutableStateOf(botPref.getStringSet("user_blacklist", setOf())?.joinToString("\n") ?: "") }
@@ -220,8 +240,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
         var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
 
-        var normalWordsText by remember { mutableStateOf(botPref.getStringSet("normal", setOf())?.joinToString("\n") ?: "") }
-        var bypassWordsText by remember { mutableStateOf(botPref.getStringSet("bypass", setOf())?.joinToString("\n") ?: "") }
+        var normalWordsText by remember { mutableStateOf(loadMultilineText("normal")) }
+        var bypassWordsText by remember { mutableStateOf(loadMultilineText("bypass")) }
 
         var scanPageText by remember { mutableStateOf(botPref.getInt("scan_page_count", 1).toString()) }
         var postMinText by remember { mutableStateOf(botPref.getFloat("delay_post_min_sec", 1.0f).toString()) }
@@ -949,9 +969,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                     when(editDialogType) {
                         "bot_name" -> { botName = tempEditText; botPref.edit().putString("bot_name", tempEditText).apply() }
                         "block_reason" -> { blockReasonText = tempEditText; botPref.edit().putString("block_reason_text", tempEditText).apply() }
-                        "normal" -> { normalWordsText = tempEditText; botPref.edit().putStringSet("normal", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "bypass" -> { bypassWordsText = tempEditText; botPref.edit().putStringSet("bypass", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "search" -> { searchWordsText = tempEditText; botPref.edit().putStringSet("search_keywords", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "normal" -> { normalWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("normal", tempEditText) }
+                        "bypass" -> { bypassWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("bypass", tempEditText) }
+                        "search" -> { searchWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("search_keywords", tempEditText) }
                         "url" -> { targetUrlsText = tempEditText; botPref.edit().putString("target_urls", tempEditText).apply() }
                         "url_whitelist" -> { urlWhitelistText = tempEditText; botPref.edit().putStringSet("url_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "user_blacklist" -> { userBlacklistText = tempEditText; botPref.edit().putStringSet("user_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
