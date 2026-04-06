@@ -1,4 +1,4 @@
-package com.heyheyon.armbandbot
+﻿package com.heyheyon.armbandbot
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -94,6 +94,7 @@ class BotService : Service() {
         val voiceBlacklist: List<String>,
 
         val isAiFilterMode: Boolean,
+        val aiFilterProvider: String,
         val aiFilterEndpoint: String,
         val aiFilterApiKey: String,
         val aiFilterModel: String,
@@ -2172,6 +2173,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?: emptyList(),
 
             isAiFilterMode = botPref.getBoolean("is_ai_filter_mode", false),
+            aiFilterProvider = botPref.getString("ai_filter_provider", "openai_compatible")?.trim().orEmpty(),
             aiFilterEndpoint = botPref.getString("ai_filter_endpoint", "https://api.openai.com/v1/chat/completions")?.trim().orEmpty(),
             aiFilterApiKey = botPref.getString("ai_filter_api_key", "")?.trim().orEmpty(),
             aiFilterModel = botPref.getString("ai_filter_model", "gpt-4o-mini")?.trim().orEmpty(),
@@ -2375,6 +2377,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     val aiEvaluation = AiFilterClient(
                         config = AiFilterConfig(
                             enabled = config.isAiFilterMode,
+                            provider = if (config.aiFilterProvider.equals("gemini_direct", ignoreCase = true)) AiFilterProvider.GEMINI_DIRECT else AiFilterProvider.OPENAI_COMPATIBLE,
                             endpoint = config.aiFilterEndpoint,
                             apiKey = config.aiFilterApiKey,
                             model = config.aiFilterModel,

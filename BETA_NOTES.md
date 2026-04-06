@@ -190,3 +190,18 @@
 - `BotService`에는 최소 범위로 설정 로드, 게시글 분석 후 2차 AI 평가, AI 차단/검토 로그 프레젠테이션만 추가
 - 댓글 필터 흐름은 유지하고 AI 필터는 게시글에만 적용되도록 분리
 - 봇 설정 export/import 키에 AI 필터 관련 프리퍼런스를 포함
+
+
+## 1.1.1 beta15
+
+### 주요 변화
+- AI 필터에 `provider` 개념을 추가해 OpenAI-compatible과 Gemini direct를 같은 흐름에서 선택 가능하게 확장
+- 설정 UI에서 AI 제공자 선택 드롭다운을 추가하고, Gemini direct 선택 시 기본 generateContent 경로를 사용할 수 있게 보강
+- Gemini direct 요청 본문/인증/응답 파싱을 `AiFilter.kt`에 추가하고, 실패 시 기존처럼 REVIEW fallback을 유지
+- 게시글 전용 AI 2차 검사, review-first, 기존 OpenAI-compatible 동작은 그대로 유지
+
+### 기술 포인트
+- `AiFilterConfig`에 provider enum을 추가하고 OpenAI-compatible/Gemini direct별 payload 및 응답 파싱 분기 처리
+- `BotService`는 설정 로드와 provider 전달만 최소 수정해 기존 분석 흐름 침범을 줄임
+- 봇 설정 export/import에도 `ai_filter_provider`를 포함해 복제 시 provider 설정이 함께 이동되도록 정리
+- beta15 release 빌드 성공 및 APK 산출 완료

@@ -1,4 +1,4 @@
-package com.heyheyon.armbandbot
+﻿package com.heyheyon.armbandbot
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -259,6 +259,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var voiceBlacklistText by remember { mutableStateOf(botPref.getStringSet("voice_blacklist", setOf())?.joinToString("\n") ?: "") }
 
         var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
+        val aiProviderOptions = mapOf("openai_compatible" to "OpenAI-compatible", "gemini_direct" to "Gemini direct")
+        var isAiProviderDropdownExpanded by remember { mutableStateOf(false) }
+        var aiFilterProvider by remember { mutableStateOf(botPref.getString("ai_filter_provider", "openai_compatible") ?: "openai_compatible") }
         var aiFilterEndpointText by remember { mutableStateOf(botPref.getString("ai_filter_endpoint", "https://api.openai.com/v1/chat/completions") ?: "https://api.openai.com/v1/chat/completions") }
         var aiFilterApiKeyText by remember { mutableStateOf(botPref.getString("ai_filter_api_key", "") ?: "") }
         var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gpt-4o-mini") ?: "gpt-4o-mini") }
@@ -662,11 +665,34 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 Text("동작 방식", fontWeight = FontWeight.Bold, color = textColor)
                                                 Spacer(modifier = Modifier.height(8.dp))
                                                 Text("- 기존 룰 기반 필터 통과 후 AI 필터가 2차 검사", fontSize = 12.sp, color = subTextColor)
+                                                Text("- OpenAI-compatible / Gemini direct 지원", fontSize = 12.sp, color = subTextColor)
                                                 Text("- 출력 파싱 실패/모순 시 REVIEW fallback", fontSize = 12.sp, color = subTextColor)
                                                 Text("- review 우선 모드 고정", fontSize = 12.sp, color = subTextColor)
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Text("AI 제공자", fontWeight = FontWeight.Bold, color = textColor)
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Box {
+                                                    OutlinedButton(onClick = { isAiProviderDropdownExpanded = true }) {
+                                                        Text(aiProviderOptions[aiFilterProvider] ?: "OpenAI-compatible", color = textColor)
+                                                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                                                    }
+                                                    DropdownMenu(expanded = isAiProviderDropdownExpanded, onDismissRequest = { isAiProviderDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                        aiProviderOptions.forEach { (key, label) ->
+                                                            DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
+                                                                aiFilterProvider = key
+                                                                botPref.edit().putString("ai_filter_provider", key).apply()
+                                                                if (key == "gemini_direct" && aiFilterEndpointText == "https://api.openai.com/v1/chat/completions") {
+                                                                    aiFilterEndpointText = ""
+                                                                    botPref.edit().putString("ai_filter_endpoint", "").apply()
+                                                                }
+                                                                isAiProviderDropdownExpanded = false
+                                                            })
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
-                                        ReadOnlyTextCard("AI API Endpoint", aiFilterEndpointText, colors) { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }
+                                        ReadOnlyTextCard(if (aiFilterProvider == "gemini_direct") "Gemini Endpoint (비우면 기본 generateContent 사용)" else "AI API Endpoint", aiFilterEndpointText, colors) { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }
                                         ReadOnlyTextCard("AI API Key", if (aiFilterApiKeyText.isBlank()) "" else "●".repeat(12), colors) { tempEditText = aiFilterApiKeyText; editDialogType = "ai_filter_api_key" }
                                         ReadOnlyTextCard("AI 모델", aiFilterModelText, colors) { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }
                                         ReadOnlyTextCard("봇별 사용자 프롬프트", aiFilterUserPromptText, colors) { tempEditText = aiFilterUserPromptText; editDialogType = "ai_filter_user_prompt" }
@@ -735,7 +761,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         FilledTonalButton(
                             onClick = {
                                 val safeName = botName.replace(Regex("[\\/:*?\"<>|]"), "_").trim().ifBlank { "bot" }
-                                exportLauncher.launch("${safeName}_settings_1.1.1-beta4.json")
+                                exportLauncher.launch("${safeName}_settings_1.1.1-beta15.json")
                             },
                             shape = RoundedCornerShape(50),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),

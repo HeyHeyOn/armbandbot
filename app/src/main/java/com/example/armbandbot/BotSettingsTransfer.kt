@@ -9,7 +9,7 @@ import java.io.InputStreamReader
 import java.util.UUID
 
 private const val BOT_SETTINGS_EXPORT_VERSION = 1
-private const val BOT_SETTINGS_APP_VERSION = "1.1.1-beta4"
+private const val BOT_SETTINGS_APP_VERSION = "1.1.1-beta15"
 private const val BOT_SETTINGS_FILE_TYPE = "armbandbot_bot_settings"
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 
@@ -17,6 +17,7 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
     "target_urls",
     "search_type",
     "block_reason_text",
+    "ai_filter_provider",
     "ai_filter_endpoint",
     "ai_filter_api_key",
     "ai_filter_model",

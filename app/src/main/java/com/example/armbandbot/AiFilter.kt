@@ -7,9 +7,16 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
+
+internal enum class AiFilterProvider {
+    OPENAI_COMPATIBLE,
+    GEMINI_DIRECT,
+}
 
 internal data class AiFilterConfig(
     val enabled: Boolean,
+    val provider: AiFilterProvider = AiFilterProvider.OPENAI_COMPATIBLE,
     val endpoint: String,
     val apiKey: String,
     val model: String,
@@ -52,14 +59,36 @@ internal class AiFilterClient(
     private val config: AiFilterConfig,
     private val logger: (String) -> Unit = {},
 ) {
+    private val fixedPrompt = """
+        당신은 커뮤니티 게시글 전용 안전 필터입니다.
+        댓글은 검사 대상이 아닙니다.
+        기존 1차 룰 기반 필터를 통과한 게시글만 2차로 받습니다.
+        review 우선 모드이므로 애매하거나 판단 근거가 부족하면 REVIEW 를 선택하세요.
+        반드시 JSON 객체 하나만 출력하세요. 마크다운, 설명, 코드블록 금지.
+        허용 가능한 action 값: ALLOW, REVIEW, BLOCK
+        JSON 스키마:
+        {
+          \"action\": \"ALLOW|REVIEW|BLOCK\",
+          \"reason\": \"한 줄 요약\",
+          \"category\": \"spam|sexual|abuse|scam|other\",
+          \"confidence\": 0~100,
+          \"evidence\": [\"근거1\", \"근거2\"]
+        }
+        REVIEW 는 의심되지만 자동 확신 차단이 어려울 때 사용하세요.
+        BLOCK 은 명백한 위반일 때만 사용하세요.
+    """.trimIndent()
+
     fun evaluate(request: AiFilterRequest): AiFilterEvaluation {
         if (!config.enabled) return AiFilterEvaluation()
-        if (config.apiKey.isBlank() || config.model.isBlank() || config.endpoint.isBlank()) {
+        if (config.apiKey.isBlank() || config.model.isBlank()) {
             return AiFilterEvaluation(failureReason = "AI 필터 설정 미완료")
+        }
+        if (config.provider == AiFilterProvider.OPENAI_COMPATIBLE && config.endpoint.isBlank()) {
+            return AiFilterEvaluation(failureReason = "AI 필터 Endpoint 미설정")
         }
 
         return try {
-            val responseText = callApi(buildPayload(request))
+            val responseText = callApi(request)
             parseResponse(responseText)
         } catch (e: Exception) {
             logger("AI 필터 호출 실패: ${e.message}")
@@ -67,37 +96,19 @@ internal class AiFilterClient(
         }
     }
 
-    private fun buildPayload(request: AiFilterRequest): JSONObject {
-        val fixedPrompt = """
-            당신은 커뮤니티 게시글 전용 안전 필터입니다.
-            댓글은 검사 대상이 아닙니다.
-            기존 1차 룰 기반 필터를 통과한 게시글만 2차로 받습니다.
-            review 우선 모드이므로 애매하거나 판단 근거가 부족하면 REVIEW 를 선택하세요.
-            반드시 JSON 객체 하나만 출력하세요. 마크다운, 설명, 코드블록 금지.
-            허용 가능한 action 값: ALLOW, REVIEW, BLOCK
-            JSON 스키마:
-            {
-              \"action\": \"ALLOW|REVIEW|BLOCK\",
-              \"reason\": \"한 줄 요약\",
-              \"category\": \"spam|sexual|abuse|scam|other\",
-              \"confidence\": 0~100,
-              \"evidence\": [\"근거1\", \"근거2\"]
-            }
-            REVIEW 는 의심되지만 자동 확신 차단이 어려울 때 사용하세요.
-            BLOCK 은 명백한 위반일 때만 사용하세요.
-        """.trimIndent()
+    private fun buildComposedUserPrompt(request: AiFilterRequest): String = buildString {
+        appendLine(config.userPrompt.ifBlank { "추가 사용자 지침 없음" })
+        appendLine()
+        appendLine("[게시글 메타]")
+        appendLine("작성자 ID/IP: ${request.postAuthor}")
+        appendLine("닉네임: ${request.postNick}")
+        appendLine("제목: ${request.postTitle}")
+        appendLine("본문: ${request.postBody}")
+        appendLine("이미지 alt: ${request.postImageAlts.joinToString(" | ").ifBlank { "없음" }}")
+    }
 
-        val composedUserPrompt = buildString {
-            appendLine(config.userPrompt.ifBlank { "추가 사용자 지침 없음" })
-            appendLine()
-            appendLine("[게시글 메타]")
-            appendLine("작성자 ID/IP: ${request.postAuthor}")
-            appendLine("닉네임: ${request.postNick}")
-            appendLine("제목: ${request.postTitle}")
-            appendLine("본문: ${request.postBody}")
-            appendLine("이미지 alt: ${request.postImageAlts.joinToString(" | ").ifBlank { "없음" }}")
-        }
-
+    private fun buildOpenAiPayload(request: AiFilterRequest): JSONObject {
+        val composedUserPrompt = buildComposedUserPrompt(request)
         return JSONObject().apply {
             put("model", config.model)
             put("response_format", JSONObject().put("type", "json_object"))
@@ -109,14 +120,55 @@ internal class AiFilterClient(
         }
     }
 
-    private fun callApi(payload: JSONObject): String {
-        val connection = (URL(config.endpoint).openConnection() as HttpURLConnection).apply {
+    private fun buildGeminiPayload(request: AiFilterRequest): JSONObject {
+        val composedUserPrompt = buildComposedUserPrompt(request)
+        return JSONObject().apply {
+            put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", fixedPrompt))))
+            put(
+                "contents",
+                JSONArray().put(
+                    JSONObject()
+                        .put("role", "user")
+                        .put("parts", JSONArray().put(JSONObject().put("text", composedUserPrompt)))
+                )
+            )
+            put(
+                "generationConfig",
+                JSONObject()
+                    .put("temperature", 0.1)
+                    .put("responseMimeType", "application/json")
+            )
+        }
+    }
+
+    private fun buildRequestUrl(): String {
+        if (config.provider == AiFilterProvider.GEMINI_DIRECT) {
+            if (config.endpoint.isNotBlank()) return config.endpoint
+            val encodedModel = URLEncoder.encode(config.model, Charsets.UTF_8.name())
+            return "https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent?key=${config.apiKey}"
+        }
+        return config.endpoint
+    }
+
+    private fun callApi(request: AiFilterRequest): String {
+        val requestUrl = buildRequestUrl()
+        val payload = when (config.provider) {
+            AiFilterProvider.OPENAI_COMPATIBLE -> buildOpenAiPayload(request)
+            AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
+        }
+
+        val connection = (URL(requestUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = config.timeoutMs
             readTimeout = config.timeoutMs
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+            when (config.provider) {
+                AiFilterProvider.OPENAI_COMPATIBLE -> setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+                AiFilterProvider.GEMINI_DIRECT -> if (!requestUrl.contains("key=")) {
+                    setRequestProperty("x-goog-api-key", config.apiKey)
+                }
+            }
         }
 
         connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
@@ -132,12 +184,22 @@ internal class AiFilterClient(
 
     private fun parseResponse(responseText: String): AiFilterEvaluation {
         val root = JSONObject(responseText)
-        val content = root.optJSONArray("choices")
-            ?.optJSONObject(0)
-            ?.optJSONObject("message")
-            ?.optString("content", "")
-            ?.trim()
-            .orEmpty()
+        val content = when (config.provider) {
+            AiFilterProvider.OPENAI_COMPATIBLE -> root.optJSONArray("choices")
+                ?.optJSONObject(0)
+                ?.optJSONObject("message")
+                ?.optString("content", "")
+                ?.trim()
+                .orEmpty()
+            AiFilterProvider.GEMINI_DIRECT -> root.optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.optJSONObject(0)
+                ?.optString("text", "")
+                ?.trim()
+                .orEmpty()
+        }
 
         if (content.isBlank()) {
             return AiFilterEvaluation(failureReason = "AI 응답 비어 있음")
