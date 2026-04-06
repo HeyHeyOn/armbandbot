@@ -9,19 +9,14 @@ import java.io.InputStreamReader
 import java.util.UUID
 
 private const val BOT_SETTINGS_EXPORT_VERSION = 1
-private const val BOT_SETTINGS_APP_VERSION = "1.1.1-beta15"
+private const val BOT_SETTINGS_APP_VERSION = "1.1.1-beta17"
 private const val BOT_SETTINGS_FILE_TYPE = "armbandbot_bot_settings"
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 
 internal val EXPORTABLE_STRING_KEYS = listOf(
     "target_urls",
     "search_type",
-    "block_reason_text",
-    "ai_filter_provider",
-    "ai_filter_endpoint",
-    "ai_filter_api_key",
-    "ai_filter_model",
-    "ai_filter_user_prompt"
+    "block_reason_text"
 )
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
@@ -31,7 +26,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_yudong_post_block", "is_yudong_comment_block", "is_yudong_image_block", "is_yudong_voice_block",
     "is_kkang_filter_mode", "is_kkang_post_block", "is_kkang_comment_block", "is_kkang_image_block", "is_kkang_voice_block",
     "is_url_filter_mode", "is_image_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode",
-    "is_ai_filter_mode", "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
+    "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
 
 internal val EXPORTABLE_INT_KEYS = listOf(

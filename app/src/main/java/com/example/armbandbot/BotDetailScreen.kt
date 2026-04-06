@@ -258,6 +258,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isVoiceFilterMode by remember { mutableStateOf(botPref.getBoolean("is_voice_filter_mode", false)) }
         var voiceBlacklistText by remember { mutableStateOf(botPref.getStringSet("voice_blacklist", setOf())?.joinToString("\n") ?: "") }
 
+        val isAiFilterVisible = false
         var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
         val aiProviderOptions = mapOf("openai_compatible" to "OpenAI-compatible", "gemini_direct" to "Gemini direct")
         var isAiProviderDropdownExpanded by remember { mutableStateOf(false) }
@@ -650,53 +651,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     }
                                 }
                                 "AI" -> {
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("AI 필터", fontWeight = FontWeight.Bold, color = textColor)
-                                                Text("게시글만 2차 AI 검토합니다. 댓글은 제외되며 애매하면 REVIEW 우선 처리됩니다.", fontSize = 12.sp, color = subTextColor)
-                                            }
-                                            Switch(checked = isAiFilterMode, onCheckedChange = { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
-                                        }
-                                    }
-                                    Column(modifier = if (!isAiFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                                            Column(modifier = Modifier.padding(16.dp)) {
-                                                Text("동작 방식", fontWeight = FontWeight.Bold, color = textColor)
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text("- 기존 룰 기반 필터 통과 후 AI 필터가 2차 검사", fontSize = 12.sp, color = subTextColor)
-                                                Text("- OpenAI-compatible / Gemini direct 지원", fontSize = 12.sp, color = subTextColor)
-                                                Text("- 출력 파싱 실패/모순 시 REVIEW fallback", fontSize = 12.sp, color = subTextColor)
-                                                Text("- review 우선 모드 고정", fontSize = 12.sp, color = subTextColor)
-                                                Spacer(modifier = Modifier.height(12.dp))
-                                                Text("AI 제공자", fontWeight = FontWeight.Bold, color = textColor)
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Box {
-                                                    OutlinedButton(onClick = { isAiProviderDropdownExpanded = true }) {
-                                                        Text(aiProviderOptions[aiFilterProvider] ?: "OpenAI-compatible", color = textColor)
-                                                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
-                                                    }
-                                                    DropdownMenu(expanded = isAiProviderDropdownExpanded, onDismissRequest = { isAiProviderDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                        aiProviderOptions.forEach { (key, label) ->
-                                                            DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
-                                                                aiFilterProvider = key
-                                                                botPref.edit().putString("ai_filter_provider", key).apply()
-                                                                if (key == "gemini_direct" && aiFilterEndpointText == "https://api.openai.com/v1/chat/completions") {
-                                                                    aiFilterEndpointText = ""
-                                                                    botPref.edit().putString("ai_filter_endpoint", "").apply()
-                                                                }
-                                                                isAiProviderDropdownExpanded = false
-                                                            })
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        ReadOnlyTextCard(if (aiFilterProvider == "gemini_direct") "Gemini Endpoint (비우면 기본 generateContent 사용)" else "AI API Endpoint", aiFilterEndpointText, colors) { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }
-                                        ReadOnlyTextCard("AI API Key", if (aiFilterApiKeyText.isBlank()) "" else "●".repeat(12), colors) { tempEditText = aiFilterApiKeyText; editDialogType = "ai_filter_api_key" }
-                                        ReadOnlyTextCard("AI 모델", aiFilterModelText, colors) { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }
-                                        ReadOnlyTextCard("봇별 사용자 프롬프트", aiFilterUserPromptText, colors) { tempEditText = aiFilterUserPromptText; editDialogType = "ai_filter_user_prompt" }
-                                    }
                                 }
                                 "SPAM" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
@@ -816,7 +770,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 ModernSettingItem("URL 필터", "외부 링크 차단", Icons.Filled.Share, colors, isUrlFilterMode, { isUrlFilterMode = it; botPref.edit().putBoolean("is_url_filter_mode", it).apply() }) { currentSubScreen = "URL" }
                                 ModernSettingItem("이미지 필터", "alt값 기반 이미지 차단", Icons.Filled.Search, colors, isImageFilterMode, { isImageFilterMode = it; botPref.edit().putBoolean("is_image_filter_mode", it).apply() }) { currentSubScreen = "IMAGE" }
                                 ModernSettingItem("보이스 필터", "보이스 리플 차단", Icons.Filled.Call, colors, isVoiceFilterMode, { isVoiceFilterMode = it; botPref.edit().putBoolean("is_voice_filter_mode", it).apply() }) { currentSubScreen = "VOICE" }
-                                ModernSettingItem("AI 필터", "게시글 2차 AI 검토", Icons.Filled.AutoAwesome, colors, isAiFilterMode, { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }) { currentSubScreen = "AI" }
+                                if (isAiFilterVisible) {
+                                    ModernSettingItem("AI 필터", "게시글 2차 AI 검토", Icons.Filled.AutoAwesome, colors, isAiFilterMode, { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }) { currentSubScreen = "AI" }
+                                }
                                 ModernSettingItem("스팸코드 필터", "대문자+숫자 조합 문자열 차단", Icons.Filled.Warning, colors, isSpamCodeFilterMode, { isSpamCodeFilterMode = it; botPref.edit().putBoolean("is_spam_code_filter_mode", it).apply() }) { currentSubScreen = "SPAM" }
 
                                 Spacer(modifier = Modifier.height(24.dp))
