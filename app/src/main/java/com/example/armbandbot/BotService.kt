@@ -676,30 +676,60 @@ class BotService : Service() {
             .execute()
 
         val loginDocument = loginPageResponse.parse()
-        val conKey = loginDocument.select("input[name=conKey]").attr("value")
+        val initialConKey = loginDocument.select("input[name=conKey]").attr("value")
         val returnUrl = loginDocument.select("input[name=r_url]").attr("value").ifBlank { "https://m.dcinside.com" }
         val token = loginDocument.select("input[name=_token]").attr("value")
         val csrfToken = loginDocument.select("meta[name=csrf-token]").attr("content")
+        val randCode = loginDocument.select("input[name=randCode]").attr("value")
+        val captchaCodeName = loginDocument.select("input[name=captchaCode]").attr("name")
+        val captchaCodeValue = loginDocument.select("input[name=captchaCode]").attr("value")
+
+        val accessResponse = Jsoup.connect("https://msign.dcinside.com/login/access")
+            .userAgent(dcUserAgent)
+            .referrer("https://msign.dcinside.com/login")
+            .header("Origin", "https://msign.dcinside.com")
+            .header("X-CSRF-TOKEN", csrfToken)
+            .cookies(loginPageResponse.cookies())
+            .data("token_verify", "dc_login")
+            .data("conKey", initialConKey)
+            .data("code", loginId)
+            .data("randcode", randCode)
+            .apply {
+                if (captchaCodeName.isNotBlank()) {
+                    data(captchaCodeName, captchaCodeValue)
+                }
+            }
+            .method(Connection.Method.POST)
+            .ignoreContentType(true)
+            .execute()
+
+        val accessJson = runCatching { org.json.JSONObject(accessResponse.body()) }.getOrNull() ?: return null
+        if (accessJson.optInt("result", 0) != 1) {
+            return null
+        }
+
+        val verifiedConKey = accessJson.optString("Block_key").ifBlank { accessJson.optString("block_key") }.ifBlank { initialConKey }
 
         val loginResponse = Jsoup.connect("https://msign.dcinside.com/login")
             .userAgent(dcUserAgent)
             .referrer("https://msign.dcinside.com/login")
             .header("Origin", "https://msign.dcinside.com")
             .header("X-CSRF-TOKEN", csrfToken)
-            .cookies(loginPageResponse.cookies())
+            .cookies(loginPageResponse.cookies() + accessResponse.cookies())
             .data("code", loginId)
             .data("password", loginPw)
             .data("loginCash", "on")
-            .data("conKey", conKey)
+            .data("conKey", verifiedConKey)
             .data("r_url", returnUrl)
             .data("_token", token)
             .method(Connection.Method.POST)
-            .followRedirects(false)
+            .followRedirects(true)
             .ignoreContentType(true)
             .execute()
 
         val mergedCookie = mergeCookieStrings(
             loginPageResponse.cookies().toCookieHeader(),
+            accessResponse.cookies().toCookieHeader(),
             loginResponse.cookies().toCookieHeader()
         )
 
