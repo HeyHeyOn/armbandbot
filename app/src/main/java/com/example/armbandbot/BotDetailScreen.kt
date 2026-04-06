@@ -98,6 +98,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var botName by remember { mutableStateOf(botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇") }
     var myCookie by remember { mutableStateOf(botPref.getString("saved_cookie", null)) }
     var isAutoLoginInProgress by remember { mutableStateOf(false) }
+    var shouldOpenWebViewFallback by remember { mutableStateOf(botPref.getBoolean("session_webview_fallback_pending", false)) }
+    var sessionRecoveryReason by remember { mutableStateOf(botPref.getString("session_recovery_reason", null)) }
 
     var editDialogType by remember { mutableStateOf<String?>(null) }
     var tempEditText by remember { mutableStateOf("") }
@@ -110,25 +112,44 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var extractVoiceText by remember { mutableStateOf("") }
     var extractedVoiceResult by remember { mutableStateOf<String?>(null) }
 
+    fun resumeBotWithRecoveredSession(extractedCookie: String) {
+        botPref.edit()
+            .putString("saved_cookie", extractedCookie)
+            .putBoolean("session_login_required", false)
+            .putBoolean("session_webview_fallback_pending", false)
+            .remove("session_recovery_reason")
+            .apply()
+        myCookie = extractedCookie
+        shouldOpenWebViewFallback = false
+        sessionRecoveryReason = null
+
+        if (isAutoLoginInProgress) {
+            isAutoLoginInProgress = false
+            val serviceIntent = Intent(context, BotService::class.java).apply {
+                putExtra("BOT_ID", botId)
+                putExtra("COOKIE", extractedCookie)
+                action = "START"
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(serviceIntent)
+            else context.startService(serviceIntent)
+            botPref.edit().putBoolean("is_running", true).putBoolean("should_restore_after_restart", true).apply()
+        }
+    }
+
     if (myCookie == null || isAutoLoginInProgress) {
         BotLoginScreen(
             botId = botId,
+            preferWebViewFallback = shouldOpenWebViewFallback,
+            recoveryReason = sessionRecoveryReason,
             onLoginSuccess = { extractedCookie ->
-                botPref.edit().putString("saved_cookie", extractedCookie).apply()
-                myCookie = extractedCookie
+                resumeBotWithRecoveredSession(extractedCookie)
+            },
+            onBack = {
                 if (isAutoLoginInProgress) {
                     isAutoLoginInProgress = false
-                    val serviceIntent = Intent(context, BotService::class.java).apply {
-                        putExtra("BOT_ID", botId)
-                        putExtra("COOKIE", extractedCookie)
-                        action = "START"
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(serviceIntent)
-                    else context.startService(serviceIntent)
-                    botPref.edit().putBoolean("is_running", true).putBoolean("should_restore_after_restart", true).apply()
-                }
-            },
-            onBack = { if (isAutoLoginInProgress) isAutoLoginInProgress = false else onBack() }
+                    shouldOpenWebViewFallback = false
+                } else onBack()
+            }
         )
     } else {
         val coroutineScope = rememberCoroutineScope()
@@ -283,6 +304,12 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                     if (intent?.getStringExtra("BOT_ID") == botId) {
                         isRunning = false
                         isAutoLoginInProgress = true
+                        shouldOpenWebViewFallback = intent.getBooleanExtra(
+                            "REQUIRE_WEBVIEW_FALLBACK",
+                            botPref.getBoolean("session_webview_fallback_pending", false)
+                        )
+                        sessionRecoveryReason = intent.getStringExtra("RECOVERY_REASON")
+                            ?: botPref.getString("session_recovery_reason", null)
                     }
                 }
             }

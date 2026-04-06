@@ -27,6 +27,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 @Composable
 fun BotLoginScreen(
     botId: String,
+    preferWebViewFallback: Boolean = false,
+    recoveryReason: String? = null,
     onLoginSuccess: (String) -> Unit,
     onBack: (() -> Unit)? = null
 ) {
@@ -50,7 +52,7 @@ fun BotLoginScreen(
     var errorMsg by errorMsgState
     var triggerLogin by triggerLoginState
 
-    var showFallbackWebView by remember { mutableStateOf(false) }
+    var showFallbackWebView by remember(preferWebViewFallback) { mutableStateOf(preferWebViewFallback) }
 
     val inputFieldColors = OutlinedTextFieldDefaults.colors(
         focusedContainerColor = colors.card,
@@ -126,6 +128,25 @@ fun BotLoginScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+
+        if (preferWebViewFallback) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = colors.card),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("자동 로그인 복구 실패", fontWeight = FontWeight.Bold, color = colors.warningRed)
+                    if (!recoveryReason.isNullOrBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(recoveryReason, fontSize = 12.sp, color = colors.subText)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text("아래 WebView 로그인으로 세션을 다시 연결하면 봇을 바로 재개합니다.", fontSize = 13.sp, color = colors.text)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
 
         // 3. 식별코드 입력
         OutlinedTextField(
@@ -218,7 +239,10 @@ fun BotLoginScreen(
 
         // 15. 브라우저 직접 로그인
         TextButton(onClick = { showFallbackWebView = true }) {
-            Text("직접 로그인 (브라우저)", color = colors.subText)
+            Text(
+                if (preferWebViewFallback) "WebView 로그인 열기" else "직접 로그인 (브라우저)",
+                color = colors.subText
+            )
         }
     }
 

@@ -163,3 +163,16 @@
 ### ?? ??
 - ?? ??? URL, ??? ?, ??? ??? ?? ??? ?? ??? ?????.
 - ?? ?????? ?? ??? ????? `LOGIN_REQUIRED`? ???? ??? ?? ??????.
+
+## 1.1.1 beta13
+
+### 주요 변화
+- 세션 복구를 서비스형 자동 로그인 1차 시도 + WebView 로그인 fallback 2차 진입 구조로 연결
+- 자동 로그인 실패 시 서비스가 복구 사유와 fallback 필요 상태를 UI에 브로드캐스트하도록 정리
+- 수동/WebView 로그인 성공 후 saved_cookie 저장, 세션 복구 플래그 해제, 봇 재시작 흐름을 공통 처리
+- `LOGIN_REQUIRED`는 fallback 대상으로 넘기고 `NO_PERMISSION`은 기존처럼 중단하도록 구분 유지
+
+### 기술 포인트
+- `session_login_required`, `session_webview_fallback_pending`, `session_recovery_reason` 프리퍼런스 상태 추가
+- BotDetailScreen이 복구 브로드캐스트의 extras를 받아 WebView fallback을 바로 열 수 있게 보강
+- 무한 복구 루프를 줄이기 위해 fallback 대기 상태는 로그인 성공 시에만 해제되도록 정리

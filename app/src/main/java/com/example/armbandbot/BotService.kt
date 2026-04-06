@@ -691,6 +691,42 @@ class BotService : Service() {
         return if (isSessionValid(mergedCookie)) mergedCookie else null
     }
 
+    private fun persistRecoveredSession(
+        botPref: android.content.SharedPreferences,
+        cookie: String,
+        currentCookie: String = ""
+    ): String {
+        val mergedCookie = mergeCookieStrings(currentCookie, cookie)
+        botPref.edit()
+            .putString("saved_cookie", mergedCookie)
+            .putBoolean("session_login_required", false)
+            .putBoolean("session_webview_fallback_pending", false)
+            .apply()
+        resetAutoLoginFailureState(botPref)
+        return mergedCookie
+    }
+
+    private fun notifySessionRecoveryRequired(
+        botId: String,
+        botPref: android.content.SharedPreferences,
+        reason: String,
+        requireWebViewFallback: Boolean
+    ) {
+        botPref.edit()
+            .putBoolean("session_login_required", true)
+            .putBoolean("session_webview_fallback_pending", requireWebViewFallback)
+            .putString("session_recovery_reason", reason)
+            .apply()
+
+        val sessionExpiredIntent = Intent("BOT_SESSION_EXPIRED").apply {
+            putExtra("BOT_ID", botId)
+            putExtra("RECOVERY_REASON", reason)
+            putExtra("REQUIRE_WEBVIEW_FALLBACK", requireWebViewFallback)
+            setPackage(applicationContext.packageName)
+        }
+        sendBroadcast(sessionExpiredIntent)
+    }
+
     private fun tryRecoverSession(
         botId: String,
         botPref: android.content.SharedPreferences,
@@ -700,6 +736,12 @@ class BotService : Service() {
         val (canAttempt, blockedReason) = canAttemptAutoLogin(botPref)
         if (!canAttempt) {
             sendLog("[자동 로그인 건너뜀] $blockedReason", botId)
+            notifySessionRecoveryRequired(
+                botId = botId,
+                botPref = botPref,
+                reason = blockedReason ?: reason,
+                requireWebViewFallback = true
+            )
             return null
         }
 
@@ -711,18 +753,32 @@ class BotService : Service() {
             val refreshedCookie = performAutoLogin(loginId, loginPw)
             if (refreshedCookie.isNullOrBlank()) {
                 recordAutoLoginFailure(botPref)
-                sendLog("[자동 로그인 실패] 로그인 응답은 받았지만 유효 세션을 확보하지 못했습니다.", botId)
+                sendLog("[자동 로그인 실패] 로그인 응답은 받았지만 유효 세션을 확보하지 못했습니다. WebView 로그인으로 전환합니다.", botId)
+                notifySessionRecoveryRequired(
+                    botId = botId,
+                    botPref = botPref,
+                    reason = "$reason / 자동 로그인 실패",
+                    requireWebViewFallback = true
+                )
                 null
             } else {
-                val mergedCookie = mergeCookieStrings(currentCookie, refreshedCookie)
-                botPref.edit().putString("saved_cookie", mergedCookie).apply()
-                resetAutoLoginFailureState(botPref)
+                val mergedCookie = persistRecoveredSession(
+                    botPref = botPref,
+                    cookie = refreshedCookie,
+                    currentCookie = currentCookie
+                )
                 sendLog("[자동 로그인 성공] 새 세션을 저장했고 작업을 재개합니다.", botId)
                 mergedCookie
             }
         } catch (e: Exception) {
             recordAutoLoginFailure(botPref)
             sendLog("[자동 로그인 오류] ${e.message ?: "알 수 없는 오류"}", botId)
+            notifySessionRecoveryRequired(
+                botId = botId,
+                botPref = botPref,
+                reason = "$reason / 자동 로그인 오류",
+                requireWebViewFallback = true
+            )
             null
         }
     }
@@ -817,12 +873,13 @@ class BotService : Service() {
                     .putBoolean("should_restore_after_restart", false)
                     .putBoolean("is_running", false)
                     .apply()
-                sendLog("🚨 로그인 세션이 만료되었고 자동 복구에 실패했습니다. 봇을 종료합니다.", botId)
-                val sessionExpiredIntent = Intent("BOT_SESSION_EXPIRED").apply {
-                    putExtra("BOT_ID", botId)
-                    setPackage(applicationContext.packageName)
-                }
-                sendBroadcast(sessionExpiredIntent)
+                sendLog("🚨 로그인 세션이 만료되었고 자동 복구에 실패했습니다. WebView 로그인 대기로 전환합니다.", botId)
+                notifySessionRecoveryRequired(
+                    botId = botId,
+                    botPref = botPref,
+                    reason = "세션 만료 감지",
+                    requireWebViewFallback = true
+                )
                 break
             }
 
@@ -867,13 +924,22 @@ class BotService : Service() {
                             .putBoolean("should_restore_after_restart", false)
                             .putBoolean("is_running", false)
                             .apply()
-                        sendLog("[인증 복구 실패] 로그인 필요 상태가 반복되어 봇을 종료합니다.", botId)
+                        sendLog("[인증 복구 실패] 로그인 필요 상태가 반복되어 WebView 로그인 대기로 전환합니다.", botId)
+                        notifySessionRecoveryRequired(
+                            botId = botId,
+                            botPref = botPref,
+                            reason = "페이지 접근 중 로그인 필요 반복",
+                            requireWebViewFallback = true
+                        )
                         return
                     }
                     UrlProcessOutcome.NO_PERMISSION -> {
                         botPref.edit()
                             .putBoolean("should_restore_after_restart", false)
                             .putBoolean("is_running", false)
+                            .putBoolean("session_login_required", false)
+                            .putBoolean("session_webview_fallback_pending", false)
+                            .putString("session_recovery_reason", "매니저 권한 없음")
                             .apply()
                         sendLog("[권한 없음] 매니저 권한이 없어 작업을 중단합니다.", botId)
                         return
