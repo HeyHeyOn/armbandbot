@@ -480,10 +480,41 @@ class BotService : Service() {
         return SearchNavigation(currentPageUrl, currentSearchPos, nextPageUrl, nextSearchChunkUrl)
     }
 
-    private fun evaluateManagerPermission(document: org.jsoup.nodes.Document): ManagerPermissionStatus {
+    private fun isSearchPageUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        val lowered = url.lowercase()
+        return lowered.contains("s_type=") || lowered.contains("s_keyword=") || lowered.contains("search_pos=")
+    }
+
+    private fun isConfirmedLoginPage(document: org.jsoup.nodes.Document, requestedUrl: String? = null): Boolean {
         val location = document.location().lowercase()
+        val requested = requestedUrl.orEmpty().lowercase()
+        val bodyText = document.body()?.text().orEmpty().replace(Regex("\\s+"), " ")
+        val loginFormExists = document.select("form[action*=login], input[name=user_id], input[name=pw], input[type=password]").isNotEmpty()
+        val explicitLoginPhrases = listOf(
+            "로그인이 필요합니다",
+            "로그인 후 이용",
+            "회원 로그인",
+            "디시인사이드 로그인"
+        )
+        val explicitLoginText = explicitLoginPhrases.any { bodyText.contains(it, ignoreCase = true) }
+        val isLoginUrl = location.contains("/login") || location.contains("msign.dcinside.com/login")
+        val requestedSearchPage = isSearchPageUrl(requested)
+
+        return if (requestedSearchPage) {
+            isLoginUrl || loginFormExists || explicitLoginText
+        } else {
+            val loginIndicators = listOf("???", "login", "???", "????", "디시인사이드 로그인")
+            isLoginUrl || loginFormExists || explicitLoginText || loginIndicators.count { bodyText.contains(it, ignoreCase = true) } >= 2
+        }
+    }
+
+    private fun evaluateManagerPermission(document: org.jsoup.nodes.Document, requestedUrl: String? = null): ManagerPermissionStatus {
+        val location = document.location().lowercase()
+        val requested = requestedUrl.orEmpty().lowercase()
         val bodyText = document.body()?.text().orEmpty()
         val normalizedBodyText = bodyText.replace(Regex("\\s+"), " ")
+        val isSearchPage = isSearchPageUrl(location) || isSearchPageUrl(requested)
 
         val managerSelectors = listOf(
             "a[onclick*=listSearchHead(999)]",
@@ -497,8 +528,8 @@ class BotService : Service() {
         val managerEvidence = managerSelectors.any { selector ->
             document.select(selector).any { element ->
                 val text = element.text().trim()
-                text.contains("\uB9E4\uB2C8\uC800") ||
-                    text.contains("\uAD00\uB9AC") ||
+                text.contains("매니저") ||
+                    text.contains("관리") ||
                     element.attr("href").contains("manager", ignoreCase = true) ||
                     element.attr("onclick").contains("manager", ignoreCase = true) ||
                     element.attr("action").contains("manager", ignoreCase = true)
@@ -510,33 +541,29 @@ class BotService : Service() {
             return ManagerPermissionStatus.CONFIRMED
         }
 
-        val loginIndicators = listOf(
-            "\uB85C\uADF8\uC778", "login", "\uC544\uC774\uB514", "\uBE44\uBC00\uBC88\uD638", "\uB514\uC2DC\uC778\uC0AC\uC774\uB4DC \uB85C\uADF8\uC778"
-        )
-        val loginFormExists = document.select("form[action*=login], input[name=user_id], input[name=pw], input[type=password]").isNotEmpty()
-        if (location.contains("login") || loginFormExists || loginIndicators.count { normalizedBodyText.contains(it, ignoreCase = true) } >= 2) {
-            return ManagerPermissionStatus.LOGIN_REQUIRED
-        }
-
         val explicitNoPermissionPhrases = listOf(
-            "\uAD00\uB9AC\uC790 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
-            "\uB9E4\uB2C8\uC800 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
-            "\uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
-            "\uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
-            "\uC798\uBABB\uB41C \uC811\uADFC\uC785\uB2C8\uB2E4",
-            "\uAD8C\uD55C\uC774 \uC5C6\uB294",
-            "\uB9E4\uB2C8\uC800\uB9CC",
-            "\uAD00\uB9AC\uC790\uB9CC"
+            "관리자 권한이 없습니다",
+            "매니저 권한이 없습니다",
+            "권한이 없습니다",
+            "접근 권한이 없습니다",
+            "잘못된 접근입니다",
+            "권한이 없는",
+            "매니저만",
+            "관리자만"
         )
         if (explicitNoPermissionPhrases.any { normalizedBodyText.contains(it) }) {
             return ManagerPermissionStatus.NO_PERMISSION
         }
 
+        if (isConfirmedLoginPage(document, requestedUrl)) {
+            return ManagerPermissionStatus.LOGIN_REQUIRED
+        }
+
         val hasPostRows = document.select(".ub-content").isNotEmpty()
         val hasSearchMarkers = document.select("input[name=search_pos], .bottom_paging_box, .sch_result, .sch_no_result").isNotEmpty() ||
-            location.contains("s_keyword=") || location.contains("search_pos=")
+            location.contains("s_keyword=") || location.contains("search_pos=") || requested.contains("s_keyword=") || requested.contains("search_pos=")
 
-        return if (hasPostRows || hasSearchMarkers) {
+        return if (hasPostRows || hasSearchMarkers || isSearchPage) {
             ManagerPermissionStatus.AMBIGUOUS
         } else {
             ManagerPermissionStatus.NO_PERMISSION
@@ -887,7 +914,7 @@ class BotService : Service() {
             .userAgent("Mozilla/5.0")
             .header("Cookie", cookie)
             .get()
-        val managerPermissionStatus = evaluateManagerPermission(document)
+        val managerPermissionStatus = evaluateManagerPermission(document, pageUrl)
         if (config.isDebugMode) {
             sendLog("[디버그][페이지] 매니저 권한 상태: ${managerPermissionStatus.logLabel}", botId)
         }
@@ -952,6 +979,26 @@ class BotService : Service() {
         )
     }
 
+    private fun revalidateSearchLoginRequirement(
+        botId: String,
+        cookie: String,
+        stableListUrl: String
+    ): ManagerPermissionStatus {
+        return try {
+            val verifyUrl = if (stableListUrl.contains("page=")) stableListUrl else "$stableListUrl&page=1"
+            val verifyDocument = Jsoup.connect(verifyUrl)
+                .userAgent("Mozilla/5.0")
+                .header("Cookie", cookie)
+                .get()
+            val verifyStatus = evaluateManagerPermission(verifyDocument, verifyUrl)
+            sendLog("[\uC778\uC99D \uC7AC\uAC80\uC99D] \uAC80\uC0C9 \uD398\uC774\uC9C0 \uB85C\uADF8\uC778 \uD544\uC694 \uD310\uC815 ? \uC77C\uBC18 \uBAA9\uB85D \uD655\uC778 \uACB0\uACFC: ${verifyStatus.logLabel}", botId)
+            verifyStatus
+        } catch (e: Exception) {
+            sendLog("[\uC778\uC99D \uC7AC\uAC80\uC99D] \uC77C\uBC18 \uBAA9\uB85D \uD655\uC778 \uC2E4\uD328: ${e.message ?: "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"}", botId)
+            ManagerPermissionStatus.AMBIGUOUS
+        }
+    }
+
     private suspend fun processTargetUrl(
         config: BotConfig,
         botId: String,
@@ -1003,7 +1050,23 @@ class BotService : Service() {
                         notifyIfEnabled = notifyIfEnabled
                     )
                     when (pageResult.managerPermissionStatus) {
-                        ManagerPermissionStatus.LOGIN_REQUIRED -> return UrlProcessOutcome.LOGIN_REQUIRED
+                        ManagerPermissionStatus.LOGIN_REQUIRED -> {
+                            if (!config.isSearchMode) return UrlProcessOutcome.LOGIN_REQUIRED
+
+                            val stableListStatus = revalidateSearchLoginRequirement(
+                                botId = botId,
+                                cookie = cookie,
+                                stableListUrl = convertToPcUrl(rawUrl)
+                            )
+                            when (stableListStatus) {
+                                ManagerPermissionStatus.LOGIN_REQUIRED -> return UrlProcessOutcome.LOGIN_REQUIRED
+                                ManagerPermissionStatus.NO_PERMISSION -> return UrlProcessOutcome.NO_PERMISSION
+                                ManagerPermissionStatus.AMBIGUOUS, ManagerPermissionStatus.CONFIRMED -> {
+                                    sendLog("[인증 예외] 검색 페이지에서만 로그인 필요로 보여 이번 키워드 스캔은 건너뜁니다.", botId)
+                                    break
+                                }
+                            }
+                        }
                         ManagerPermissionStatus.NO_PERMISSION -> return UrlProcessOutcome.NO_PERMISSION
                         ManagerPermissionStatus.AMBIGUOUS, ManagerPermissionStatus.CONFIRMED -> Unit
                     }
