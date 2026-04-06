@@ -8,6 +8,7 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.LinkedHashMap
 
 internal enum class AiFilterProvider {
     OPENAI_COMPATIBLE,
@@ -59,6 +60,14 @@ internal class AiFilterClient(
     private val config: AiFilterConfig,
     private val logger: (String) -> Unit = {},
 ) {
+    companion object {
+        private const val CACHE_LIMIT = 200
+        private val evaluationCache = object : LinkedHashMap<String, AiFilterEvaluation>(CACHE_LIMIT, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AiFilterEvaluation>?): Boolean = size > CACHE_LIMIT
+        }
+        private val cacheLock = Any()
+    }
+
     private val fixedPrompt = """
         당신은 커뮤니티 게시글 전용 안전 필터입니다.
         댓글은 검사 대상이 아닙니다.
@@ -81,19 +90,47 @@ internal class AiFilterClient(
     fun evaluate(request: AiFilterRequest): AiFilterEvaluation {
         if (!config.enabled) return AiFilterEvaluation()
         if (config.apiKey.isBlank() || config.model.isBlank()) {
-            return AiFilterEvaluation(failureReason = "AI 필터 설정 미완료")
+            return AiFilterEvaluation(failureReason = "AI ?? ?? ???")
         }
         if (config.provider == AiFilterProvider.OPENAI_COMPATIBLE && config.endpoint.isBlank()) {
-            return AiFilterEvaluation(failureReason = "AI 필터 Endpoint 미설정")
+            return AiFilterEvaluation(failureReason = "AI ?? Endpoint ???")
         }
 
-        return try {
+        val cacheKey = buildCacheKey(request)
+        synchronized(cacheLock) {
+            evaluationCache[cacheKey]?.let {
+                logger("AI ?? ?? ??")
+                return it
+            }
+        }
+
+        val evaluation = try {
             val responseText = callApi(request)
             parseResponse(responseText)
         } catch (e: Exception) {
-            logger("AI 필터 호출 실패: ${e.message}")
-            AiFilterEvaluation(failureReason = e.message ?: "AI 필터 호출 실패")
+            logger("AI ?? ?? ??: ${e.message}")
+            AiFilterEvaluation(failureReason = e.message ?: "AI ?? ?? ??")
         }
+
+        synchronized(cacheLock) {
+            evaluationCache[cacheKey] = evaluation
+        }
+        return evaluation
+    }
+
+    private fun buildCacheKey(request: AiFilterRequest): String {
+        return listOf(
+            config.provider.name,
+            config.endpoint,
+            config.model,
+            config.userPrompt,
+            config.reviewMode.toString(),
+            request.postTitle.trim(),
+            request.postAuthor.trim(),
+            request.postNick.trim(),
+            request.postBody.trim(),
+            request.postImageAlts.joinToString("|") { it.trim() }
+        ).joinToString("\n")
     }
 
     private fun buildComposedUserPrompt(request: AiFilterRequest): String = buildString {

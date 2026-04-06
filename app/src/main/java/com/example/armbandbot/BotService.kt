@@ -111,8 +111,14 @@ class BotService : Service() {
         val normalWords: Array<String>,
         val bypassWords: Array<String>
     )
+    private enum class PostModerationAction {
+        ALLOW,
+        REVIEW_ONLY,
+        BLOCK_EXECUTE
+    }
+
     private data class PostAnalysisResult(
-        val isBadPost: Boolean,
+        val action: PostModerationAction,
         val isWhitelistedUser: Boolean,
         val isBlacklistedUserId: Boolean,
         val isBlacklistedUserNick: Boolean,
@@ -122,6 +128,7 @@ class BotService : Service() {
         val matchedVoiceIdPost: String? = null,
         val aiDecision: AiFilterDecision? = null,
         val aiReviewReason: String? = null,
+        val reviewReason: String? = null,
         val blockReasonPrefix: String? = null,
         val notiType: String? = null,
         val debugDetail: String? = null
@@ -1341,7 +1348,7 @@ class BotService : Service() {
             cookie = cookie
         )
         if (config.isDebugMode) {
-            if (postAnalysis.isBadPost) {
+            if (postAnalysis.action == PostModerationAction.BLOCK_EXECUTE) {
                 sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 차단 대상 → ${postAnalysis.debugDetail}", botId)
             } else {
                 sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 정상${if (postAnalysis.isWhitelistedUser) " (화이트리스트 통과)" else ""}", botId)
@@ -1732,7 +1739,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
-        if (postAnalysis.isBadPost) {
+        if (postAnalysis.action == PostModerationAction.BLOCK_EXECUTE) {
             if (config.isDebugMode && !postAnalysis.debugDetail.isNullOrBlank()) {
                 sendLog("[디버그][게시글 차단 상세] 번호: $postNumStr / ${postAnalysis.debugDetail}", botId)
             }
@@ -1776,6 +1783,23 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             dbBlockReason = postBlockResult.blockReason
             dbSnapshotPath = postBlockResult.snapshotPath
+        } else if (postAnalysis.action == PostModerationAction.REVIEW_ONLY) {
+            val reviewReason = postAnalysis.reviewReason ?: postAnalysis.aiReviewReason ?: "AI ?? ??"
+            sendLog("[AI ?? ??] ??: $postNumStr / $reviewReason", botId)
+            if (config.isNotiMaster) {
+                sendBlockNotification(botId, botName = botId, title = "AI ?? ??", message = "??? ?? $postNumStr / $reviewReason")
+            }
+            GlobalBotState.saveBlockHistory(
+                gallType = gallType,
+                gallId = gallId,
+                postNum = postNumStr,
+                targetType = "POST_REVIEW",
+                targetAuthor = postDisplayAuthor,
+                targetContent = text,
+                blockReason = reviewReason,
+                snapshotPath = null,
+                creationDate = postDate
+            )
         } else {
             var badCommentCount = 0
 
@@ -2223,7 +2247,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             sendLog("[디버그][필터/유저] 작성자: $postAuthor / 닉: $postNick → 블랙(ID): $isBlacklistedUserId, 블랙(닉): $isBlacklistedUserNick, 화이트: $isWhitelistedUser", botId)
         }
 
-        var isBadPost = isBlacklistedUserId || isBlacklistedUserNick
+        var shouldBlockExecute = isBlacklistedUserId || isBlacklistedUserNick
+        var shouldReviewOnly = false
         var suspiciousUrlInPost: String? = null
         var spamCodeMatchPost: String? = null
         var matchedImageAlt: String? = null
@@ -2246,7 +2271,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             sendLog("[디버그][필터/화이트] 화이트리스트 유저 → 이후 모든 필터 통과", botId)
         }
 
-        if (!isBadPost && !isWhitelistedUser) {
+        if (!shouldBlockExecute && !isWhitelistedUser) {
             val isYudong = postUid.isEmpty()
             if (config.isDebugMode && botId.isNotEmpty()) {
                 sendLog("[디버그][필터/유동] 유동 여부: $isYudong", botId)
@@ -2307,7 +2332,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
 
             if (blockReasonPrefix != null) {
-                isBadPost = true
+                shouldBlockExecute = true
             } else {
                 val matchedNormalWord =
                     config.normalWords.firstOrNull { postText.contains(it, ignoreCase = true) }
@@ -2326,7 +2351,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     sendLog("[디버그][필터/spam] 스팸코드: ${spamCodeMatchPost ?: "없음"}", botId)
                 }
 
-                isBadPost =
+                shouldBlockExecute =
                     (matchedNormalWord != null) ||
                             (matchedBypassWord != null) ||
                             (suspiciousUrlInPost != null) ||
@@ -2342,27 +2367,27 @@ img.written_dccon{max-width:80px;max-height:80px}
                     debugDetail = "스팸코드 감지 ($spamCodeMatchPost)"
                 }
 
-                if (!isBadPost && config.isImageFilterMode) {
+                if (!shouldBlockExecute && config.isImageFilterMode) {
                     for (postAlt in postImageAlts) {
                         for (blackAlt in config.imageAltBlacklist) {
                             if (getAltSimilarity(postAlt, blackAlt) >= config.imageFilterThreshold) {
-                                isBadPost = true
+                                shouldBlockExecute = true
                                 matchedImageAlt = postAlt
                                 debugDetail = "이미지 alt 유사도 차단 (감지='$postAlt', 기준='$blackAlt', 임계치=${config.imageFilterThreshold})"
                                 break
                             }
                         }
-                        if (isBadPost) break
+                        if (shouldBlockExecute) break
                     }
                     if (config.isDebugMode && botId.isNotEmpty()) {
                         sendLog("[디버그][필터/image] 이미지 필터: ${if (matchedImageAlt != null) "차단 (alt=$matchedImageAlt)" else "통과"}", botId)
                     }
                 }
 
-                if (!isBadPost && config.isVoiceFilterMode) {
+                if (!shouldBlockExecute && config.isVoiceFilterMode) {
                     for (vid in config.voiceBlacklist) {
                         if (postRawHtml.contains(vid)) {
-                            isBadPost = true
+                            shouldBlockExecute = true
                             matchedVoiceIdPost = vid
                             debugDetail = "금지 보이스 ID 감지 ($vid)"
                             break
@@ -2373,7 +2398,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                 }
 
-                if (!isBadPost && config.isAiFilterMode) {
+                if (!shouldBlockExecute && config.isAiFilterMode) {
                     val aiEvaluation = AiFilterClient(
                         config = AiFilterConfig(
                             enabled = config.isAiFilterMode,
@@ -2398,21 +2423,21 @@ img.written_dccon{max-width:80px;max-height:80px}
                     aiDecision = aiEvaluation.decision
                     when {
                         aiDecision?.type == AiFilterDecisionType.REVIEW -> {
-                            isBadPost = true
+                            shouldReviewOnly = true
                             aiReviewReason = aiDecision?.reason ?: "AI 검토 필요"
                             blockReasonPrefix = "AI 필터 검토 필요"
                             notiType = "ai"
                             debugDetail = "AI REVIEW (${aiDecision?.category}/${aiDecision?.confidence}) ${aiReviewReason ?: ""}".trim()
                         }
                         aiDecision?.type == AiFilterDecisionType.BLOCK -> {
-                            isBadPost = true
+                            shouldBlockExecute = true
                             aiReviewReason = aiDecision?.reason ?: "AI 차단"
                             blockReasonPrefix = "AI 필터 차단"
                             notiType = "ai"
                             debugDetail = "AI BLOCK (${aiDecision?.category}/${aiDecision?.confidence}) ${aiReviewReason ?: ""}".trim()
                         }
                         aiEvaluation.failureReason != null -> {
-                            isBadPost = true
+                            shouldReviewOnly = true
                             aiReviewReason = aiEvaluation.failureReason
                             blockReasonPrefix = "AI 필터 검토 필요"
                             notiType = "ai"
@@ -2427,8 +2452,14 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
+        val action = when {
+            shouldBlockExecute -> PostModerationAction.BLOCK_EXECUTE
+            shouldReviewOnly -> PostModerationAction.REVIEW_ONLY
+            else -> PostModerationAction.ALLOW
+        }
+
         return PostAnalysisResult(
-            isBadPost = isBadPost,
+            action = action,
             isWhitelistedUser = isWhitelistedUser,
             isBlacklistedUserId = isBlacklistedUserId,
             isBlacklistedUserNick = isBlacklistedUserNick,
@@ -2438,6 +2469,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             matchedVoiceIdPost = matchedVoiceIdPost,
             aiDecision = aiDecision,
             aiReviewReason = aiReviewReason,
+            reviewReason = if (action == PostModerationAction.REVIEW_ONLY) (debugDetail ?: aiReviewReason ?: blockReasonPrefix) else null,
             blockReasonPrefix = blockReasonPrefix,
             notiType = notiType,
             debugDetail = debugDetail
