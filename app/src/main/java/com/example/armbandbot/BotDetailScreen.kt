@@ -258,6 +258,12 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isVoiceFilterMode by remember { mutableStateOf(botPref.getBoolean("is_voice_filter_mode", false)) }
         var voiceBlacklistText by remember { mutableStateOf(botPref.getStringSet("voice_blacklist", setOf())?.joinToString("\n") ?: "") }
 
+        var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
+        var aiFilterEndpointText by remember { mutableStateOf(botPref.getString("ai_filter_endpoint", "https://api.openai.com/v1/chat/completions") ?: "https://api.openai.com/v1/chat/completions") }
+        var aiFilterApiKeyText by remember { mutableStateOf(botPref.getString("ai_filter_api_key", "") ?: "") }
+        var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gpt-4o-mini") ?: "gpt-4o-mini") }
+        var aiFilterUserPromptText by remember { mutableStateOf(botPref.getString("ai_filter_user_prompt", "") ?: "") }
+
         var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
         var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
 
@@ -640,6 +646,32 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
                                     }
                                 }
+                                "AI" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text("AI 필터", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("게시글만 2차 AI 검토합니다. 댓글은 제외되며 애매하면 REVIEW 우선 처리됩니다.", fontSize = 12.sp, color = subTextColor)
+                                            }
+                                            Switch(checked = isAiFilterMode, onCheckedChange = { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                        }
+                                    }
+                                    Column(modifier = if (!isAiFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                Text("동작 방식", fontWeight = FontWeight.Bold, color = textColor)
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text("- 기존 룰 기반 필터 통과 후 AI 필터가 2차 검사", fontSize = 12.sp, color = subTextColor)
+                                                Text("- 출력 파싱 실패/모순 시 REVIEW fallback", fontSize = 12.sp, color = subTextColor)
+                                                Text("- review 우선 모드 고정", fontSize = 12.sp, color = subTextColor)
+                                            }
+                                        }
+                                        ReadOnlyTextCard("AI API Endpoint", aiFilterEndpointText, colors) { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }
+                                        ReadOnlyTextCard("AI API Key", if (aiFilterApiKeyText.isBlank()) "" else "●".repeat(12), colors) { tempEditText = aiFilterApiKeyText; editDialogType = "ai_filter_api_key" }
+                                        ReadOnlyTextCard("AI 모델", aiFilterModelText, colors) { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }
+                                        ReadOnlyTextCard("봇별 사용자 프롬프트", aiFilterUserPromptText, colors) { tempEditText = aiFilterUserPromptText; editDialogType = "ai_filter_user_prompt" }
+                                    }
+                                }
                                 "SPAM" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -758,6 +790,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 ModernSettingItem("URL 필터", "외부 링크 차단", Icons.Filled.Share, colors, isUrlFilterMode, { isUrlFilterMode = it; botPref.edit().putBoolean("is_url_filter_mode", it).apply() }) { currentSubScreen = "URL" }
                                 ModernSettingItem("이미지 필터", "alt값 기반 이미지 차단", Icons.Filled.Search, colors, isImageFilterMode, { isImageFilterMode = it; botPref.edit().putBoolean("is_image_filter_mode", it).apply() }) { currentSubScreen = "IMAGE" }
                                 ModernSettingItem("보이스 필터", "보이스 리플 차단", Icons.Filled.Call, colors, isVoiceFilterMode, { isVoiceFilterMode = it; botPref.edit().putBoolean("is_voice_filter_mode", it).apply() }) { currentSubScreen = "VOICE" }
+                                ModernSettingItem("AI 필터", "게시글 2차 AI 검토", Icons.Filled.AutoAwesome, colors, isAiFilterMode, { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }) { currentSubScreen = "AI" }
                                 ModernSettingItem("스팸코드 필터", "대문자+숫자 조합 문자열 차단", Icons.Filled.Warning, colors, isSpamCodeFilterMode, { isSpamCodeFilterMode = it; botPref.edit().putBoolean("is_spam_code_filter_mode", it).apply() }) { currentSubScreen = "SPAM" }
 
                                 Spacer(modifier = Modifier.height(24.dp))
@@ -1007,6 +1040,10 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "nickname_whitelist" -> { nicknameWhitelistText = tempEditText; botPref.edit().putStringSet("nickname_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "image_alt_blacklist" -> { imageAltBlacklistText = tempEditText; botPref.edit().putStringSet("image_alt_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "voice_blacklist" -> { voiceBlacklistText = tempEditText; botPref.edit().putStringSet("voice_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "ai_filter_endpoint" -> { aiFilterEndpointText = tempEditText.trim(); botPref.edit().putString("ai_filter_endpoint", aiFilterEndpointText).apply() }
+                        "ai_filter_api_key" -> { aiFilterApiKeyText = tempEditText.trim(); botPref.edit().putString("ai_filter_api_key", aiFilterApiKeyText).apply() }
+                        "ai_filter_model" -> { aiFilterModelText = tempEditText.trim(); botPref.edit().putString("ai_filter_model", aiFilterModelText).apply() }
+                        "ai_filter_user_prompt" -> { aiFilterUserPromptText = tempEditText.trim(); botPref.edit().putString("ai_filter_user_prompt", aiFilterUserPromptText).apply() }
                     }
                     editDialogType = null; Toast.makeText(context, "저장되었습니다.", Toast.LENGTH_SHORT).show()
                 }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("저장", color = Color.White) } },

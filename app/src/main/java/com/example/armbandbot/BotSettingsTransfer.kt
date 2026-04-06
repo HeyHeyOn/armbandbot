@@ -16,7 +16,11 @@ private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtub
 internal val EXPORTABLE_STRING_KEYS = listOf(
     "target_urls",
     "search_type",
-    "block_reason_text"
+    "block_reason_text",
+    "ai_filter_endpoint",
+    "ai_filter_api_key",
+    "ai_filter_model",
+    "ai_filter_user_prompt"
 )
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
@@ -26,7 +30,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_yudong_post_block", "is_yudong_comment_block", "is_yudong_image_block", "is_yudong_voice_block",
     "is_kkang_filter_mode", "is_kkang_post_block", "is_kkang_comment_block", "is_kkang_image_block", "is_kkang_voice_block",
     "is_url_filter_mode", "is_image_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode",
-    "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
+    "is_ai_filter_mode", "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
 
 internal val EXPORTABLE_INT_KEYS = listOf(

@@ -176,3 +176,17 @@
 - `session_login_required`, `session_webview_fallback_pending`, `session_recovery_reason` 프리퍼런스 상태 추가
 - BotDetailScreen이 복구 브로드캐스트의 extras를 받아 WebView fallback을 바로 열 수 있게 보강
 - 무한 복구 루프를 줄이기 위해 fallback 대기 상태는 로그인 성공 시에만 해제되도록 정리
+
+## 1.1.1 beta14
+
+### 주요 변화
+- 게시글 전용 2차 검사 기능인 `AI 필터`를 추가하고, 기존 rule-based 1차 필터 통과 후에만 동작하도록 연결
+- 봇별 AI 설정 UI를 추가해 Endpoint, API Key, 모델, 사용자 프롬프트를 저장할 수 있게 구성
+- AI 응답은 고정 JSON만 허용하고, 파싱 실패/모순/호출 실패 시 자동으로 `REVIEW` fallback 처리
+- review 우선 모드를 기본값으로 적용해 AI의 `BLOCK` 응답도 우선 검토 대상으로 수렴되도록 보수적으로 처리
+
+### 기술 포인트
+- `AiFilter.kt` 별도 모듈을 추가해 API 호출, JSON 파싱, 판단 결과 정규화를 서비스 로직과 분리
+- `BotService`에는 최소 범위로 설정 로드, 게시글 분석 후 2차 AI 평가, AI 차단/검토 로그 프레젠테이션만 추가
+- 댓글 필터 흐름은 유지하고 AI 필터는 게시글에만 적용되도록 분리
+- 봇 설정 export/import 키에 AI 필터 관련 프리퍼런스를 포함

@@ -93,6 +93,12 @@ class BotService : Service() {
         val isVoiceFilterMode: Boolean,
         val voiceBlacklist: List<String>,
 
+        val isAiFilterMode: Boolean,
+        val aiFilterEndpoint: String,
+        val aiFilterApiKey: String,
+        val aiFilterModel: String,
+        val aiFilterUserPrompt: String,
+
         val scanPageCount: Int,
         val postMinMs: Long,
         val postMaxMs: Long,
@@ -113,6 +119,8 @@ class BotService : Service() {
         val spamCodeMatchPost: String? = null,
         val matchedImageAlt: String? = null,
         val matchedVoiceIdPost: String? = null,
+        val aiDecision: AiFilterDecision? = null,
+        val aiReviewReason: String? = null,
         val blockReasonPrefix: String? = null,
         val notiType: String? = null,
         val debugDetail: String? = null
@@ -1323,6 +1331,7 @@ class BotService : Service() {
             postAuthor = postAuthor,
             postNick = postNick,
             postUid = postUid,
+            postTitle = text,
             postText = postText,
             postImageAlts = postImageAlts,
             postRawHtml = postRawHtml,
@@ -1344,6 +1353,8 @@ class BotService : Service() {
         val spamCodeMatchPost = postAnalysis.spamCodeMatchPost
         val matchedImageAlt = postAnalysis.matchedImageAlt
         val matchedVoiceIdPost = postAnalysis.matchedVoiceIdPost
+        val aiDecision = postAnalysis.aiDecision
+        val aiReviewReason = postAnalysis.aiReviewReason
         val blockReasonPrefix = postAnalysis.blockReasonPrefix
         val notiType = postAnalysis.notiType
 
@@ -1750,6 +1761,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 notiType = notiType,
                 matchedVoiceIdPost = matchedVoiceIdPost,
                 matchedImageAlt = matchedImageAlt,
+                aiDecision = aiDecision,
+                aiReviewReason = aiReviewReason,
                 suspiciousUrlInPost = suspiciousUrlInPost,
                 spamCodeMatchPost = spamCodeMatchPost,
                 notifyIfEnabled = notifyIfEnabled,
@@ -2158,6 +2171,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?.filter { it.isNotEmpty() }
                 ?: emptyList(),
 
+            isAiFilterMode = botPref.getBoolean("is_ai_filter_mode", false),
+            aiFilterEndpoint = botPref.getString("ai_filter_endpoint", "https://api.openai.com/v1/chat/completions")?.trim().orEmpty(),
+            aiFilterApiKey = botPref.getString("ai_filter_api_key", "")?.trim().orEmpty(),
+            aiFilterModel = botPref.getString("ai_filter_model", "gpt-4o-mini")?.trim().orEmpty(),
+            aiFilterUserPrompt = botPref.getString("ai_filter_user_prompt", "")?.trim().orEmpty(),
+
             scanPageCount = botPref.getInt("scan_page_count", 1),
             postMinMs = postMinMs,
             postMaxMs = postMaxMs,
@@ -2185,6 +2204,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         postAuthor: String,
         postNick: String,
         postUid: String,
+        postTitle: String,
         postText: String,
         postImageAlts: List<String>,
         postRawHtml: String,
@@ -2206,6 +2226,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         var spamCodeMatchPost: String? = null
         var matchedImageAlt: String? = null
         var matchedVoiceIdPost: String? = null
+        var aiDecision: AiFilterDecision? = null
+        var aiReviewReason: String? = null
         var blockReasonPrefix: String? = null
         var notiType: String? = null
         var debugDetail: String? = null
@@ -2348,6 +2370,57 @@ img.written_dccon{max-width:80px;max-height:80px}
                         sendLog("[디버그][필터/voice] 보이스 필터: ${if (matchedVoiceIdPost != null) "차단 (id=$matchedVoiceIdPost)" else "통과"}", botId)
                     }
                 }
+
+                if (!isBadPost && config.isAiFilterMode) {
+                    val aiEvaluation = AiFilterClient(
+                        config = AiFilterConfig(
+                            enabled = config.isAiFilterMode,
+                            endpoint = config.aiFilterEndpoint,
+                            apiKey = config.aiFilterApiKey,
+                            model = config.aiFilterModel,
+                            userPrompt = config.aiFilterUserPrompt,
+                            reviewMode = true,
+                        ),
+                        logger = { if (botId.isNotEmpty()) sendLog("[AI 필터] $it", botId) }
+                    ).evaluate(
+                        AiFilterRequest(
+                            postTitle = postTitle,
+                            postAuthor = postAuthor,
+                            postNick = postNick,
+                            postBody = postText,
+                            postImageAlts = postImageAlts,
+                        )
+                    )
+
+                    aiDecision = aiEvaluation.decision
+                    when {
+                        aiDecision?.type == AiFilterDecisionType.REVIEW -> {
+                            isBadPost = true
+                            aiReviewReason = aiDecision?.reason ?: "AI 검토 필요"
+                            blockReasonPrefix = "AI 필터 검토 필요"
+                            notiType = "ai"
+                            debugDetail = "AI REVIEW (${aiDecision?.category}/${aiDecision?.confidence}) ${aiReviewReason ?: ""}".trim()
+                        }
+                        aiDecision?.type == AiFilterDecisionType.BLOCK -> {
+                            isBadPost = true
+                            aiReviewReason = aiDecision?.reason ?: "AI 차단"
+                            blockReasonPrefix = "AI 필터 차단"
+                            notiType = "ai"
+                            debugDetail = "AI BLOCK (${aiDecision?.category}/${aiDecision?.confidence}) ${aiReviewReason ?: ""}".trim()
+                        }
+                        aiEvaluation.failureReason != null -> {
+                            isBadPost = true
+                            aiReviewReason = aiEvaluation.failureReason
+                            blockReasonPrefix = "AI 필터 검토 필요"
+                            notiType = "ai"
+                            debugDetail = "AI fallback REVIEW (${aiEvaluation.failureReason})"
+                        }
+                    }
+
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[디버그][필터/ai] ${aiDecision?.rawJson ?: aiEvaluation.failureReason ?: "ALLOW"}", botId)
+                    }
+                }
             }
         }
 
@@ -2360,6 +2433,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             spamCodeMatchPost = spamCodeMatchPost,
             matchedImageAlt = matchedImageAlt,
             matchedVoiceIdPost = matchedVoiceIdPost,
+            aiDecision = aiDecision,
+            aiReviewReason = aiReviewReason,
             blockReasonPrefix = blockReasonPrefix,
             notiType = notiType,
             debugDetail = debugDetail
@@ -2543,6 +2618,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         notiType: String?,
         matchedVoiceIdPost: String?,
         matchedImageAlt: String?,
+        aiDecision: AiFilterDecision?,
+        aiReviewReason: String?,
         suspiciousUrlInPost: String?,
         spamCodeMatchPost: String?,
         notifyIfEnabled: (String, String, String) -> Unit,
@@ -2564,6 +2641,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             notiType = notiType,
             matchedVoiceIdPost = matchedVoiceIdPost,
             matchedImageAlt = matchedImageAlt,
+            aiDecision = aiDecision,
+            aiReviewReason = aiReviewReason,
             suspiciousUrlInPost = suspiciousUrlInPost,
             spamCodeMatchPost = spamCodeMatchPost,
             debugDetail = debugDetail
@@ -2836,6 +2915,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         notiType: String?,
         matchedVoiceIdPost: String?,
         matchedImageAlt: String?,
+        aiDecision: AiFilterDecision?,
+        aiReviewReason: String?,
         suspiciousUrlInPost: String?,
         spamCodeMatchPost: String?,
         debugDetail: String?,
@@ -2889,6 +2970,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                 notificationType = "image",
                 notificationTitle = "이미지 차단됨",
                 notificationMessage = "금지된 이미지가 포함된 게시글이 차단되었습니다."
+            )
+
+            aiDecision != null || aiReviewReason != null -> BlockPresentation(
+                blockReason = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 차단" else "AI 필터 검토 필요",
+                detailedBlockReason = debugDetail ?: aiReviewReason ?: "AI 필터 검토 필요",
+                logCategory = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 차단!" else "AI 필터 REVIEW!",
+                logMessage = "번호: $postNumStr",
+                notificationType = "ai",
+                notificationTitle = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 차단됨" else "AI 검토 필요",
+                notificationMessage = (aiReviewReason ?: aiDecision?.reason ?: "AI 필터가 검토 대상으로 분류했습니다.")
             )
 
             suspiciousUrlInPost != null -> BlockPresentation(
