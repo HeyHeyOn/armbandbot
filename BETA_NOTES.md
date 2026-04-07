@@ -285,3 +285,16 @@
 - Galaxy S23에서 시작 직후 앱 전체 종료가 `scheduleAutoRestart()` 주변일 가능성에 대응한 안전화 베타
 - `AutoRestartReceiver.scheduleWatchdog()`가 성공/실패를 반환하도록 바꾸고, `BotService`는 실패를 로그로 남기고 계속 진행
 - beta21 빌드/업로드 예정
+
+
+## 1.1.1 beta22
+
+### 주요 변화
+- watchdog 예약 시 exact alarm 가능 여부를 확인하고, 불가한 기기에서는 `setAndAllowWhileIdle` fallback으로 자동 전환
+- watchdog 예약 결과를 `exact`, `exact_legacy`, `inexact_fallback`, `failed`로 구분해 로그에 남기도록 보강
+- exact alarm 실패/제한 시에도 봇 자체는 계속 동작하고, 복구 전략만 기기 상태에 맞춰 낮춰서 적용하도록 정리
+
+### 기술 포인트
+- Galaxy S23에서 exact alarm 예약이 앱 시작 안정성에 영향을 주는 점을 확인한 뒤, 기기별 권한/정책 상태에 맞춘 fallback 전략을 추가
+- `AutoRestartReceiver.scheduleWatchdog()`가 결과 객체를 반환하고, `BotService`는 mode/detail 기반으로 사용자 로그를 남김
+- beta22 빌드/업로드 예정

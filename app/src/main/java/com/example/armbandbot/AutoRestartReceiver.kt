@@ -37,11 +37,30 @@ class AutoRestartReceiver : BroadcastReceiver() {
         private const val WATCHDOG_INTERVAL_MS = 60_000L
         const val ACTION_RESTART_BOTS = "com.heyheyon.armbandbot.ACTION_RESTART_BOTS"
 
-        fun scheduleWatchdog(context: Context): Boolean {
+        data class WatchdogScheduleResult(
+            val scheduled: Boolean,
+            val mode: String,
+            val detail: String? = null
+        )
+
+        fun scheduleWatchdog(context: Context): WatchdogScheduleResult {
             return try {
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
                 val pendingIntent = buildPendingIntent(context)
                 val triggerAt = SystemClock.elapsedRealtime() + WATCHDOG_INTERVAL_MS
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val canScheduleExact = alarmManager.canScheduleExactAlarms()
+                    if (!canScheduleExact) {
+                        alarmManager.setAndAllowWhileIdle(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                            triggerAt,
+                            pendingIntent
+                        )
+                        Log.w("AutoRestartReceiver", "watchdog exact alarm unavailable, fallback setAndAllowWhileIdle used")
+                        return WatchdogScheduleResult(true, "inexact_fallback", "canScheduleExactAlarms=false")
+                    }
+                }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     alarmManager.setExactAndAllowWhileIdle(
@@ -49,19 +68,20 @@ class AutoRestartReceiver : BroadcastReceiver() {
                         triggerAt,
                         pendingIntent
                     )
+                    Log.d("AutoRestartReceiver", "watchdog exact 60초 예약 완료")
+                    WatchdogScheduleResult(true, "exact")
                 } else {
                     alarmManager.setExact(
                         AlarmManager.ELAPSED_REALTIME_WAKEUP,
                         triggerAt,
                         pendingIntent
                     )
+                    Log.d("AutoRestartReceiver", "watchdog exact 60초 예약 완료")
+                    WatchdogScheduleResult(true, "exact_legacy")
                 }
-
-                Log.d("AutoRestartReceiver", "watchdog 60초 예약 완료")
-                true
             } catch (e: Exception) {
                 Log.e("AutoRestartReceiver", "watchdog 예약 실패", e)
-                false
+                WatchdogScheduleResult(false, "failed", e.javaClass.simpleName + ": " + (e.message ?: ""))
             }
         }
 

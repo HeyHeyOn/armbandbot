@@ -272,15 +272,25 @@ class BotService : Service() {
     }
 
     private fun scheduleAutoRestart(botId: String? = null) {
-        val scheduled = AutoRestartReceiver.scheduleWatchdog(this)
-        if (scheduled) {
-            Log.d("BotService", "[복구 예약] watchdog 재예약 완료")
+        val result = AutoRestartReceiver.scheduleWatchdog(this)
+        if (result.scheduled) {
+            val detailSuffix = result.detail?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+            botId?.let {
+                runCatching {
+                    when (result.mode) {
+                        "inexact_fallback" -> sendLog("[복구 예약] exact alarm 권한이 없어 fallback 알람으로 진행합니다.$detailSuffix", it)
+                        else -> sendLog("[복구 예약] watchdog 예약 완료 (${result.mode})$detailSuffix", it)
+                    }
+                }
+            }
+            Log.d("BotService", "[복구 예약] watchdog 예약 완료 mode=${result.mode} detail=${result.detail}")
         } else {
             botId?.let {
-                markStartupPhase(it, "watchdog_schedule_failed", "exact alarm schedule failed")
-                runCatching { sendLog("[시작 보호] watchdog 예약 실패 - exact alarm 없이 계속 진행합니다.", it) }
+                val detail = result.detail ?: "unknown"
+                markStartupPhase(it, "watchdog_schedule_failed", detail)
+                runCatching { sendLog("[시작 보호] watchdog 예약 실패 - 복구 예약 없이 계속 진행합니다. ($detail)", it) }
             }
-            Log.e("BotService", "[복구 예약] watchdog 예약 실패")
+            Log.e("BotService", "[복구 예약] watchdog 예약 실패 detail=${result.detail}")
         }
     }
 
