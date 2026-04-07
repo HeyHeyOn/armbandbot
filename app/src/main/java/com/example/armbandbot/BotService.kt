@@ -204,6 +204,16 @@ class BotService : Service() {
         sendBroadcast(intent)
     }
 
+
+    private fun markStartupPhase(botId: String, phase: String, detail: String? = null) {
+        val pref = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+        pref.edit()
+            .putString("last_startup_phase", phase)
+            .putString("last_startup_detail", detail ?: "")
+            .putLong("last_startup_at", System.currentTimeMillis())
+            .apply()
+    }
+
     private fun logBlock(
         botId: String,
         category: String,
@@ -309,7 +319,15 @@ class BotService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(1, buildForegroundNotification())
+        try {
+            startForeground(1, buildForegroundNotification())
+        } catch (e: Exception) {
+            val botIdForCrash = intent?.getStringExtra("BOT_ID") ?: "SYSTEM"
+            markStartupPhase(botIdForCrash, "startForeground_failed", e.javaClass.simpleName + ": " + (e.message ?: ""))
+            runCatching { sendLog("[시작 보호] startForeground 실패: ${e.javaClass.simpleName} / ${e.message ?: "알 수 없는 오류"}", botIdForCrash) }
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         if (intent == null) {
             sendLog("[복구 점검] null intent로 서비스가 재시작됨. restoreRunningBots() 호출", "SYSTEM")
@@ -318,10 +336,18 @@ class BotService : Service() {
         }
 
         val botId = intent.getStringExtra("BOT_ID") ?: return START_STICKY
+        markStartupPhase(botId, "intent_received", "action=${intent.action}")
         val cookie = intent.getStringExtra("COOKIE") ?: ""
         val action = intent.action
         val botPref = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
         val botName = botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇"
+        runCatching {
+            val lastPhase = botPref.getString("last_startup_phase", "") ?: ""
+            val lastDetail = botPref.getString("last_startup_detail", "") ?: ""
+            if (lastPhase.isNotBlank() && lastPhase != "run_loop_entered") {
+                sendLog("[시작 진단] 이전 시작 단계: $lastPhase / $lastDetail", botId)
+            }
+        }
 
         if (action == "STOP") {
             botPref.edit()
@@ -363,17 +389,20 @@ class BotService : Service() {
             .apply()
 
         sendLog("[복구 점검] 새 Job 생성을 시작합니다.", botId)
+        markStartupPhase(botId, "job_creating")
         scheduleAutoRestart()
 
         val job = serviceScope.launch {
             try {
                 sendLog("[복구 점검] runBotLoop 진입", botId)
+                markStartupPhase(botId, "run_loop_entered")
                 runBotLoop(botId, botName, cookie, botPref)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                markStartupPhase(botId, "run_loop_crash", e.javaClass.simpleName + ": " + (e.message ?: ""))
                 Log.e("BotService", "[$botId] runBotLoop 치명적 오류", e)
-                sendLog("[치명적 오류] ${e.message ?: "알 수 없는 오류"}", botId)
+                sendLog("[치명적 오류] ${e.javaClass.simpleName} / ${e.message ?: "알 수 없는 오류"}", botId)
             } finally {
                 finalizeBot(botId, botPref, botName, "봇 루프 종료")
             }

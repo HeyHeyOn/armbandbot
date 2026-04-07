@@ -259,3 +259,16 @@
 - Galaxy S23에서 beta11 이후 시작 직후 종료처럼 보이는 현상을 추적하기 위한 진단 중심 베타
 - 자동로그인 enabled/id/pw/current cookie 상태와 각 단계 성공/실패를 확인할 수 있게 로그 보강
 - beta19 빌드/업로드 예정
+
+
+## 1.1.1 beta20
+
+### 주요 변화
+- 서비스 시작 초반 보호 로직을 추가해 `startForeground()` 실패 시 앱이 무조건 뻗지 않도록 방어
+- 서비스 시작 단계(`intent_received`, `job_creating`, `run_loop_entered`, `run_loop_crash`, `startForeground_failed`)를 기록해 다음 실행에서 직전 실패 지점을 추적할 수 있게 보강
+- 이전 시작 실패 흔적이 있으면 다음 실행 시 활동 로그에 요약을 남기도록 정리
+
+### 기술 포인트
+- Galaxy S23에서 beta11 이후 시작 직후 앱 전체가 종료되는 현상을 잡기 위한 보호/진단 중심 베타
+- 로그를 못 남기고 죽는 경우를 대비해 SharedPreferences에 마지막 시작 단계와 상세 오류를 저장
+- beta20 빌드/업로드 예정
