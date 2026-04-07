@@ -669,7 +669,8 @@ class BotService : Service() {
             .apply()
     }
 
-    private fun performAutoLogin(loginId: String, loginPw: String): String? {
+    private fun performAutoLogin(loginId: String, loginPw: String, botId: String? = null): String? {
+        botId?.let { sendLog("[자동 로그인][1/4] 로그인 페이지 요청 시작", it) }
         val loginPageResponse = Jsoup.connect("https://msign.dcinside.com/login")
             .userAgent(dcUserAgent)
             .method(Connection.Method.GET)
@@ -684,6 +685,7 @@ class BotService : Service() {
         val captchaCodeName = loginDocument.select("input[name=captchaCode]").attr("name")
         val captchaCodeValue = loginDocument.select("input[name=captchaCode]").attr("value")
 
+        botId?.let { sendLog("[자동 로그인][2/4] login/access 사전 검증 요청", it) }
         val accessResponse = Jsoup.connect("https://msign.dcinside.com/login/access")
             .userAgent(dcUserAgent)
             .referrer("https://msign.dcinside.com/login")
@@ -703,12 +705,19 @@ class BotService : Service() {
             .ignoreContentType(true)
             .execute()
 
-        val accessJson = runCatching { org.json.JSONObject(accessResponse.body()) }.getOrNull() ?: return null
+        val accessJson = runCatching { org.json.JSONObject(accessResponse.body()) }.getOrNull()
+        if (accessJson == null) {
+            botId?.let { sendLog("[자동 로그인 실패][2/4] login/access 응답 JSON 파싱 실패", it) }
+            return null
+        }
         if (accessJson.optInt("result", 0) != 1) {
+            val reason = accessJson.optString("reason").ifBlank { accessJson.optString("cause") }.ifBlank { "알 수 없는 사유" }
+            botId?.let { sendLog("[자동 로그인 실패][2/4] login/access 거부: $reason", it) }
             return null
         }
 
         val verifiedConKey = accessJson.optString("Block_key").ifBlank { accessJson.optString("block_key") }.ifBlank { initialConKey }
+        botId?.let { sendLog("[자동 로그인][3/4] login/access 통과, 실제 로그인 제출", it) }
 
         val loginResponse = Jsoup.connect("https://msign.dcinside.com/login")
             .userAgent(dcUserAgent)
@@ -733,8 +742,19 @@ class BotService : Service() {
             loginResponse.cookies().toCookieHeader()
         )
 
-        if (mergedCookie.isBlank()) return null
-        return if (isSessionValid(mergedCookie)) mergedCookie else null
+        if (mergedCookie.isBlank()) {
+            botId?.let { sendLog("[자동 로그인 실패][4/4] 병합된 쿠키가 비어 있습니다.", it) }
+            return null
+        }
+
+        val sessionValid = isSessionValid(mergedCookie)
+        if (!sessionValid) {
+            botId?.let { sendLog("[자동 로그인 실패][4/4] 로그인 제출 후에도 유효 세션 검증에 실패했습니다.", it) }
+            return null
+        }
+
+        botId?.let { sendLog("[자동 로그인 성공][4/4] 유효 세션 확보 완료", it) }
+        return mergedCookie
     }
 
     private fun persistRecoveredSession(
@@ -796,7 +816,8 @@ class BotService : Service() {
 
         return try {
             sendLog("[자동 로그인] $reason → 재로그인 시도", botId)
-            val refreshedCookie = performAutoLogin(loginId, loginPw)
+            sendLog("[자동 로그인 진단] enabled=${botPref.getBoolean("auto_login_enabled", false)} / hasId=${loginId.isNotBlank()} / hasPw=${loginPw.isNotBlank()} / hasCurrentCookie=${currentCookie.isNotBlank()}", botId)
+            val refreshedCookie = performAutoLogin(loginId, loginPw, botId)
             if (refreshedCookie.isNullOrBlank()) {
                 recordAutoLoginFailure(botPref)
                 sendLog("[자동 로그인 실패] 로그인 응답은 받았지만 유효 세션을 확보하지 못했습니다. WebView 로그인으로 전환합니다.", botId)
@@ -903,6 +924,9 @@ class BotService : Service() {
                 sendLog("[디버그][사이클] 대상 URL 목록 (${urlList.size}개): ${urlList.joinToString(", ")}", botId)
             }
 
+            if (config.isDebugMode) {
+                sendLog("[세션 진단] runBotLoop 시작 / hasCookie=${currentCookie.isNotBlank()} / cookieLength=${currentCookie.length}", botId)
+            }
             if (!isSessionValid(currentCookie)) {
                 val recoveredCookie = tryRecoverSession(
                     botId = botId,
@@ -915,6 +939,7 @@ class BotService : Service() {
                     continue
                 }
 
+                sendLog("[세션 진단] 시작 직후 세션 복구 실패. 즉시 종료 대신 WebView 로그인 대기 상태로 전환합니다.", botId)
                 botPref.edit()
                     .putBoolean("should_restore_after_restart", false)
                     .putBoolean("is_running", false)
@@ -926,6 +951,7 @@ class BotService : Service() {
                     reason = "세션 만료 감지",
                     requireWebViewFallback = true
                 )
+                delay(500)
                 break
             }
 
