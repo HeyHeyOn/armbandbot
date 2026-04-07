@@ -2644,64 +2644,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                 }
 
-                if (!shouldBlockExecute && config.isAiFilterMode) {
-                    val aiEvaluation = AiFilterClient(
-                        config = AiFilterConfig(
-                            enabled = config.isAiFilterMode,
-                            provider = if (config.aiFilterProvider.equals("gemini_direct", ignoreCase = true)) AiFilterProvider.GEMINI_DIRECT else AiFilterProvider.OPENAI_COMPATIBLE,
-                            endpoint = config.aiFilterEndpoint,
-                            apiKey = config.aiFilterApiKey,
-                            model = config.aiFilterModel,
-                            userPrompt = config.aiFilterUserPrompt,
-                            reviewMode = true,
-                        ),
-                        logger = { if (botId.isNotEmpty()) sendLog("[AI 필터] $it", botId) }
-                    ).evaluateBatch(
-                        AiFilterBatchRequest(
-                            posts = listOf(
-                                AiFilterPostInput(
-                                    postNo = "single:$postTitle:${postAuthor.hashCode()}",
-                                    title = postTitle,
-                                    authorIdOrIp = postAuthor,
-                                    nickname = postNick,
-                                    body = postText,
-                                    mediaSources = postImageAlts,
-                                    comments = emptyList(),
-                                )
-                            )
-                        )
-                    )
-
-                    val postDecisionResult = aiEvaluation.postDecisions.firstOrNull()
-                    aiDecision = postDecisionResult?.decision
-                    when {
-                        aiDecision?.type == AiFilterDecisionType.REVIEW -> {
-                            shouldReviewOnly = true
-                            aiReviewReason = aiDecision?.reason ?: "AI 검토 필요"
-                            blockReasonPrefix = "AI 필터 검토 필요"
-                            notiType = "ai"
-                            debugDetail = "AI REVIEW (${aiDecision?.category}/${aiDecision?.confidence}) ${aiReviewReason ?: ""}".trim()
-                        }
-                        aiDecision?.type == AiFilterDecisionType.BLOCK -> {
-                            shouldBlockExecute = true
-                            aiReviewReason = aiDecision?.reason ?: "AI 차단"
-                            blockReasonPrefix = "AI 필터 차단"
-                            notiType = "ai"
-                            debugDetail = "AI BLOCK (${aiDecision?.category}/${aiDecision?.confidence}) ${aiReviewReason ?: ""}".trim()
-                        }
-                        aiEvaluation.failureReason != null -> {
-                            shouldReviewOnly = true
-                            aiReviewReason = aiEvaluation.failureReason
-                            blockReasonPrefix = "AI 필터 검토 필요"
-                            notiType = "ai"
-                            debugDetail = "AI fallback REVIEW (${aiEvaluation.failureReason})"
-                        }
-                    }
-
-                    if (config.isDebugMode && botId.isNotEmpty()) {
-                        sendLog("[디버그][필터/ai] ${aiDecision?.rawJson ?: aiEvaluation.failureReason ?: "ALLOW"}", botId)
-                    }
-                }
+                // AI 2차 판단은 processSinglePost()의 배치 큐 경로에서만 처리한다.
             }
         }
 
