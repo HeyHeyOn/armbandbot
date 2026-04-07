@@ -37,26 +37,32 @@ class AutoRestartReceiver : BroadcastReceiver() {
         private const val WATCHDOG_INTERVAL_MS = 60_000L
         const val ACTION_RESTART_BOTS = "com.heyheyon.armbandbot.ACTION_RESTART_BOTS"
 
-        fun scheduleWatchdog(context: Context) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val pendingIntent = buildPendingIntent(context)
-            val triggerAt = SystemClock.elapsedRealtime() + WATCHDOG_INTERVAL_MS
+        fun scheduleWatchdog(context: Context): Boolean {
+            return try {
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val pendingIntent = buildPendingIntent(context)
+                val triggerAt = SystemClock.elapsedRealtime() + WATCHDOG_INTERVAL_MS
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerAt,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerAt,
+                        pendingIntent
+                    )
+                }
+
+                Log.d("AutoRestartReceiver", "watchdog 60초 예약 완료")
+                true
+            } catch (e: Exception) {
+                Log.e("AutoRestartReceiver", "watchdog 예약 실패", e)
+                false
             }
-
-            Log.d("AutoRestartReceiver", "watchdog 60초 뒤 재예약 완료")
         }
 
         fun cancelWatchdog(context: Context) {

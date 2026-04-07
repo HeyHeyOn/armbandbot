@@ -271,9 +271,17 @@ class BotService : Service() {
             .build()
     }
 
-    private fun scheduleAutoRestart() {
-        AutoRestartReceiver.scheduleWatchdog(this)
-        Log.d("BotService", "[복구 예약] watchdog 재예약 완료")
+    private fun scheduleAutoRestart(botId: String? = null) {
+        val scheduled = AutoRestartReceiver.scheduleWatchdog(this)
+        if (scheduled) {
+            Log.d("BotService", "[복구 예약] watchdog 재예약 완료")
+        } else {
+            botId?.let {
+                markStartupPhase(it, "watchdog_schedule_failed", "exact alarm schedule failed")
+                runCatching { sendLog("[시작 보호] watchdog 예약 실패 - exact alarm 없이 계속 진행합니다.", it) }
+            }
+            Log.e("BotService", "[복구 예약] watchdog 예약 실패")
+        }
     }
 
     private fun cancelAutoRestart() {
@@ -390,7 +398,7 @@ class BotService : Service() {
 
         sendLog("[복구 점검] 새 Job 생성을 시작합니다.", botId)
         markStartupPhase(botId, "job_creating")
-        scheduleAutoRestart()
+        scheduleAutoRestart(botId)
 
         val job = serviceScope.launch {
             try {

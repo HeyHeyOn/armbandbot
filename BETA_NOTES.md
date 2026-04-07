@@ -272,3 +272,16 @@
 - Galaxy S23에서 beta11 이후 시작 직후 앱 전체가 종료되는 현상을 잡기 위한 보호/진단 중심 베타
 - 로그를 못 남기고 죽는 경우를 대비해 SharedPreferences에 마지막 시작 단계와 상세 오류를 저장
 - beta20 빌드/업로드 예정
+
+
+## 1.1.1 beta21
+
+### 주요 변화
+- watchdog exact alarm 예약을 예외 안전하게 감싸, Galaxy 기기에서 예약 실패 시 앱이 즉시 종료되지 않도록 보강
+- exact alarm 예약 실패 시 watchdog 없이도 봇 루프가 계속 진행되도록 완화
+- 시작 단계 추적에 `watchdog_schedule_failed` 마커를 추가해 다음 실행에서 예약 실패 여부를 확인할 수 있게 정리
+
+### 기술 포인트
+- Galaxy S23에서 시작 직후 앱 전체 종료가 `scheduleAutoRestart()` 주변일 가능성에 대응한 안전화 베타
+- `AutoRestartReceiver.scheduleWatchdog()`가 성공/실패를 반환하도록 바꾸고, `BotService`는 실패를 로그로 남기고 계속 진행
+- beta21 빌드/업로드 예정
