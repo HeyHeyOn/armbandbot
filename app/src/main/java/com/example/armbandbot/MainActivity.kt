@@ -86,7 +86,7 @@ import kotlin.math.roundToInt
 
 
 object GlobalBotState {
-    val logs = mutableMapOf<String, SnapshotStateList<String>>()
+    val logs = mutableMapOf<String, SnapshotStateList<BotLogEntry>>()
     val lastCheckedNumbers = mutableMapOf<String, Int>()
     private var db: AppDatabase? = null
 
@@ -247,21 +247,23 @@ fun getBotLogFile(context: Context, botId: String): File {
     return File(dir, "log_$botId.txt")
 }
 
-fun appendBotLogToFile(context: Context, botId: String, line: String, maxLines: Int = 500) {
+fun appendBotLogToFile(context: Context, botId: String, line: String, maxLines: Int = 5000) {
     try {
         val file = getBotLogFile(context, botId)
-        val existing = if (file.exists()) file.readLines().toMutableList() else mutableListOf()
-        existing.add(line)
-        val trimmed = if (existing.size > maxLines) existing.takeLast(maxLines) else existing
-        file.writeText(trimmed.joinToString("\n"))
+        val entry = parseBotLogEntry(line)
+        file.appendText(entry.toJsonLine() + "\n")
+        val lines = file.readLines()
+        if (lines.size > maxLines) {
+            file.writeText(lines.takeLast(maxLines).joinToString("\n") + "\n")
+        }
     } catch (e: Exception) {
     }
 }
 
-fun loadBotLogsFromFile(context: Context, botId: String): List<String> {
+fun loadBotLogsFromFile(context: Context, botId: String): List<BotLogEntry> {
     return try {
         val file = getBotLogFile(context, botId)
-        if (file.exists()) file.readLines().filter { it.isNotBlank() } else emptyList()
+        if (file.exists()) file.readLines().filter { it.isNotBlank() }.map { botLogEntryFromLine(it) } else emptyList()
     } catch (e: Exception) {
         emptyList()
     }
@@ -465,8 +467,8 @@ fun MainApp() {
 
                 if (incomingBotId != null && msg != null) {
                     val list = GlobalBotState.logs.getOrPut(incomingBotId) { mutableStateListOf() }
-                    list.add(msg)
-                    if (list.size > 500) list.removeAt(0)
+                    list.add(parseBotLogEntry(msg))
+                    if (list.size > 5000) list.removeAt(0)
 
                     // 파일 저장은 BotService.sendLog()에서 처리
                 }

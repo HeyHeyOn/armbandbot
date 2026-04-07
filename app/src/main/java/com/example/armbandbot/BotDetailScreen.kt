@@ -184,7 +184,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
             if (fileLogs.isNotEmpty()) {
                 logMessages.clear()
-                logMessages.addAll(fileLogs.takeLast(500))
+                logMessages.addAll(fileLogs.takeLast(5000))
             }
         }
 
@@ -911,8 +911,11 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             val filteredLogs by remember(logMessages.size, logFilterTab) {
                                 derivedStateOf {
                                     when(logFilterTab) {
-                                        "CYCLE" -> logMessages.filter { it.contains("사이클") || it.contains("탐색") || it.contains("대기") || it.contains("점프") || it.contains("검색") || it.contains("페이지") }
-                                        "BLOCK" -> logMessages.filter { it.contains("차단") || it.contains("삭제") || it.contains("악성") || it.contains("악플") }
+                                        "CYCLE" -> logMessages.filter { it.category == BotLogCategory.CYCLE }
+                                        "BLOCK" -> logMessages.filter { it.category == BotLogCategory.BLOCK }
+                                        "DEBUG" -> logMessages.filter { it.category == BotLogCategory.DEBUG }
+                                        "SESSION" -> logMessages.filter { it.category == BotLogCategory.SESSION }
+                                        "ERROR" -> logMessages.filter { it.category == BotLogCategory.ERROR }
                                         else -> logMessages.toList()
                                     }
                                 }
@@ -922,7 +925,19 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             LaunchedEffect(filteredLogs.size) { if (isAtBottom && filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) }
 
                             Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                                val exportLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
+                                    if (uri == null) return@rememberLauncherForActivityResult
+                                    runCatching {
+                                        val content = logMessages.joinToString("\n") { it.raw }
+                                        context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(content) }
+                                    }.onSuccess {
+                                        Toast.makeText(context, "로그 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
+                                    }.onFailure {
+                                        Toast.makeText(context, it.message ?: "로그 파일 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Button(
                                         onClick = {
                                             logMessages.clear()
@@ -936,7 +951,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight,
                                             contentColor = if(isDarkMode) Color.White else PastelNavy
                                         ),
-                                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                                        modifier = Modifier.weight(1f).height(50.dp),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
                                         Icon(
@@ -947,26 +962,45 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text("로그 지우기", fontWeight = FontWeight.Bold)
                                     }
+                                    Button(
+                                        onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if(isDarkMode) Color(0xFF2E3B55) else Color(0xFFE3F2FD),
+                                            contentColor = if(isDarkMode) Color.White else PastelNavy
+                                        ),
+                                        modifier = Modifier.weight(1f).height(50.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Save, contentDescription = "저장", modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("로그 저장", fontWeight = FontWeight.Bold)
+                                    }
                                 }
 
                                 Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilterChip(selected = logFilterTab == "ALL", onClick = { logFilterTab = "ALL" }, label = { Text("전체 로그", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "CYCLE", onClick = { logFilterTab = "CYCLE" }, label = { Text("탐색/사이클", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "BLOCK", onClick = { logFilterTab = "BLOCK" }, label = { Text("차단 내역", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "ALL", onClick = { logFilterTab = "ALL" }, label = { Text("전체", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "CYCLE", onClick = { logFilterTab = "CYCLE" }, label = { Text("탐색", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "BLOCK", onClick = { logFilterTab = "BLOCK" }, label = { Text("차단", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "DEBUG", onClick = { logFilterTab = "DEBUG" }, label = { Text("디버그", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFFFB300), selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "SESSION", onClick = { logFilterTab = "SESSION" }, label = { Text("세션/복구", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF6A1B9A), selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "ERROR", onClick = { logFilterTab = "ERROR" }, label = { Text("오류", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFD32F2F), selectedLabelColor = Color.White))
                                 }
 
                                 Box(modifier = Modifier.weight(1f).fillMaxWidth().background(DarkTerminal, RoundedCornerShape(12.dp)).padding(12.dp)) {
                                     SelectionContainer {
                                         LazyColumn(state = logListState, modifier = Modifier.fillMaxSize()) {
                                             items(filteredLogs.size) { index ->
-                                                val msg = filteredLogs[index]
-                                                val logTextColor = when {
-                                                    msg.contains("차단") || msg.contains("삭제") || msg.contains("오류") || msg.contains("실패") -> Color(0xFFFF5252)
-                                                    msg.contains("대기") || msg.contains("디버그") || msg.contains("경고") -> Color(0xFFFFD740)
-                                                    msg.contains("시작") || msg.contains("완료") || msg.contains("돌파") -> Color(0xFF69F0AE)
+                                                val entry = filteredLogs[index]
+                                                val logTextColor = when (entry.category) {
+                                                    BotLogCategory.BLOCK -> Color(0xFFFF5252)
+                                                    BotLogCategory.ERROR -> Color(0xFFFF6E6E)
+                                                    BotLogCategory.DEBUG -> Color(0xFFFFD740)
+                                                    BotLogCategory.SESSION -> Color(0xFFCE93D8)
+                                                    BotLogCategory.CYCLE -> Color(0xFF69F0AE)
+                                                    BotLogCategory.SYSTEM -> Color(0xFF90CAF9)
                                                     else -> Color(0xFFE0E0E0)
                                                 }
-                                                Text(text = msg, color = logTextColor, fontSize = 13.sp)
+                                                Text(text = entry.raw, color = logTextColor, fontSize = 13.sp)
                                                 Spacer(modifier = Modifier.height(6.dp))
                                             }
                                         }
@@ -1166,7 +1200,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             GlobalBotState.clearDb(context)
                             rememberedPostCount = 0
                             lastCheckedNumber = 0
-                            logMessages.add("[${getCurrentTimeStr()}] 공용 DB 초기화됨!")
+                            logMessages.add(parseBotLogEntry("[${getCurrentTimeStr()}] 공용 DB 초기화됨!"))
                         }
 
                         "logout" -> {
@@ -1200,7 +1234,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         }
 
                         "crash_test" -> {
-                            logMessages.add("[${getCurrentTimeStr()}] [개발자] 강제 종료 테스트 실행")
+                            logMessages.add(parseBotLogEntry("[${getCurrentTimeStr()}] [개발자] 강제 종료 테스트 실행"))
                             Process.killProcess(Process.myPid())
                         }
                     }
