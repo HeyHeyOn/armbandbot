@@ -75,6 +75,8 @@ internal data class AiFilterPostDecision(
 internal data class AiFilterBatchEvaluation(
     val postDecisions: List<AiFilterPostDecision> = emptyList(),
     val failureReason: String? = null,
+    val rawResponseText: String? = null,
+    val parsedContentText: String? = null,
 )
 
 internal class AiFilterClient(
@@ -135,7 +137,7 @@ internal class AiFilterClient(
         val cacheKey = buildCacheKey(request)
         synchronized(cacheLock) {
             evaluationCache[cacheKey]?.let {
-                logger("AI 배치 캐시 사용")
+                logger("AI 배치 캐시 사용 (post=${it.postDecisions.size}, failure=${it.failureReason != null})")
                 return it
             }
         }
@@ -148,8 +150,12 @@ internal class AiFilterClient(
             AiFilterBatchEvaluation(failureReason = e.message ?: "AI 배치 호출 실패")
         }
 
-        synchronized(cacheLock) {
-            evaluationCache[cacheKey] = evaluation
+        if (evaluation.failureReason == null && evaluation.postDecisions.isNotEmpty()) {
+            synchronized(cacheLock) {
+                evaluationCache[cacheKey] = evaluation
+            }
+        } else {
+            logger("AI 배치 캐시 저장 생략 (failure=${evaluation.failureReason != null}, postDecisions=${evaluation.postDecisions.size})")
         }
         return evaluation
     }
@@ -277,6 +283,7 @@ internal class AiFilterClient(
         val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
         if (status !in 200..299) {
             Log.w("AiFilterClient", "HTTP $status: $text")
+            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status")
             error("HTTP $status")
         }
         return text
@@ -302,22 +309,37 @@ internal class AiFilterClient(
         }
 
         if (content.isBlank()) {
-            return AiFilterBatchEvaluation(failureReason = "AI 응답이 비어 있습니다")
+            logger("AI 파싱 실패: content 비어 있음")
+            return AiFilterBatchEvaluation(failureReason = "AI 응답이 비어 있습니다", rawResponseText = responseText, parsedContentText = content)
         }
+
+        logger("AI raw content 길이=${content.length}")
+        logger("AI raw content 미리보기=${content.take(500)}")
 
         val parsed = runCatching { JSONObject(content) }.getOrElse {
             logger("AI 배치 JSON 파싱 실패: ${it.message}")
-            return AiFilterBatchEvaluation(failureReason = "AI JSON 파싱 실패")
+            return AiFilterBatchEvaluation(failureReason = "AI JSON 파싱 실패", rawResponseText = responseText, parsedContentText = content)
         }
 
-        val resultsArray = parsed.optJSONArray("results") ?: return AiFilterBatchEvaluation(failureReason = "AI results 누락")
+        val resultsArray = parsed.optJSONArray("results") ?: run {
+            logger("AI 파싱 실패: results 배열 누락")
+            return AiFilterBatchEvaluation(failureReason = "AI results 누락", rawResponseText = responseText, parsedContentText = content)
+        }
         val requestPostMap = request.posts.associateBy { it.postNo }
         val postDecisions = mutableListOf<AiFilterPostDecision>()
 
         for (i in 0 until resultsArray.length()) {
             val item = resultsArray.optJSONObject(i) ?: continue
             val postNo = item.optString("post_no", "").trim()
-            val requestPost = requestPostMap[postNo] ?: continue
+            if (postNo.isBlank()) {
+                logger("AI 파싱 무시: post_no 비어 있음 / index=$i")
+                continue
+            }
+            val requestPost = requestPostMap[postNo]
+            if (requestPost == null) {
+                logger("AI 파싱 무시: 요청에 없는 post_no=$postNo")
+                continue
+            }
 
             val postDecision = parseDecision(
                 actionRaw = item.optString("post_decision", "REVIEW"),
@@ -326,7 +348,11 @@ internal class AiFilterClient(
                 confidence = item.optInt("post_confidence", 0),
                 reviewMode = config.reviewMode,
                 rawJson = item.toString()
-            ) ?: continue
+            )
+            if (postDecision == null) {
+                logger("AI 파싱 무시: 게시글 decision 해석 실패 / post_no=$postNo / raw=${item.toString().take(300)}")
+                continue
+            }
 
             val requestCommentMap = requestPost.comments.associateBy { it.commentId }
             val commentDecisions = mutableListOf<AiFilterCommentDecision>()
@@ -334,7 +360,10 @@ internal class AiFilterClient(
             for (j in 0 until commentsArray.length()) {
                 val commentItem = commentsArray.optJSONObject(j) ?: continue
                 val commentId = commentItem.optString("comment_id", "").trim()
-                if (!requestCommentMap.containsKey(commentId)) continue
+                if (!requestCommentMap.containsKey(commentId)) {
+                    logger("AI 파싱 무시: 요청에 없는 comment_id=$commentId / post_no=$postNo")
+                    continue
+                }
                 val commentDecision = parseDecision(
                     actionRaw = commentItem.optString("decision", "REVIEW"),
                     reason = commentItem.optString("reason", "AI 판단 사유 없음"),
@@ -342,7 +371,11 @@ internal class AiFilterClient(
                     confidence = commentItem.optInt("confidence", 0),
                     reviewMode = config.reviewMode,
                     rawJson = commentItem.toString()
-                ) ?: continue
+                )
+                if (commentDecision == null) {
+                    logger("AI 파싱 무시: 댓글 decision 해석 실패 / post_no=$postNo / comment_id=$commentId")
+                    continue
+                }
                 commentDecisions += AiFilterCommentDecision(commentId = commentId, decision = commentDecision)
             }
 
@@ -353,7 +386,8 @@ internal class AiFilterClient(
             )
         }
 
-        return AiFilterBatchEvaluation(postDecisions = postDecisions)
+        logger("AI 파싱 완료: postDecisions=${postDecisions.size}")
+        return AiFilterBatchEvaluation(postDecisions = postDecisions, rawResponseText = responseText, parsedContentText = content)
     }
 
     private fun parseDecision(

@@ -1001,44 +1001,90 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Toast.makeText(context, it.message ?: "로그 파일 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
                                     }
                                 }
-
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Button(
-                                        onClick = {
-                                            logMessages.clear()
-                                            try {
-                                                val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
-                                                if (logFile.exists()) logFile.delete()
-                                            } catch (_: Exception) {
+                                val exportDebugLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
+                                    if (uri == null) return@rememberLauncherForActivityResult
+                                    runCatching {
+                                        val debugLogs = logMessages.filter { it.category == BotLogCategory.DEBUG || it.category == BotLogCategory.ERROR || it.category == BotLogCategory.SESSION }
+                                            .joinToString("\n") { it.raw }
+                                        val settingsDump = buildString {
+                                            appendLine("[bot_id]")
+                                            appendLine(botId)
+                                            appendLine()
+                                            appendLine("[bot_name]")
+                                            appendLine(botName)
+                                            appendLine()
+                                            appendLine("[bot_prefs]")
+                                            botPref.all.toSortedMap(compareBy<String> { it }).forEach { (key, value) ->
+                                                appendLine("$key=$value")
                                             }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight,
-                                            contentColor = if(isDarkMode) Color.White else PastelNavy
-                                        ),
-                                        modifier = Modifier.weight(1f).height(50.dp),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(
-                                            androidx.compose.material.icons.Icons.Filled.Delete,
-                                            contentDescription = "삭제",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("로그 지우기", fontWeight = FontWeight.Bold)
+                                        }
+                                        val content = buildString {
+                                            appendLine("[debug_logs]")
+                                            appendLine(debugLogs)
+                                            appendLine()
+                                            appendLine("[settings_dump]")
+                                            append(settingsDump)
+                                        }
+                                        context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(content) }
+                                    }.onSuccess {
+                                        Toast.makeText(context, "디버그 로그 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
+                                    }.onFailure {
+                                        Toast.makeText(context, it.message ?: "디버그 로그 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+
+                                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Button(
+                                            onClick = {
+                                                logMessages.clear()
+                                                try {
+                                                    val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
+                                                    if (logFile.exists()) logFile.delete()
+                                                } catch (_: Exception) {
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight,
+                                                contentColor = if(isDarkMode) Color.White else PastelNavy
+                                            ),
+                                            modifier = Modifier.weight(1f).height(50.dp),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Icon(
+                                                androidx.compose.material.icons.Icons.Filled.Delete,
+                                                contentDescription = "삭제",
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("로그 지우기", fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if(isDarkMode) Color(0xFF2E3B55) else Color(0xFFE3F2FD),
+                                                contentColor = if(isDarkMode) Color.White else PastelNavy
+                                            ),
+                                            modifier = Modifier.weight(1f).height(50.dp),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Save, contentDescription = "저장", modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("로그 저장", fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                     Button(
-                                        onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") },
+                                        onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if(isDarkMode) Color(0xFF2E3B55) else Color(0xFFE3F2FD),
-                                            contentColor = if(isDarkMode) Color.White else PastelNavy
+                                            containerColor = if(isDarkMode) Color(0xFF4527A0) else Color(0xFFEDE7F6),
+                                            contentColor = if(isDarkMode) Color.White else Color(0xFF4527A0)
                                         ),
-                                        modifier = Modifier.weight(1f).height(50.dp),
+                                        modifier = Modifier.fillMaxWidth().height(50.dp),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Icon(Icons.Filled.Save, contentDescription = "저장", modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Filled.BugReport, contentDescription = "디버그 저장", modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("로그 저장", fontWeight = FontWeight.Bold)
+                                        Text("디버그 로그+설정 저장", fontWeight = FontWeight.Bold)
                                     }
                                 }
 
