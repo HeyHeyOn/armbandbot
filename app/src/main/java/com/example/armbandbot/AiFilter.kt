@@ -23,15 +23,28 @@ internal data class AiFilterConfig(
     val model: String,
     val userPrompt: String,
     val reviewMode: Boolean = true,
-    val timeoutMs: Int = 15000,
+    val timeoutMs: Int = 20000,
 )
 
-internal data class AiFilterRequest(
-    val postTitle: String,
-    val postAuthor: String,
-    val postNick: String,
-    val postBody: String,
-    val postImageAlts: List<String>,
+internal data class AiFilterCommentInput(
+    val commentId: String,
+    val authorIdOrIp: String,
+    val nickname: String,
+    val body: String,
+)
+
+internal data class AiFilterPostInput(
+    val postNo: String,
+    val title: String,
+    val authorIdOrIp: String,
+    val nickname: String,
+    val body: String,
+    val mediaSources: List<String>,
+    val comments: List<AiFilterCommentInput>,
+)
+
+internal data class AiFilterBatchRequest(
+    val posts: List<AiFilterPostInput>,
 )
 
 internal enum class AiFilterDecisionType {
@@ -48,68 +61,91 @@ internal data class AiFilterDecision(
     val rawJson: String,
 )
 
-internal data class AiFilterEvaluation(
-    val decision: AiFilterDecision? = null,
+internal data class AiFilterCommentDecision(
+    val commentId: String,
+    val decision: AiFilterDecision,
+)
+
+internal data class AiFilterPostDecision(
+    val postNo: String,
+    val decision: AiFilterDecision,
+    val commentDecisions: List<AiFilterCommentDecision> = emptyList(),
+)
+
+internal data class AiFilterBatchEvaluation(
+    val postDecisions: List<AiFilterPostDecision> = emptyList(),
     val failureReason: String? = null,
-) {
-    val shouldReview: Boolean get() = decision?.type == AiFilterDecisionType.REVIEW
-    val shouldBlock: Boolean get() = decision?.type == AiFilterDecisionType.BLOCK
-}
+)
 
 internal class AiFilterClient(
     private val config: AiFilterConfig,
     private val logger: (String) -> Unit = {},
 ) {
     companion object {
-        private const val CACHE_LIMIT = 200
-        private val evaluationCache = object : LinkedHashMap<String, AiFilterEvaluation>(CACHE_LIMIT, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AiFilterEvaluation>?): Boolean = size > CACHE_LIMIT
+        private const val CACHE_LIMIT = 100
+        private val evaluationCache = object : LinkedHashMap<String, AiFilterBatchEvaluation>(CACHE_LIMIT, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AiFilterBatchEvaluation>?): Boolean = size > CACHE_LIMIT
         }
         private val cacheLock = Any()
     }
 
     private val fixedPrompt = """
-        당신은 커뮤니티 게시글 전용 안전 필터입니다.
-        댓글은 검사 대상이 아닙니다.
-        기존 1차 룰 기반 필터를 통과한 게시글만 2차로 받습니다.
-        review 우선 모드이므로 애매하거나 판단 근거가 부족하면 REVIEW 를 선택하세요.
-        반드시 JSON 객체 하나만 출력하세요. 마크다운, 설명, 코드블록 금지.
-        허용 가능한 action 값: ALLOW, REVIEW, BLOCK
+        당신은 커뮤니티 게시글/댓글 전용 2차 AI 필터입니다.
+        기존 1차 룰 기반 필터를 통과한 게시글 묶음을 입력으로 받습니다.
+        입력은 항상 원문 전체이며, 게시글과 댓글을 반드시 분리해서 판단해야 합니다.
+        출력은 JSON 객체 하나만 허용됩니다. 마크다운, 설명, 코드블록 금지.
+        허용 가능한 decision 값: ALLOW, REVIEW, BLOCK
+        게시글 decision 과 댓글 decision 은 별개입니다.
+        게시글이 정상이고 댓글만 문제인 경우, 게시글은 ALLOW/PASS 성격으로 두고 댓글만 BLOCK 하세요.
+        애매하거나 판단 근거가 부족하면 REVIEW 를 선택하세요.
+        reviewMode 가 활성화되어 있으면 BLOCK 은 앱 쪽에서 REVIEW 로 완화될 수 있습니다.
         JSON 스키마:
         {
-          \"action\": \"ALLOW|REVIEW|BLOCK\",
-          \"reason\": \"한 줄 요약\",
-          \"category\": \"spam|sexual|abuse|scam|other\",
-          \"confidence\": 0~100,
-          \"evidence\": [\"근거1\", \"근거2\"]
+          "results": [
+            {
+              "post_no": "문자열",
+              "post_decision": "ALLOW|REVIEW|BLOCK",
+              "post_reason": "한 줄 요약",
+              "post_category": "spam|sexual|abuse|scam|other",
+              "post_confidence": 0,
+              "comments": [
+                {
+                  "comment_id": "문자열",
+                  "decision": "ALLOW|REVIEW|BLOCK",
+                  "reason": "한 줄 요약",
+                  "category": "spam|sexual|abuse|scam|other",
+                  "confidence": 0
+                }
+              ]
+            }
+          ]
         }
-        REVIEW 는 의심되지만 자동 확신 차단이 어려울 때 사용하세요.
-        BLOCK 은 명백한 위반일 때만 사용하세요.
     """.trimIndent()
 
-    fun evaluate(request: AiFilterRequest): AiFilterEvaluation {
-        if (!config.enabled) return AiFilterEvaluation()
+    fun evaluateBatch(request: AiFilterBatchRequest): AiFilterBatchEvaluation {
+        if (!config.enabled) return AiFilterBatchEvaluation()
+        if (request.posts.isEmpty()) return AiFilterBatchEvaluation()
         if (config.apiKey.isBlank() || config.model.isBlank()) {
-            return AiFilterEvaluation(failureReason = "AI ?? ?? ???")
+            return AiFilterBatchEvaluation(failureReason = "AI 설정이 비어 있습니다")
         }
         if (config.provider == AiFilterProvider.OPENAI_COMPATIBLE && config.endpoint.isBlank()) {
-            return AiFilterEvaluation(failureReason = "AI ?? Endpoint ???")
+            return AiFilterBatchEvaluation(failureReason = "AI endpoint 가 비어 있습니다")
         }
 
         val cacheKey = buildCacheKey(request)
         synchronized(cacheLock) {
             evaluationCache[cacheKey]?.let {
-                logger("AI ?? ?? ??")
+                logger("AI 배치 캐시 사용")
                 return it
             }
         }
 
         val evaluation = try {
             val responseText = callApi(request)
-            parseResponse(responseText)
+            parseBatchResponse(responseText, request)
         } catch (e: Exception) {
-            logger("AI ?? ?? ??: ${e.message}")
-            AiFilterEvaluation(failureReason = e.message ?: "AI ?? ?? ??")
+            logger("AI 배치 호출 실패: ${e.message}")
+            AiFilterBatchEvaluation(failureReason = e.message ?: "AI 배치 호출 실패")
         }
 
         synchronized(cacheLock) {
@@ -118,33 +154,60 @@ internal class AiFilterClient(
         return evaluation
     }
 
-    private fun buildCacheKey(request: AiFilterRequest): String {
-        return listOf(
-            config.provider.name,
-            config.endpoint,
-            config.model,
-            config.userPrompt,
-            config.reviewMode.toString(),
-            request.postTitle.trim(),
-            request.postAuthor.trim(),
-            request.postNick.trim(),
-            request.postBody.trim(),
-            request.postImageAlts.joinToString("|") { it.trim() }
-        ).joinToString("\n")
+    private fun buildCacheKey(request: AiFilterBatchRequest): String {
+        return buildString {
+            appendLine(config.provider.name)
+            appendLine(config.endpoint)
+            appendLine(config.model)
+            appendLine(config.userPrompt)
+            appendLine(config.reviewMode.toString())
+            request.posts.forEach { post ->
+                appendLine(post.postNo)
+                appendLine(post.title)
+                appendLine(post.authorIdOrIp)
+                appendLine(post.nickname)
+                appendLine(post.body)
+                appendLine(post.mediaSources.joinToString("|"))
+                post.comments.forEach { comment ->
+                    appendLine(comment.commentId)
+                    appendLine(comment.authorIdOrIp)
+                    appendLine(comment.nickname)
+                    appendLine(comment.body)
+                }
+            }
+        }
     }
 
-    private fun buildComposedUserPrompt(request: AiFilterRequest): String = buildString {
-        appendLine(config.userPrompt.ifBlank { "추가 사용자 지침 없음" })
-        appendLine()
-        appendLine("[게시글 메타]")
-        appendLine("작성자 ID/IP: ${request.postAuthor}")
-        appendLine("닉네임: ${request.postNick}")
-        appendLine("제목: ${request.postTitle}")
-        appendLine("본문: ${request.postBody}")
-        appendLine("이미지 alt: ${request.postImageAlts.joinToString(" | ").ifBlank { "없음" }}")
+    private fun buildComposedUserPrompt(request: AiFilterBatchRequest): String {
+        val payload = JSONObject().apply {
+            put("user_prompt", config.userPrompt.ifBlank { "추가 사용자 지침 없음" })
+            put("posts", JSONArray().apply {
+                request.posts.forEach { post ->
+                    put(JSONObject().apply {
+                        put("post_no", post.postNo)
+                        put("title", post.title)
+                        put("author_id_or_ip", post.authorIdOrIp)
+                        put("nickname", post.nickname)
+                        put("body", post.body)
+                        put("media_sources", JSONArray(post.mediaSources))
+                        put("comments", JSONArray().apply {
+                            post.comments.forEach { comment ->
+                                put(JSONObject().apply {
+                                    put("comment_id", comment.commentId)
+                                    put("author_id_or_ip", comment.authorIdOrIp)
+                                    put("nickname", comment.nickname)
+                                    put("body", comment.body)
+                                })
+                            }
+                        })
+                    })
+                }
+            })
+        }
+        return payload.toString()
     }
 
-    private fun buildOpenAiPayload(request: AiFilterRequest): JSONObject {
+    private fun buildOpenAiPayload(request: AiFilterBatchRequest): JSONObject {
         val composedUserPrompt = buildComposedUserPrompt(request)
         return JSONObject().apply {
             put("model", config.model)
@@ -157,7 +220,7 @@ internal class AiFilterClient(
         }
     }
 
-    private fun buildGeminiPayload(request: AiFilterRequest): JSONObject {
+    private fun buildGeminiPayload(request: AiFilterBatchRequest): JSONObject {
         val composedUserPrompt = buildComposedUserPrompt(request)
         return JSONObject().apply {
             put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", fixedPrompt))))
@@ -187,7 +250,7 @@ internal class AiFilterClient(
         return config.endpoint
     }
 
-    private fun callApi(request: AiFilterRequest): String {
+    private fun callApi(request: AiFilterBatchRequest): String {
         val requestUrl = buildRequestUrl()
         val payload = when (config.provider) {
             AiFilterProvider.OPENAI_COMPATIBLE -> buildOpenAiPayload(request)
@@ -219,7 +282,7 @@ internal class AiFilterClient(
         return text
     }
 
-    private fun parseResponse(responseText: String): AiFilterEvaluation {
+    private fun parseBatchResponse(responseText: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation {
         val root = JSONObject(responseText)
         val content = when (config.provider) {
             AiFilterProvider.OPENAI_COMPATIBLE -> root.optJSONArray("choices")
@@ -239,54 +302,80 @@ internal class AiFilterClient(
         }
 
         if (content.isBlank()) {
-            return AiFilterEvaluation(failureReason = "AI 응답 비어 있음")
+            return AiFilterBatchEvaluation(failureReason = "AI 응답이 비어 있습니다")
         }
 
         val parsed = runCatching { JSONObject(content) }.getOrElse {
-            logger("AI 필터 JSON 파싱 실패: ${it.message}")
-            return AiFilterEvaluation(failureReason = "AI JSON 파싱 실패")
+            logger("AI 배치 JSON 파싱 실패: ${it.message}")
+            return AiFilterBatchEvaluation(failureReason = "AI JSON 파싱 실패")
         }
 
-        val actionRaw = parsed.optString("action", "REVIEW").uppercase()
-        val category = parsed.optString("category", "other").ifBlank { "other" }
-        val confidence = parsed.optInt("confidence", 0).coerceIn(0, 100)
-        val reason = parsed.optString("reason", "AI 판단 사유 없음").ifBlank { "AI 판단 사유 없음" }
-        val evidence = parsed.optJSONArray("evidence")?.let { array ->
-            buildList {
-                for (i in 0 until array.length()) {
-                    val value = array.optString(i).trim()
-                    if (value.isNotEmpty()) add(value)
-                }
+        val resultsArray = parsed.optJSONArray("results") ?: return AiFilterBatchEvaluation(failureReason = "AI results 누락")
+        val requestPostMap = request.posts.associateBy { it.postNo }
+        val postDecisions = mutableListOf<AiFilterPostDecision>()
+
+        for (i in 0 until resultsArray.length()) {
+            val item = resultsArray.optJSONObject(i) ?: continue
+            val postNo = item.optString("post_no", "").trim()
+            val requestPost = requestPostMap[postNo] ?: continue
+
+            val postDecision = parseDecision(
+                actionRaw = item.optString("post_decision", "REVIEW"),
+                reason = item.optString("post_reason", "AI 판단 사유 없음"),
+                category = item.optString("post_category", "other"),
+                confidence = item.optInt("post_confidence", 0),
+                reviewMode = config.reviewMode,
+                rawJson = item.toString()
+            ) ?: continue
+
+            val requestCommentMap = requestPost.comments.associateBy { it.commentId }
+            val commentDecisions = mutableListOf<AiFilterCommentDecision>()
+            val commentsArray = item.optJSONArray("comments") ?: JSONArray()
+            for (j in 0 until commentsArray.length()) {
+                val commentItem = commentsArray.optJSONObject(j) ?: continue
+                val commentId = commentItem.optString("comment_id", "").trim()
+                if (!requestCommentMap.containsKey(commentId)) continue
+                val commentDecision = parseDecision(
+                    actionRaw = commentItem.optString("decision", "REVIEW"),
+                    reason = commentItem.optString("reason", "AI 판단 사유 없음"),
+                    category = commentItem.optString("category", "other"),
+                    confidence = commentItem.optInt("confidence", 0),
+                    reviewMode = config.reviewMode,
+                    rawJson = commentItem.toString()
+                ) ?: continue
+                commentDecisions += AiFilterCommentDecision(commentId = commentId, decision = commentDecision)
             }
-        }.orEmpty()
 
-        val type = when (actionRaw) {
-            "ALLOW" -> AiFilterDecisionType.ALLOW
-            "BLOCK" -> if (config.reviewMode) AiFilterDecisionType.REVIEW else AiFilterDecisionType.BLOCK
-            "REVIEW" -> AiFilterDecisionType.REVIEW
-            else -> return AiFilterEvaluation(failureReason = "알 수 없는 action: $actionRaw")
-        }
-
-        if (type == AiFilterDecisionType.ALLOW && confidence >= 80 && evidence.any { it.contains("차단") || it.contains("위반") }) {
-            return AiFilterEvaluation(failureReason = "AI 응답 모순 감지")
-        }
-
-        val decoratedReason = buildString {
-            append(reason)
-            if (evidence.isNotEmpty()) {
-                append(" / 근거: ")
-                append(evidence.joinToString("; "))
-            }
-        }
-
-        return AiFilterEvaluation(
-            decision = AiFilterDecision(
-                type = type,
-                reason = decoratedReason,
-                category = category,
-                confidence = confidence,
-                rawJson = parsed.toString(),
+            postDecisions += AiFilterPostDecision(
+                postNo = postNo,
+                decision = postDecision,
+                commentDecisions = commentDecisions
             )
+        }
+
+        return AiFilterBatchEvaluation(postDecisions = postDecisions)
+    }
+
+    private fun parseDecision(
+        actionRaw: String,
+        reason: String,
+        category: String,
+        confidence: Int,
+        reviewMode: Boolean,
+        rawJson: String,
+    ): AiFilterDecision? {
+        val type = when (actionRaw.uppercase()) {
+            "ALLOW", "PASS" -> AiFilterDecisionType.ALLOW
+            "REVIEW" -> AiFilterDecisionType.REVIEW
+            "BLOCK" -> if (reviewMode) AiFilterDecisionType.REVIEW else AiFilterDecisionType.BLOCK
+            else -> return null
+        }
+        return AiFilterDecision(
+            type = type,
+            reason = reason.ifBlank { "AI 판단 사유 없음" },
+            category = category.ifBlank { "other" },
+            confidence = confidence.coerceIn(0, 100),
+            rawJson = rawJson,
         )
     }
 }

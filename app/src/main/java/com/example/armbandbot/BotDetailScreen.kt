@@ -259,7 +259,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isVoiceFilterMode by remember { mutableStateOf(botPref.getBoolean("is_voice_filter_mode", false)) }
         var voiceBlacklistText by remember { mutableStateOf(botPref.getStringSet("voice_blacklist", setOf())?.joinToString("\n") ?: "") }
 
-        val isAiFilterVisible = false
+        val isAiFilterVisible = true
         var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
         val aiProviderOptions = mapOf("openai_compatible" to "OpenAI-compatible", "gemini_direct" to "Gemini direct")
         var isAiProviderDropdownExpanded by remember { mutableStateOf(false) }
@@ -268,6 +268,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var aiFilterApiKeyText by remember { mutableStateOf(botPref.getString("ai_filter_api_key", "") ?: "") }
         var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gpt-4o-mini") ?: "gpt-4o-mini") }
         var aiFilterUserPromptText by remember { mutableStateOf(botPref.getString("ai_filter_user_prompt", "") ?: "") }
+        var aiFilterBatchMaxPostsText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_posts", 5).toString()) }
+        var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_wait_sec", 5).toString()) }
+        var aiFilterBatchMaxWeightText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_weight", 20000).toString()) }
 
         var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
         var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
@@ -652,6 +655,67 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     }
                                 }
                                 "AI" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("AI 필터", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("클라우드 LLM 기반 2차 보조 필터입니다.", fontSize = 12.sp, color = subTextColor)
+                                                }
+                                                Switch(
+                                                    checked = isAiFilterMode,
+                                                    onCheckedChange = { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() },
+                                                    colors = SwitchDefaults.colors(
+                                                        checkedThumbColor = Color.White,
+                                                        checkedTrackColor = PastelNavy,
+                                                        uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White,
+                                                        uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Column(modifier = if (!isAiFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                Text("기본 설정", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("배치 검사 대상도 게시글/댓글 원문 전체를 기준으로 검사합니다. 큰 글은 생략하지 않고 단독 전체 검사로 전환됩니다.", fontSize = 12.sp, color = subTextColor)
+
+                                                Text("Provider", fontWeight = FontWeight.Bold, color = textColor)
+                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    aiProviderOptions.forEach { (key, label) ->
+                                                        FilterChip(
+                                                            selected = aiFilterProvider == key,
+                                                            onClick = {
+                                                                aiFilterProvider = key
+                                                                botPref.edit().putString("ai_filter_provider", key).apply()
+                                                            },
+                                                            label = { Text(label) },
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                selectedContainerColor = PastelNavy,
+                                                                selectedLabelColor = Color.White
+                                                            )
+                                                        )
+                                                    }
+                                                }
+
+                                                Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("Endpoint 설정") }
+                                                Button(onClick = { tempEditText = aiFilterApiKeyText; editDialogType = "ai_filter_api_key" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("API Key 설정") }
+                                                Button(onClick = { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("Model 설정") }
+                                                Button(onClick = { tempEditText = aiFilterUserPromptText; editDialogType = "ai_filter_user_prompt" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("사용자 프롬프트 설정") }
+                                            }
+                                        }
+
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                Text("배치 기준", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("용량 중심 + 글 수/시간 보조 기준으로 배치를 발사합니다.", fontSize = 12.sp, color = subTextColor)
+                                                Button(onClick = { tempEditText = aiFilterBatchMaxPostsText; editDialogType = "ai_filter_batch_max_posts" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 글 수: ${aiFilterBatchMaxPostsText}") }
+                                                Button(onClick = { tempEditText = aiFilterBatchMaxWaitSecText; editDialogType = "ai_filter_batch_max_wait_sec" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 대기 시간(초): ${aiFilterBatchMaxWaitSecText}") }
+                                                Button(onClick = { tempEditText = aiFilterBatchMaxWeightText; editDialogType = "ai_filter_batch_max_weight" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 누적 용량: ${aiFilterBatchMaxWeightText}") }
+                                            }
+                                        }
+                                    }
                                 }
                                 "SPAM" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
@@ -1067,6 +1131,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "ai_filter_api_key" -> { aiFilterApiKeyText = tempEditText.trim(); botPref.edit().putString("ai_filter_api_key", aiFilterApiKeyText).apply() }
                         "ai_filter_model" -> { aiFilterModelText = tempEditText.trim(); botPref.edit().putString("ai_filter_model", aiFilterModelText).apply() }
                         "ai_filter_user_prompt" -> { aiFilterUserPromptText = tempEditText.trim(); botPref.edit().putString("ai_filter_user_prompt", aiFilterUserPromptText).apply() }
+                        "ai_filter_batch_max_posts" -> { aiFilterBatchMaxPostsText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_posts", tempEditText.trim().toIntOrNull() ?: 5).apply() }
+                        "ai_filter_batch_max_wait_sec" -> { aiFilterBatchMaxWaitSecText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_wait_sec", tempEditText.trim().toIntOrNull() ?: 5).apply() }
+                        "ai_filter_batch_max_weight" -> { aiFilterBatchMaxWeightText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_weight", tempEditText.trim().toIntOrNull() ?: 20000).apply() }
                     }
                     editDialogType = null; Toast.makeText(context, "저장되었습니다.", Toast.LENGTH_SHORT).show()
                 }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("저장", color = Color.White) } },
