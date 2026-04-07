@@ -1486,6 +1486,12 @@ class BotService : Service() {
         val cachedAiPostDecision = aiBatchResults[botId]?.remove(postNumStr)
         if (cachedAiPostDecision != null) {
             aiDecision = cachedAiPostDecision.decision
+            if (config.isDebugMode && botId.isNotEmpty()) {
+                sendLog("[AI 결과][게시글] 번호: $postNumStr / decision=${aiDecision?.type} / reason=${aiDecision?.reason ?: "없음"} / category=${aiDecision?.category ?: "other"} / confidence=${aiDecision?.confidence ?: 0}", botId)
+                cachedAiPostDecision.commentDecisions.forEach { commentDecision ->
+                    sendLog("[AI 결과][댓글] 글번호: $postNumStr / comment=${commentDecision.commentId} / decision=${commentDecision.decision.type} / reason=${commentDecision.decision.reason} / category=${commentDecision.decision.category} / confidence=${commentDecision.decision.confidence}", botId)
+                }
+            }
             if (aiDecision?.type == AiFilterDecisionType.REVIEW) {
                 aiReviewReason = aiDecision?.reason
                 blockReasonPrefix = "AI 필터 검토 필요"
@@ -1554,7 +1560,7 @@ class BotService : Service() {
                             apiKey = config.aiFilterApiKey,
                             model = config.aiFilterModel,
                             userPrompt = config.aiFilterUserPrompt,
-                            reviewMode = true,
+                            reviewMode = false,
                         ),
                         logger = { if (botId.isNotEmpty()) sendLog("[AI 배치] $it", botId) }
                     ).evaluateBatch(
@@ -1580,8 +1586,10 @@ class BotService : Service() {
 
                     if (config.isDebugMode && botId.isNotEmpty()) {
                         val postBlockCount = aiBatchEvaluation.postDecisions.count { it.decision.type == AiFilterDecisionType.BLOCK }
+                        val postReviewCount = aiBatchEvaluation.postDecisions.count { it.decision.type == AiFilterDecisionType.REVIEW }
                         val commentBlockCount = aiBatchEvaluation.postDecisions.sumOf { decision -> decision.commentDecisions.count { it.decision.type == AiFilterDecisionType.BLOCK } }
-                        sendLog("[AI 배치] 검사 완료 / 묶음 ${flushItems.size}건 / post ${postBlockCount}건 / comment ${commentBlockCount}건 / 현재 글 댓글 AI 차단 후보 ${aiCommentPlans.size}건", botId)
+                        val commentReviewCount = aiBatchEvaluation.postDecisions.sumOf { decision -> decision.commentDecisions.count { it.decision.type == AiFilterDecisionType.REVIEW } }
+                        sendLog("[AI 배치] 검사 완료 / 묶음 ${flushItems.size}건 / post(block=${postBlockCount}, review=${postReviewCount}) / comment(block=${commentBlockCount}, review=${commentReviewCount}) / 현재 글 댓글 AI 차단 후보 ${aiCommentPlans.size}건", botId)
                     }
                 }
             }.onFailure {

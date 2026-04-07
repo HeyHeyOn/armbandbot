@@ -352,3 +352,18 @@
 - `BotDetailScreen.kt`에서 디버그 로그+설정 dump를 별도 txt로 저장하는 export 기능 추가
 - 1.2.0-beta2 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta3
+
+### 주요 변화
+- 배치 AI 결과가 실제로 어떤 판단을 내렸는지 활동 로그에서 바로 확인할 수 있도록 게시글/댓글별 decision 로그를 추가
+- AI 배치 요약 로그에 post/comment의 block/review 개수를 함께 표시하도록 보강
+- 테스트 단계에서 실제 AI 차단 판정을 확인할 수 있도록 내부 `reviewMode` 강제 완화를 해제
+
+### 기술 포인트
+- `BotService.kt`에서 캐시에서 회수한 `AiFilterPostDecision`과 `AiFilterCommentDecision`을 사람이 읽을 수 있는 로그 형식으로 출력
+- AI 배치 요약 로그를 `post(block=?, review=?) / comment(block=?, review=?)` 형태로 확장
+- 배치 호출 시 `reviewMode = false`로 전환해 모델의 `BLOCK` 응답이 내부에서 자동 REVIEW로 낮아지지 않도록 조정
+- 1.2.0-beta3 debug 빌드 성공 및 APK 업로드 예정
+
