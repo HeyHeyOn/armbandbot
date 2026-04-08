@@ -9,6 +9,7 @@ enum class BotLogCategory {
     DEBUG,
     SESSION,
     ERROR,
+    AI,
     SYSTEM
 }
 
@@ -21,6 +22,7 @@ data class BotLogEntry(
 
 fun classifyBotLog(message: String): BotLogCategory {
     return when {
+        message.contains("[AI ") || message.contains("[AI배치") || message.contains("[AI 배치") || message.contains("[AI 결과") || message.contains("AI HTTP") || message.contains("AI 파싱") || message.contains("AI raw") -> BotLogCategory.AI
         message.contains("[디버그]") -> BotLogCategory.DEBUG
         message.contains("[자동 로그인") || message.contains("[세션 ") || message.contains("[시작 ") || message.contains("[복구 ") || message.contains("로그인") -> BotLogCategory.SESSION
         message.contains("[차단", ignoreCase = false) || message.contains("차단 요청") || message.contains("삭제 요청") || message.contains("차단!") -> BotLogCategory.BLOCK

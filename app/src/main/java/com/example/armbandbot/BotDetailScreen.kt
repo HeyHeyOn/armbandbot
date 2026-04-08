@@ -58,7 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalAnimationApi::class)
+@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsumed: () -> Unit, onBack: () -> Unit) {
 
@@ -268,10 +268,13 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             "custom_openai" to "기타(OpenAI 호환 직접 입력)"
         )
         var isAiProviderDropdownExpanded by remember { mutableStateOf(false) }
+        var isAiModelDropdownExpanded by remember { mutableStateOf(false) }
         var aiFilterProvider by remember { mutableStateOf(botPref.getString("ai_filter_provider", "gemini_direct") ?: "gemini_direct") }
         var aiFilterEndpointText by remember { mutableStateOf(botPref.getString("ai_filter_endpoint", "") ?: "") }
         var aiFilterApiKeyText by remember { mutableStateOf(botPref.getString("ai_filter_api_key", "") ?: "") }
         var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gemini-2.5-flash") ?: "gemini-2.5-flash") }
+        var aiFilterUseCustomEndpoint by remember { mutableStateOf(botPref.getBoolean("ai_filter_use_custom_endpoint", false)) }
+        var aiFilterUseCustomModel by remember { mutableStateOf(botPref.getBoolean("ai_filter_use_custom_model", false)) }
         var aiFilterUserPromptText by remember { mutableStateOf(botPref.getString("ai_filter_user_prompt", "") ?: "") }
         val aiModelPresetOptions = remember(aiFilterProvider) {
             when (aiFilterProvider) {
@@ -706,34 +709,52 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                                                 Text("AI 제공자", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text("사용할 AI 서비스를 선택하세요. 서비스에 따라 기본 endpoint와 추천 모델이 달라집니다.", fontSize = 12.sp, color = subTextColor)
-                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    aiProviderOptions.forEach { (key, label) ->
-                                                        FilterChip(
-                                                            selected = aiFilterProvider == key,
-                                                            onClick = {
-                                                                aiFilterProvider = key
-                                                                botPref.edit().putString("ai_filter_provider", key).apply()
-                                                                if (key == "gemini_direct" && aiFilterEndpointText.isBlank()) {
-                                                                    aiFilterModelText = "gemini-2.5-flash"
-                                                                    botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                ExposedDropdownMenuBox(expanded = isAiProviderDropdownExpanded, onExpandedChange = { isAiProviderDropdownExpanded = !isAiProviderDropdownExpanded }) {
+                                                    OutlinedTextField(
+                                                        value = aiProviderOptions[aiFilterProvider] ?: aiFilterProvider,
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        label = { Text("AI 제공자") },
+                                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isAiProviderDropdownExpanded) },
+                                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+                                                    )
+                                                    ExposedDropdownMenu(expanded = isAiProviderDropdownExpanded, onDismissRequest = { isAiProviderDropdownExpanded = false }) {
+                                                        aiProviderOptions.forEach { (key, label) ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(label) },
+                                                                onClick = {
+                                                                    aiFilterProvider = key
+                                                                    botPref.edit().putString("ai_filter_provider", key).apply()
+                                                                    isAiProviderDropdownExpanded = false
+                                                                    if (key == "gemini_direct" && !aiFilterUseCustomModel) {
+                                                                        aiFilterModelText = "gemini-2.5-flash"
+                                                                        botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                    }
+                                                                    if (key == "groq" && !aiFilterUseCustomModel) {
+                                                                        aiFilterModelText = "llama-3.3-70b-versatile"
+                                                                        botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                    }
                                                                 }
-                                                                if (key == "groq" && aiFilterModelText.isBlank()) {
-                                                                    aiFilterModelText = "llama-3.3-70b-versatile"
-                                                                    botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
-                                                                }
-                                                            },
-                                                            label = { Text(label) },
-                                                            colors = FilterChipDefaults.filterChipColors(
-                                                                selectedContainerColor = PastelNavy,
-                                                                selectedLabelColor = Color.White
                                                             )
-                                                        )
+                                                        }
                                                     }
                                                 }
 
                                                 Text("Endpoint", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text(aiEndpointGuideText, fontSize = 12.sp, color = subTextColor)
-                                                Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterEndpointText.isBlank()) "Endpoint 입력/수정" else "Endpoint 수정") }
+                                                FilterChip(
+                                                    selected = aiFilterUseCustomEndpoint,
+                                                    onClick = {
+                                                        aiFilterUseCustomEndpoint = !aiFilterUseCustomEndpoint
+                                                        botPref.edit().putBoolean("ai_filter_use_custom_endpoint", aiFilterUseCustomEndpoint).apply()
+                                                    },
+                                                    label = { Text(if (aiFilterUseCustomEndpoint) "직접 입력 사용 중" else "기본 endpoint 사용") },
+                                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White)
+                                                )
+                                                if (aiFilterUseCustomEndpoint) {
+                                                    Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterEndpointText.isBlank()) "Endpoint 직접 입력" else "Endpoint 직접 수정") }
+                                                }
 
                                                 Text("API Key", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text("선택한 AI 서비스의 API 키를 입력하세요.", fontSize = 12.sp, color = subTextColor)
@@ -741,28 +762,38 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                                                 Text("모델", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text(aiModelGuideText, fontSize = 12.sp, color = subTextColor)
-                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    aiModelPresetOptions.forEach { preset ->
-                                                        FilterChip(
-                                                            selected = preset != "직접 입력" && aiFilterModelText == preset,
-                                                            onClick = {
-                                                                if (preset == "직접 입력") {
-                                                                    tempEditText = aiFilterModelText
-                                                                    editDialogType = "ai_filter_model"
-                                                                } else {
-                                                                    aiFilterModelText = preset
-                                                                    botPref.edit().putString("ai_filter_model", preset).apply()
+                                                ExposedDropdownMenuBox(expanded = isAiModelDropdownExpanded, onExpandedChange = { isAiModelDropdownExpanded = !isAiModelDropdownExpanded }) {
+                                                    OutlinedTextField(
+                                                        value = if (aiFilterUseCustomModel) "직접 입력: ${aiFilterModelText}" else aiFilterModelText,
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        label = { Text("모델 선택") },
+                                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isAiModelDropdownExpanded) },
+                                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+                                                    )
+                                                    ExposedDropdownMenu(expanded = isAiModelDropdownExpanded, onDismissRequest = { isAiModelDropdownExpanded = false }) {
+                                                        aiModelPresetOptions.forEach { preset ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(preset) },
+                                                                onClick = {
+                                                                    isAiModelDropdownExpanded = false
+                                                                    if (preset == "직접 입력") {
+                                                                        aiFilterUseCustomModel = true
+                                                                        botPref.edit().putBoolean("ai_filter_use_custom_model", true).apply()
+                                                                    } else {
+                                                                        aiFilterUseCustomModel = false
+                                                                        aiFilterModelText = preset
+                                                                        botPref.edit().putBoolean("ai_filter_use_custom_model", false).putString("ai_filter_model", preset).apply()
+                                                                    }
                                                                 }
-                                                            },
-                                                            label = { Text(preset) },
-                                                            colors = FilterChipDefaults.filterChipColors(
-                                                                selectedContainerColor = PastelNavy,
-                                                                selectedLabelColor = Color.White
                                                             )
-                                                        )
+                                                        }
                                                     }
                                                 }
-                                                Button(onClick = { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("모델 직접 입력/수정") }
+                                                if (aiFilterUseCustomModel) {
+                                                    Button(onClick = { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("모델 직접 입력/수정") }
+                                                }
 
                                                 Text("사용자 프롬프트", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text("AI가 어떤 글이나 댓글을 차단해야 하는지 구체적으로 설명하세요. 예: '두바이 쫀득 쿠키와 관련 있는 글이나 댓글만 차단해줘. 그 외에는 절대로 차단하지 마.'", fontSize = 12.sp, color = subTextColor)
@@ -1043,6 +1074,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         "CYCLE" -> logMessages.filter { it.category == BotLogCategory.CYCLE }
                                         "BLOCK" -> logMessages.filter { it.category == BotLogCategory.BLOCK }
                                         "DEBUG" -> logMessages.filter { it.category == BotLogCategory.DEBUG }
+                                        "AI" -> logMessages.filter { it.category == BotLogCategory.AI }
                                         "SESSION" -> logMessages.filter { it.category == BotLogCategory.SESSION }
                                         "ERROR" -> logMessages.filter { it.category == BotLogCategory.ERROR }
                                         else -> logMessages.toList()
@@ -1068,7 +1100,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 val exportDebugLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
                                     if (uri == null) return@rememberLauncherForActivityResult
                                     runCatching {
-                                        val debugLogs = logMessages.filter { it.category == BotLogCategory.DEBUG || it.category == BotLogCategory.ERROR || it.category == BotLogCategory.SESSION }
+                                        val debugLogs = logMessages.filter { it.category == BotLogCategory.DEBUG || it.category == BotLogCategory.ERROR || it.category == BotLogCategory.SESSION || it.category == BotLogCategory.AI }
                                             .joinToString("\n") { it.raw }
                                         val settingsDump = buildString {
                                             appendLine("[bot_id]")
@@ -1163,6 +1195,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     FilterChip(selected = logFilterTab == "CYCLE", onClick = { logFilterTab = "CYCLE" }, label = { Text("탐색", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "BLOCK", onClick = { logFilterTab = "BLOCK" }, label = { Text("차단", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "DEBUG", onClick = { logFilterTab = "DEBUG" }, label = { Text("디버그", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFFFB300), selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "AI", onClick = { logFilterTab = "AI" }, label = { Text("AI", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF00897B), selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "SESSION", onClick = { logFilterTab = "SESSION" }, label = { Text("세션/복구", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF6A1B9A), selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "ERROR", onClick = { logFilterTab = "ERROR" }, label = { Text("오류", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFD32F2F), selectedLabelColor = Color.White))
                                 }
@@ -1176,6 +1209,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     BotLogCategory.BLOCK -> Color(0xFFFF5252)
                                                     BotLogCategory.ERROR -> Color(0xFFFF6E6E)
                                                     BotLogCategory.DEBUG -> Color(0xFFFFD740)
+                                                    BotLogCategory.AI -> Color(0xFF4DB6AC)
                                                     BotLogCategory.SESSION -> Color(0xFFCE93D8)
                                                     BotLogCategory.CYCLE -> Color(0xFF69F0AE)
                                                     BotLogCategory.SYSTEM -> Color(0xFF90CAF9)
@@ -1215,7 +1249,18 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
-                "bot_name" -> "새로운 봇 이름을 입력하세요"; "block_reason" -> "예: 커뮤니티 규칙 위반"; "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."; "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"; "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"; "image_alt_blacklist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n759b8005c4... #광고1"; "voice_blacklist" -> "39a4c023b... #어그로보플"; else -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n사과 #금지어1"
+                "bot_name" -> "새로운 봇 이름을 입력하세요"
+                "block_reason" -> "예: 커뮤니티 규칙 위반"
+                "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."
+                "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"
+                "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"
+                "image_alt_blacklist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n759b8005c4... #광고1"
+                "voice_blacklist" -> "39a4c023b... #어그로보플"
+                "ai_filter_endpoint" -> "선택한 AI 서비스의 endpoint를 입력하세요.\n예: Groq는 https://api.groq.com/openai/v1/chat/completions\nGemini direct는 비워두면 기본 경로를 사용합니다."
+                "ai_filter_api_key" -> "선택한 AI 서비스의 API 키를 입력하세요.\n예: Gemini key 또는 Groq API key"
+                "ai_filter_model" -> "사용할 모델명을 입력하세요.\n예: gemini-2.5-flash / llama-3.3-70b-versatile"
+                "ai_filter_user_prompt" -> "AI가 어떤 글/댓글을 차단해야 하는지 구체적으로 설명하세요.\n예: 두바이 쫀득 쿠키와 관련 있는 글이나 댓글만 차단해줘. 그 외에는 절대로 차단하지 마."
+                else -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n사과 #금지어1"
             }
 
             AlertDialog(

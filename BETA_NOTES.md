@@ -411,3 +411,19 @@
 - provider별 endpoint 안내 문구와 모델 preset 목록을 분기 처리하고, 모델 직접 입력 fallback을 유지
 - 1.2.0-beta6 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta7
+
+### 주요 변화
+- 활동 로그에 AI 전용 카테고리를 추가해 AI 호출/응답/파싱 관련 로그를 별도로 확인할 수 있도록 개선
+- 디버그 로그+설정 저장 기능에 AI 카테고리 로그를 함께 포함하도록 보강
+- AI endpoint/API key/model/prompt 입력 다이얼로그의 placeholder를 AI 필터 용도에 맞는 안내 문구로 교체
+- AI 설정 화면의 provider/model 선택을 드롭다운 방식으로 정리하고, `직접 입력` 선택 시에만 입력 버튼이 보이도록 UX 개선
+
+### 기술 포인트
+- `LogModels.kt`에 `BotLogCategory.AI`를 추가하고 AI 관련 문자열 분류 규칙을 보강
+- `BotDetailScreen.kt`의 활동 로그 필터/색상/디버그 export 범위에 AI 카테고리를 추가
+- AI 설정 카드에서 provider/model 선택을 dropdown + 직접입력 fallback 구조로 재정리
+- 1.2.0-beta7 debug 빌드 성공 및 APK 업로드 예정
+
