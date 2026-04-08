@@ -263,30 +263,48 @@ internal class AiFilterClient(
             AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
         }
 
-        val connection = (URL(requestUrl).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = config.timeoutMs
-            readTimeout = config.timeoutMs
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            when (config.provider) {
-                AiFilterProvider.OPENAI_COMPATIBLE -> setRequestProperty("Authorization", "Bearer ${config.apiKey}")
-                AiFilterProvider.GEMINI_DIRECT -> if (!requestUrl.contains("key=")) {
-                    setRequestProperty("x-goog-api-key", config.apiKey)
+        val retryableStatuses = setOf(429, 500, 502, 503, 504)
+        val retryDelaysMs = listOf(1500L, 4000L)
+        var lastError: String? = null
+
+        for (attempt in 0..retryDelaysMs.size) {
+            val connection = (URL(requestUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = config.timeoutMs
+                readTimeout = config.timeoutMs
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                when (config.provider) {
+                    AiFilterProvider.OPENAI_COMPATIBLE -> setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+                    AiFilterProvider.GEMINI_DIRECT -> if (!requestUrl.contains("key=")) {
+                        setRequestProperty("x-goog-api-key", config.apiKey)
+                    }
                 }
             }
+
+            connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+            if (status in 200..299) {
+                return text
+            }
+
+            Log.w("AiFilterClient", "HTTP $status: $text")
+            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1}")
+            lastError = "HTTP $status"
+
+            val shouldRetry = status in retryableStatuses && attempt < retryDelaysMs.size
+            if (!shouldRetry) {
+                error(lastError)
+            }
+
+            val delayMs = retryDelaysMs[attempt]
+            logger("AI 재시도 예정 / ${delayMs}ms 후 재시도")
+            Thread.sleep(delayMs)
         }
 
-        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
-        if (status !in 200..299) {
-            Log.w("AiFilterClient", "HTTP $status: $text")
-            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status")
-            error("HTTP $status")
-        }
-        return text
+        error(lastError ?: "AI 호출 실패")
     }
 
     private fun parseBatchResponse(responseText: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation {

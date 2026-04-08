@@ -1567,6 +1567,13 @@ class BotService : Service() {
                         AiFilterBatchRequest(posts = flushItems.map { it.postInput })
                     )
 
+                    if (aiBatchEvaluation.failureReason != null) {
+                        flushItems.forEach { queue.addOrReplace(it) }
+                        if (botId.isNotEmpty()) {
+                            sendLog("[AI 배치] 검사 실패로 묶음 ${flushItems.size}건 재큐", botId)
+                        }
+                    }
+
                     val resultCache = aiBatchResults.getOrPut(botId) { ConcurrentHashMap() }
                     aiBatchEvaluation.postDecisions.forEach { resultCache[it.postNo] = it }
 
@@ -1593,7 +1600,13 @@ class BotService : Service() {
                     }
                 }
             }.onFailure {
-                if (botId.isNotEmpty()) sendLog("[AI 배치] 댓글 검사 실패: ${it.message ?: "원인 불명"}", botId)
+                if (botId.isNotEmpty()) {
+                    val msg = it.message ?: "원인 불명"
+                    sendLog("[AI 배치] 댓글 검사 실패: $msg", botId)
+                    if (msg.contains("HTTP 503") || msg.contains("HTTP 429") || msg.contains("HTTP 500") || msg.contains("HTTP 502") || msg.contains("HTTP 504")) {
+                        sendLog("[AI 배치] 일시적 서버 오류로 판단되어 다음 사이클에서 재시도합니다.", botId)
+                    }
+                }
             }
         }
 
