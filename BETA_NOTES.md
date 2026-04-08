@@ -563,3 +563,18 @@
 - 차단된 댓글 번호에 하이라이트를 주고, 현재 글에 속한 댓글 목록 중심으로 snapshot HTML 저장
 - 1.2.0-beta16 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta17
+
+### 주요 변화
+- 차단 스냅샷 저장 시 모바일 리다이렉트용 껍데기 HTML이 저장되는 문제를 막도록 보강
+- snapshot fetch에 데스크톱 UA를 사용하고, 실제 본문/댓글 영역이 없는 리다이렉트 HTML은 저장하지 않도록 수정
+- 잘못된 snapshot 파일이 남아 스냅샷 뷰어에서 의미 없는 HTML이 보이던 문제를 줄이기 위한 안정성 개선
+
+### 기술 포인트
+- `BotService.kt`의 `buildSnapshotHtml(...)`에서 mobile UA 대신 `dcUserAgent` 사용
+- snapshot HTML에 `.write_div`, `.view_content_wrap`, `.cmt_list`, `#comment_box` 등 실제 본문/댓글 영역 존재 여부를 검증
+- `m.dcinside.com` 리다이렉트 스크립트만 있는 HTML은 저장 중단 및 오류 로그 처리
+- 1.2.0-beta17 debug 빌드 성공 및 APK 업로드 예정
+

@@ -1415,9 +1415,16 @@ class BotService : Service() {
                 val snapshotUrl = buildSnapshotUrl(gallType, gallId, postNumStr)
                 sendLog("[디버그] $debugLabel 시도 URL: $snapshotUrl", botId)
                 Jsoup.connect(snapshotUrl)
-                    .userAgent("Mozilla/5.0 (Linux; Android 10; SM-G981B)")
+                    .userAgent(dcUserAgent)
                     .header("Cookie", cookie)
                     .get()
+            }
+
+            val redirectScript = snapshotDoc.select("script").eachText().joinToString("\n")
+            val hasRealContent = snapshotDoc.select(".write_div, .view_content_wrap, .view_content, .cmt_list, #comment_box").isNotEmpty()
+            if (!hasRealContent && redirectScript.contains("m.dcinside.com")) {
+                sendLog("[오류] $debugLabel 실패: 모바일 리다이렉트 HTML이 반환되어 스냅샷 저장을 중단합니다.", botId)
+                return null
             }
 
             snapshotDoc.select(
