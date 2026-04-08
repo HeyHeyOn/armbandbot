@@ -1500,6 +1500,9 @@ class BotService : Service() {
         }
 
         if (config.isAiFilterMode) {
+            if (config.isDebugMode && botId.isNotEmpty()) {
+                sendLog("[AI 배치] AI 필터 활성 / 글 번호: $postNumStr / 댓글 수: ${commentsArray?.length() ?: 0}", botId)
+            }
             runCatching {
                 val aiComments = buildList {
                     if (commentsArray != null) {
@@ -1550,8 +1553,17 @@ class BotService : Service() {
                     sendLog("[AI 배치] 후보 적재 / 글 번호: $postNumStr / 추정 용량: ${queueItem.estimatedWeight}", botId)
                 }
 
-                if (queueItem.estimatedWeight >= config.aiFilterBatchMaxWeight.coerceAtLeast(1000) || queue.shouldFlush()) {
-                    val flushItems = if (queueItem.estimatedWeight >= config.aiFilterBatchMaxWeight.coerceAtLeast(1000)) listOf(queueItem) else queue.drainFlushable()
+                val isOversizeSingle = queueItem.estimatedWeight >= config.aiFilterBatchMaxWeight.coerceAtLeast(1000)
+                val shouldFlushNow = queue.shouldFlush()
+                if (config.isDebugMode && botId.isNotEmpty()) {
+                    sendLog("[AI 배치] flush 판정 / 글 번호: $postNumStr / oversize=$isOversizeSingle / shouldFlush=$shouldFlushNow", botId)
+                }
+
+                if (isOversizeSingle || shouldFlushNow) {
+                    val flushItems = if (isOversizeSingle) listOf(queueItem) else queue.drainFlushable()
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[AI 배치] 호출 시작 / 묶음 ${flushItems.size}건 / postNos=${flushItems.joinToString(",") { it.postNo }}", botId)
+                    }
                     val aiBatchEvaluation = AiFilterClient(
                         config = AiFilterConfig(
                             enabled = true,
