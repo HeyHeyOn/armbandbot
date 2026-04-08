@@ -270,7 +270,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         )
         var isAiProviderDropdownExpanded by remember { mutableStateOf(false) }
         var isAiModelDropdownExpanded by remember { mutableStateOf(false) }
+        var isAiEndpointDropdownExpanded by remember { mutableStateOf(false) }
         var aiFilterProvider by remember { mutableStateOf(botPref.getString("ai_filter_provider", "gemini_direct") ?: "gemini_direct") }
+        var aiFilterCustomProviderLabel by remember { mutableStateOf(botPref.getString("ai_filter_provider_custom_label", "") ?: "") }
         var aiFilterEndpointText by remember { mutableStateOf(botPref.getString("ai_filter_endpoint", "") ?: "") }
         var aiFilterApiKeyText by remember { mutableStateOf(botPref.getString("ai_filter_api_key", "") ?: "") }
         var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gemini-2.5-flash") ?: "gemini-2.5-flash") }
@@ -285,10 +287,16 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             }
         }
         val aiEndpointGuideText = when (aiFilterProvider) {
-            "gemini_direct" -> "비워두면 Gemini 기본 API 경로를 자동 사용합니다."
-            "groq" -> "비워두면 Groq 기본 OpenAI 호환 endpoint를 사용합니다."
-            "openai_compatible" -> "사용할 OpenAI 호환 chat/completions endpoint를 입력하세요."
-            else -> "기타 OpenAI 호환 서비스의 endpoint를 직접 입력하세요."
+            "gemini_direct" -> "Gemini direct는 기본 경로를 권장합니다. 필요할 때만 직접 입력하세요."
+            "groq" -> "Groq는 기본 endpoint를 권장합니다. 필요할 때만 직접 입력하세요."
+            "openai_compatible" -> "기본 OpenAI 호환 endpoint를 쓰거나 직접 입력할 수 있습니다."
+            else -> "직접 선택한 제공자에 맞는 endpoint를 입력하세요."
+        }
+        val aiEndpointPresetOptions = when (aiFilterProvider) {
+            "gemini_direct" -> listOf("기본 endpoint 사용", "직접 입력")
+            "groq" -> listOf("기본 endpoint 사용", "직접 입력")
+            "openai_compatible" -> listOf("기본 endpoint 사용", "직접 입력")
+            else -> listOf("직접 입력")
         }
         val aiModelGuideText = when (aiFilterProvider) {
             "gemini_direct" -> "자주 쓰는 Gemini 모델을 선택하거나 직접 입력할 수 있습니다."
@@ -732,13 +740,25 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                                     aiFilterProvider = key
                                                                     botPref.edit().putString("ai_filter_provider", key).apply()
                                                                     isAiProviderDropdownExpanded = false
-                                                                    if (key == "gemini_direct" && !aiFilterUseCustomModel) {
-                                                                        aiFilterModelText = "gemini-2.5-flash"
-                                                                        botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                    if (key == "custom_openai") {
+                                                                        tempEditText = aiFilterCustomProviderLabel
+                                                                        editDialogType = "ai_filter_provider_custom"
                                                                     }
-                                                                    if (key == "groq" && !aiFilterUseCustomModel) {
-                                                                        aiFilterModelText = "llama-3.3-70b-versatile"
-                                                                        botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                    if (key == "gemini_direct") {
+                                                                        aiFilterUseCustomEndpoint = false
+                                                                        botPref.edit().putBoolean("ai_filter_use_custom_endpoint", false).apply()
+                                                                        if (!aiFilterUseCustomModel) {
+                                                                            aiFilterModelText = "gemini-2.5-flash"
+                                                                            botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                        }
+                                                                    }
+                                                                    if (key == "groq") {
+                                                                        aiFilterUseCustomEndpoint = false
+                                                                        botPref.edit().putBoolean("ai_filter_use_custom_endpoint", false).apply()
+                                                                        if (!aiFilterUseCustomModel) {
+                                                                            aiFilterModelText = "llama-3.3-70b-versatile"
+                                                                            botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                        }
                                                                     }
                                                                 }
                                                             )
@@ -748,15 +768,33 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                                                 Text("Endpoint", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text(aiEndpointGuideText, fontSize = 12.sp, color = subTextColor)
-                                                FilterChip(
-                                                    selected = aiFilterUseCustomEndpoint,
-                                                    onClick = {
-                                                        aiFilterUseCustomEndpoint = !aiFilterUseCustomEndpoint
-                                                        botPref.edit().putBoolean("ai_filter_use_custom_endpoint", aiFilterUseCustomEndpoint).apply()
-                                                    },
-                                                    label = { Text(if (aiFilterUseCustomEndpoint) "직접 입력 사용 중" else "기본 endpoint 사용") },
-                                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White)
-                                                )
+                                                ExposedDropdownMenuBox(expanded = isAiEndpointDropdownExpanded, onExpandedChange = { isAiEndpointDropdownExpanded = !isAiEndpointDropdownExpanded }) {
+                                                    OutlinedTextField(
+                                                        value = if (aiFilterUseCustomEndpoint) "직접 입력" else "기본 endpoint 사용",
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        label = { Text("Endpoint 선택") },
+                                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isAiEndpointDropdownExpanded) },
+                                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+                                                    )
+                                                    ExposedDropdownMenu(expanded = isAiEndpointDropdownExpanded, onDismissRequest = { isAiEndpointDropdownExpanded = false }) {
+                                                        aiEndpointPresetOptions.forEach { preset ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(preset) },
+                                                                onClick = {
+                                                                    isAiEndpointDropdownExpanded = false
+                                                                    aiFilterUseCustomEndpoint = preset == "직접 입력"
+                                                                    botPref.edit().putBoolean("ai_filter_use_custom_endpoint", aiFilterUseCustomEndpoint).apply()
+                                                                    if (preset == "직접 입력") {
+                                                                        tempEditText = aiFilterEndpointText
+                                                                        editDialogType = "ai_filter_endpoint"
+                                                                    }
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
                                                 if (aiFilterUseCustomEndpoint) {
                                                     Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterEndpointText.isBlank()) "Endpoint 직접 입력" else "Endpoint 직접 수정") }
                                                 }
@@ -1105,8 +1143,24 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 val exportDebugLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
                                     if (uri == null) return@rememberLauncherForActivityResult
                                     runCatching {
+                                        fun sanitizeDebugValue(key: String, value: Any?): String {
+                                            val lower = key.lowercase(Locale.getDefault())
+                                            return when {
+                                                lower.contains("pw") || lower.contains("password") -> "[REDACTED_PASSWORD]"
+                                                lower.contains("api_key") || lower.contains("apikey") || lower.contains("token") || lower.contains("secret") -> "[REDACTED_SECRET]"
+                                                lower.contains("cookie") || lower.contains("session") -> "[REDACTED_SESSION]"
+                                                lower.contains("id") && lower.startsWith("auto_login_") -> "[REDACTED_LOGIN_ID]"
+                                                else -> value?.toString() ?: "null"
+                                            }
+                                        }
+
                                         val debugLogs = logMessages.filter { it.category == BotLogCategory.DEBUG || it.category == BotLogCategory.ERROR || it.category == BotLogCategory.SESSION || it.category == BotLogCategory.AI }
-                                            .joinToString("\n") { it.raw }
+                                            .joinToString("\n") { line ->
+                                                line.raw
+                                                    .replace(Regex("""(?i)(api[_-]?key\s*[=:]\s*)([^\s]+)"""), "$1[REDACTED_SECRET]")
+                                                    .replace(Regex("""(?i)(authorization\s*[:=]\s*bearer\s+)([^\s]+)"""), "$1[REDACTED_SECRET]")
+                                                    .replace(Regex("""(?i)(cookie\s*[=:]\s*)(.+)$"""), "$1[REDACTED_SESSION]")
+                                            }
                                         val settingsDump = buildString {
                                             appendLine("[bot_id]")
                                             appendLine(botId)
@@ -1116,7 +1170,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             appendLine()
                                             appendLine("[bot_prefs]")
                                             botPref.all.toSortedMap(compareBy<String> { it }).forEach { (key, value) ->
-                                                appendLine("$key=$value")
+                                                appendLine("$key=${sanitizeDebugValue(key, value)}")
                                             }
                                         }
                                         val content = buildString {
@@ -1131,61 +1185,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Toast.makeText(context, "디버그 로그 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
                                     }.onFailure {
                                         Toast.makeText(context, it.message ?: "디버그 로그 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-
-                                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Button(
-                                            onClick = {
-                                                logMessages.clear()
-                                                try {
-                                                    val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
-                                                    if (logFile.exists()) logFile.delete()
-                                                } catch (_: Exception) {
-                                                }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight,
-                                                contentColor = if(isDarkMode) Color.White else PastelNavy
-                                            ),
-                                            modifier = Modifier.weight(1f).height(50.dp),
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Icon(
-                                                androidx.compose.material.icons.Icons.Filled.Delete,
-                                                contentDescription = "삭제",
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("로그 지우기", fontWeight = FontWeight.Bold)
-                                        }
-                                        Button(
-                                            onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if(isDarkMode) Color(0xFF2E3B55) else Color(0xFFE3F2FD),
-                                                contentColor = if(isDarkMode) Color.White else PastelNavy
-                                            ),
-                                            modifier = Modifier.weight(1f).height(50.dp),
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Icon(Icons.Filled.Save, contentDescription = "저장", modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("로그 저장", fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Button(
-                                        onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if(isDarkMode) Color(0xFF4527A0) else Color(0xFFEDE7F6),
-                                            contentColor = if(isDarkMode) Color.White else Color(0xFF4527A0)
-                                        ),
-                                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(Icons.Filled.BugReport, contentDescription = "디버그 저장", modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("디버그 로그+설정 저장", fontWeight = FontWeight.Bold)
                                     }
                                 }
 
@@ -1225,7 +1224,35 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             }
                                         }
                                     }
-                                    Column(modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)) {
+                                    Column(modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp), horizontalAlignment = Alignment.End) {
+                                        FloatingActionButton(
+                                            onClick = {
+                                                logMessages.clear()
+                                                try {
+                                                    val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
+                                                    if (logFile.exists()) logFile.delete()
+                                                } catch (_: Exception) {
+                                                }
+                                            },
+                                            containerColor = if (isDarkMode) Color(0xFF37474F) else Color.White,
+                                            contentColor = if (isDarkMode) Color.White else warningRed,
+                                            modifier = Modifier.size(44.dp)
+                                        ) { Icon(Icons.Filled.Delete, contentDescription = "로그 지우기") }
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        FloatingActionButton(
+                                            onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") },
+                                            containerColor = if (isDarkMode) Color(0xFF2E3B55) else Color.White,
+                                            contentColor = if (isDarkMode) Color.White else PastelNavy,
+                                            modifier = Modifier.size(44.dp)
+                                        ) { Icon(Icons.Filled.Save, contentDescription = "로그 저장") }
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        FloatingActionButton(
+                                            onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") },
+                                            containerColor = if (isDarkMode) Color(0xFF4527A0) else Color.White,
+                                            contentColor = if (isDarkMode) Color.White else Color(0xFF4527A0),
+                                            modifier = Modifier.size(44.dp)
+                                        ) { Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장") }
+                                        Spacer(modifier = Modifier.height(10.dp))
                                         Button(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha=0.2f)), contentPadding = PaddingValues(0.dp), modifier = Modifier.size(40.dp)) { Text("▲", color = Color.White) }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Button(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha=0.2f)), contentPadding = PaddingValues(0.dp), modifier = Modifier.size(40.dp)) { Text("▼", color = Color.White) }
@@ -1261,6 +1288,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"
                 "image_alt_blacklist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n759b8005c4... #광고1"
                 "voice_blacklist" -> "39a4c023b... #어그로보플"
+                "ai_filter_provider_custom" -> "사용할 AI 제공자 표시 이름을 입력하세요.\n예: 회사 내부 OpenAI 호환 / 기타 API"
                 "ai_filter_endpoint" -> "선택한 AI 서비스의 endpoint를 입력하세요.\n예: Groq는 https://api.groq.com/openai/v1/chat/completions\nGemini direct는 비워두면 기본 경로를 사용합니다."
                 "ai_filter_api_key" -> "선택한 AI 서비스의 API 키를 입력하세요.\n예: Gemini key 또는 Groq API key"
                 "ai_filter_model" -> "사용할 모델명을 입력하세요.\n예: gemini-2.5-flash / llama-3.3-70b-versatile"
@@ -1290,6 +1318,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "nickname_whitelist" -> { nicknameWhitelistText = tempEditText; botPref.edit().putStringSet("nickname_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "image_alt_blacklist" -> { imageAltBlacklistText = tempEditText; botPref.edit().putStringSet("image_alt_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "voice_blacklist" -> { voiceBlacklistText = tempEditText; botPref.edit().putStringSet("voice_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "ai_filter_provider_custom" -> { aiFilterCustomProviderLabel = tempEditText.trim(); botPref.edit().putString("ai_filter_provider_custom_label", aiFilterCustomProviderLabel).apply() }
                         "ai_filter_endpoint" -> { aiFilterEndpointText = tempEditText.trim(); botPref.edit().putString("ai_filter_endpoint", aiFilterEndpointText).apply() }
                         "ai_filter_api_key" -> { aiFilterApiKeyText = tempEditText.trim(); botPref.edit().putString("ai_filter_api_key", aiFilterApiKeyText).apply() }
                         "ai_filter_model" -> { aiFilterModelText = tempEditText.trim(); botPref.edit().putString("ai_filter_model", aiFilterModelText).apply() }

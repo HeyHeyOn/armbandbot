@@ -500,3 +500,20 @@
 - `BotDetailScreen.kt`의 AI 카드에서 AI 알림 스위치를 제거하고 `NOTI_SETTING` 화면으로 이동
 - 1.2.0-beta12 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta13
+
+### 주요 변화
+- 활동 로그 화면 상단의 큰 버튼 3개를 제거하고, 로그 지우기/로그 저장/디버그 로그 저장을 우측 하단 아이콘형 버튼으로 이동해 로그 창 높이를 더 확보
+- 디버그 로그 저장 시 비밀번호, API 키, 토큰, 쿠키, 세션 등의 민감한 정보를 마스킹하도록 보강
+- AI endpoint 선택도 드롭다운 + 직접 입력 구조로 정리하고, AI provider의 직접 입력 선택 시 입력창이 뜨도록 UX 보완
+- 봇 목록 화면의 하드코딩 버전 표기를 현재 beta 버전에 맞게 수정
+
+### 기술 포인트
+- `BotDetailScreen.kt`에서 로그 액션 버튼을 로그 창 우하단 FAB 스타일로 재배치
+- 디버그 로그 export 시 설정 dump와 raw 로그에서 민감 정보 패턴을 `[REDACTED_*]`로 마스킹
+- AI endpoint 선택에 드롭다운 상태를 추가하고 `custom_openai` 선택 시 provider 표시명 입력 dialog 연결
+- `BotListScreen.kt`의 버전 문자열을 `1.2.0-beta13` 기준으로 갱신
+- 1.2.0-beta13 debug 빌드 성공 및 APK 업로드 예정
+
