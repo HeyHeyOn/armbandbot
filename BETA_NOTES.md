@@ -533,3 +533,18 @@
 - 댓글 실행 직전 `[AI 댓글 실행후보]` 로그 추가
 - 1.2.0-beta14 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta15
+
+### 주요 변화
+- AI 배치 결과에서 현재 글이 아닌 과거 글의 댓글 BLOCK도 flush 직후 즉시 차단 요청이 실행되도록 보강
+- AI가 댓글 BLOCK을 반환했는데도 현재 글 기준이 아니라는 이유로 실제 차단이 누락되던 문제를 보완
+- 과거 글 댓글 AI 차단의 즉시집행 로그를 추가해 실제 실행 여부를 더 명확히 확인할 수 있도록 개선
+
+### 기술 포인트
+- `BotService.kt`에서 `aiBatchEvaluation.postDecisions` 중 `postNo != postNumStr`인 댓글 BLOCK을 순회해 `handleBadComment(...)`를 직접 호출하는 즉시집행 경로 추가
+- 즉시집행용 로그 `[AI 댓글 즉시집행] ...` 및 스냅샷 저장 시도 로그 추가
+- 과거 글 댓글 차단 스냅샷은 우선 `captureBlockSnapshot(...)` 재사용으로 연결
+- 1.2.0-beta15 debug 빌드 성공 및 APK 업로드 예정
+

@@ -1724,6 +1724,80 @@ class BotService : Service() {
                         }
                     }
 
+                    val immediateCommentExecutions = aiBatchEvaluation.postDecisions.filter { it.postNo != postNumStr }
+                    immediateCommentExecutions.forEach { postDecision ->
+                        val targetInput = flushItems.firstOrNull { it.postNo == postDecision.postNo }?.postInput
+                        if (targetInput == null) {
+                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                sendLog("[AI 댓글 즉시집행] 글 번호 ${postDecision.postNo} / flush input 누락으로 생략", botId)
+                            }
+                            return@forEach
+                        }
+                        postDecision.commentDecisions
+                            .filter { it.decision.type == AiFilterDecisionType.BLOCK }
+                            .forEach { commentDecision ->
+                                val targetComment = targetInput.comments.firstOrNull { it.commentId == commentDecision.commentId }
+                                if (targetComment == null) {
+                                    if (config.isDebugMode && botId.isNotEmpty()) {
+                                        sendLog("[AI 댓글 즉시집행] 글번호 ${postDecision.postNo} / comment=${commentDecision.commentId} / 원본 댓글 입력 누락으로 생략", botId)
+                                    }
+                                    return@forEach
+                                }
+                                if (config.isDebugMode && botId.isNotEmpty()) {
+                                    sendLog("[AI 댓글 즉시집행] 글번호 ${postDecision.postNo} / comment=${commentDecision.commentId} / reason=${commentDecision.decision.reason} / confidence=${commentDecision.decision.confidence}", botId)
+                                }
+                                runCatching {
+                                    handleBadComment(
+                                        config = config,
+                                        botId = botId,
+                                        gallType = gallType,
+                                        gallId = gallId,
+                                        postNumStr = postDecision.postNo,
+                                        commentNo = commentDecision.commentId,
+                                        cmtDisplayAuthor = if (targetComment.authorIdOrIp.isNotBlank()) "${targetComment.nickname}(${targetComment.authorIdOrIp})" else targetComment.nickname,
+                                        cmtNick = targetComment.nickname,
+                                        commentMemo = targetComment.body,
+                                        commentDate = "",
+                                        cookie = cookie,
+                                        pcPostDetailUrl = if (gallType == "M") {
+                                            "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${postDecision.postNo}"
+                                        } else {
+                                            "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${postDecision.postNo}"
+                                        },
+                                        tokenToUse = tokenToUse,
+                                        blockDuration = blockDuration,
+                                        blockReasonText = blockReason,
+                                        delChk = delChk,
+                                        isBlacklistedCmtUserId = false,
+                                        isBlacklistedCmtUserNick = false,
+                                        blockReasonPrefixCmt = "AI 댓글 차단",
+                                        notiTypeCmt = "ai",
+                                        matchedVoiceIdComment = null,
+                                        suspiciousUrlInComment = null,
+                                        spamCodeMatchComment = null,
+                                        notifyIfEnabled = notifyIfEnabled,
+                                        debugDetail = "AI 댓글 배치 즉시집행",
+                                        saveSnapshotFn = {
+                                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                                sendLog("[AI 댓글 즉시집행] 글번호 ${postDecision.postNo} / comment=${commentDecision.commentId} / 차단 스냅샷 저장 시도", botId)
+                                            }
+                                            captureBlockSnapshot(
+                                                botId = botId,
+                                                gallType = gallType,
+                                                gallId = gallId,
+                                                postNumStr = postDecision.postNo,
+                                                cookie = cookie
+                                            )
+                                        }
+                                    )
+                                }.onFailure {
+                                    if (config.isDebugMode && botId.isNotEmpty()) {
+                                        sendLog("[AI 댓글 즉시집행] 글번호 ${postDecision.postNo} / comment=${commentDecision.commentId} / 실패: ${it.message ?: "원인 불명"}", botId)
+                                    }
+                                }
+                            }
+                    }
+
                     val batchPostDecision = resultCache.remove(postNumStr)
                     if (batchPostDecision != null && config.isDebugMode && botId.isNotEmpty()) {
                         sendLog("[AI 결과][게시글] 번호: $postNumStr / decision=${batchPostDecision.decision.type} / reason=${batchPostDecision.decision.reason} / category=${batchPostDecision.decision.category} / confidence=${batchPostDecision.decision.confidence}", botId)
