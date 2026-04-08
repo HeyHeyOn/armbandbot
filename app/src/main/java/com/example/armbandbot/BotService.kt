@@ -1694,7 +1694,18 @@ class BotService : Service() {
                                 spamCodeMatchPost = null,
                                 notifyIfEnabled = notifyIfEnabled,
                                 debugDetail = "AI 배치 즉시집행",
-                                saveSnapshotFn = null,
+                                saveSnapshotFn = {
+                                    if (config.isDebugMode && botId.isNotEmpty()) {
+                                        sendLog("[AI 즉시집행] 글 번호 ${decision.postNo} / 차단 스냅샷 저장 시도", botId)
+                                    }
+                                    captureBlockSnapshot(
+                                        botId = botId,
+                                        gallType = gallType,
+                                        gallId = gallId,
+                                        postNumStr = decision.postNo,
+                                        cookie = cookie
+                                    )
+                                },
                             )
                             resultCache.remove(decision.postNo)
                         }.onFailure {
@@ -3329,6 +3340,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                 notificationMessage = "닉네임 블랙리스트에 의해 게시글이 차단되었습니다."
             )
 
+            aiDecision != null || aiReviewReason != null -> BlockPresentation(
+                blockReason = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 차단" else "AI 필터 검토 필요",
+                detailedBlockReason = debugDetail ?: aiReviewReason ?: aiDecision?.reason ?: "AI 필터 검토 필요",
+                logCategory = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 배치 차단!" else "AI 필터 REVIEW!",
+                logMessage = "번호: $postNumStr",
+                notificationType = "ai",
+                notificationTitle = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 차단됨" else "AI 검토 필요",
+                notificationMessage = (aiReviewReason ?: aiDecision?.reason ?: "AI 필터가 검토 대상으로 분류했습니다.")
+            )
+
             blockReasonPrefix != null -> BlockPresentation(
                 blockReason = blockReasonPrefix,
                 detailedBlockReason = debugDetail ?: blockReasonPrefix,
@@ -3357,16 +3378,6 @@ img.written_dccon{max-width:80px;max-height:80px}
                 notificationType = "image",
                 notificationTitle = "이미지 차단됨",
                 notificationMessage = "금지된 이미지가 포함된 게시글이 차단되었습니다."
-            )
-
-            aiDecision != null || aiReviewReason != null -> BlockPresentation(
-                blockReason = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 차단" else "AI 필터 검토 필요",
-                detailedBlockReason = debugDetail ?: aiReviewReason ?: "AI 필터 검토 필요",
-                logCategory = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 차단!" else "AI 필터 REVIEW!",
-                logMessage = "번호: $postNumStr",
-                notificationType = "ai",
-                notificationTitle = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 차단됨" else "AI 검토 필요",
-                notificationMessage = (aiReviewReason ?: aiDecision?.reason ?: "AI 필터가 검토 대상으로 분류했습니다.")
             )
 
             suspiciousUrlInPost != null -> BlockPresentation(
