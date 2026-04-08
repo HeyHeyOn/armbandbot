@@ -457,3 +457,17 @@
 - 즉시집행 시 `[AI 즉시집행] ... / 차단 스냅샷 저장 시도` 로그 추가
 - 1.2.0-beta9 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta10
+
+### 주요 변화
+- AI 게시글 차단 로그가 활동 로그의 `차단` 카테고리로 분류되도록 보강
+- AI 즉시집행 게시글 차단 스냅샷이 모바일 HTML이 아니라 PC 상세 HTML 기반으로 저장되도록 수정
+- 스냅샷 뷰어 호환성과 AI 차단 운영 로그 가시성을 개선
+
+### 기술 포인트
+- `LogModels.kt`에서 AI 차단 관련 문자열은 AI 카테고리보다 BLOCK 카테고리를 우선하도록 분류 순서 조정
+- `BotService.kt`의 `buildSnapshotUrl()`을 모바일 URL 대신 PC 상세 URL(`gall.dcinside.com/.../view/?id=...&no=...`)로 변경
+- 1.2.0-beta10 debug 빌드 성공 및 APK 업로드 예정
+

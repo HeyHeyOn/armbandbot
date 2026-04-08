@@ -653,9 +653,9 @@ class BotService : Service() {
     }
     private fun buildSnapshotUrl(gallType: String, gallId: String, postNum: String): String {
         return when (gallType) {
-            "M" -> "https://m.dcinside.com/board/$gallId/$postNum"
-            "MI" -> "https://m.dcinside.com/mini/$gallId/$postNum"
-            else -> "https://m.dcinside.com/board/$gallId/$postNum"
+            "M" -> "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=$postNum"
+            "MI" -> "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=$postNum"
+            else -> "https://gall.dcinside.com/board/view/?id=$gallId&no=$postNum"
         }
     }
 
