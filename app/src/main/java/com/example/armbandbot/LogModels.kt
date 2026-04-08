@@ -22,7 +22,7 @@ data class BotLogEntry(
 
 fun classifyBotLog(message: String): BotLogCategory {
     return when {
-        message.contains("AI 배치 차단!") || message.contains("AI 댓글 차단") || message.contains("AI 필터 차단") || (message.contains("[AI ") && message.contains("차단")) -> BotLogCategory.BLOCK
+        message.startsWith("[AI 배치 차단!") || message.startsWith("[AI 댓글 차단!") || message.startsWith("[AI 필터 차단!") -> BotLogCategory.BLOCK
         message.contains("[AI ") || message.contains("[AI배치") || message.contains("[AI 배치") || message.contains("[AI 결과") || message.contains("AI HTTP") || message.contains("AI 파싱") || message.contains("AI raw") -> BotLogCategory.AI
         message.contains("[디버그]") -> BotLogCategory.DEBUG
         message.contains("[자동 로그인") || message.contains("[세션 ") || message.contains("[시작 ") || message.contains("[복구 ") || message.contains("로그인") -> BotLogCategory.SESSION

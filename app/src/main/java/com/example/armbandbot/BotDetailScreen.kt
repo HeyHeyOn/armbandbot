@@ -297,6 +297,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var aiFilterBatchMaxPostsText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_posts", 5).toString()) }
         var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_wait_sec", 5).toString()) }
         var aiFilterBatchMaxWeightText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_weight", 20000).toString()) }
+        var notiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
 
         var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
         var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
@@ -706,6 +707,29 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                                 Text("기본 설정", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text("배치 검사 대상도 게시글/댓글 원문 전체를 기준으로 검사합니다. 큰 글은 생략하지 않고 단독 전체 검사로 전환됩니다.", fontSize = 12.sp, color = subTextColor)
+
+                                                Card(colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF263238) else Color(0xFFF7FAFC)), shape = RoundedCornerShape(10.dp)) {
+                                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Text("AI 알림", fontWeight = FontWeight.Bold, color = textColor)
+                                                        Text("AI 필터가 실제로 차단 또는 검토를 발생시켰을 때 알림을 보냅니다.", fontSize = 12.sp, color = subTextColor)
+                                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                            Text("AI 필터 차단/검토 알림", color = textColor)
+                                                            Switch(
+                                                                checked = notiAi,
+                                                                onCheckedChange = {
+                                                                    notiAi = it
+                                                                    botPref.edit().putBoolean("noti_ai", it).apply()
+                                                                },
+                                                                colors = SwitchDefaults.colors(
+                                                                    checkedThumbColor = Color.White,
+                                                                    checkedTrackColor = PastelNavy,
+                                                                    uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White,
+                                                                    uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                }
 
                                                 Text("AI 제공자", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text("사용할 AI 서비스를 선택하세요. 서비스에 따라 기본 endpoint와 추천 모델이 달라집니다.", fontSize = 12.sp, color = subTextColor)
@@ -1260,6 +1284,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "ai_filter_api_key" -> "선택한 AI 서비스의 API 키를 입력하세요.\n예: Gemini key 또는 Groq API key"
                 "ai_filter_model" -> "사용할 모델명을 입력하세요.\n예: gemini-2.5-flash / llama-3.3-70b-versatile"
                 "ai_filter_user_prompt" -> "AI가 어떤 글/댓글을 차단해야 하는지 구체적으로 설명하세요.\n예: 두바이 쫀득 쿠키와 관련 있는 글이나 댓글만 차단해줘. 그 외에는 절대로 차단하지 마."
+                "ai_filter_batch_max_posts" -> "한 번의 AI 배치 요청에 포함할 최대 게시글 수를 숫자로 입력하세요.\n예: 3"
+                "ai_filter_batch_max_wait_sec" -> "배치를 보내기 전 최대 대기 시간을 초 단위 숫자로 입력하세요.\n예: 60"
+                "ai_filter_batch_max_weight" -> "배치 누적 용량 상한을 숫자로 입력하세요.\n큰 글은 이 값을 넘으면 단독 검사로 전환됩니다.\n예: 20000"
                 else -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n사과 #금지어1"
             }
 

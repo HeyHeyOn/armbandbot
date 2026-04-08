@@ -54,6 +54,7 @@ class BotService : Service() {
         val notiImage: Boolean,
         val notiVoice: Boolean,
         val notiSpam: Boolean,
+        val notiAi: Boolean,
 
         val targetUrls: List<String>,
 
@@ -968,7 +969,8 @@ class BotService : Service() {
                 "url" to config.notiUrl,
                 "image" to config.notiImage,
                 "voice" to config.notiVoice,
-                "spam" to config.notiSpam
+                "spam" to config.notiSpam,
+                "ai" to config.notiAi
             )
 
             fun notifyIfEnabled(type: String, title: String, content: String) {
@@ -2541,6 +2543,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             notiImage = botPref.getBoolean("noti_image", true),
             notiVoice = botPref.getBoolean("noti_voice", true),
             notiSpam = botPref.getBoolean("noti_spam", true),
+            notiAi = botPref.getBoolean("noti_ai", true),
 
             targetUrls = targetUrls,
 

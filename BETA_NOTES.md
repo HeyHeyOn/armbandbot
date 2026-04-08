@@ -471,3 +471,18 @@
 - `BotService.kt`의 `buildSnapshotUrl()`을 모바일 URL 대신 PC 상세 URL(`gall.dcinside.com/.../view/?id=...&no=...`)로 변경
 - 1.2.0-beta10 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta11
+
+### 주요 변화
+- AI 로그는 실제 차단이 발생한 기록만 `차단` 카테고리로 분류하고, 일반 AI 배치/결과 로그는 다시 `AI` 카테고리로 유지되도록 정리
+- AI 필터 차단/검토 알림을 별도 설정으로 켜고 끌 수 있도록 옵션 추가
+- AI 설정창의 잔여 입력 팝업 placeholder를 AI 용도에 맞게 정리해 금지어 필터용 안내가 보이지 않도록 보강
+
+### 기술 포인트
+- `LogModels.kt`에서 AI 차단 분류 조건을 실제 차단 로그 라인(`AI 배치 차단!`, `AI 댓글 차단!`, `AI 필터 차단!`)만 잡도록 축소
+- `BotService.kt`에 `notiAi` 설정과 알림 맵(`"ai" to config.notiAi`) 추가
+- `BotDetailScreen.kt`에 `AI 필터 차단/검토 알림` 스위치 및 AI 배치 숫자 입력용 전용 placeholder 추가
+- 1.2.0-beta11 debug 빌드 성공 및 APK 업로드 예정
+
