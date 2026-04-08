@@ -13,6 +13,7 @@ import java.util.LinkedHashMap
 internal enum class AiFilterProvider {
     OPENAI_COMPATIBLE,
     GEMINI_DIRECT,
+    GROQ,
 }
 
 internal data class AiFilterConfig(
@@ -248,18 +249,24 @@ internal class AiFilterClient(
     }
 
     private fun buildRequestUrl(): String {
-        if (config.provider == AiFilterProvider.GEMINI_DIRECT) {
-            if (config.endpoint.isNotBlank()) return config.endpoint
-            val encodedModel = URLEncoder.encode(config.model, Charsets.UTF_8.name())
-            return "https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent?key=${config.apiKey}"
+        return when (config.provider) {
+            AiFilterProvider.GEMINI_DIRECT -> {
+                if (config.endpoint.isNotBlank()) config.endpoint else {
+                    val encodedModel = URLEncoder.encode(config.model, Charsets.UTF_8.name())
+                    "https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent?key=${config.apiKey}"
+                }
+            }
+            AiFilterProvider.GROQ -> {
+                if (config.endpoint.isNotBlank()) config.endpoint else "https://api.groq.com/openai/v1/chat/completions"
+            }
+            AiFilterProvider.OPENAI_COMPATIBLE -> config.endpoint
         }
-        return config.endpoint
     }
 
     private fun callApi(request: AiFilterBatchRequest): String {
         val requestUrl = buildRequestUrl()
         val payload = when (config.provider) {
-            AiFilterProvider.OPENAI_COMPATIBLE -> buildOpenAiPayload(request)
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> buildOpenAiPayload(request)
             AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
         }
 
@@ -275,7 +282,7 @@ internal class AiFilterClient(
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
                 when (config.provider) {
-                    AiFilterProvider.OPENAI_COMPATIBLE -> setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+                    AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> setRequestProperty("Authorization", "Bearer ${config.apiKey}")
                     AiFilterProvider.GEMINI_DIRECT -> if (!requestUrl.contains("key=")) {
                         setRequestProperty("x-goog-api-key", config.apiKey)
                     }
@@ -310,7 +317,7 @@ internal class AiFilterClient(
     private fun parseBatchResponse(responseText: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation {
         val root = JSONObject(responseText)
         val content = when (config.provider) {
-            AiFilterProvider.OPENAI_COMPATIBLE -> root.optJSONArray("choices")
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> root.optJSONArray("choices")
                 ?.optJSONObject(0)
                 ?.optJSONObject("message")
                 ?.optString("content", "")

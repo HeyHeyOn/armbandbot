@@ -395,3 +395,19 @@
 - 이후 로그만으로도 AI 실행 경로가 어디서 끊겼는지 빠르게 분석할 수 있도록 가시성 중심으로 보강
 - 1.2.0-beta5 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta6
+
+### 주요 변화
+- AI 제공자 선택 범위를 확장해 Gemini direct 외에 Groq와 기타 OpenAI 호환 서비스도 사용할 수 있도록 기반 추가
+- AI endpoint 기본값에서 ChatGPT 기준 고정 주소를 제거하고, provider별 안내 문구 중심으로 UX 정리
+- 자주 쓰는 모델은 preset 형태로 선택하고, 필요 시 `직접 입력`으로 전환할 수 있도록 모델 선택 UX 개선
+- 사용자 프롬프트/endpoint/API Key/model 설명 문구를 실제 AI 필터 사용 용도에 맞게 구체화
+
+### 기술 포인트
+- `AiFilter.kt`에 `GROQ` provider를 추가하고, OpenAI-compatible 방식으로 payload/auth/response parsing을 재사용하도록 연결
+- `BotDetailScreen.kt`에서 provider 선택지를 Gemini/Groq/OpenAI-compatible/기타(OpenAI 호환 직접 입력)로 확장
+- provider별 endpoint 안내 문구와 모델 preset 목록을 분기 처리하고, 모델 직접 입력 fallback을 유지
+- 1.2.0-beta6 debug 빌드 성공 및 APK 업로드 예정
+

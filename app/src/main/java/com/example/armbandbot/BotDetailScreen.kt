@@ -261,13 +261,36 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         val isAiFilterVisible = true
         var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
-        val aiProviderOptions = mapOf("openai_compatible" to "OpenAI-compatible", "gemini_direct" to "Gemini direct")
+        val aiProviderOptions = linkedMapOf(
+            "gemini_direct" to "Gemini direct",
+            "groq" to "Groq",
+            "openai_compatible" to "OpenAI-compatible",
+            "custom_openai" to "기타(OpenAI 호환 직접 입력)"
+        )
         var isAiProviderDropdownExpanded by remember { mutableStateOf(false) }
-        var aiFilterProvider by remember { mutableStateOf(botPref.getString("ai_filter_provider", "openai_compatible") ?: "openai_compatible") }
-        var aiFilterEndpointText by remember { mutableStateOf(botPref.getString("ai_filter_endpoint", "https://api.openai.com/v1/chat/completions") ?: "https://api.openai.com/v1/chat/completions") }
+        var aiFilterProvider by remember { mutableStateOf(botPref.getString("ai_filter_provider", "gemini_direct") ?: "gemini_direct") }
+        var aiFilterEndpointText by remember { mutableStateOf(botPref.getString("ai_filter_endpoint", "") ?: "") }
         var aiFilterApiKeyText by remember { mutableStateOf(botPref.getString("ai_filter_api_key", "") ?: "") }
-        var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gpt-4o-mini") ?: "gpt-4o-mini") }
+        var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gemini-2.5-flash") ?: "gemini-2.5-flash") }
         var aiFilterUserPromptText by remember { mutableStateOf(botPref.getString("ai_filter_user_prompt", "") ?: "") }
+        val aiModelPresetOptions = remember(aiFilterProvider) {
+            when (aiFilterProvider) {
+                "gemini_direct" -> listOf("gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "직접 입력")
+                "groq" -> listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-20b", "직접 입력")
+                else -> listOf("gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "직접 입력")
+            }
+        }
+        val aiEndpointGuideText = when (aiFilterProvider) {
+            "gemini_direct" -> "비워두면 Gemini 기본 API 경로를 자동 사용합니다."
+            "groq" -> "비워두면 Groq 기본 OpenAI 호환 endpoint를 사용합니다."
+            "openai_compatible" -> "사용할 OpenAI 호환 chat/completions endpoint를 입력하세요."
+            else -> "기타 OpenAI 호환 서비스의 endpoint를 직접 입력하세요."
+        }
+        val aiModelGuideText = when (aiFilterProvider) {
+            "gemini_direct" -> "자주 쓰는 Gemini 모델을 선택하거나 직접 입력할 수 있습니다."
+            "groq" -> "자주 쓰는 Groq 모델을 선택하거나 직접 입력할 수 있습니다."
+            else -> "자주 쓰는 모델을 선택하거나 직접 입력할 수 있습니다."
+        }
         var aiFilterBatchMaxPostsText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_posts", 5).toString()) }
         var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_wait_sec", 5).toString()) }
         var aiFilterBatchMaxWeightText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_weight", 20000).toString()) }
@@ -681,7 +704,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 Text("기본 설정", fontWeight = FontWeight.Bold, color = textColor)
                                                 Text("배치 검사 대상도 게시글/댓글 원문 전체를 기준으로 검사합니다. 큰 글은 생략하지 않고 단독 전체 검사로 전환됩니다.", fontSize = 12.sp, color = subTextColor)
 
-                                                Text("Provider", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("AI 제공자", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("사용할 AI 서비스를 선택하세요. 서비스에 따라 기본 endpoint와 추천 모델이 달라집니다.", fontSize = 12.sp, color = subTextColor)
                                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     aiProviderOptions.forEach { (key, label) ->
                                                         FilterChip(
@@ -689,6 +713,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                             onClick = {
                                                                 aiFilterProvider = key
                                                                 botPref.edit().putString("ai_filter_provider", key).apply()
+                                                                if (key == "gemini_direct" && aiFilterEndpointText.isBlank()) {
+                                                                    aiFilterModelText = "gemini-2.5-flash"
+                                                                    botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                }
+                                                                if (key == "groq" && aiFilterModelText.isBlank()) {
+                                                                    aiFilterModelText = "llama-3.3-70b-versatile"
+                                                                    botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                }
                                                             },
                                                             label = { Text(label) },
                                                             colors = FilterChipDefaults.filterChipColors(
@@ -699,10 +731,42 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     }
                                                 }
 
-                                                Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("Endpoint 설정") }
-                                                Button(onClick = { tempEditText = aiFilterApiKeyText; editDialogType = "ai_filter_api_key" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("API Key 설정") }
-                                                Button(onClick = { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("Model 설정") }
-                                                Button(onClick = { tempEditText = aiFilterUserPromptText; editDialogType = "ai_filter_user_prompt" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("사용자 프롬프트 설정") }
+                                                Text("Endpoint", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text(aiEndpointGuideText, fontSize = 12.sp, color = subTextColor)
+                                                Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterEndpointText.isBlank()) "Endpoint 입력/수정" else "Endpoint 수정") }
+
+                                                Text("API Key", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("선택한 AI 서비스의 API 키를 입력하세요.", fontSize = 12.sp, color = subTextColor)
+                                                Button(onClick = { tempEditText = aiFilterApiKeyText; editDialogType = "ai_filter_api_key" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterApiKeyText.isBlank()) "API Key 입력" else "API Key 수정") }
+
+                                                Text("모델", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text(aiModelGuideText, fontSize = 12.sp, color = subTextColor)
+                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    aiModelPresetOptions.forEach { preset ->
+                                                        FilterChip(
+                                                            selected = preset != "직접 입력" && aiFilterModelText == preset,
+                                                            onClick = {
+                                                                if (preset == "직접 입력") {
+                                                                    tempEditText = aiFilterModelText
+                                                                    editDialogType = "ai_filter_model"
+                                                                } else {
+                                                                    aiFilterModelText = preset
+                                                                    botPref.edit().putString("ai_filter_model", preset).apply()
+                                                                }
+                                                            },
+                                                            label = { Text(preset) },
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                selectedContainerColor = PastelNavy,
+                                                                selectedLabelColor = Color.White
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                                Button(onClick = { tempEditText = aiFilterModelText; editDialogType = "ai_filter_model" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("모델 직접 입력/수정") }
+
+                                                Text("사용자 프롬프트", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("AI가 어떤 글이나 댓글을 차단해야 하는지 구체적으로 설명하세요. 예: '두바이 쫀득 쿠키와 관련 있는 글이나 댓글만 차단해줘. 그 외에는 절대로 차단하지 마.'", fontSize = 12.sp, color = subTextColor)
+                                                Button(onClick = { tempEditText = aiFilterUserPromptText; editDialogType = "ai_filter_user_prompt" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterUserPromptText.isBlank()) "프롬프트 입력" else "프롬프트 수정") }
                                             }
                                         }
 

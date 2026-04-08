@@ -1567,7 +1567,11 @@ class BotService : Service() {
                     val aiBatchEvaluation = AiFilterClient(
                         config = AiFilterConfig(
                             enabled = true,
-                            provider = if (config.aiFilterProvider.equals("gemini_direct", ignoreCase = true)) AiFilterProvider.GEMINI_DIRECT else AiFilterProvider.OPENAI_COMPATIBLE,
+                            provider = when {
+                                config.aiFilterProvider.equals("gemini_direct", ignoreCase = true) -> AiFilterProvider.GEMINI_DIRECT
+                                config.aiFilterProvider.equals("groq", ignoreCase = true) -> AiFilterProvider.GROQ
+                                else -> AiFilterProvider.OPENAI_COMPATIBLE
+                            },
                             endpoint = config.aiFilterEndpoint,
                             apiKey = config.aiFilterApiKey,
                             model = config.aiFilterModel,
