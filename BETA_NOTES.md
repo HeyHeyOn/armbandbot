@@ -517,3 +517,19 @@
 - `BotListScreen.kt`의 버전 문자열을 `1.2.0-beta13` 기준으로 갱신
 - 1.2.0-beta13 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta14
+
+### 주요 변화
+- AI 댓글 차단 후보를 글 단위로 정확히 매핑하도록 보강해, 다른 글의 댓글 BLOCK 결과가 현재 글 댓글 실행 후보에 섞이지 않도록 수정
+- 실제 차단돼야 할 AI 댓글이 누락되는 문제를 줄이기 위해 댓글 실행 plan을 `postNo + commentNo` 기준으로 처리하도록 개선
+- AI 댓글 실행 전용 디버그 로그를 추가해, 후보 생성은 됐는지 / 실제 실행 경로에 들어갔는지 구분해서 확인 가능하도록 보강
+
+### 기술 포인트
+- `BotService.kt`의 `AiCommentExecutionPlan`에 `postNo`를 추가
+- AI 댓글 후보 dedupe key를 `commentId` 단독이 아니라 `postNo:commentId` 기준으로 변경
+- flush/cached 경로 모두에서 현재 글(`postNumStr`)에 해당하는 댓글 BLOCK만 현재 글 실행 후보에 넣도록 수정
+- 댓글 실행 직전 `[AI 댓글 실행후보]` 로그 추가
+- 1.2.0-beta14 debug 빌드 성공 및 APK 업로드 예정
+

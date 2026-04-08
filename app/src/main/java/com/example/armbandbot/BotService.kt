@@ -161,6 +161,7 @@ class BotService : Service() {
     )
 
     private data class AiCommentExecutionPlan(
+        val postNo: String,
         val commentNo: String,
         val reason: String,
         val category: String,
@@ -1459,7 +1460,7 @@ class BotService : Service() {
         val aiPostPlans = mutableListOf<AiPostExecutionPlan>()
         val aiPostPlanNos = mutableSetOf<String>()
         val aiCommentPlans = mutableListOf<AiCommentExecutionPlan>()
-        val aiCommentPlanNos = mutableSetOf<String>()
+        val aiCommentPlanKeys = mutableSetOf<String>()
 
         val postAnalysis = analyzePost(
             config = config,
@@ -1514,8 +1515,10 @@ class BotService : Service() {
             cachedAiPostDecision.commentDecisions
                 .filter { it.decision.type == AiFilterDecisionType.BLOCK }
                 .forEach { commentDecision ->
-                    if (aiCommentPlanNos.add(commentDecision.commentId)) {
+                    val commentKey = "$postNumStr:${commentDecision.commentId}"
+                    if (aiCommentPlanKeys.add(commentKey)) {
                         aiCommentPlans += AiCommentExecutionPlan(
+                            postNo = postNumStr,
                             commentNo = commentDecision.commentId,
                             reason = commentDecision.decision.reason,
                             category = commentDecision.decision.category,
@@ -1634,18 +1637,22 @@ class BotService : Service() {
                             )
                         }
 
-                        decision.commentDecisions
-                            .filter { it.decision.type == AiFilterDecisionType.BLOCK }
-                            .forEach { commentDecision ->
-                                if (aiCommentPlanNos.add(commentDecision.commentId)) {
-                                    aiCommentPlans += AiCommentExecutionPlan(
-                                        commentNo = commentDecision.commentId,
-                                        reason = commentDecision.decision.reason,
-                                        category = commentDecision.decision.category,
-                                        confidence = commentDecision.decision.confidence
-                                    )
+                        if (decision.postNo == postNumStr) {
+                            decision.commentDecisions
+                                .filter { it.decision.type == AiFilterDecisionType.BLOCK }
+                                .forEach { commentDecision ->
+                                    val commentKey = "$postNumStr:${commentDecision.commentId}"
+                                    if (aiCommentPlanKeys.add(commentKey)) {
+                                        aiCommentPlans += AiCommentExecutionPlan(
+                                            postNo = postNumStr,
+                                            commentNo = commentDecision.commentId,
+                                            reason = commentDecision.decision.reason,
+                                            category = commentDecision.decision.category,
+                                            confidence = commentDecision.decision.confidence
+                                        )
+                                    }
                                 }
-                            }
+                        }
                     }
 
                     val immediatePostExecutions = aiBatchEvaluation.postDecisions.filter {
@@ -1730,7 +1737,8 @@ class BotService : Service() {
                         val postReviewCount = aiBatchEvaluation.postDecisions.count { it.decision.type == AiFilterDecisionType.REVIEW }
                         val commentBlockCount = aiBatchEvaluation.postDecisions.sumOf { decision -> decision.commentDecisions.count { it.decision.type == AiFilterDecisionType.BLOCK } }
                         val commentReviewCount = aiBatchEvaluation.postDecisions.sumOf { decision -> decision.commentDecisions.count { it.decision.type == AiFilterDecisionType.REVIEW } }
-                        sendLog("[AI 배치] 검사 완료 / 묶음 ${flushItems.size}건 / post(block=${postBlockCount}, review=${postReviewCount}) / comment(block=${commentBlockCount}, review=${commentReviewCount}) / 글 AI 차단 후보 ${aiPostPlans.size}건 / 현재 글 댓글 AI 차단 후보 ${aiCommentPlans.size}건", botId)
+                        val currentPostAiCommentPlans = aiCommentPlans.filter { it.postNo == postNumStr }
+                        sendLog("[AI 배치] 검사 완료 / 묶음 ${flushItems.size}건 / post(block=${postBlockCount}, review=${postReviewCount}) / comment(block=${commentBlockCount}, review=${commentReviewCount}) / 글 AI 차단 후보 ${aiPostPlans.size}건 / 현재 글 댓글 AI 차단 후보 ${currentPostAiCommentPlans.size}건", botId)
                     }
                 }
             }.onFailure {
@@ -2243,7 +2251,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         }
                     }
 
-                    val aiCommentPlan = aiCommentPlans.firstOrNull { it.commentNo == commentNo }
+                    val aiCommentPlan = aiCommentPlans.firstOrNull { it.postNo == postNumStr && it.commentNo == commentNo }
                     val isBlacklistedCmtUserId = commentAnalysis.isBlacklistedUserId
                     val isBlacklistedCmtUserNick = commentAnalysis.isBlacklistedUserNick
                     val matchedVoiceIdComment = commentAnalysis.matchedVoiceIdComment
@@ -2253,6 +2261,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                     val notiTypeCmt = aiCommentPlan?.let { "ai" } ?: commentAnalysis.notiType
 
                     if (commentAnalysis.isBadComment || aiCommentPlan != null) {
+                        if (config.isDebugMode && aiCommentPlan != null) {
+                            sendLog("[AI 댓글 실행후보] 글번호: $postNumStr / comment=$commentNo / reason=${aiCommentPlan.reason} / category=${aiCommentPlan.category} / confidence=${aiCommentPlan.confidence}", botId)
+                        }
                         if (config.isDebugMode) {
                             val detail = aiCommentPlan?.let { "AI BLOCK (${it.category}/${it.confidence}) ${it.reason}" } ?: commentAnalysis.debugDetail
                             if (!detail.isNullOrBlank()) {
