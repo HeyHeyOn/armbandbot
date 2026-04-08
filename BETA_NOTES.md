@@ -486,3 +486,17 @@
 - `BotDetailScreen.kt`에 `AI 필터 차단/검토 알림` 스위치 및 AI 배치 숫자 입력용 전용 placeholder 추가
 - 1.2.0-beta11 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta12
+
+### 주요 변화
+- AI 댓글 차단도 게시글과 동일하게 `차단` 카테고리로 안정적으로 분류되도록 정리
+- AI 차단/검토 알림 토글을 AI 설정 화면이 아니라 기존 알림 설정 모음 화면으로 이동
+- 사용자 기준으로 설정 위치를 더 자연스럽게 정리
+
+### 기술 포인트
+- `BotService.kt`의 댓글 차단 presentation에 AI 전용 분기를 추가해 `AI 댓글 차단!` 로그 문구를 고정
+- `BotDetailScreen.kt`의 AI 카드에서 AI 알림 스위치를 제거하고 `NOTI_SETTING` 화면으로 이동
+- 1.2.0-beta12 debug 빌드 성공 및 APK 업로드 예정
+

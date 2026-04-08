@@ -3448,6 +3448,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                 notificationMessage = "닉네임 블랙리스트에 의해 댓글이 차단되었습니다."
             )
 
+            notiTypeCmt == "ai" -> BlockPresentation(
+                blockReason = "AI 댓글 차단",
+                detailedBlockReason = debugDetail ?: blockReasonPrefixCmt ?: "AI 댓글 차단",
+                logCategory = "AI 댓글 차단!",
+                logMessage = "작성자: $cmtDisplayAuthor",
+                notificationType = "ai",
+                notificationTitle = "AI 댓글 차단됨",
+                notificationMessage = debugDetail ?: "AI 필터 사유로 댓글이 차단되었습니다."
+            )
+
             blockReasonPrefixCmt != null -> BlockPresentation(
                 blockReason = "악플($blockReasonPrefixCmt)",
                 detailedBlockReason = debugDetail ?: blockReasonPrefixCmt,
