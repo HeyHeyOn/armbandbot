@@ -427,3 +427,18 @@
 - AI 설정 카드에서 provider/model 선택을 dropdown + 직접입력 fallback 구조로 재정리
 - 1.2.0-beta7 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta8
+
+### 주요 변화
+- AI 배치 결과에서 현재 글만 소비하던 구조를 보완해, flush 시점에 이미 지나간 글이 BLOCK 판정을 받아도 즉시 차단 요청이 실행되도록 개선
+- AI batch 결과의 글/댓글 BLOCK 후보를 더 명확히 로그로 남겨, 누락이 집행 문제인지 판정 문제인지 구분하기 쉽게 정리
+- 현재 글은 기존 흐름으로 유지하면서, 같은 묶음의 다른 글 BLOCK 결과는 배치 직후 즉시집행하도록 보강
+
+### 기술 포인트
+- `BotService.kt`에 `AiPostExecutionPlan`을 추가하고 flush 결과에서 글 BLOCK plan을 별도로 수집
+- flush 후 `postNumStr`이 아닌 다른 글의 BLOCK 결과에 대해 `handleBadPost(...)`를 직접 호출하는 즉시집행 경로 추가
+- AI 결과 로그와 배치 요약 로그에 글 AI 차단 후보 수를 추가
+- 1.2.0-beta8 debug 빌드 성공 및 APK 업로드 예정
+

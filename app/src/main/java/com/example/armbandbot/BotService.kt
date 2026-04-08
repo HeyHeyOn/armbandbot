@@ -152,6 +152,13 @@ class BotService : Service() {
         val debugDetail: String? = null
     )
 
+    private data class AiPostExecutionPlan(
+        val postNo: String,
+        val reason: String,
+        val category: String,
+        val confidence: Int
+    )
+
     private data class AiCommentExecutionPlan(
         val commentNo: String,
         val reason: String,
@@ -1447,6 +1454,8 @@ class BotService : Service() {
             sendLog("[디버그][게시글] 번호: $postNumStr / 댓글 수 (API): ${commentsArray?.length() ?: 0}", botId)
         }
         val postText = "$text $contentText"
+        val aiPostPlans = mutableListOf<AiPostExecutionPlan>()
+        val aiPostPlanNos = mutableSetOf<String>()
         val aiCommentPlans = mutableListOf<AiCommentExecutionPlan>()
         val aiCommentPlanNos = mutableSetOf<String>()
 
@@ -1492,6 +1501,26 @@ class BotService : Service() {
                     sendLog("[AI 결과][댓글] 글번호: $postNumStr / comment=${commentDecision.commentId} / decision=${commentDecision.decision.type} / reason=${commentDecision.decision.reason} / category=${commentDecision.decision.category} / confidence=${commentDecision.decision.confidence}", botId)
                 }
             }
+            if (aiDecision?.type == AiFilterDecisionType.BLOCK && aiPostPlanNos.add(postNumStr)) {
+                aiPostPlans += AiPostExecutionPlan(
+                    postNo = postNumStr,
+                    reason = aiDecision?.reason ?: "AI 판단 사유 없음",
+                    category = aiDecision?.category ?: "other",
+                    confidence = aiDecision?.confidence ?: 0
+                )
+            }
+            cachedAiPostDecision.commentDecisions
+                .filter { it.decision.type == AiFilterDecisionType.BLOCK }
+                .forEach { commentDecision ->
+                    if (aiCommentPlanNos.add(commentDecision.commentId)) {
+                        aiCommentPlans += AiCommentExecutionPlan(
+                            commentNo = commentDecision.commentId,
+                            reason = commentDecision.decision.reason,
+                            category = commentDecision.decision.category,
+                            confidence = commentDecision.decision.confidence
+                        )
+                    }
+                }
             if (aiDecision?.type == AiFilterDecisionType.REVIEW) {
                 aiReviewReason = aiDecision?.reason
                 blockReasonPrefix = "AI 필터 검토 필요"
@@ -1591,28 +1620,104 @@ class BotService : Service() {
                     }
 
                     val resultCache = aiBatchResults.getOrPut(botId) { ConcurrentHashMap() }
-                    aiBatchEvaluation.postDecisions.forEach { resultCache[it.postNo] = it }
+                    aiBatchEvaluation.postDecisions.forEach { decision ->
+                        resultCache[decision.postNo] = decision
 
-                    val batchPostDecision = resultCache.remove(postNumStr)
-                    batchPostDecision?.commentDecisions
-                        ?.filter { it.decision.type == AiFilterDecisionType.BLOCK }
-                        ?.forEach { commentDecision ->
-                            if (aiCommentPlanNos.add(commentDecision.commentId)) {
-                                aiCommentPlans += AiCommentExecutionPlan(
-                                    commentNo = commentDecision.commentId,
-                                    reason = commentDecision.decision.reason,
-                                    category = commentDecision.decision.category,
-                                    confidence = commentDecision.decision.confidence
-                                )
+                        if (decision.decision.type == AiFilterDecisionType.BLOCK && aiPostPlanNos.add(decision.postNo)) {
+                            aiPostPlans += AiPostExecutionPlan(
+                                postNo = decision.postNo,
+                                reason = decision.decision.reason,
+                                category = decision.decision.category,
+                                confidence = decision.decision.confidence
+                            )
+                        }
+
+                        decision.commentDecisions
+                            .filter { it.decision.type == AiFilterDecisionType.BLOCK }
+                            .forEach { commentDecision ->
+                                if (aiCommentPlanNos.add(commentDecision.commentId)) {
+                                    aiCommentPlans += AiCommentExecutionPlan(
+                                        commentNo = commentDecision.commentId,
+                                        reason = commentDecision.decision.reason,
+                                        category = commentDecision.decision.category,
+                                        confidence = commentDecision.decision.confidence
+                                    )
+                                }
+                            }
+                    }
+
+                    val immediatePostExecutions = aiBatchEvaluation.postDecisions.filter {
+                        it.postNo != postNumStr && it.decision.type == AiFilterDecisionType.BLOCK
+                    }
+                    immediatePostExecutions.forEach { decision ->
+                        val targetInput = flushItems.firstOrNull { it.postNo == decision.postNo }?.postInput
+                        if (targetInput == null) {
+                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                sendLog("[AI 즉시집행] 글 번호 ${decision.postNo} / flush input 누락으로 즉시 집행 생략", botId)
+                            }
+                            return@forEach
+                        }
+                        if (config.isDebugMode && botId.isNotEmpty()) {
+                            sendLog("[AI 즉시집행] 글 번호 ${decision.postNo} / reason=${decision.decision.reason} / confidence=${decision.decision.confidence}", botId)
+                        }
+                        runCatching {
+                            handleBadPost(
+                                config = config,
+                                botId = botId,
+                                gallType = gallType,
+                                gallId = gallId,
+                                postNumStr = decision.postNo,
+                                postAuthor = targetInput.authorIdOrIp,
+                                postNick = targetInput.nickname,
+                                postDisplayAuthor = if (targetInput.authorIdOrIp.isNotBlank()) "${targetInput.nickname}(${targetInput.authorIdOrIp})" else targetInput.nickname,
+                                postTitle = targetInput.title,
+                                postDate = "",
+                                cookie = cookie,
+                                pcPostDetailUrl = if (gallType == "M") {
+                                    "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${decision.postNo}"
+                                } else {
+                                    "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${decision.postNo}"
+                                },
+                                tokenToUse = tokenToUse,
+                                blockDuration = blockDuration,
+                                blockReasonText = blockReason,
+                                delChk = delChk,
+                                isBlacklistedUserId = false,
+                                isBlacklistedUserNick = false,
+                                blockReasonPrefix = "AI 필터 차단",
+                                notiType = "ai",
+                                matchedVoiceIdPost = null,
+                                matchedImageAlt = null,
+                                aiDecision = decision.decision,
+                                aiReviewReason = null,
+                                suspiciousUrlInPost = null,
+                                spamCodeMatchPost = null,
+                                notifyIfEnabled = notifyIfEnabled,
+                                debugDetail = "AI 배치 즉시집행",
+                                saveSnapshotFn = null,
+                            )
+                            resultCache.remove(decision.postNo)
+                        }.onFailure {
+                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                sendLog("[AI 즉시집행] 글 번호 ${decision.postNo} / 실패: ${it.message ?: "원인 불명"}", botId)
                             }
                         }
+                    }
+
+                    val batchPostDecision = resultCache.remove(postNumStr)
+                    if (batchPostDecision != null && config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[AI 결과][게시글] 번호: $postNumStr / decision=${batchPostDecision.decision.type} / reason=${batchPostDecision.decision.reason} / category=${batchPostDecision.decision.category} / confidence=${batchPostDecision.decision.confidence}", botId)
+                        batchPostDecision.commentDecisions.forEach { commentDecision ->
+                            sendLog("[AI 결과][댓글] 글번호: $postNumStr / comment=${commentDecision.commentId} / decision=${commentDecision.decision.type} / reason=${commentDecision.decision.reason} / category=${commentDecision.decision.category} / confidence=${commentDecision.decision.confidence}", botId)
+                        }
+                    }
 
                     if (config.isDebugMode && botId.isNotEmpty()) {
                         val postBlockCount = aiBatchEvaluation.postDecisions.count { it.decision.type == AiFilterDecisionType.BLOCK }
                         val postReviewCount = aiBatchEvaluation.postDecisions.count { it.decision.type == AiFilterDecisionType.REVIEW }
                         val commentBlockCount = aiBatchEvaluation.postDecisions.sumOf { decision -> decision.commentDecisions.count { it.decision.type == AiFilterDecisionType.BLOCK } }
                         val commentReviewCount = aiBatchEvaluation.postDecisions.sumOf { decision -> decision.commentDecisions.count { it.decision.type == AiFilterDecisionType.REVIEW } }
-                        sendLog("[AI 배치] 검사 완료 / 묶음 ${flushItems.size}건 / post(block=${postBlockCount}, review=${postReviewCount}) / comment(block=${commentBlockCount}, review=${commentReviewCount}) / 현재 글 댓글 AI 차단 후보 ${aiCommentPlans.size}건", botId)
+                        sendLog("[AI 배치] 검사 완료 / 묶음 ${flushItems.size}건 / post(block=${postBlockCount}, review=${postReviewCount}) / comment(block=${commentBlockCount}, review=${commentReviewCount}) / 글 AI 차단 후보 ${aiPostPlans.size}건 / 현재 글 댓글 AI 차단 후보 ${aiCommentPlans.size}건", botId)
                     }
                 }
             }.onFailure {
@@ -1630,19 +1735,33 @@ class BotService : Service() {
         var dbSnapshotPath: String? = null
         var isPostBlocked = false
 
-        if (postAnalysis.action != PostModerationAction.BLOCK_EXECUTE && aiDecision != null) {
-            when (aiDecision?.type) {
-                AiFilterDecisionType.BLOCK -> {
+        val aiPostExecutionPlan = aiPostPlans.firstOrNull { it.postNo == postNumStr }
+        if (postAnalysis.action != PostModerationAction.BLOCK_EXECUTE) {
+            when {
+                aiPostExecutionPlan != null -> {
+                    isPostBlocked = true
+                    blockReasonPrefix = "AI 필터 차단"
+                    notiType = "ai"
+                    if (aiDecision == null) {
+                        aiDecision = AiFilterDecision(
+                            type = AiFilterDecisionType.BLOCK,
+                            reason = aiPostExecutionPlan.reason,
+                            category = aiPostExecutionPlan.category,
+                            confidence = aiPostExecutionPlan.confidence,
+                            rawJson = ""
+                        )
+                    }
+                }
+                aiDecision?.type == AiFilterDecisionType.BLOCK -> {
                     isPostBlocked = true
                     blockReasonPrefix = "AI 필터 차단"
                     notiType = "ai"
                 }
-                AiFilterDecisionType.REVIEW -> {
+                aiDecision?.type == AiFilterDecisionType.REVIEW -> {
                     if (aiReviewReason.isNullOrBlank()) aiReviewReason = aiDecision?.reason
                     if (blockReasonPrefix.isNullOrBlank()) blockReasonPrefix = "AI 필터 검토 필요"
                     if (notiType.isNullOrBlank()) notiType = "ai"
                 }
-                else -> Unit
             }
         }
 
