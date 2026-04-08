@@ -548,3 +548,18 @@
 - 과거 글 댓글 차단 스냅샷은 우선 `captureBlockSnapshot(...)` 재사용으로 연결
 - 1.2.0-beta15 debug 빌드 성공 및 APK 업로드 예정
 
+---
+
+## 1.2.0 beta16
+
+### 주요 변화
+- 과거 글 AI 댓글 즉시집행 스냅샷도 댓글 전용 증거 형태에 가깝게 저장되도록 보강
+- 글 전체 통짜 snapshot 재사용 대신, 차단된 댓글 번호를 기준으로 해당 댓글이 보이도록 강조한 PC HTML snapshot 저장 경로 추가
+- AI 댓글 차단 성공 후 운영 기록 품질을 더 개선
+
+### 기술 포인트
+- `BotService.kt`에 `captureCommentBlockSnapshot(...)` helper 추가
+- 과거 글 AI 댓글 즉시집행의 `saveSnapshotFn`이 `captureBlockSnapshot(...)` 대신 댓글 전용 snapshot helper를 사용하도록 변경
+- 차단된 댓글 번호에 하이라이트를 주고, 현재 글에 속한 댓글 목록 중심으로 snapshot HTML 저장
+- 1.2.0-beta16 debug 빌드 성공 및 APK 업로드 예정
+

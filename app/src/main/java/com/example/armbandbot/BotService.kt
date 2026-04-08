@@ -14,6 +14,8 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import org.jsoup.Jsoup
 import org.jsoup.Connection
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.net.URI
 import java.net.URLDecoder
@@ -1344,6 +1346,59 @@ class BotService : Service() {
         }
     }
 
+    private fun captureCommentBlockSnapshot(
+        botId: String,
+        gallType: String,
+        gallId: String,
+        postNumStr: String,
+        commentNo: String,
+        cookie: String,
+        comments: List<AiFilterCommentInput>
+    ): String? {
+        val html = buildSnapshotHtml(
+            botId = botId,
+            gallType = gallType,
+            gallId = gallId,
+            postNumStr = postNumStr,
+            cookie = cookie,
+            debugLabel = "AI 댓글 차단 증거"
+        ) ?: return null
+
+        return try {
+            val doc = Jsoup.parse(html)
+            val commentIdsToKeep = comments.map { it.commentId }.toSet()
+            doc.select("li.ub-content, li.reply").forEach { li ->
+                val dataNo = li.attr("data-no")
+                val id = li.id()
+                val extractedCommentNo = when {
+                    dataNo.isNotBlank() -> dataNo
+                    id.startsWith("comment_li_") -> id.removePrefix("comment_li_")
+                    id.startsWith("reply_li_") -> id.removePrefix("reply_li_")
+                    else -> ""
+                }
+                if (extractedCommentNo.isNotBlank() && extractedCommentNo !in commentIdsToKeep) {
+                    li.remove()
+                }
+                if (extractedCommentNo == commentNo) {
+                    val currentStyle = li.attr("style")
+                    li.attr("style", listOf(currentStyle, "border:2px solid #ff5252", "background:#fff3f3").filter { it.isNotBlank() }.joinToString("; "))
+                }
+            }
+
+            val cacheDir = File(cacheDir, "snapshots_$botId")
+            if (!cacheDir.exists()) cacheDir.mkdirs()
+
+            val timestamp = System.currentTimeMillis()
+            val blockFile = File(cacheDir, "${gallId}_${postNumStr}_comment_${commentNo}_block_$timestamp.html")
+            blockFile.writeText(doc.html())
+            blockFile.absolutePath
+        } catch (e: Exception) {
+            Log.e("BotService", "[$botId] comment block snapshot save failed", e)
+            sendLog("[오류] AI 댓글 차단 스냅샷 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
+            null
+        }
+    }
+
     private fun buildSnapshotHtml(
         botId: String,
         gallType: String,
@@ -1781,12 +1836,14 @@ class BotService : Service() {
                                             if (config.isDebugMode && botId.isNotEmpty()) {
                                                 sendLog("[AI 댓글 즉시집행] 글번호 ${postDecision.postNo} / comment=${commentDecision.commentId} / 차단 스냅샷 저장 시도", botId)
                                             }
-                                            captureBlockSnapshot(
+                                            captureCommentBlockSnapshot(
                                                 botId = botId,
                                                 gallType = gallType,
                                                 gallId = gallId,
                                                 postNumStr = postDecision.postNo,
-                                                cookie = cookie
+                                                commentNo = commentDecision.commentId,
+                                                cookie = cookie,
+                                                comments = targetInput.comments
                                             )
                                         }
                                     )
