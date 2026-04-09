@@ -1332,13 +1332,17 @@ class BotService : Service() {
         ) ?: return null
 
         return try {
-            val cacheDir = File(cacheDir, "snapshots_$botId")
-            if (!cacheDir.exists()) cacheDir.mkdirs()
-
-            val timestamp = System.currentTimeMillis()
-            val blockFile = File(cacheDir, "${gallId}_${postNumStr}_block_$timestamp.html")
-            blockFile.writeText(html)
-            blockFile.absolutePath
+            val config = loadBotConfig(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))
+            saveSnapshotFromDocCommon(
+                config = config,
+                botId = botId,
+                gallId = gallId,
+                postNumStr = postNumStr,
+                doc = Jsoup.parse(html),
+                comments = null,
+                blockedCommentNo = null,
+                blockedTs = System.currentTimeMillis().toString()
+            )
         } catch (e: Exception) {
             Log.e("BotService", "[$botId] block snapshot save failed", e)
             sendLog("[경고] 차단 증거 스냅샷 파일 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
@@ -2699,6 +2703,13 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         return value
     }
+
+    private fun extractCreationDateFromPostDoc(doc: org.jsoup.nodes.Document): String {
+        val raw = doc.selectFirst(".gall_writer .gall_date")?.attr("title")?.takeIf { it.isNotBlank() }
+            ?: doc.selectFirst(".gall_writer .gall_date")?.text()
+            ?: ""
+        return normalizeCreationDate(raw)
+    }
     private fun loadBotConfig(botPref: android.content.SharedPreferences): BotConfig {
         val rawUrlsText = botPref.getString("target_urls", "") ?: ""
         val targetUrls = rawUrlsText
@@ -3540,13 +3551,17 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
 
             aiDecision != null || aiReviewReason != null -> BlockPresentation(
-                blockReason = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 차단" else "AI 필터 검토 필요",
+                blockReason = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 작동" else "AI 필터 검토 필요",
                 detailedBlockReason = debugDetail ?: aiReviewReason ?: aiDecision?.reason ?: "AI 필터 검토 필요",
-                logCategory = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 배치 차단!" else "AI 필터 REVIEW!",
+                logCategory = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 작동" else "AI 필터 검토",
                 logMessage = "번호: $postNumStr",
                 notificationType = "ai",
-                notificationTitle = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 차단됨" else "AI 검토 필요",
-                notificationMessage = (aiReviewReason ?: aiDecision?.reason ?: "AI 필터가 검토 대상으로 분류했습니다.")
+                notificationTitle = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 작동" else "AI 검토 필요",
+                notificationMessage = if (aiDecision?.type == AiFilterDecisionType.BLOCK) {
+                    "AI 필터로 게시글을 차단했습니다."
+                } else {
+                    aiReviewReason ?: aiDecision?.reason ?: "AI 필터가 검토 대상으로 분류했습니다."
+                }
             )
 
             blockReasonPrefix != null -> BlockPresentation(
@@ -3645,13 +3660,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
 
             notiTypeCmt == "ai" -> BlockPresentation(
-                blockReason = "AI 댓글 차단",
-                detailedBlockReason = debugDetail ?: blockReasonPrefixCmt ?: "AI 댓글 차단",
-                logCategory = "AI 댓글 차단!",
+                blockReason = "AI 필터 작동",
+                detailedBlockReason = debugDetail ?: blockReasonPrefixCmt ?: "AI 필터 작동",
+                logCategory = "AI 필터 작동",
                 logMessage = "작성자: $cmtDisplayAuthor",
                 notificationType = "ai",
-                notificationTitle = "AI 댓글 차단됨",
-                notificationMessage = debugDetail ?: "AI 필터 사유로 댓글이 차단되었습니다."
+                notificationTitle = "AI 필터 작동",
+                notificationMessage = "AI 필터로 댓글을 차단했습니다."
             )
 
             blockReasonPrefixCmt != null -> BlockPresentation(

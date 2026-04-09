@@ -248,6 +248,19 @@
 - beta18 빌드/업로드 예정
 
 
+## 1.2.0 beta21
+
+### 주요 변화
+- AI 게시글 즉시집행 경로에서 작성일시가 비어 들어가던 문제를 보강
+- 게시글 AI 차단 snapshot도 공용 helper 기준으로 저장 흐름을 더 맞춤
+- AI 차단 알림 문구를 사용자 친화적으로 정리
+
+### 기술 포인트
+- AI 게시글 차단 시 detail page에서 작성일시를 다시 추출해 `creationDate` fallback으로 사용
+- `captureBlockSnapshot(...)`도 공용 snapshot 저장 helper 기준으로 정리
+- AI 알림 문구를 `AI 필터 작동`, `AI 필터로 게시글/댓글을 차단했습니다.` 형태로 정리
+- `assembleDebug` 빌드 성공으로 현재 수정 코드가 컴파일 가능함을 확인
+
 ## 1.2.0 beta20
 
 ### 주요 변화
