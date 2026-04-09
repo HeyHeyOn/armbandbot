@@ -248,6 +248,18 @@
 - beta18 빌드/업로드 예정
 
 
+## 1.2.0 beta20
+
+### 주요 변화
+- 일반 차단 snapshot과 AI 댓글 차단 snapshot이 같은 공용 저장 본문을 공유하도록 구조 통합
+- 로컬 `saveSnapshotFromDoc(...)`는 공용 helper를 호출하는 wrapper 역할만 하도록 정리
+- AI 댓글 차단도 동일 공용 helper를 직접 타게 변경해 코드 구조 기준으로도 단일 흐름화 진행
+
+### 기술 포인트
+- `saveSnapshotFromDocCommon(...)` 공용 helper 기준으로 일반/AI snapshot 저장 경로를 맞춤
+- 결과물 유사 수준을 넘어서 코드 구조 차이 자체를 줄이는 방향으로 정리
+- `assembleDebug` 빌드 성공으로 현재 완전 통합 단계 코드가 컴파일 가능함을 확인
+
 ## 1.2.0 beta19
 
 ### 주요 변화
