@@ -2200,6 +2200,45 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     sendLog("[AI 댓글 즉시집행] 글번호 ${postDecision.postNo} / comment=${commentDecision.commentId} / reason=${commentDecision.decision.reason} / confidence=${commentDecision.decision.confidence}", botId)
                                 }
                                 runCatching {
+                                    val immediateCommentPostDetailUrl = if (gallType == "M") {
+                                        "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${postDecision.postNo}"
+                                    } else {
+                                        "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${postDecision.postNo}"
+                                    }
+                                    val immediateCommentPostDoc = Jsoup.connect(immediateCommentPostDetailUrl)
+                                        .userAgent(dcUserAgent)
+                                        .header("Cookie", cookie)
+                                        .get()
+                                    val esnoToken = immediateCommentPostDoc.select("input[id=e_s_n_o]").attr("value")
+                                    val commentApiResponse = Jsoup.connect("https://gall.dcinside.com/board/comment/")
+                                        .userAgent(dcUserAgent)
+                                        .header("Cookie", cookie)
+                                        .header("Referer", immediateCommentPostDetailUrl)
+                                        .header("X-Requested-With", "XMLHttpRequest")
+                                        .data("id", gallId)
+                                        .data("no", postDecision.postNo)
+                                        .data("cmt_id", gallId)
+                                        .data("cmt_no", postDecision.postNo)
+                                        .data("e_s_n_o", esnoToken)
+                                        .data("comment_page", "1")
+                                        .data("sort", "D")
+                                        .data("_GALLTYPE_", gallType)
+                                        .ignoreContentType(true)
+                                        .method(org.jsoup.Connection.Method.POST)
+                                        .execute()
+                                    val resolvedCommentDate = runCatching {
+                                        val commentsJson = JSONObject(commentApiResponse.body()).optJSONArray("comments") ?: JSONArray()
+                                        var date = ""
+                                        for (i in 0 until commentsJson.length()) {
+                                            val obj = commentsJson.optJSONObject(i) ?: continue
+                                            if (obj.optString("no", "") == commentDecision.commentId) {
+                                                date = normalizeCreationDate(obj.optString("reg_date", obj.optString("date", "")))
+                                                break
+                                            }
+                                        }
+                                        date
+                                    }.getOrDefault("")
+
                                     handleBadComment(
                                         config = config,
                                         botId = botId,
@@ -2210,13 +2249,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         cmtDisplayAuthor = if (targetComment.authorIdOrIp.isNotBlank()) "${targetComment.nickname}(${targetComment.authorIdOrIp})" else targetComment.nickname,
                                         cmtNick = targetComment.nickname,
                                         commentMemo = targetComment.body,
-                                        commentDate = "",
+                                        commentDate = resolvedCommentDate,
                                         cookie = cookie,
-                                        pcPostDetailUrl = if (gallType == "M") {
-                                            "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${postDecision.postNo}"
-                                        } else {
-                                            "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${postDecision.postNo}"
-                                        },
+                                        pcPostDetailUrl = immediateCommentPostDetailUrl,
                                         tokenToUse = tokenToUse,
                                         blockDuration = blockDuration,
                                         blockReasonText = blockReason,
