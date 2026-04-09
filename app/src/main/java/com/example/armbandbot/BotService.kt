@@ -1355,52 +1355,44 @@ class BotService : Service() {
         cookie: String,
         comments: List<AiFilterCommentInput>
     ): String? {
-        val html = buildSnapshotHtml(
-            botId = botId,
-            gallType = gallType,
-            gallId = gallId,
-            postNumStr = postNumStr,
-            cookie = cookie,
-            debugLabel = "AI 댓글 차단 증거"
-        ) ?: return null
-
         return try {
-            val doc = Jsoup.parse(html)
-            val commentIdsToKeep = comments.map { it.commentId }.toSet()
-            doc.select("li.ub-content, li.reply").forEach { li ->
-                val dataNo = li.attr("data-no")
-                val id = li.id()
-                val extractedCommentNo = when {
-                    dataNo.isNotBlank() -> dataNo
-                    id.startsWith("comment_li_") -> id.removePrefix("comment_li_")
-                    id.startsWith("reply_li_") -> id.removePrefix("reply_li_")
-                    else -> ""
-                }
-                if (extractedCommentNo.isNotBlank() && extractedCommentNo !in commentIdsToKeep) {
-                    li.remove()
-                }
-                if (extractedCommentNo == commentNo) {
-                    val currentStyle = li.attr("style")
-                    li.attr("style", listOf(currentStyle, "border:2px solid #ff5252", "background:#fff3f3").filter { it.isNotBlank() }.joinToString("; "))
-                }
+            val config = loadBotConfig(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))
+            if (!config.isExpertMode) return null
+
+            val pcPostDetailUrl = if (gallType == "M") {
+                "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=$postNumStr"
+            } else {
+                "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=$postNumStr"
             }
 
-            val saveSnapshotFromDocMethod = this::class.java.getDeclaredMethod(
-                "saveSnapshotFromDocCompat",
-                BotConfig::class.java,
-                String::class.java,
-                String::class.java,
-                String::class.java,
-                org.jsoup.nodes.Document::class.java,
-                JSONArray::class.java,
-                String::class.java,
-                String::class.java
-            )
-            saveSnapshotFromDocMethod.isAccessible = true
+            val postDoc = Jsoup.connect(pcPostDetailUrl)
+                .userAgent("Mozilla/5.0")
+                .header("Cookie", cookie)
+                .get()
 
-            val commentsJson = JSONArray().apply {
+            val esnoToken = postDoc.select("input[id=e_s_n_o]").attr("value")
+            val commentApiUrl = "https://gall.dcinside.com/board/comment/"
+            val commentResponse = Jsoup.connect(commentApiUrl)
+                .userAgent("Mozilla/5.0")
+                .header("Cookie", cookie)
+                .header("Referer", pcPostDetailUrl)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .data("id", gallId)
+                .data("no", postNumStr)
+                .data("cmt_id", gallId)
+                .data("cmt_no", postNumStr)
+                .data("e_s_n_o", esnoToken)
+                .data("comment_page", "1")
+                .data("sort", "D")
+                .data("_GALLTYPE_", gallType)
+                .ignoreContentType(true)
+                .method(org.jsoup.Connection.Method.POST)
+                .execute()
+
+            val commentsJson = JSONObject(commentResponse.body()).optJSONArray("comments") ?: JSONArray()
+            if (commentsJson.length() == 0 && comments.isNotEmpty()) {
                 comments.forEach { cmt ->
-                    put(JSONObject().apply {
+                    commentsJson.put(JSONObject().apply {
                         put("no", cmt.commentId)
                         put("name", cmt.nickname)
                         put("memo", cmt.body)
@@ -1413,17 +1405,16 @@ class BotService : Service() {
                 }
             }
 
-            saveSnapshotFromDocMethod.invoke(
-                this,
-                loadBotConfig(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE)),
-                botId,
-                gallId,
-                postNumStr,
-                doc,
-                commentsJson,
-                commentNo,
-                System.currentTimeMillis().toString()
-            ) as? String
+            saveSnapshotFromDocCompat(
+                config = config,
+                botId = botId,
+                gallId = gallId,
+                postNumStr = postNumStr,
+                doc = postDoc,
+                comments = commentsJson,
+                blockedCommentNo = commentNo,
+                blockedTs = System.currentTimeMillis().toString()
+            )
         } catch (e: Exception) {
             Log.e("BotService", "[$botId] comment block snapshot save failed", e)
             sendLog("[오류] AI 댓글 차단 스냅샷 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
@@ -1441,31 +1432,358 @@ class BotService : Service() {
         blockedCommentNo: String? = null,
         blockedTs: String? = null
     ): String? {
-        if (!config.isExpertMode) return null
+            if (!config.isExpertMode) return null
+            sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
-        doc.select(
-            "header.header, nav.nav, footer.dcfoot, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share, #bottom_listwrap, .section.right_content, .right_content, .stickyunit"
-        ).remove()
-        doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
-        doc.select("script").remove()
+            // 1. 광고/네비/헤더/푸터/사이드바 등 불필요 요소 제거
+            doc.select(
+                "header.header, nav.nav, footer.dcfoot, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share, #bottom_listwrap, .section.right_content, .right_content, .stickyunit"
+            ).remove()
+            doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
 
-        val cacheDir = File(cacheDir, "snapshots_$botId")
-        if (!cacheDir.exists()) cacheDir.mkdirs()
+            // 2. 모든 script 제거 (JS 간섭 방지)
+            doc.select("script").remove()
 
-        val html = doc.html()
-        return if (blockedTs != null) {
-            val blockedFile = File(cacheDir, "${gallId}_${postNumStr}_blocked_${blockedTs}.html")
-            blockedFile.writeText(html)
-            blockedFile.absolutePath
-        } else {
-            val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
-            val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
-            latestFile.writeText(html)
-            if (!initialFile.exists()) {
-                initialFile.writeText(html)
+            // 3. 댓글창 + 댓글창 이후 불필요 요소 제거
+            // 기준 앵커: #jquery_jplayer (댓글창 바로 앞 요소) 또는 .view_comment
+            val commentParent = doc.selectFirst(".view_content_wrap, article.gallview_contents, .gallview_contents")
+            val commentAnchor = doc.selectFirst(".view_comment, #focus_cmt")
+            val jplayer = doc.getElementById("jquery_jplayer")
+
+            // jplayer 제거
+            jplayer?.remove()
+
+            // 댓글창 이후 형제 요소 제거 (글쓰기 버튼 영역 등)
+            if (commentAnchor != null) {
+                var next = commentAnchor.nextElementSibling()
+                while (next != null) {
+                    val toRemove = next
+                    next = next.nextElementSibling()
+                    toRemove.remove()
+                }
+                commentAnchor.remove()
+            } else {
+                doc.select(".view_comment, #focus_cmt, .view_bottom_btnbox").remove()
             }
-            latestFile.absolutePath
-        }
+
+            // 4. commentsArray로 실제 DC 렌더링 구조로 댓글 블록 생성 후 body 끝에 append
+            run {
+                // 차단된 댓글 강조 + 기타 최소 보정 스타일만 head에 삽입
+                doc.head().append("""<style>
+.view_comment{display:block!important}
+.comment_wrap.show{display:block!important}
+.comment_box{display:block!important}
+.cmt_list{display:block!important}
+.cmt_list li.ub-content{display:block!important}
+.reply.show{display:block!important}
+.reply_list{display:block!important}
+.reply_list li.ub-content{display:block!important}
+/* 차단 강조는 스냅샷 뷰어에서만 표시 */
+.voice_wrap iframe{max-width:100%}
+img.written_dccon{max-width:80px;max-height:80px}
+</style>""")
+
+                // 실제 DC 구조로 view_comment 블록 생성
+                // 구조: div.view_comment#focus_cmt > div.comment_wrap.show > div.comment_box > ul.cmt_list
+                // 상위댓글: ul.cmt_list > li.ub-content > div.cmt_info.clear
+                // 답글: ul.cmt_list 다음 li > div.reply.show > div.reply_box > ul.reply_list > li.ub-content > div.reply_info.clear
+                val viewCommentDiv = org.jsoup.nodes.Element("div")
+                viewCommentDiv.addClass("view_comment")
+                viewCommentDiv.attr("id", "focus_cmt")
+                viewCommentDiv.attr("style", "display:block")
+
+                val commentWrap = org.jsoup.nodes.Element("div")
+                commentWrap.addClass("comment_wrap show")
+                commentWrap.attr("style", "display:block")
+
+                val countDiv = org.jsoup.nodes.Element("div")
+                countDiv.addClass("comment_count")
+                val numBox = org.jsoup.nodes.Element("div")
+                numBox.addClass("fl num_box")
+                numBox.html("전체 댓글 <em class=\"font_red\">${comments?.length() ?: 0}</em>개")
+                countDiv.appendChild(numBox)
+                commentWrap.appendChild(countDiv)
+
+                val commentBox = org.jsoup.nodes.Element("div")
+                commentBox.addClass("comment_box")
+                commentBox.attr("style", "display:block")
+
+                val cmtList = org.jsoup.nodes.Element("ul")
+                cmtList.addClass("cmt_list add")
+                cmtList.attr("style", "display:block")
+
+                // 헬퍼: 닉네임 span 생성
+                fun makeNickSpan(nick: String, uid: String, ip: String): org.jsoup.nodes.Element {
+                    val writerSpan = org.jsoup.nodes.Element("span")
+                    writerSpan.addClass("gall_writer ub-writer")
+                    writerSpan.attr("data-nick", nick)
+                    writerSpan.attr("data-uid", uid)
+                    writerSpan.attr("data-ip", ip)
+                    val nickSpan = org.jsoup.nodes.Element("span")
+                    nickSpan.addClass("nickname")
+                    val nickEm = org.jsoup.nodes.Element("em")
+                    nickEm.text(nick)
+                    nickSpan.appendChild(nickEm)
+                    if (ip.isNotEmpty()) {
+                        val ipSpan = org.jsoup.nodes.Element("span")
+                        ipSpan.addClass("ip")
+                        ipSpan.text("($ip)")
+                        nickSpan.appendChild(ipSpan)
+                    } else if (uid.isNotEmpty()) {
+                        val ipSpan = org.jsoup.nodes.Element("span")
+                        ipSpan.addClass("ip")
+                        ipSpan.text("($uid)")
+                        nickSpan.appendChild(ipSpan)
+                    }
+                    writerSpan.appendChild(nickSpan)
+                    return writerSpan
+                }
+
+                // 헬퍼: 텍스트+디시콘+보이스리플 콘텐츠 div 생성 (cmt_txtbox)
+                fun makeTxtBox(memo: String, vrPlayerTag: String, isBlocked: Boolean, isReply: Boolean): org.jsoup.nodes.Element {
+                    val txtBox = org.jsoup.nodes.Element("div")
+                    txtBox.addClass("clear cmt_txtbox" + if (isReply) " btn_re_reply_write_all" else "")
+
+                    val memoDoc = org.jsoup.Jsoup.parseBodyFragment(memo)
+                    val isVoiceReple = memo.contains("voice/player") || vrPlayerTag.contains("voice/player")
+
+                    if (isVoiceReple) {
+                        // 보이스리플: voice_wrap > iframe
+                        val vrIframes = if (vrPlayerTag.isNotEmpty())
+                            org.jsoup.Jsoup.parseBodyFragment(vrPlayerTag).select("iframe[src*=voice]")
+                        else
+                            memoDoc.select("iframe[src*=voice]")
+                        if (vrIframes.isNotEmpty()) {
+                            val voiceWrap = org.jsoup.nodes.Element("div")
+                            voiceWrap.addClass("voice_wrap")
+                            vrIframes.forEach { iframe ->
+                                val src = iframe.attr("src").let { if (it.startsWith("//")) "https:$it" else it }
+                                val iframeEl = org.jsoup.nodes.Element("iframe")
+                                iframeEl.attr("src", src)
+                                iframeEl.attr("width", "280px")
+                                iframeEl.attr("height", "54px")
+                                iframeEl.attr("frameborder", "0")
+                                iframeEl.attr("scrolling", "no")
+                                voiceWrap.appendChild(iframeEl)
+                            }
+                            txtBox.appendChild(voiceWrap)
+                        }
+                    }
+
+                    // 디시콘 처리 (img.written_dccon 또는 video.written_dccon → img로 변환)
+                    val dcconEls = memoDoc.select("img.written_dccon, img[src*=dccon.php], video.written_dccon")
+                    if (dcconEls.isNotEmpty()) {
+                        val mentionEl = memoDoc.select("a.mention").first()
+                        if (mentionEl != null) {
+                            val mentionA = org.jsoup.nodes.Element("a")
+                            mentionA.addClass("mention deco")
+                            mentionA.attr("href", "javascript:;")
+                            mentionA.text(mentionEl.text())
+                            txtBox.appendChild(mentionA)
+                        }
+                        val dcconWrap = org.jsoup.nodes.Element("div")
+                        dcconWrap.addClass("comment_dccon clear")
+                        val dcconImgWrap = org.jsoup.nodes.Element("div")
+                        dcconImgWrap.addClass("coment_dccon_img")
+                        dcconEls.forEach { el ->
+                            val rawSrc = el.attr("src").ifEmpty { el.attr("data-src") }
+                            if (rawSrc.isNotEmpty()) {
+                                val src = if (rawSrc.startsWith("//")) "https:$rawSrc" else rawSrc
+                                val img = org.jsoup.nodes.Element("img")
+                                img.addClass("written_dccon")
+                                img.attr("src", src)
+                                val alt = el.attr("conalt").ifEmpty { el.attr("alt") }
+                                img.attr("alt", alt)
+                                img.attr("title", alt)
+                                dcconImgWrap.appendChild(img)
+                            }
+                        }
+                        dcconWrap.appendChild(dcconImgWrap)
+                        txtBox.appendChild(dcconWrap)
+                    } else if (!isVoiceReple) {
+                        // 일반 텍스트
+                        val mentionEls = memoDoc.select("a.mention")
+                        val mentionTexts = mentionEls.map { el ->
+                            val t = el.text().trim()
+                            if (t.startsWith("@")) t else "@$t"
+                        }
+                        mentionEls.remove()
+                        memoDoc.select("img, video, iframe").remove()
+                        val bodyText = memoDoc.body()?.html()?.trim() ?: ""
+                        val pEl = org.jsoup.nodes.Element("p")
+                        pEl.addClass("usertxt ub-word")
+                        if (mentionTexts.isNotEmpty()) {
+                            val mentionA = org.jsoup.nodes.Element("a")
+                            mentionA.addClass("mention")
+                            mentionA.attr("href", "javascript:;")
+                            mentionA.text(mentionTexts.joinToString(" "))
+                            pEl.appendChild(mentionA)
+                            if (bodyText.isNotEmpty()) pEl.append(" $bodyText")
+                        } else {
+                            pEl.html(bodyText)
+                        }
+                        // 차단 표시는 HTML에 넣지 않음 (뷰어에서만 표시)
+                        txtBox.appendChild(pEl)
+                    }
+                    return txtBox
+                }
+
+                if (comments != null && comments.length() > 0) {
+                    var i = 0
+                    while (i < comments.length()) {
+                        val cmt = comments.getJSONObject(i)
+                        val depth = cmt.optInt("depth", 0)
+                        if (depth != 0) { i++; continue } // 상위 댓글만 여기서 처리
+
+                        val nick = cmt.optString("name", "")
+                        val uid = cmt.optString("user_id", "")
+                        val ip = cmt.optString("ip", "")
+                        val date = cmt.optString("reg_date", "")
+                        val memo = cmt.optString("memo", "")
+                        val vrPlayerTag = cmt.optString("vr_player_tag", "")
+                        val no = cmt.optString("no", "")
+                        val isBlocked = blockedCommentNo != null && no == blockedCommentNo
+
+                        // li.ub-content > div.cmt_info.clear
+                        val li = org.jsoup.nodes.Element("li")
+                        li.addClass("ub-content")
+                        // 차단 강조 HTML 표시 제거
+                        li.attr("id", "comment_li_$no")
+                        li.attr("style", "display:block")
+
+                        val cmt_info = org.jsoup.nodes.Element("div")
+                        cmt_info.addClass("cmt_info clear")
+                        cmt_info.attr("data-no", no)
+
+                        val addbox = org.jsoup.nodes.Element("div")
+                        addbox.addClass("addbox")
+
+                        val nickbox = org.jsoup.nodes.Element("div")
+                        nickbox.addClass("cmt_nickbox")
+                        nickbox.appendChild(makeNickSpan(nick, uid, ip))
+                        addbox.appendChild(nickbox)
+                        addbox.appendChild(makeTxtBox(memo, vrPlayerTag, isBlocked, false))
+                        cmt_info.appendChild(addbox)
+
+                        val frDiv = org.jsoup.nodes.Element("div")
+                        frDiv.addClass("fr clear")
+                        val dateSpan = org.jsoup.nodes.Element("span")
+                        dateSpan.addClass("date_time")
+                        dateSpan.text(date)
+                        frDiv.appendChild(dateSpan)
+                        cmt_info.appendChild(frDiv)
+                        li.appendChild(cmt_info)
+                        cmtList.appendChild(li)
+
+                        // 이 댓글에 속한 답글 수집 (다음 depth==1 댓글들)
+                        val replies = mutableListOf<org.json.JSONObject>()
+                        var j = i + 1
+                        while (j < comments.length() && comments.getJSONObject(j).optInt("depth", 0) == 1) {
+                            replies.add(comments.getJSONObject(j))
+                            j++
+                        }
+
+                        if (replies.isNotEmpty()) {
+                            // li > div.reply.show > div.reply_box > ul.reply_list
+                            val replyOuterLi = org.jsoup.nodes.Element("li")
+                            replyOuterLi.attr("style", "display:block")
+                            val replyDiv = org.jsoup.nodes.Element("div")
+                            replyDiv.addClass("reply show")
+                            replyDiv.attr("style", "display:block")
+                            val replyBox = org.jsoup.nodes.Element("div")
+                            replyBox.addClass("reply_box")
+                            val replyList = org.jsoup.nodes.Element("ul")
+                            replyList.addClass("reply_list")
+                            replyList.attr("id", "reply_list_$no")
+                            replyList.attr("style", "display:block")
+
+                            replies.forEach { rep ->
+                                val rNick = rep.optString("name", "")
+                                val rUid = rep.optString("user_id", "")
+                                val rIp = rep.optString("ip", "")
+                                val rDate = rep.optString("reg_date", "")
+                                val rMemo = rep.optString("memo", "")
+                                val rVrTag = rep.optString("vr_player_tag", "")
+                                val rNo = rep.optString("no", "")
+                                val rBlocked = blockedCommentNo != null && rNo == blockedCommentNo
+
+                                val rLi = org.jsoup.nodes.Element("li")
+                                rLi.addClass("ub-content")
+                                // 차단 강조 HTML 표시 제거
+                                rLi.attr("id", "reply_li_$rNo")
+                                rLi.attr("style", "display:block")
+
+                                val repInfo = org.jsoup.nodes.Element("div")
+                                repInfo.addClass("reply_info clear")
+                                repInfo.attr("data-no", rNo)
+
+                                val rAddbox = org.jsoup.nodes.Element("div")
+                                rAddbox.addClass("addbox")
+                                val rNickbox = org.jsoup.nodes.Element("div")
+                                rNickbox.addClass("cmt_nickbox")
+                                rNickbox.appendChild(makeNickSpan(rNick, rUid, rIp))
+                                rAddbox.appendChild(rNickbox)
+                                rAddbox.appendChild(makeTxtBox(rMemo, rVrTag, rBlocked, true))
+                                repInfo.appendChild(rAddbox)
+
+                                val rFr = org.jsoup.nodes.Element("div")
+                                rFr.addClass("fr clear")
+                                val rDate2 = org.jsoup.nodes.Element("span")
+                                rDate2.addClass("date_time")
+                                rDate2.text(rDate)
+                                rFr.appendChild(rDate2)
+                                repInfo.appendChild(rFr)
+                                rLi.appendChild(repInfo)
+                                replyList.appendChild(rLi)
+                            }
+                            replyBox.appendChild(replyList)
+                            replyDiv.appendChild(replyBox)
+                            replyOuterLi.appendChild(replyDiv)
+                            cmtList.appendChild(replyOuterLi)
+                            i = j
+                        } else {
+                            i++
+                        }
+                    }
+                }
+
+                commentBox.appendChild(cmtList)
+                commentWrap.appendChild(commentBox)
+                viewCommentDiv.appendChild(commentWrap)
+
+                // 원본 댓글창 위치(view_content_wrap 내부)에 삽입, 없으면 body 끝
+                if (commentParent != null) {
+                    commentParent.appendChild(viewCommentDiv)
+                } else {
+                    doc.body()?.appendChild(viewCommentDiv)
+                }
+            }
+
+            // 6. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
+            return try {
+                val cacheDir = File(cacheDir, "snapshots_$botId")
+                if (!cacheDir.exists()) cacheDir.mkdirs()
+
+                val html = doc.html()
+
+                if (blockedTs != null) {
+                    val blockedFile = File(cacheDir, "${gallId}_${postNumStr}_blocked_${blockedTs}.html")
+                    blockedFile.writeText(html)
+                    blockedFile.absolutePath
+                } else {
+                    val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
+                    val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
+                    latestFile.writeText(html)
+                    if (!initialFile.exists()) {
+                        initialFile.writeText(html)
+                    }
+                    latestFile.absolutePath
+                }
+            } catch (e: Exception) {
+                Log.e("BotService", "[$botId] snapshot save failed", e)
+                sendLog("[경고] 스냅샷 파일 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
+                null
+            }
     }
 
     private fun buildSnapshotHtml(
@@ -3295,6 +3613,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (lastId != null && path != null) {
                         GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPathById(lastId, path)
                         blockHistorySnapshotPath = path
+                        dbSnapshotPath = path
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
@@ -3457,6 +3776,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (lastId != null && path != null) {
                         GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPathById(lastId, path)
                         blockHistorySnapshotPath = path
+                        dbSnapshotPath = path
                     }
                 } finally {
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)

@@ -248,6 +248,18 @@
 - beta18 빌드/업로드 예정
 
 
+## 1.2.0 beta19
+
+### 주요 변화
+- AI 댓글 차단 snapshot 저장 본문을 기존 일반 차단 snapshot 본문 기반으로 재정렬
+- 기존 compat helper가 단순 저장만 하던 상태에서, 댓글 재구성/붙여넣기 구조까지 포함한 legacy 본문 로직을 타도록 변경
+- AI 댓글 차단과 일반 차단 사이의 snapshot 결과 차이를 줄이기 위한 통합 단계 진행
+
+### 기술 포인트
+- `saveSnapshotFromDocCompat(...)` 내부를 기존 `saveSnapshotFromDoc(...)` 원본 본문 기반으로 교체
+- snapshot path 반환 누락 보정 상태와 함께, AI 댓글 snapshot도 기존 저장 본문을 공유하도록 정리
+- `assembleDebug` 빌드 성공으로 현재 통합 단계 코드가 컴파일 가능함을 확인
+
 ## 1.2.0 beta18
 
 ### 주요 변화
