@@ -248,6 +248,18 @@
 - beta18 빌드/업로드 예정
 
 
+## 1.2.0 beta23
+
+### 주요 변화
+- prior-post AI 게시글 즉시집행 경로도 일반 처리 경로와 같은 메타데이터 저장 흐름을 타도록 정리
+- AI 게시글 차단 기록에서 작성일시/사유/스냅샷 저장 방식 차이가 남던 부분을 추가 보강
+- 차단 기능 구조가 실제로 단일 흐름으로 수렴하는지 최종 검증하기 위한 베타
+
+### 기술 포인트
+- prior-post AI 게시글 즉시집행 시 detail page 재조회 후 `extractCreationDateFromPostDoc(...)`로 작성일시를 확보
+- `postDate = ""`, `AI 배치 즉시집행` 같은 내부 흔적을 제거하고 실제 AI reason + 공용 snapshot helper 기준으로 정리
+- `assembleDebug` 빌드 성공으로 현재 수정 코드가 컴파일 가능함을 확인
+
 ## 1.2.0 beta22
 
 ### 주요 변화

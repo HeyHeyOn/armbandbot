@@ -2123,6 +2123,17 @@ img.written_dccon{max-width:80px;max-height:80px}
                             sendLog("[AI 즉시집행] 글 번호 ${decision.postNo} / reason=${decision.decision.reason} / confidence=${decision.decision.confidence}", botId)
                         }
                         runCatching {
+                            val immediatePostDetailUrl = if (gallType == "M") {
+                                "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${decision.postNo}"
+                            } else {
+                                "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${decision.postNo}"
+                            }
+                            val immediatePostDoc = Jsoup.connect(immediatePostDetailUrl)
+                                .userAgent(dcUserAgent)
+                                .header("Cookie", cookie)
+                                .get()
+                            val resolvedPostDate = extractCreationDateFromPostDoc(immediatePostDoc)
+
                             handleBadPost(
                                 config = config,
                                 botId = botId,
@@ -2133,20 +2144,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 postNick = targetInput.nickname,
                                 postDisplayAuthor = if (targetInput.authorIdOrIp.isNotBlank()) "${targetInput.nickname}(${targetInput.authorIdOrIp})" else targetInput.nickname,
                                 postTitle = targetInput.title,
-                                postDate = "",
+                                postDate = resolvedPostDate,
                                 cookie = cookie,
-                                pcPostDetailUrl = if (gallType == "M") {
-                                    "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${decision.postNo}"
-                                } else {
-                                    "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${decision.postNo}"
-                                },
+                                pcPostDetailUrl = immediatePostDetailUrl,
                                 tokenToUse = tokenToUse,
                                 blockDuration = blockDuration,
                                 blockReasonText = blockReason,
                                 delChk = delChk,
                                 isBlacklistedUserId = false,
                                 isBlacklistedUserNick = false,
-                                blockReasonPrefix = "AI 필터 차단",
+                                blockReasonPrefix = "AI 필터 작동",
                                 notiType = "ai",
                                 matchedVoiceIdPost = null,
                                 matchedImageAlt = null,
@@ -2155,17 +2162,20 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 suspiciousUrlInPost = null,
                                 spamCodeMatchPost = null,
                                 notifyIfEnabled = notifyIfEnabled,
-                                debugDetail = "AI 배치 즉시집행",
+                                debugDetail = decision.decision.reason,
                                 saveSnapshotFn = {
                                     if (config.isDebugMode && botId.isNotEmpty()) {
                                         sendLog("[AI 즉시집행] 글 번호 ${decision.postNo} / 차단 스냅샷 저장 시도", botId)
                                     }
-                                    captureBlockSnapshot(
+                                    saveSnapshotFromDocCommon(
+                                        config = config,
                                         botId = botId,
-                                        gallType = gallType,
                                         gallId = gallId,
                                         postNumStr = decision.postNo,
-                                        cookie = cookie
+                                        doc = immediatePostDoc,
+                                        comments = null,
+                                        blockedCommentNo = null,
+                                        blockedTs = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                                     )
                                 },
                             )
