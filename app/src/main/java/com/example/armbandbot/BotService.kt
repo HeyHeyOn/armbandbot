@@ -1385,17 +1385,86 @@ class BotService : Service() {
                 }
             }
 
-            val cacheDir = File(cacheDir, "snapshots_$botId")
-            if (!cacheDir.exists()) cacheDir.mkdirs()
+            val saveSnapshotFromDocMethod = this::class.java.getDeclaredMethod(
+                "saveSnapshotFromDocCompat",
+                BotConfig::class.java,
+                String::class.java,
+                String::class.java,
+                String::class.java,
+                org.jsoup.nodes.Document::class.java,
+                JSONArray::class.java,
+                String::class.java,
+                String::class.java
+            )
+            saveSnapshotFromDocMethod.isAccessible = true
 
-            val timestamp = System.currentTimeMillis()
-            val blockFile = File(cacheDir, "${gallId}_${postNumStr}_comment_${commentNo}_block_$timestamp.html")
-            blockFile.writeText(doc.html())
-            blockFile.absolutePath
+            val commentsJson = JSONArray().apply {
+                comments.forEach { cmt ->
+                    put(JSONObject().apply {
+                        put("no", cmt.commentId)
+                        put("name", cmt.nickname)
+                        put("memo", cmt.body)
+                        put("ip", cmt.authorIdOrIp)
+                        put("user_id", "")
+                        put("reg_date", "")
+                        put("depth", 0)
+                        put("vr_player_tag", "")
+                    })
+                }
+            }
+
+            saveSnapshotFromDocMethod.invoke(
+                this,
+                loadBotConfig(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE)),
+                botId,
+                gallId,
+                postNumStr,
+                doc,
+                commentsJson,
+                commentNo,
+                System.currentTimeMillis().toString()
+            ) as? String
         } catch (e: Exception) {
             Log.e("BotService", "[$botId] comment block snapshot save failed", e)
             sendLog("[오류] AI 댓글 차단 스냅샷 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
             null
+        }
+    }
+
+    private fun saveSnapshotFromDocCompat(
+        config: BotConfig,
+        botId: String,
+        gallId: String,
+        postNumStr: String,
+        doc: org.jsoup.nodes.Document,
+        comments: JSONArray? = null,
+        blockedCommentNo: String? = null,
+        blockedTs: String? = null
+    ): String? {
+        if (!config.isExpertMode) return null
+
+        doc.select(
+            "header.header, nav.nav, footer.dcfoot, .adv-group, .adv-groupno, .adv-groupin, .ad-md, .pwlink, .con-search-box, .outside-search-box, .view-btm-con, .reco-search, #singoPopup, #blockLayer, #voice_share, #sns_share, #bottom_listwrap, .section.right_content, .right_content, .stickyunit"
+        ).remove()
+        doc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
+        doc.select("script").remove()
+
+        val cacheDir = File(cacheDir, "snapshots_$botId")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+
+        val html = doc.html()
+        return if (blockedTs != null) {
+            val blockedFile = File(cacheDir, "${gallId}_${postNumStr}_blocked_${blockedTs}.html")
+            blockedFile.writeText(html)
+            blockedFile.absolutePath
+        } else {
+            val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
+            val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
+            latestFile.writeText(html)
+            if (!initialFile.exists()) {
+                initialFile.writeText(html)
+            }
+            latestFile.absolutePath
         }
     }
 
