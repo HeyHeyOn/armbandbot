@@ -740,67 +740,39 @@ class BotService : Service() {
     }
 
     private fun performAutoLogin(loginId: String, loginPw: String, botId: String? = null): String? {
-        botId?.let { sendLog("[자동 로그인][1/4] 로그인 페이지 요청 시작", it) }
-        val loginPageResponse = Jsoup.connect("https://msign.dcinside.com/login")
+        botId?.let { sendLog("[자동 로그인][1/3] 로그인 페이지 요청 시작", it) }
+        val loginPageResponse = Jsoup.connect("https://sign.dcinside.com/login")
             .userAgent(dcUserAgent)
             .method(Connection.Method.GET)
             .execute()
 
         val loginDocument = loginPageResponse.parse()
-        val initialConKey = loginDocument.select("input[name=conKey]").attr("value")
-        val returnUrl = loginDocument.select("input[name=r_url]").attr("value").ifBlank { "https://m.dcinside.com" }
-        val token = loginDocument.select("input[name=_token]").attr("value")
-        val csrfToken = loginDocument.select("meta[name=csrf-token]").attr("content")
-        val randCode = loginDocument.select("input[name=randCode]").attr("value")
-        val captchaCodeName = loginDocument.select("input[name=captchaCode]").attr("name")
-        val captchaCodeValue = loginDocument.select("input[name=captchaCode]").attr("value")
+        val loginForm = loginDocument.selectFirst("form[action*=member_check]")
+        if (loginForm == null) {
+            botId?.let { sendLog("[자동 로그인 실패][1/3] 로그인 form(action=member_check)을 찾지 못했습니다.", it) }
+            return null
+        }
 
-        botId?.let { sendLog("[자동 로그인][2/4] login/access 사전 검증 요청", it) }
-        val accessResponse = Jsoup.connect("https://msign.dcinside.com/login/access")
-            .userAgent(dcUserAgent)
-            .referrer("https://msign.dcinside.com/login")
-            .header("Origin", "https://msign.dcinside.com")
-            .header("X-CSRF-TOKEN", csrfToken)
-            .cookies(loginPageResponse.cookies())
-            .data("token_verify", "dc_login")
-            .data("conKey", initialConKey)
-            .data("code", loginId)
-            .data("randcode", randCode)
-            .apply {
-                if (captchaCodeName.isNotBlank()) {
-                    data(captchaCodeName, captchaCodeValue)
-                }
+        val actionUrl = loginForm.absUrl("action").ifBlank { "https://sign.dcinside.com/login/member_check" }
+        val formData = linkedMapOf<String, String>()
+        loginForm.select("input[name]").forEach { input ->
+            val name = input.attr("name")
+            if (name.isNotBlank()) {
+                formData[name] = input.attr("value")
             }
-            .method(Connection.Method.POST)
-            .ignoreContentType(true)
-            .execute()
-
-        val accessJson = runCatching { org.json.JSONObject(accessResponse.body()) }.getOrNull()
-        if (accessJson == null) {
-            botId?.let { sendLog("[자동 로그인 실패][2/4] login/access 응답 JSON 파싱 실패", it) }
-            return null
         }
-        if (accessJson.optInt("result", 0) != 1) {
-            val reason = accessJson.optString("reason").ifBlank { accessJson.optString("cause") }.ifBlank { "알 수 없는 사유" }
-            botId?.let { sendLog("[자동 로그인 실패][2/4] login/access 거부: $reason", it) }
-            return null
-        }
+        formData["user_id"] = loginId
+        formData["pw"] = loginPw
 
-        val verifiedConKey = accessJson.optString("Block_key").ifBlank { accessJson.optString("block_key") }.ifBlank { initialConKey }
-        botId?.let { sendLog("[자동 로그인][3/4] login/access 통과, 실제 로그인 제출", it) }
-
-        val loginResponse = Jsoup.connect("https://msign.dcinside.com/login")
+        botId?.let { sendLog("[자동 로그인][2/3] member_check 로그인 제출", it) }
+        val loginResponse = Jsoup.connect(actionUrl)
             .userAgent(dcUserAgent)
-            .referrer("https://msign.dcinside.com/login")
-            .header("Origin", "https://msign.dcinside.com")
-            .header("X-CSRF-TOKEN", csrfToken)
-            .cookies(loginPageResponse.cookies() + accessResponse.cookies())
-            .data("code", loginId)
-            .data("password", loginPw)
-            .data("loginCash", "on")
-            .data("conKey", verifiedConKey)
-            .data("r_url", returnUrl)
-            .data("_token", token)
+            .referrer(loginPageResponse.url().toString())
+            .header("Origin", "https://sign.dcinside.com")
+            .cookies(loginPageResponse.cookies())
+            .apply {
+                formData.forEach { (key, value) -> data(key, value) }
+            }
             .method(Connection.Method.POST)
             .followRedirects(true)
             .ignoreContentType(true)
@@ -808,22 +780,21 @@ class BotService : Service() {
 
         val mergedCookie = mergeCookieStrings(
             loginPageResponse.cookies().toCookieHeader(),
-            accessResponse.cookies().toCookieHeader(),
             loginResponse.cookies().toCookieHeader()
         )
 
         if (mergedCookie.isBlank()) {
-            botId?.let { sendLog("[자동 로그인 실패][4/4] 병합된 쿠키가 비어 있습니다.", it) }
+            botId?.let { sendLog("[자동 로그인 실패][3/3] 병합된 쿠키가 비어 있습니다.", it) }
             return null
         }
 
         val sessionValid = isSessionValid(mergedCookie)
         if (!sessionValid) {
-            botId?.let { sendLog("[자동 로그인 실패][4/4] 로그인 제출 후에도 유효 세션 검증에 실패했습니다.", it) }
+            botId?.let { sendLog("[자동 로그인 실패][3/3] 로그인 제출 후에도 유효 세션 검증에 실패했습니다.", it) }
             return null
         }
 
-        botId?.let { sendLog("[자동 로그인 성공][4/4] 유효 세션 확보 완료", it) }
+        botId?.let { sendLog("[자동 로그인 성공][3/3] 유효 세션 확보 완료", it) }
         return mergedCookie
     }
 
