@@ -248,6 +248,20 @@
 - beta18 빌드/업로드 예정
 
 
+## 1.2.1 beta1
+
+### 주요 변화
+- 갤러리 주소 인식 로직을 `id=` 파라미터 의존 방식에서 벗어나도록 보강
+- 마이너/미니 갤러리의 다양한 주소 형식을 더 유연하게 인식하도록 수정
+- `m.dcinside.com`, `gall.dcinside.com`, 축약형 경로 주소도 공통 파서 기준으로 처리
+
+### 기술 포인트
+- `resolveGalleryInfo(rawUrl)` 공통 파서를 추가해 query `id` 우선, 없으면 host/path 규칙으로 갤러리 타입과 id를 추출
+- 마이너 갤러리: `mgallery/board/lists/?id=...`, `m.dcinside.com/board/...`, `gall.dcinside.com/...` 형식 대응
+- 미니 갤러리: `mini/board/lists/?id=...`, `m.dcinside.com/mini/...`, `gall.dcinside.com/mini/...` 형식 대응
+- `parseTargetUrl()`와 `convertToPcUrl()`가 같은 공통 파서를 사용하도록 정리
+- `assembleDebug` 빌드 성공으로 현재 수정 코드가 컴파일 가능함을 확인
+
 ## 1.2.0 beta24
 
 ### 주요 변화

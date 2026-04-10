@@ -455,36 +455,74 @@ class BotService : Service() {
     }
 
     private fun String.removeCommentAndTrim() = this.substringBefore("#").trim()
-    private fun convertToPcUrl(rawUrl: String): String {
-        val url = rawUrl.trim()
-        val idMatch = Regex("id=([^&]+)").find(url)
-        if (idMatch != null) {
-            val gallId = idMatch.groupValues[1]
-            return if (url.contains("/mini/"))
-                "https://gall.dcinside.com/mini/board/lists/?id=$gallId"
-            else
-                "https://gall.dcinside.com/mgallery/board/lists/?id=$gallId"
-        }
-        // id= 파라미터 없을 때: 경로 마지막 세그먼트를 gallId로 추출
-        val pathMatch = Regex("gall\\.dcinside\\.com/([^?#]+)").find(url) ?: return url
-        val segments = pathMatch.groupValues[1].trimEnd('/').split("/").filter { it.isNotEmpty() }
-        if (segments.isEmpty()) return url
-        val lastSegment = segments.last()
-        return when {
-            url.contains("/mini/") -> "https://gall.dcinside.com/mini/board/lists/?id=$lastSegment"
-            url.contains("/mgallery/") || url.contains("/board/") -> "https://gall.dcinside.com/mgallery/board/lists/?id=$lastSegment"
-            else -> url
-        }
-    }
 
-    private fun parseTargetUrl(rawUrl: String): ParsedTargetUrl? {
-        val idMatch = Regex("id=([^&]+)").find(rawUrl) ?: return null
-        val gallId = idMatch.groupValues[1]
-        val gallType = if (rawUrl.contains("/mini/")) "MI" else "M"
+    private fun resolveGalleryInfo(rawUrl: String): ParsedTargetUrl? {
+        val url = rawUrl.trim()
+        val queryParams = parseQueryParams(url)
+        val gallIdFromQuery = queryParams["id"]?.trim().orEmpty()
+        val lowerUrl = url.lowercase(Locale.ROOT)
+        val gallTypeFromPath = when {
+            lowerUrl.contains("/mini/") -> "MI"
+            lowerUrl.contains("/mgallery/") || lowerUrl.contains("m.dcinside.com/board/") -> "M"
+            else -> null
+        }
+
+        if (gallIdFromQuery.isNotBlank()) {
+            return ParsedTargetUrl(
+                gallId = gallIdFromQuery,
+                gallType = gallTypeFromPath ?: "M"
+            )
+        }
+
+        val uri = try {
+            URI(url)
+        } catch (_: Exception) {
+            null
+        } ?: return null
+
+        val segments = uri.path
+            ?.trim('/')
+            ?.split('/')
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+
+        if (segments.isEmpty()) return null
+
+        val gallType = when {
+            segments.contains("mini") -> "MI"
+            segments.contains("mgallery") -> "M"
+            uri.host.equals("m.dcinside.com", ignoreCase = true) && segments.firstOrNull() == "board" -> "M"
+            uri.host.equals("gall.dcinside.com", ignoreCase = true) && segments.size == 1 -> "M"
+            uri.host.equals("gall.dcinside.com", ignoreCase = true) && segments.size == 2 && segments.first() == "mini" -> "MI"
+            else -> null
+        } ?: return null
+
+        val gallId = when {
+            gallType == "MI" && segments.firstOrNull() == "mini" && segments.size >= 2 -> segments[1]
+            gallType == "M" && segments.firstOrNull() == "mgallery" && segments.contains("lists") -> segments.lastOrNull { it != "lists" && it != "board" && it != "mgallery" }
+            gallType == "M" && uri.host.equals("m.dcinside.com", ignoreCase = true) && segments.firstOrNull() == "board" && segments.size >= 2 -> segments[1]
+            gallType == "M" && uri.host.equals("gall.dcinside.com", ignoreCase = true) && segments.size == 1 -> segments[0]
+            else -> segments.lastOrNull()
+        }?.trim().orEmpty()
+
+        if (gallId.isBlank()) return null
+
         return ParsedTargetUrl(
             gallId = gallId,
             gallType = gallType
         )
+    }
+
+    private fun convertToPcUrl(rawUrl: String): String {
+        val parsed = resolveGalleryInfo(rawUrl) ?: return rawUrl.trim()
+        return when (parsed.gallType) {
+            "MI" -> "https://gall.dcinside.com/mini/board/lists/?id=${parsed.gallId}"
+            else -> "https://gall.dcinside.com/mgallery/board/lists/?id=${parsed.gallId}"
+        }
+    }
+
+    private fun parseTargetUrl(rawUrl: String): ParsedTargetUrl? {
+        return resolveGalleryInfo(rawUrl)
     }
 
     private fun parseQueryParams(url: String): Map<String, String> {
