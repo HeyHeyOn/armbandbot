@@ -2385,10 +2385,14 @@ img.written_dccon{max-width:80px;max-height:80px}
         if (config.isExpertMode && config.isSnapshotAll) {
             if (GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
                 try {
-                    saveSnapshotFromDoc(postDoc, commentsArray)
-                    if (dbSnapshotPath != null) {
+                    val generalSnapshotPath = saveSnapshotFromDoc(postDoc, commentsArray)
+                    if (!generalSnapshotPath.isNullOrBlank()) {
+                        dbSnapshotPath = generalSnapshotPath
                         GlobalBotState.getDb()?.postDao()
-                            ?.updateSnapshotPath(gallType, gallId, postNumStr, dbSnapshotPath!!)
+                            ?.updateSnapshotPath(gallType, gallId, postNumStr, generalSnapshotPath)
+                        sendLog("[스냅샷][전체] 저장 완료: $generalSnapshotPath", botId)
+                    } else {
+                        sendLog("[스냅샷][전체] 저장 실패 또는 경로 없음", botId)
                     }
                 } finally {
                     GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
