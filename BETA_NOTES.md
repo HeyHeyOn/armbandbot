@@ -37,11 +37,10 @@
   - UI에 `개별 차단 설정 사용` + `처리 방식(삭제/차단)` + 차단 상세 설정 추가
   - 서비스 집행부에서 `IMAGE` / `SPAM` filter source 기준 override 적용
   - 저장 키: `image_*`, `spam_*`
-- 유동 필터 / 깡계 필터 후속 확장 마감
-  - 서비스 집행부에서 `YUDONG` / `KKANG` filter source 기준 override 분기 유지
-  - 유동 필터 화면에 개별 차단 설정 본체 UI 추가 완료
-  - 깡계 필터 화면에 개별 차단 설정 본체 UI 추가 완료
-  - rule-based 필터 전체를 커스텀 액션 공통 구조로 1차 통일
+- 유동 필터 / 깡계 필터 override 연결 보강
+  - 게시글/댓글 분석 단계에서 `filterSource = YUDONG / KKANG`를 실제로 세팅하도록 수정
+  - 이제 유동/깡계도 UI/저장 키/override 분기/감지 source 연결이 모두 닫힘
+  - rule-based 필터 전체 커스텀 액션 구조 1차 통일 마감
 - beta APK Drive 업로드를 서비스 계정으로 자동화 (수동 OAuth 불필요)
 
 ### 기술 포인트

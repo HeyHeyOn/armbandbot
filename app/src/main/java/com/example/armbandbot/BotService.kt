@@ -3183,10 +3183,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                     blockReasonPrefix = "유동 게시글 금지"
                     notiType = "yudong"
                     debugDetail = "유동 작성자 감지"
+                    filterSource = ModerationFilterSource.YUDONG
                 } else if (config.isYudongImageBlock && postImageAlts.isNotEmpty()) {
                     blockReasonPrefix = "유동 이미지 첨부 금지"
                     notiType = "yudong"
                     debugDetail = "유동 작성자 + 이미지 첨부 감지"
+                    filterSource = ModerationFilterSource.YUDONG
                 } else if (
                     config.isYudongVoiceBlock &&
                     (postRawHtml.contains("btn-voice") || postRawHtml.contains("voice/player"))
@@ -3194,6 +3196,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     blockReasonPrefix = "유동 보이스 첨부 금지"
                     notiType = "yudong"
                     debugDetail = "유동 작성자 + 보이스 첨부 감지"
+                    filterSource = ModerationFilterSource.YUDONG
                 }
             } else if (
                 config.isKkangFilterMode &&
@@ -3217,10 +3220,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                         blockReasonPrefix = "깡계 게시글 금지(글:$pCount/댓:$cCount)"
                         notiType = "kkang"
                         debugDetail = "깡계 기준 미달: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        filterSource = ModerationFilterSource.KKANG
                     } else if (config.isKkangImageBlock && postImageAlts.isNotEmpty()) {
                         blockReasonPrefix = "깡계 이미지 첨부 금지"
                         notiType = "kkang"
                         debugDetail = "깡계 기준 미달 + 이미지 첨부: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        filterSource = ModerationFilterSource.KKANG
                     } else if (
                         config.isKkangVoiceBlock &&
                         (postRawHtml.contains("btn-voice") || postRawHtml.contains("voice/player"))
@@ -3228,6 +3233,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         blockReasonPrefix = "깡계 보이스 첨부 금지"
                         notiType = "kkang"
                         debugDetail = "깡계 기준 미달 + 보이스 첨부: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        filterSource = ModerationFilterSource.KKANG
                     }
                 }
             }
@@ -3387,6 +3393,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     blockReasonPrefix = "유동 댓글 작성 금지"
                     notiType = "yudong"
                     debugDetail = "유동 댓글 작성자 감지"
+                    filterSource = ModerationFilterSource.YUDONG
                 } else if (
                     config.isYudongVoiceBlock &&
                     (commentMemo.contains("voice_wrap") || commentMemo.contains("voice/player"))
@@ -3394,6 +3401,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     blockReasonPrefix = "유동 보이스 첨부 금지"
                     notiType = "yudong"
                     debugDetail = "유동 댓글 작성자 + 보이스 첨부 감지"
+                    filterSource = ModerationFilterSource.YUDONG
                 }
             } else if (config.isKkangFilterMode && (config.isKkangCommentBlock || config.isKkangVoiceBlock)) {
                 val gallogStats = getGallogStats(
@@ -3414,6 +3422,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         blockReasonPrefix = "깡계 댓글 금지(글:$pCount/댓:$cCount)"
                         notiType = "kkang"
                         debugDetail = "깡계 댓글 기준 미달: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        filterSource = ModerationFilterSource.KKANG
                     } else if (
                         config.isKkangVoiceBlock &&
                         (commentMemo.contains("voice_wrap") || commentMemo.contains("voice/player"))
@@ -3421,6 +3430,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         blockReasonPrefix = "깡계 보이스 첨부 금지"
                         notiType = "kkang"
                         debugDetail = "깡계 기준 미달 + 댓글 보이스 첨부: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        filterSource = ModerationFilterSource.KKANG
                     }
                 }
             }
