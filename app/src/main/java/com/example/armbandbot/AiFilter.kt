@@ -277,6 +277,14 @@ internal class AiFilterClient(
             AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> buildOpenAiPayload(request)
             AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
         }
+        val keyFingerprint = config.apiKey.trim().let { key ->
+            when {
+                key.isEmpty() -> "<empty>"
+                key.length <= 8 -> "${key.take(2)}...${key.takeLast(2)}(len=${key.length})"
+                else -> "${key.take(4)}...${key.takeLast(4)}(len=${key.length})"
+            }
+        }
+        logger("AI 인증 진단 / provider=${config.provider.name} / model=${config.model} / key=$keyFingerprint / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()}")
 
         val requestUri = runCatching { URI(requestUrl) }.getOrNull()
         val keyPreview = when {
@@ -317,14 +325,14 @@ internal class AiFilterClient(
                 when (config.provider) {
                     AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> {
                         setRequestProperty("Authorization", "Bearer ${config.apiKey}")
-                        logger("AI 요청 헤더 / auth=Bearer / x-goog-api-key=false")
+                        logger("AI 요청 헤더 / auth=Bearer / x-goog-api-key=false / provider=${config.provider.name}")
                     }
                     AiFilterProvider.GEMINI_DIRECT -> {
                         val useHeaderKey = !requestUrl.contains("key=")
                         if (useHeaderKey) {
                             setRequestProperty("x-goog-api-key", config.apiKey)
                         }
-                        logger("AI 요청 헤더 / auth=false / x-goog-api-key=$useHeaderKey")
+                        logger("AI 요청 헤더 / auth=false / x-goog-api-key=$useHeaderKey / provider=${config.provider.name}")
                     }
                 }
             }

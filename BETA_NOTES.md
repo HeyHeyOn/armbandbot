@@ -54,3 +54,5 @@
 - debug: AI 배치 경로 강제 마커(MARKER_AI_*_V2) 추가 및 실패 문구를 단일 줄로 통합
 
 - fix: AI 배치 즉시집행(타 글/타 댓글) 경로를 임시 비활성화해 현재 글 중심 안정 흐름으로 축소
+
+- debug: AI 인증 진단 로그 추가 (provider/model/key fingerprint/urlHasKey/header mode)
