@@ -60,3 +60,5 @@
 - debug: AI 로그 인코딩/표시 문제 회피용으로 기존 가시 로그 라인에 auth/url/key 정보를 통합
 
 - debug: AI 내부 logger 대신 BotService sendLog로 호출 메타(provider/model/endpointHost/urlHasKey/key길이) 직접 출력
+
+- debug: 새 AI 로그 줄 대신 기존 '호출 시작'/'AI 배치 호출 실패' 라인에 provider/endpointHost/urlHasKey/keyLen 정보 직접 병합
