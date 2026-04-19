@@ -277,15 +277,6 @@ internal class AiFilterClient(
             AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> buildOpenAiPayload(request)
             AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
         }
-        val keyFingerprint = config.apiKey.trim().let { key ->
-            when {
-                key.isEmpty() -> "<empty>"
-                key.length <= 8 -> "${key.take(2)}...${key.takeLast(2)}(len=${key.length})"
-                else -> "${key.take(4)}...${key.takeLast(4)}(len=${key.length})"
-            }
-        }
-        logger("AI 인증 진단 / provider=${config.provider.name} / model=${config.model} / key=$keyFingerprint / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()}")
-
         val requestUri = runCatching { URI(requestUrl) }.getOrNull()
         val keyPreview = when {
             config.apiKey.isBlank() -> "blank"
@@ -307,8 +298,12 @@ internal class AiFilterClient(
             }
         }
         val payloadPreview = payload.toString().replace("\n", " ").replace("\r", " ").take(400)
+        val authModePreview = when (config.provider) {
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> "bearer"
+            AiFilterProvider.GEMINI_DIRECT -> if (requestUrl.contains("key=")) "url-key" else "x-goog-api-key"
+        }
         logger(
-            "AI 요청 준비 / provider=${config.provider.name} / model=${config.model} / url=${sanitizedUrl.ifBlank { requestUrl.take(120) }} / apiKey=$keyPreview / customEndpoint=${config.endpoint.isNotBlank()} / payload=$payloadPreview"
+            "AI REQUEST PREP / provider=${config.provider.name} / model=${config.model} / url=${sanitizedUrl.ifBlank { requestUrl.take(120) }} / apiKey=$keyPreview / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()} / payload=$payloadPreview"
         )
 
         val retryableStatuses = setOf(429, 500, 502, 503, 504)
@@ -325,14 +320,12 @@ internal class AiFilterClient(
                 when (config.provider) {
                     AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> {
                         setRequestProperty("Authorization", "Bearer ${config.apiKey}")
-                        logger("AI 요청 헤더 / auth=Bearer / x-goog-api-key=false / provider=${config.provider.name}")
                     }
                     AiFilterProvider.GEMINI_DIRECT -> {
                         val useHeaderKey = !requestUrl.contains("key=")
                         if (useHeaderKey) {
                             setRequestProperty("x-goog-api-key", config.apiKey)
                         }
-                        logger("AI 요청 헤더 / auth=false / x-goog-api-key=$useHeaderKey / provider=${config.provider.name}")
                     }
                 }
             }
@@ -347,8 +340,12 @@ internal class AiFilterClient(
 
             Log.w("AiFilterClient", "HTTP $status: $text")
             val trimmedError = text.replace("\n", " ").replace("\r", " ").take(300)
-            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / body=$trimmedError / marker=MARKER_AI_HTTP_V2")
-            lastError = "HTTP $status / $trimmedError / marker=MARKER_AI_HTTP_V2"
+            val authModePreview = when (config.provider) {
+                AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> "bearer"
+                AiFilterProvider.GEMINI_DIRECT -> if (requestUrl.contains("key=")) "url-key" else "x-goog-api-key"
+            }
+            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / key=$keyPreview / customEndpoint=${config.endpoint.isNotBlank()} / body=$trimmedError")
+            lastError = "HTTP $status / $trimmedError"
 
             val shouldRetry = status in retryableStatuses && attempt < retryDelaysMs.size
             if (!shouldRetry) {
@@ -356,11 +353,11 @@ internal class AiFilterClient(
             }
 
             val delayMs = retryDelaysMs[attempt]
-            logger("AI 재시도 예정 / ${delayMs}ms 후 재시도")
+            logger("AI RETRY / delayMs=${delayMs}")
             Thread.sleep(delayMs)
         }
 
-        error(lastError ?: "AI 호출 실패")
+        error(lastError ?: "AI call failed")
     }
 
     private fun parseBatchResponse(responseText: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation {

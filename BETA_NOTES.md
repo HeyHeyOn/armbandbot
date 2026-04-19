@@ -56,3 +56,5 @@
 - fix: AI 배치 즉시집행(타 글/타 댓글) 경로를 임시 비활성화해 현재 글 중심 안정 흐름으로 축소
 
 - debug: AI 인증 진단 로그 추가 (provider/model/key fingerprint/urlHasKey/header mode)
+
+- debug: AI 로그 인코딩/표시 문제 회피용으로 기존 가시 로그 라인에 auth/url/key 정보를 통합
