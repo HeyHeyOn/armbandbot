@@ -2126,7 +2126,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (aiBatchEvaluation.failureReason != null) {
                         flushItems.forEach { queue.addOrReplace(it) }
                         if (botId.isNotEmpty()) {
-                            sendLog("[AI 배치] 상세 실패사유: ${aiBatchEvaluation.failureReason.take(500)}", botId)
+                            sendLog("[AI 배치][서비스확인] 상세 실패사유: ${aiBatchEvaluation.failureReason.take(500)}", botId)
                             sendLog("[AI 배치] 검사 실패로 묶음 ${flushItems.size}건 재큐", botId)
                         }
                     }

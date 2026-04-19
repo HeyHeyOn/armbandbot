@@ -1584,7 +1584,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             }
                                         }
 
-                                        val debugLogs = logMessages.filter { it.category == BotLogCategory.DEBUG || it.category == BotLogCategory.ERROR || it.category == BotLogCategory.SESSION || it.category == BotLogCategory.AI }
+                                        val debugLogs = logMessages
                                             .joinToString("\n") { line ->
                                                 line.raw
                                                     .replace(Regex("""(?i)(api[_-]?key\s*[=:]\s*)([^\s]+)"""), "$1[REDACTED_SECRET]")
