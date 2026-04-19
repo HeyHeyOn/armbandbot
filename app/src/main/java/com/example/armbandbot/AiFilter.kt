@@ -6,6 +6,7 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
 import java.util.LinkedHashMap
@@ -275,6 +276,31 @@ internal class AiFilterClient(
             AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
         }
 
+        val requestUri = runCatching { URI(requestUrl) }.getOrNull()
+        val keyPreview = when {
+            config.apiKey.isBlank() -> "blank"
+            config.apiKey.length <= 8 -> "len=${config.apiKey.length}"
+            else -> "${config.apiKey.take(4)}...len=${config.apiKey.length}"
+        }
+        val sanitizedUrl = buildString {
+            append(requestUri?.scheme ?: "")
+            if (!requestUri?.host.isNullOrBlank()) {
+                append("://")
+                append(requestUri?.host)
+            }
+            append(requestUri?.rawPath ?: requestUrl)
+            val rawQuery = requestUri?.rawQuery.orEmpty()
+            if (rawQuery.isNotBlank()) {
+                val hasKey = rawQuery.contains("key=", ignoreCase = true)
+                append("?")
+                append(if (hasKey) "key=[REDACTED_SECRET]" else rawQuery)
+            }
+        }
+        val payloadPreview = payload.toString().replace("\n", " ").replace("\r", " ").take(400)
+        logger(
+            "AI 요청 준비 / provider=${config.provider.name} / model=${config.model} / url=${sanitizedUrl.ifBlank { requestUrl.take(120) }} / apiKey=$keyPreview / customEndpoint=${config.endpoint.isNotBlank()} / payload=$payloadPreview"
+        )
+
         val retryableStatuses = setOf(429, 500, 502, 503, 504)
         val retryDelaysMs = listOf(1500L, 4000L)
         var lastError: String? = null
@@ -287,9 +313,16 @@ internal class AiFilterClient(
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
                 when (config.provider) {
-                    AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> setRequestProperty("Authorization", "Bearer ${config.apiKey}")
-                    AiFilterProvider.GEMINI_DIRECT -> if (!requestUrl.contains("key=")) {
-                        setRequestProperty("x-goog-api-key", config.apiKey)
+                    AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> {
+                        setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+                        logger("AI 요청 헤더 / auth=Bearer / x-goog-api-key=false")
+                    }
+                    AiFilterProvider.GEMINI_DIRECT -> {
+                        val useHeaderKey = !requestUrl.contains("key=")
+                        if (useHeaderKey) {
+                            setRequestProperty("x-goog-api-key", config.apiKey)
+                        }
+                        logger("AI 요청 헤더 / auth=false / x-goog-api-key=$useHeaderKey")
                     }
                 }
             }
@@ -303,7 +336,8 @@ internal class AiFilterClient(
             }
 
             Log.w("AiFilterClient", "HTTP $status: $text")
-            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1}")
+            val trimmedError = text.replace("\n", " ").replace("\r", " ").take(300)
+            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / body=$trimmedError")
             lastError = "HTTP $status"
 
             val shouldRetry = status in retryableStatuses && attempt < retryDelaysMs.size
