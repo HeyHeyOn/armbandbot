@@ -251,6 +251,24 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var voiceDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("voice_delete_post_on_block")) botPref.getBoolean("voice_delete_post_on_block", true) else isDeletePostOnBlock) }
         var voiceDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("voice_delete_only_mode")) botPref.getBoolean("voice_delete_only_mode", false) else isDeleteOnlyMode) }
 
+        var imageUseCustomAction by remember { mutableStateOf(botPref.getBoolean("image_use_custom_action_config", false)) }
+        var imageActionMode by remember { mutableStateOf(if ((if (botPref.contains("image_delete_only_mode")) botPref.getBoolean("image_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var imageBlockDurationHours by remember { mutableStateOf(botPref.getInt("image_block_duration_hours", blockDurationHours)) }
+        var isImageActionModeDropdownExpanded by remember { mutableStateOf(false) }
+        var isImageBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
+        var imageBlockReasonText by remember { mutableStateOf(botPref.getString("image_block_reason_text", null) ?: blockReasonText) }
+        var imageDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("image_delete_post_on_block")) botPref.getBoolean("image_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var imageDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("image_delete_only_mode")) botPref.getBoolean("image_delete_only_mode", false) else isDeleteOnlyMode) }
+
+        var spamUseCustomAction by remember { mutableStateOf(botPref.getBoolean("spam_use_custom_action_config", false)) }
+        var spamActionMode by remember { mutableStateOf(if ((if (botPref.contains("spam_delete_only_mode")) botPref.getBoolean("spam_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var spamBlockDurationHours by remember { mutableStateOf(botPref.getInt("spam_block_duration_hours", blockDurationHours)) }
+        var isSpamActionModeDropdownExpanded by remember { mutableStateOf(false) }
+        var isSpamBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
+        var spamBlockReasonText by remember { mutableStateOf(botPref.getString("spam_block_reason_text", null) ?: blockReasonText) }
+        var spamDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("spam_delete_post_on_block")) botPref.getBoolean("spam_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var spamDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("spam_delete_only_mode")) botPref.getBoolean("spam_delete_only_mode", false) else isDeleteOnlyMode) }
+
         var isNotiMaster by remember { mutableStateOf(botPref.getBoolean("noti_master", true)) }
         var isNotiKeyword by remember { mutableStateOf(botPref.getBoolean("noti_keyword", true)) }
         var isNotiUser by remember { mutableStateOf(botPref.getBoolean("noti_user", true)) }
@@ -816,6 +834,21 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
                                     }
                                     ReadOnlyTextCard("차단할 이미지 alt값 (블랙리스트)", imageAltBlacklistText, colors) { tempEditText = imageAltBlacklistText; editDialogType = "image_alt_blacklist" }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = imageUseCustomAction, onCheckedChange = { imageUseCustomAction = it; botPref.edit().putBoolean("image_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
+                                    Column(modifier = if (!imageUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageActionModeDropdownExpanded = true }) { Text(actionModeOptions[imageActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageActionModeDropdownExpanded, onDismissRequest = { isImageActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageActionMode = mode; imageDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("image_delete_only_mode", imageDeleteOnlyMode).apply(); isImageActionModeDropdownExpanded = false }) } } } }
+                                            if (imageActionMode == "block") {
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[imageBlockDurationHours] ?: "${imageBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageBlockDurationDropdownExpanded, onDismissRequest = { isImageBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageBlockDurationHours = hours; botPref.edit().putInt("image_block_duration_hours", hours).apply(); isImageBlockDurationDropdownExpanded = false }) } } } }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = imageDeletePostOnBlock, onCheckedChange = { imageDeletePostOnBlock = it; botPref.edit().putBoolean("image_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
+                                            }
+                                        } }
+                                        if (imageActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", imageBlockReasonText, colors) { tempEditText = imageBlockReasonText; editDialogType = "image_block_reason" } }
+                                    }
                                     } // end Column
                                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -1083,6 +1116,21 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 Text("감지할 스팸코드 자릿수", fontWeight = FontWeight.Bold, color = textColor)
                                                 OutlinedTextField(value = spamCodeLengthText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamCodeLengthText = it; botPref.edit().putInt("spam_code_length", it.toIntOrNull() ?: 6).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
                                             }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = spamUseCustomAction, onCheckedChange = { spamUseCustomAction = it; botPref.edit().putBoolean("spam_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
+                                        Column(modifier = if (!spamUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                            Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (spamUseCustomAction) isSpamActionModeDropdownExpanded = true }) { Text(actionModeOptions[spamActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isSpamActionModeDropdownExpanded, onDismissRequest = { isSpamActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { spamActionMode = mode; spamDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("spam_delete_only_mode", spamDeleteOnlyMode).apply(); isSpamActionModeDropdownExpanded = false }) } } } }
+                                                if (spamActionMode == "block") {
+                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (spamUseCustomAction) isSpamBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[spamBlockDurationHours] ?: "${spamBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isSpamBlockDurationDropdownExpanded, onDismissRequest = { isSpamBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { spamBlockDurationHours = hours; botPref.edit().putInt("spam_block_duration_hours", hours).apply(); isSpamBlockDurationDropdownExpanded = false }) } } } }
+                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = spamDeletePostOnBlock, onCheckedChange = { spamDeletePostOnBlock = it; botPref.edit().putBoolean("spam_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
+                                                }
+                                            } }
+                                            if (spamActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", spamBlockReasonText, colors) { tempEditText = spamBlockReasonText; editDialogType = "spam_block_reason" } }
                                         }
                                     }
                                 }
@@ -1548,9 +1596,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         if (editDialogType != null) {
-            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason"
+            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "spam_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
@@ -1560,6 +1608,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "nickname_block_reason" -> "예: 닉네임 필터 위반"
                 "url_block_reason" -> "예: URL 필터 위반"
                 "voice_block_reason" -> "예: 보이스 필터 위반"
+                "image_block_reason" -> "예: 이미지 필터 위반"
+                "spam_block_reason" -> "예: 스팸코드 필터 위반"
                 "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."
                 "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"
                 "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"
@@ -1589,6 +1639,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "nickname_block_reason" -> { nicknameBlockReasonText = tempEditText; botPref.edit().putString("nickname_block_reason_text", tempEditText).apply() }
                         "url_block_reason" -> { urlBlockReasonText = tempEditText; botPref.edit().putString("url_block_reason_text", tempEditText).apply() }
                         "voice_block_reason" -> { voiceBlockReasonText = tempEditText; botPref.edit().putString("voice_block_reason_text", tempEditText).apply() }
+                        "image_block_reason" -> { imageBlockReasonText = tempEditText; botPref.edit().putString("image_block_reason_text", tempEditText).apply() }
+                        "spam_block_reason" -> { spamBlockReasonText = tempEditText; botPref.edit().putString("spam_block_reason_text", tempEditText).apply() }
                         "normal" -> { normalWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("normal", tempEditText) }
                         "bypass" -> { bypassWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("bypass", tempEditText) }
                         "search" -> { searchWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("search_keywords", tempEditText) }

@@ -2487,6 +2487,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                         override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "voice"),
                         sourceLabel = "voice_override"
                     )
+                    ModerationFilterSource.IMAGE -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "image"),
+                        sourceLabel = "image_override"
+                    )
+                    ModerationFilterSource.SPAM -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "spam"),
+                        sourceLabel = "spam_override"
+                    )
                     else -> resolveDefaultModerationActionConfig(config)
                 },
                 isBlacklistedUserId = isBlacklistedUserId,
@@ -2623,6 +2633,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     baseConfig = resolveDefaultModerationActionConfig(config),
                                     override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "voice"),
                                     sourceLabel = "voice_override"
+                                )
+                                ModerationFilterSource.IMAGE -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "image"),
+                                    sourceLabel = "image_override"
+                                )
+                                ModerationFilterSource.SPAM -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "spam"),
+                                    sourceLabel = "spam_override"
                                 )
                                 else -> resolveDefaultModerationActionConfig(config)
                             },

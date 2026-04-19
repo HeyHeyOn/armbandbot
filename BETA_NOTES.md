@@ -33,6 +33,10 @@
   - UI에 `개별 차단 설정 사용` + `처리 방식(삭제/차단)` + 차단 상세 설정 추가
   - 서비스 집행부에서 `URL` / `VOICE` filter source 기준 override 적용
   - 저장 키: `url_*`, `voice_*`
+- 이미지 필터 / 스팸코드 필터 개별 차단 설정 1차 적용
+  - UI에 `개별 차단 설정 사용` + `처리 방식(삭제/차단)` + 차단 상세 설정 추가
+  - 서비스 집행부에서 `IMAGE` / `SPAM` filter source 기준 override 적용
+  - 저장 키: `image_*`, `spam_*`
 - beta APK Drive 업로드를 서비스 계정으로 자동화 (수동 OAuth 불필요)
 
 ### 기술 포인트
