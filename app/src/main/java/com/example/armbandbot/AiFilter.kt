@@ -150,11 +150,13 @@ internal class AiFilterClient(
         }
 
         val evaluation = try {
+            logger("MARKER_AI_ENTER_V2 posts=${request.posts.size}")
             val responseText = callApi(request)
             parseBatchResponse(responseText, request)
         } catch (e: Exception) {
-            logger("AI 배치 호출 실패: ${e.message}")
-            AiFilterBatchEvaluation(failureReason = e.message ?: "AI 배치 호출 실패")
+            val failureMessage = e.message ?: "AI 배치 호출 실패"
+            logger("AI 배치 호출 실패 [MARKER_AI_CATCH_V2]: $failureMessage")
+            AiFilterBatchEvaluation(failureReason = failureMessage)
         }
 
         if (evaluation.failureReason == null && evaluation.postDecisions.isNotEmpty()) {
@@ -337,8 +339,8 @@ internal class AiFilterClient(
 
             Log.w("AiFilterClient", "HTTP $status: $text")
             val trimmedError = text.replace("\n", " ").replace("\r", " ").take(300)
-            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / body=$trimmedError")
-            lastError = "HTTP $status / $trimmedError"
+            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / body=$trimmedError / marker=MARKER_AI_HTTP_V2")
+            lastError = "HTTP $status / $trimmedError / marker=MARKER_AI_HTTP_V2"
 
             val shouldRetry = status in retryableStatuses && attempt < retryDelaysMs.size
             if (!shouldRetry) {
