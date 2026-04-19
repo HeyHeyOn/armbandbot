@@ -338,7 +338,7 @@ internal class AiFilterClient(
             Log.w("AiFilterClient", "HTTP $status: $text")
             val trimmedError = text.replace("\n", " ").replace("\r", " ").take(300)
             logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / body=$trimmedError")
-            lastError = "HTTP $status"
+            lastError = "HTTP $status / $trimmedError"
 
             val shouldRetry = status in retryableStatuses && attempt < retryDelaysMs.size
             if (!shouldRetry) {
