@@ -66,3 +66,5 @@
 - debug: 배포물 동일성 검증용 build stamp b8103ef를 기존 AI 로그 본문에 직접 삽입
 
 - debug: 한글 인코딩 영향 배제를 위해 ASCII build stamp(AISTAMP/AIFAILSTAMP)를 AI 로그 맨 앞에 삽입
+
+- beta2 실험: 파일명/버전명을 1.3.0-beta2로 변경하여 새 APK 생성 및 업로드 경로 분리 검증
