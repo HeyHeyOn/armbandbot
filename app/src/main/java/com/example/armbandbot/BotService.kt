@@ -2462,11 +2462,28 @@ img.written_dccon{max-width:80px;max-height:80px}
                 pcPostDetailUrl = pcPostDetailUrl,
                 tokenToUse = tokenToUse,
                 actionConfig = when {
-                    aiDecision?.type == AiFilterDecisionType.BLOCK -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "ai"),
-                        sourceLabel = "ai_override"
-                    )
+                    aiDecision?.type == AiFilterDecisionType.BLOCK -> {
+                        val aiPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                        val aiOverride = loadModerationActionOverride(aiPrefs, "ai")
+                        val baseConfig = resolveDefaultModerationActionConfig(config)
+                        val resolvedConfig = resolveModerationActionConfig(
+                            baseConfig = baseConfig,
+                            override = aiOverride,
+                            sourceLabel = "ai_override"
+                        )
+                        if (config.isDebugMode) {
+                            val aiDeleteOnlyRaw = if (aiPrefs.contains("ai_delete_only_mode")) aiPrefs.getBoolean("ai_delete_only_mode", false).toString() else "<missing>"
+                            val aiDurationRaw = if (aiPrefs.contains("ai_block_duration_hours")) aiPrefs.getInt("ai_block_duration_hours", -1).toString() else "<missing>"
+                            val aiDeletePostRaw = if (aiPrefs.contains("ai_delete_post_on_block")) aiPrefs.getBoolean("ai_delete_post_on_block", false).toString() else "<missing>"
+                            val aiReasonRaw = aiPrefs.getString("ai_block_reason_text", null) ?: "<null>"
+                            sendLog(
+                                "[디버그][AI설정읽기] ai_post / botId=$botId / enabledRaw=${aiPrefs.getBoolean("ai_use_custom_action_config", false)} / deleteOnlyRaw=$aiDeleteOnlyRaw / durationRaw=$aiDurationRaw / deletePostRaw=$aiDeletePostRaw / reasonRaw=$aiReasonRaw / base=${baseConfig.sourceLabel}:${baseConfig.mode.name}:${baseConfig.blockDurationHours}:${baseConfig.deletePostOnBlock}:${baseConfig.blockReasonText}",
+                                botId
+                            )
+                            logModerationActionResolution(botId, "ai_post", aiOverride, resolvedConfig)
+                        }
+                        resolvedConfig
+                    }
                     else -> when (postAnalysis.filterSource) {
                     ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
@@ -2626,11 +2643,28 @@ img.written_dccon{max-width:80px;max-height:80px}
                             pcPostDetailUrl = pcPostDetailUrl,
                             tokenToUse = tokenToUse,
                             actionConfig = when {
-                                aiCommentPlan != null -> resolveModerationActionConfig(
-                                    baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "ai"),
-                                    sourceLabel = "ai_override"
-                                )
+                                aiCommentPlan != null -> {
+                                    val aiPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                                    val aiOverride = loadModerationActionOverride(aiPrefs, "ai")
+                                    val baseConfig = resolveDefaultModerationActionConfig(config)
+                                    val resolvedConfig = resolveModerationActionConfig(
+                                        baseConfig = baseConfig,
+                                        override = aiOverride,
+                                        sourceLabel = "ai_override"
+                                    )
+                                    if (config.isDebugMode) {
+                                        val aiDeleteOnlyRaw = if (aiPrefs.contains("ai_delete_only_mode")) aiPrefs.getBoolean("ai_delete_only_mode", false).toString() else "<missing>"
+                                        val aiDurationRaw = if (aiPrefs.contains("ai_block_duration_hours")) aiPrefs.getInt("ai_block_duration_hours", -1).toString() else "<missing>"
+                                        val aiDeletePostRaw = if (aiPrefs.contains("ai_delete_post_on_block")) aiPrefs.getBoolean("ai_delete_post_on_block", false).toString() else "<missing>"
+                                        val aiReasonRaw = aiPrefs.getString("ai_block_reason_text", null) ?: "<null>"
+                                        sendLog(
+                                            "[디버그][AI설정읽기] ai_comment / botId=$botId / enabledRaw=${aiPrefs.getBoolean("ai_use_custom_action_config", false)} / deleteOnlyRaw=$aiDeleteOnlyRaw / durationRaw=$aiDurationRaw / deletePostRaw=$aiDeletePostRaw / reasonRaw=$aiReasonRaw / base=${baseConfig.sourceLabel}:${baseConfig.mode.name}:${baseConfig.blockDurationHours}:${baseConfig.deletePostOnBlock}:${baseConfig.blockReasonText}",
+                                            botId
+                                        )
+                                        logModerationActionResolution(botId, "ai_comment", aiOverride, resolvedConfig)
+                                    }
+                                    resolvedConfig
+                                }
                                 else -> when (commentAnalysis.filterSource) {
                                 ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
@@ -2952,6 +2986,18 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
     }
 
+    private fun logModerationActionResolution(
+        botId: String,
+        label: String,
+        override: ModerationActionOverride,
+        resolvedConfig: ModerationActionConfig
+    ) {
+        sendLog(
+            "[디버그][처리정책] $label / enabled=${override.enabled} / deleteOnly=${override.deleteOnlyMode} / duration=${override.blockDurationHours} / deletePostOnBlock=${override.deletePostOnBlock} / reason=${override.blockReasonText ?: ""} / resolved=${resolvedConfig.sourceLabel}:${resolvedConfig.mode.name}:${resolvedConfig.blockDurationHours}:${resolvedConfig.deletePostOnBlock}:${resolvedConfig.blockReasonText}",
+            botId
+        )
+    }
+
     private fun executeModerationAction(
         actionConfig: ModerationActionConfig,
         cookie: String,
@@ -3107,7 +3153,11 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             isAiFilterMode = botPref.getBoolean("is_ai_filter_mode", false),
             aiFilterProvider = botPref.getString("ai_filter_provider", "openai_compatible")?.trim().orEmpty(),
-            aiFilterEndpoint = botPref.getString("ai_filter_endpoint", "https://api.openai.com/v1/chat/completions")?.trim().orEmpty(),
+            aiFilterEndpoint = if (botPref.getBoolean("ai_filter_use_custom_endpoint", false)) {
+                botPref.getString("ai_filter_endpoint", "")?.trim().orEmpty()
+            } else {
+                ""
+            },
             aiFilterApiKey = botPref.getString("ai_filter_api_key", "")?.trim().orEmpty(),
             aiFilterModel = botPref.getString("ai_filter_model", "gpt-4o-mini")?.trim().orEmpty(),
             aiFilterUserPrompt = botPref.getString("ai_filter_user_prompt", "")?.trim().orEmpty(),
