@@ -64,3 +64,5 @@
 - debug: 새 AI 로그 줄 대신 기존 '호출 시작'/'AI 배치 호출 실패' 라인에 provider/endpointHost/urlHasKey/keyLen 정보 직접 병합
 
 - debug: 배포물 동일성 검증용 build stamp b8103ef를 기존 AI 로그 본문에 직접 삽입
+
+- debug: 한글 인코딩 영향 배제를 위해 ASCII build stamp(AISTAMP/AIFAILSTAMP)를 AI 로그 맨 앞에 삽입
