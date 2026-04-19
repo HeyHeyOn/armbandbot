@@ -18,6 +18,9 @@
 - 금지어 개별 차단 설정 실제 집행 연결 수정
   - 문자열(`blockReasonPrefix`) 추측 대신 명시적인 `filterSource=KEYWORD` 기반으로 override 적용
   - 게시글/댓글 모두 금지어 감지 시 `keyword_*` 설정이 실제 차단/사유/삭제모드에 반영되도록 수정
+- 기존 차단+삭제 경로 회귀 수정
+  - `update_avoid_list` 요청의 `del_chk` 값을 `Y/N`이 아니라 서버가 허용하는 `1/0`으로 복구
+  - delete-only 추가 이후 깨진 기본 차단/삭제 요청 호환성 복구
 - beta APK Drive 업로드를 서비스 계정으로 자동화 (수동 OAuth 불필요)
 
 ### 기술 포인트

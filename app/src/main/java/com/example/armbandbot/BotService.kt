@@ -214,7 +214,7 @@ class BotService : Service() {
         val sourceLabel: String = "default"
     ) {
         val blockDurationValue: String get() = blockDurationHours.toString()
-        val deleteFlagValue: String get() = if (deletePostOnBlock) "Y" else "N"
+        val deleteFlagValue: String get() = if (deletePostOnBlock) "1" else "0"
     }
 
     private data class ModerationActionOverride(
