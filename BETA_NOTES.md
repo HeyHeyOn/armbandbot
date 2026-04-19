@@ -58,3 +58,5 @@
 - debug: AI 인증 진단 로그 추가 (provider/model/key fingerprint/urlHasKey/header mode)
 
 - debug: AI 로그 인코딩/표시 문제 회피용으로 기존 가시 로그 라인에 auth/url/key 정보를 통합
+
+- debug: AI 내부 logger 대신 BotService sendLog로 호출 메타(provider/model/endpointHost/urlHasKey/key길이) 직접 출력

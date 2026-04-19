@@ -2123,10 +2123,19 @@ img.written_dccon{max-width:80px;max-height:80px}
                         AiFilterBatchRequest(posts = flushItems.map { it.postInput })
                     )
 
+                    if (botId.isNotEmpty() && config.isDebugMode) {
+                        aiBatchEvaluation.debugSummary?.let {
+                            sendLog("[AI 배치] 호출 메타 / $it", botId)
+                        }
+                    }
+
                     if (aiBatchEvaluation.failureReason != null) {
                         flushItems.forEach { queue.addOrReplace(it) }
                         if (botId.isNotEmpty()) {
                             sendLog("[AI 배치][서비스확인][MARKER_AI_FAIL_V2] ${aiBatchEvaluation.failureReason.take(500)}", botId)
+                            aiBatchEvaluation.rawResponseText?.take(500)?.let {
+                                sendLog("[AI 배치] 응답 원문 일부 / $it", botId)
+                            }
                             sendLog("[AI 배치] 검사 실패로 묶음 ${flushItems.size}건 재큐", botId)
                         }
                     }

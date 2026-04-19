@@ -79,6 +79,7 @@ internal data class AiFilterBatchEvaluation(
     val failureReason: String? = null,
     val rawResponseText: String? = null,
     val parsedContentText: String? = null,
+    val debugSummary: String? = null,
 )
 
 internal class AiFilterClient(
@@ -149,14 +150,29 @@ internal class AiFilterClient(
             }
         }
 
+        val requestUri = runCatching { URI(buildRequestUrl()) }.getOrNull()
+        val keyPreview = when {
+            config.apiKey.isBlank() -> "blank"
+            config.apiKey.length <= 8 -> "len=${config.apiKey.length}"
+            else -> "${config.apiKey.take(4)}...len=${config.apiKey.length}"
+        }
+        val debugSummary = buildString {
+            append("provider=${config.provider.name}")
+            append(" / model=${config.model}")
+            append(" / endpointHost=${requestUri?.host ?: "none"}")
+            append(" / urlHasKey=${buildRequestUrl().contains("key=")}")
+            append(" / customEndpoint=${config.endpoint.isNotBlank()}")
+            append(" / key=$keyPreview")
+        }
+
         val evaluation = try {
             logger("MARKER_AI_ENTER_V2 posts=${request.posts.size}")
             val responseText = callApi(request)
-            parseBatchResponse(responseText, request)
+            parseBatchResponse(responseText, request).copy(debugSummary = debugSummary)
         } catch (e: Exception) {
             val failureMessage = e.message ?: "AI 배치 호출 실패"
             logger("AI 배치 호출 실패 [MARKER_AI_CATCH_V2]: $failureMessage")
-            AiFilterBatchEvaluation(failureReason = failureMessage)
+            AiFilterBatchEvaluation(failureReason = failureMessage, debugSummary = debugSummary)
         }
 
         if (evaluation.failureReason == null && evaluation.postDecisions.isNotEmpty()) {
