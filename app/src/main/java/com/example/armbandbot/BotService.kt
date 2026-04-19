@@ -17,8 +17,11 @@ import org.jsoup.Connection
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URL
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.LinkedHashMap
@@ -45,6 +48,7 @@ class BotService : Service() {
         val blockDurationHours: Int,
         val blockReason: String,
         val deletePostOnBlock: Boolean,
+        val deleteOnlyMode: Boolean,
 
         val isNotiMaster: Boolean,
         val notiKeyword: Boolean,
@@ -179,6 +183,30 @@ class BotService : Service() {
     private data class BlockExecutionResult(
         val blockReason: String?,
         val snapshotPath: String?
+    )
+
+    private enum class ModerationActionMode {
+        BLOCK,
+        DELETE_ONLY
+    }
+
+    private data class ModerationActionConfig(
+        val mode: ModerationActionMode,
+        val blockDurationHours: Int,
+        val blockReasonText: String,
+        val deletePostOnBlock: Boolean,
+        val sourceLabel: String = "default"
+    ) {
+        val blockDurationValue: String get() = blockDurationHours.toString()
+        val deleteFlagValue: String get() = if (deletePostOnBlock) "Y" else "N"
+    }
+
+    private data class ModerationActionOverride(
+        val enabled: Boolean,
+        val blockDurationHours: Int?,
+        val blockReasonText: String?,
+        val deletePostOnBlock: Boolean?,
+        val deleteOnlyMode: Boolean?
     )
 
     companion object {
@@ -2157,9 +2185,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 cookie = cookie,
                                 pcPostDetailUrl = immediatePostDetailUrl,
                                 tokenToUse = tokenToUse,
-                                blockDuration = blockDuration,
-                                blockReasonText = blockReason,
-                                delChk = delChk,
+                                actionConfig = resolveDefaultModerationActionConfig(config),
                                 isBlacklistedUserId = false,
                                 isBlacklistedUserNick = false,
                                 blockReasonPrefix = "AI 필터 작동",
@@ -2272,9 +2298,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         cookie = cookie,
                                         pcPostDetailUrl = immediateCommentPostDetailUrl,
                                         tokenToUse = tokenToUse,
-                                        blockDuration = blockDuration,
-                                        blockReasonText = blockReason,
-                                        delChk = delChk,
+                                        actionConfig = resolveDefaultModerationActionConfig(config),
                                         isBlacklistedCmtUserId = false,
                                         isBlacklistedCmtUserNick = false,
                                         blockReasonPrefixCmt = "AI 댓글 차단",
@@ -2421,9 +2445,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
                 tokenToUse = tokenToUse,
-                blockDuration = blockDuration,
-                blockReasonText = blockReason,
-                delChk = delChk,
+                actionConfig = resolveModerationActionConfig(
+                    baseConfig = resolveDefaultModerationActionConfig(config),
+                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
+                    sourceLabel = "keyword_override"
+                ).let { resolved ->
+                    if (blockReasonPrefix?.contains("금지어") == true) resolved else resolveDefaultModerationActionConfig(config)
+                },
                 isBlacklistedUserId = isBlacklistedUserId,
                 isBlacklistedUserNick = isBlacklistedUserNick,
                 blockReasonPrefix = blockReasonPrefix,
@@ -2533,9 +2561,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                             cookie = cookie,
                             pcPostDetailUrl = pcPostDetailUrl,
                             tokenToUse = tokenToUse,
-                            blockDuration = blockDuration,
-                            blockReasonText = blockReason,
-                            delChk = delChk,
+                            actionConfig = resolveModerationActionConfig(
+                                baseConfig = resolveDefaultModerationActionConfig(config),
+                                override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
+                                sourceLabel = "keyword_override"
+                            ).let { resolved ->
+                                if (blockReasonPrefixCmt?.contains("금지어") == true) resolved else resolveDefaultModerationActionConfig(config)
+                            },
                             isBlacklistedCmtUserId = isBlacklistedCmtUserId,
                             isBlacklistedCmtUserNick = isBlacklistedCmtUserNick,
                             blockReasonPrefixCmt = blockReasonPrefixCmt,
@@ -2768,6 +2800,94 @@ img.written_dccon{max-width:80px;max-height:80px}
             ?: ""
         return normalizeCreationDate(raw)
     }
+    private fun resolveDefaultModerationActionConfig(config: BotConfig): ModerationActionConfig {
+        return ModerationActionConfig(
+            mode = if (config.deleteOnlyMode) ModerationActionMode.DELETE_ONLY else ModerationActionMode.BLOCK,
+            blockDurationHours = config.blockDurationHours,
+            blockReasonText = config.blockReason,
+            deletePostOnBlock = config.deletePostOnBlock,
+            sourceLabel = if (config.deleteOnlyMode) "default_delete_only" else "default"
+        )
+    }
+
+    private fun loadModerationActionOverride(
+        botPref: android.content.SharedPreferences,
+        prefix: String
+    ): ModerationActionOverride {
+        return ModerationActionOverride(
+            enabled = botPref.getBoolean("${prefix}_use_custom_action_config", false),
+            blockDurationHours = if (botPref.contains("${prefix}_block_duration_hours")) botPref.getInt("${prefix}_block_duration_hours", 6) else null,
+            blockReasonText = botPref.getString("${prefix}_block_reason_text", null),
+            deletePostOnBlock = if (botPref.contains("${prefix}_delete_post_on_block")) botPref.getBoolean("${prefix}_delete_post_on_block", true) else null,
+            deleteOnlyMode = if (botPref.contains("${prefix}_delete_only_mode")) botPref.getBoolean("${prefix}_delete_only_mode", false) else null
+        )
+    }
+
+    private fun resolveModerationActionConfig(
+        baseConfig: ModerationActionConfig,
+        override: ModerationActionOverride,
+        sourceLabel: String
+    ): ModerationActionConfig {
+        if (!override.enabled) return baseConfig
+
+        val isDeleteOnly = override.deleteOnlyMode ?: (baseConfig.mode == ModerationActionMode.DELETE_ONLY)
+        return ModerationActionConfig(
+            mode = if (isDeleteOnly) ModerationActionMode.DELETE_ONLY else ModerationActionMode.BLOCK,
+            blockDurationHours = override.blockDurationHours ?: baseConfig.blockDurationHours,
+            blockReasonText = override.blockReasonText?.takeIf { it.isNotBlank() } ?: baseConfig.blockReasonText,
+            deletePostOnBlock = override.deletePostOnBlock ?: baseConfig.deletePostOnBlock,
+            sourceLabel = sourceLabel
+        )
+    }
+
+    private fun executeModerationAction(
+        actionConfig: ModerationActionConfig,
+        cookie: String,
+        pcPostDetailUrl: String,
+        tokenToUse: String,
+        gallId: String,
+        targetNo: String,
+        parentPostNo: String,
+        gallType: String
+    ): String {
+        return when (actionConfig.mode) {
+            ModerationActionMode.BLOCK -> executeBlockRequest(
+                cookie = cookie,
+                pcPostDetailUrl = pcPostDetailUrl,
+                tokenToUse = tokenToUse,
+                gallId = gallId,
+                targetNo = targetNo,
+                parentPostNo = parentPostNo,
+                blockDuration = actionConfig.blockDurationValue,
+                blockReasonText = actionConfig.blockReasonText,
+                delChk = actionConfig.deleteFlagValue,
+                gallType = gallType
+            )
+
+            ModerationActionMode.DELETE_ONLY -> {
+                if (parentPostNo.isBlank()) {
+                    executeDeletePostRequest(
+                        cookie = cookie,
+                        pcPostDetailUrl = pcPostDetailUrl,
+                        gallId = gallId,
+                        targetNo = targetNo,
+                        gallType = gallType
+                    )
+                } else {
+                    executeDeleteCommentRequest(
+                        cookie = cookie,
+                        pcPostDetailUrl = pcPostDetailUrl,
+                        tokenToUse = tokenToUse,
+                        gallId = gallId,
+                        postNo = parentPostNo,
+                        commentNo = targetNo,
+                        gallType = gallType
+                    )
+                }
+            }
+        }
+    }
+
     private fun loadBotConfig(botPref: android.content.SharedPreferences): BotConfig {
         val rawUrlsText = botPref.getString("target_urls", "") ?: ""
         val targetUrls = rawUrlsText
@@ -2795,6 +2915,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             blockDurationHours = botPref.getInt("block_duration_hours", 6),
             blockReason = botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반",
             deletePostOnBlock = botPref.getBoolean("delete_post_on_block", true),
+            deleteOnlyMode = botPref.getBoolean("delete_only_mode", false),
 
             isNotiMaster = botPref.getBoolean("noti_master", true),
             notiKeyword = botPref.getBoolean("noti_keyword", true),
@@ -3273,9 +3394,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         cookie: String,
         pcPostDetailUrl: String,
         tokenToUse: String,
-        blockDuration: String,
-        blockReasonText: String,
-        delChk: String,
+        actionConfig: ModerationActionConfig,
         isBlacklistedUserId: Boolean,
         isBlacklistedUserNick: Boolean,
         blockReasonPrefix: String?,
@@ -3349,22 +3468,21 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         if (config.isDebugMode) {
-            sendLog("[디버그][차단요청] 게시글 차단 요청 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: blockReasonText}", botId)
+            sendLog("[디버그][차단요청] 게시글 차단 요청 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
-        executeBlockRequest(
+        val actionResponse = executeModerationAction(
+            actionConfig = actionConfig,
             cookie = cookie,
             pcPostDetailUrl = pcPostDetailUrl,
             tokenToUse = tokenToUse,
             gallId = gallId,
             targetNo = postNumStr,
             parentPostNo = "",
-            blockDuration = blockDuration,
-            blockReasonText = blockReasonText,
-            delChk = delChk,
             gallType = gallType
         )
         if (config.isDebugMode) {
-            sendLog("[디버그][차단요청] 게시글 차단 요청 완료 → 번호: $postNumStr", botId)
+            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제요청" else "차단요청"
+            sendLog("[디버그][$modeLabel] 게시글 처리 완료 → 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
         }
 
         return BlockExecutionResult(
@@ -3444,9 +3562,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         cookie: String,
         pcPostDetailUrl: String,
         tokenToUse: String,
-        blockDuration: String,
-        blockReasonText: String,
-        delChk: String,
+        actionConfig: ModerationActionConfig,
         isBlacklistedCmtUserId: Boolean,
         isBlacklistedCmtUserNick: Boolean,
         blockReasonPrefixCmt: String?,
@@ -3512,22 +3628,21 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         if (config.isDebugMode) {
-            sendLog("[디버그][차단요청] 댓글 차단 요청 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: blockReasonText}", botId)
+            sendLog("[디버그][차단요청] 댓글 차단 요청 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
-        executeBlockRequest(
+        val actionResponse = executeModerationAction(
+            actionConfig = actionConfig,
             cookie = cookie,
             pcPostDetailUrl = pcPostDetailUrl,
             tokenToUse = tokenToUse,
             gallId = gallId,
             targetNo = commentNo,
             parentPostNo = postNumStr,
-            blockDuration = blockDuration,
-            blockReasonText = blockReasonText,
-            delChk = delChk,
             gallType = gallType
         )
         if (config.isDebugMode) {
-            sendLog("[디버그][차단요청] 댓글 차단 요청 완료 → 번호: $commentNo", botId)
+            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제요청" else "차단요청"
+            sendLog("[디버그][$modeLabel] 댓글 처리 완료 → 번호: $commentNo / 응답: ${actionResponse.take(300)}", botId)
         }
 
         return BlockExecutionResult(
@@ -3547,10 +3662,10 @@ img.written_dccon{max-width:80px;max-height:80px}
         blockReasonText: String,
         delChk: String,
         gallType: String
-    ) {
+    ): String {
         val blockUrl = "https://gall.dcinside.com/ajax/minor_manager_board_ajax/update_avoid_list"
 
-        Jsoup.connect(blockUrl)
+        return Jsoup.connect(blockUrl)
             .userAgent("Mozilla/5.0")
             .header("Cookie", cookie)
             .header("Referer", pcPostDetailUrl)
@@ -3568,6 +3683,70 @@ img.written_dccon{max-width:80px;max-height:80px}
             .ignoreContentType(true)
             .method(org.jsoup.Connection.Method.POST)
             .execute()
+            .body()
+    }
+
+    private fun executeDeleteCommentRequest(
+        cookie: String,
+        pcPostDetailUrl: String,
+        tokenToUse: String,
+        gallId: String,
+        postNo: String,
+        commentNo: String,
+        gallType: String
+    ): String {
+        val deleteUrl = "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_comment"
+
+        return Jsoup.connect(deleteUrl)
+            .userAgent(dcUserAgent)
+            .header("Cookie", cookie)
+            .header("Referer", pcPostDetailUrl)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .data("ci_t", tokenToUse)
+            .data("id", gallId)
+            .data("_GALLTYPE_", gallType)
+            .data("pno", postNo)
+            .data("cmt_nos[]", commentNo)
+            .ignoreContentType(true)
+            .method(org.jsoup.Connection.Method.POST)
+            .execute()
+            .body()
+    }
+
+    private fun executeDeletePostRequest(
+        cookie: String,
+        pcPostDetailUrl: String,
+        gallId: String,
+        targetNo: String,
+        gallType: String
+    ): String {
+        val deleteUrl = when (gallType) {
+            "MI" -> "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_list"
+            else -> "https://gall.dcinside.com/ajax/manager_board_ajax/delete_list"
+        }
+
+        return Jsoup.connect(deleteUrl)
+            .userAgent(dcUserAgent)
+            .header("Cookie", cookie)
+            .header("Referer", pcPostDetailUrl)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .data("ci_t", extractCookieValue(cookie, "ci_c") ?: "")
+            .data("id", gallId)
+            .data("nos[]", targetNo)
+            .data("_GALLTYPE_", gallType)
+            .ignoreContentType(true)
+            .method(org.jsoup.Connection.Method.POST)
+            .execute()
+            .body()
+    }
+
+    private fun extractCookieValue(cookieHeader: String, key: String): String? {
+        return cookieHeader
+            .split(';')
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("$key=") }
+            ?.substringAfter('=', "")
+            ?.takeIf { it.isNotBlank() }
     }
 
     private fun buildPostBlockPresentation(
