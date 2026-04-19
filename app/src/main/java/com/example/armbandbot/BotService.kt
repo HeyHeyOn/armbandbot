@@ -129,6 +129,20 @@ class BotService : Service() {
         BLOCK_EXECUTE
     }
 
+    private enum class ModerationFilterSource {
+        KEYWORD,
+        USER,
+        NICKNAME,
+        YUDONG,
+        KKANG,
+        URL,
+        SPAM,
+        IMAGE,
+        VOICE,
+        AI,
+        UNKNOWN
+    }
+
     private data class PostAnalysisResult(
         val action: PostModerationAction,
         val isWhitelistedUser: Boolean,
@@ -143,7 +157,8 @@ class BotService : Service() {
         val reviewReason: String? = null,
         val blockReasonPrefix: String? = null,
         val notiType: String? = null,
-        val debugDetail: String? = null
+        val debugDetail: String? = null,
+        val filterSource: ModerationFilterSource = ModerationFilterSource.UNKNOWN
     )
 
     private data class CommentAnalysisResult(
@@ -156,7 +171,8 @@ class BotService : Service() {
         val matchedVoiceIdComment: String? = null,
         val blockReasonPrefix: String? = null,
         val notiType: String? = null,
-        val debugDetail: String? = null
+        val debugDetail: String? = null,
+        val filterSource: ModerationFilterSource = ModerationFilterSource.UNKNOWN
     )
 
     private data class AiPostExecutionPlan(
@@ -2445,12 +2461,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
                 tokenToUse = tokenToUse,
-                actionConfig = resolveModerationActionConfig(
-                    baseConfig = resolveDefaultModerationActionConfig(config),
-                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
-                    sourceLabel = "keyword_override"
-                ).let { resolved ->
-                    if (blockReasonPrefix?.contains("금지어") == true) resolved else resolveDefaultModerationActionConfig(config)
+                actionConfig = if (postAnalysis.filterSource == ModerationFilterSource.KEYWORD) {
+                    resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
+                        sourceLabel = "keyword_override"
+                    )
+                } else {
+                    resolveDefaultModerationActionConfig(config)
                 },
                 isBlacklistedUserId = isBlacklistedUserId,
                 isBlacklistedUserNick = isBlacklistedUserNick,
@@ -2561,12 +2579,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                             cookie = cookie,
                             pcPostDetailUrl = pcPostDetailUrl,
                             tokenToUse = tokenToUse,
-                            actionConfig = resolveModerationActionConfig(
-                                baseConfig = resolveDefaultModerationActionConfig(config),
-                                override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
-                                sourceLabel = "keyword_override"
-                            ).let { resolved ->
-                                if (blockReasonPrefixCmt?.contains("금지어") == true) resolved else resolveDefaultModerationActionConfig(config)
+                            actionConfig = if (commentAnalysis.filterSource == ModerationFilterSource.KEYWORD) {
+                                resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
+                                    sourceLabel = "keyword_override"
+                                )
+                            } else {
+                                resolveDefaultModerationActionConfig(config)
                             },
                             isBlacklistedCmtUserId = isBlacklistedCmtUserId,
                             isBlacklistedCmtUserNick = isBlacklistedCmtUserNick,
@@ -3058,6 +3078,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         var blockReasonPrefix: String? = null
         var notiType: String? = null
         var debugDetail: String? = null
+        var filterSource = ModerationFilterSource.UNKNOWN
 
         if (isBlacklistedUserId) {
             debugDetail = "ID/IP 블랙리스트 일치 ($postAuthor)"
@@ -3159,12 +3180,16 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                 if (matchedNormalWord != null) {
                     debugDetail = "일반 금지어 감지 ($matchedNormalWord)"
+                    filterSource = ModerationFilterSource.KEYWORD
                 } else if (matchedBypassWord != null) {
                     debugDetail = "우회 금지어 감지 ($matchedBypassWord)"
+                    filterSource = ModerationFilterSource.KEYWORD
                 } else if (suspiciousUrlInPost != null) {
                     debugDetail = "허용되지 않은 URL 감지 ($suspiciousUrlInPost)"
+                    filterSource = ModerationFilterSource.URL
                 } else if (spamCodeMatchPost != null) {
                     debugDetail = "스팸코드 감지 ($spamCodeMatchPost)"
+                    filterSource = ModerationFilterSource.SPAM
                 }
 
                 if (!shouldBlockExecute && config.isImageFilterMode) {
@@ -3174,6 +3199,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 shouldBlockExecute = true
                                 matchedImageAlt = postAlt
                                 debugDetail = "이미지 alt 유사도 차단 (감지='$postAlt', 기준='$blackAlt', 임계치=${config.imageFilterThreshold})"
+                                filterSource = ModerationFilterSource.IMAGE
                                 break
                             }
                         }
@@ -3190,6 +3216,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             shouldBlockExecute = true
                             matchedVoiceIdPost = vid
                             debugDetail = "금지 보이스 ID 감지 ($vid)"
+                            filterSource = ModerationFilterSource.VOICE
                             break
                         }
                     }
@@ -3222,7 +3249,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             reviewReason = if (action == PostModerationAction.REVIEW_ONLY) (debugDetail ?: aiReviewReason ?: blockReasonPrefix) else null,
             blockReasonPrefix = blockReasonPrefix,
             notiType = notiType,
-            debugDetail = debugDetail
+            debugDetail = debugDetail,
+            filterSource = filterSource
         )
     }
 
@@ -3253,6 +3281,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         var blockReasonPrefix: String? = null
         var notiType: String? = null
         var debugDetail: String? = null
+        var filterSource = ModerationFilterSource.UNKNOWN
         if (isBlacklistedUserId) {
             debugDetail = "댓글 작성자 ID/IP 블랙리스트 일치 ($cmtAuthor)"
         } else if (isBlacklistedUserNick) {
@@ -3342,12 +3371,16 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                 if (matchedNormalWord != null) {
                     debugDetail = "댓글 일반 금지어 감지 ($matchedNormalWord)"
+                    filterSource = ModerationFilterSource.KEYWORD
                 } else if (matchedBypassWord != null) {
                     debugDetail = "댓글 우회 금지어 감지 ($matchedBypassWord)"
+                    filterSource = ModerationFilterSource.KEYWORD
                 } else if (suspiciousUrlInComment != null) {
                     debugDetail = "댓글 허용되지 않은 URL 감지 ($suspiciousUrlInComment)"
+                    filterSource = ModerationFilterSource.URL
                 } else if (spamCodeMatchComment != null) {
                     debugDetail = "댓글 스팸코드 감지 ($spamCodeMatchComment)"
+                    filterSource = ModerationFilterSource.SPAM
                 }
 
                 if (!isBadComment && config.isVoiceFilterMode) {
@@ -3356,6 +3389,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             isBadComment = true
                             matchedVoiceIdComment = vid
                             debugDetail = "댓글 금지 보이스 ID 감지 ($vid)"
+                            filterSource = ModerationFilterSource.VOICE
                             break
                         }
                     }
@@ -3376,7 +3410,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             matchedVoiceIdComment = matchedVoiceIdComment,
             blockReasonPrefix = blockReasonPrefix,
             notiType = notiType,
-            debugDetail = debugDetail
+            debugDetail = debugDetail,
+            filterSource = filterSource
         )
     }
 
