@@ -193,11 +193,13 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         BackHandler(enabled = currentSubScreen != null) { currentSubScreen = null }
         BackHandler(enabled = currentSubScreen == null) { onBack() }
 
-        val deleteOnlyDurationValue = -1
-        val blockDurationOptions = linkedMapOf(deleteOnlyDurationValue to "삭제만", 1 to "1시간", 6 to "6시간", 24 to "24시간 (1일)", 168 to "168시간 (7일)", 336 to "336시간 (14일)", 744 to "744시간 (31일)")
+        val actionModeOptions = linkedMapOf("delete" to "삭제", "block" to "차단")
+        val blockDurationOptions = linkedMapOf(1 to "1시간", 6 to "6시간", 24 to "24시간 (1일)", 168 to "168시간 (7일)", 336 to "336시간 (14일)", 744 to "744시간 (31일)")
 
         // 기본 차단 설정
+        var blockActionMode by remember { mutableStateOf(if (botPref.getBoolean("delete_only_mode", false)) "delete" else "block") }
         var blockDurationHours by remember { mutableStateOf(botPref.getInt("block_duration_hours", 6)) }
+        var isBlockActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
         var blockReasonText by remember { mutableStateOf(botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반") }
         var isDeletePostOnBlock by remember { mutableStateOf(botPref.getBoolean("delete_post_on_block", true)) }
@@ -205,7 +207,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         // 금지어 필터 개별 차단 설정
         var keywordUseCustomAction by remember { mutableStateOf(botPref.getBoolean("keyword_use_custom_action_config", false)) }
+        var keywordActionMode by remember { mutableStateOf(if ((if (botPref.contains("keyword_delete_only_mode")) botPref.getBoolean("keyword_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
         var keywordBlockDurationHours by remember { mutableStateOf(botPref.getInt("keyword_block_duration_hours", blockDurationHours)) }
+        var isKeywordActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isKeywordBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
         var keywordBlockReasonText by remember { mutableStateOf(botPref.getString("keyword_block_reason_text", null) ?: blockReasonText) }
         var keywordDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("keyword_delete_post_on_block")) botPref.getBoolean("keyword_delete_post_on_block", true) else isDeletePostOnBlock) }
@@ -454,40 +458,45 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                                         Column(modifier = Modifier.padding(16.dp)) {
                                             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Column {
-                                                    Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor)
-                                                    Text("차단 시간을 선택하거나 삭제만 모드를 고를 수 있습니다.", fontSize = 12.sp, color = subTextColor)
-                                                }
+                                                Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor)
                                                 Box {
-                                                    OutlinedButton(onClick = { isBlockDurationDropdownExpanded = true }) {
-                                                        Text(blockDurationOptions[if (isDeleteOnlyMode) deleteOnlyDurationValue else blockDurationHours] ?: "${blockDurationHours}시간", color = textColor)
+                                                    OutlinedButton(onClick = { isBlockActionModeDropdownExpanded = true }) {
+                                                        Text(actionModeOptions[blockActionMode] ?: "차단", color = textColor)
                                                         Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
                                                     }
-                                                    DropdownMenu(expanded = isBlockDurationDropdownExpanded, onDismissRequest = { isBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                        blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
-                                                            if (hours == deleteOnlyDurationValue) {
-                                                                isDeleteOnlyMode = true
-                                                                botPref.edit().putBoolean("delete_only_mode", true).apply()
-                                                            } else {
-                                                                isDeleteOnlyMode = false
-                                                                blockDurationHours = hours
-                                                                botPref.edit().putBoolean("delete_only_mode", false).putInt("block_duration_hours", hours).apply()
-                                                            }
-                                                            isBlockDurationDropdownExpanded = false
+                                                    DropdownMenu(expanded = isBlockActionModeDropdownExpanded, onDismissRequest = { isBlockActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                        actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
+                                                            blockActionMode = mode
+                                                            isDeleteOnlyMode = mode == "delete"
+                                                            botPref.edit().putBoolean("delete_only_mode", isDeleteOnlyMode).apply()
+                                                            isBlockActionModeDropdownExpanded = false
                                                         }) }
                                                     }
                                                 }
                                             }
-                                            Column(modifier = if (isDeleteOnlyMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                            if (blockActionMode == "block") {
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom=8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Box {
+                                                        OutlinedButton(onClick = { isBlockDurationDropdownExpanded = true }) {
+                                                            Text(blockDurationOptions[blockDurationHours] ?: "${blockDurationHours}시간", color = textColor)
+                                                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                                                        }
+                                                        DropdownMenu(expanded = isBlockDurationDropdownExpanded, onDismissRequest = { isBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                            blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { blockDurationHours = hours; botPref.edit().putInt("block_duration_hours", hours).apply(); isBlockDurationDropdownExpanded = false }) }
+                                                        }
+                                                    }
+                                                }
                                                 Divider(color = dividerColor, modifier = Modifier.padding(bottom=8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                                     Text("차단 시 글/댓글 함께 삭제", color = textColor)
-                                                    Switch(checked = isDeletePostOnBlock, onCheckedChange = { isDeletePostOnBlock = it; botPref.edit().putBoolean("delete_post_on_block", it).apply() }, enabled = !isDeleteOnlyMode, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                                    Switch(checked = isDeletePostOnBlock, onCheckedChange = { isDeletePostOnBlock = it; botPref.edit().putBoolean("delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
                                                 }
                                             }
                                         }
                                     }
-                                    if (!isDeleteOnlyMode) {
+                                    if (blockActionMode == "block") {
                                         ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", blockReasonText, colors) { tempEditText = blockReasonText; editDialogType = "block_reason" }
                                     }
                                 }
@@ -924,40 +933,45 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
                                             Column(modifier = Modifier.padding(16.dp)) {
                                                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Column {
-                                                        Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor)
-                                                        Text("차단 시간을 선택하거나 삭제만 모드를 고를 수 있습니다.", fontSize = 12.sp, color = subTextColor)
-                                                    }
+                                                    Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor)
                                                     Box {
-                                                        OutlinedButton(onClick = { if (keywordUseCustomAction) isKeywordBlockDurationDropdownExpanded = true }) {
-                                                            Text(blockDurationOptions[if (keywordDeleteOnlyMode) deleteOnlyDurationValue else keywordBlockDurationHours] ?: "${keywordBlockDurationHours}시간", color = textColor)
+                                                        OutlinedButton(onClick = { if (keywordUseCustomAction) isKeywordActionModeDropdownExpanded = true }) {
+                                                            Text(actionModeOptions[keywordActionMode] ?: "차단", color = textColor)
                                                             Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
                                                         }
-                                                        DropdownMenu(expanded = isKeywordBlockDurationDropdownExpanded, onDismissRequest = { isKeywordBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                            blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
-                                                                if (hours == deleteOnlyDurationValue) {
-                                                                    keywordDeleteOnlyMode = true
-                                                                    botPref.edit().putBoolean("keyword_delete_only_mode", true).apply()
-                                                                } else {
-                                                                    keywordDeleteOnlyMode = false
-                                                                    keywordBlockDurationHours = hours
-                                                                    botPref.edit().putBoolean("keyword_delete_only_mode", false).putInt("keyword_block_duration_hours", hours).apply()
-                                                                }
-                                                                isKeywordBlockDurationDropdownExpanded = false
+                                                        DropdownMenu(expanded = isKeywordActionModeDropdownExpanded, onDismissRequest = { isKeywordActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                            actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
+                                                                keywordActionMode = mode
+                                                                keywordDeleteOnlyMode = mode == "delete"
+                                                                botPref.edit().putBoolean("keyword_delete_only_mode", keywordDeleteOnlyMode).apply()
+                                                                isKeywordActionModeDropdownExpanded = false
                                                             }) }
                                                         }
                                                     }
                                                 }
-                                                Column(modifier = if (keywordDeleteOnlyMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                                if (keywordActionMode == "block") {
+                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                        Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor)
+                                                        Box {
+                                                            OutlinedButton(onClick = { if (keywordUseCustomAction) isKeywordBlockDurationDropdownExpanded = true }) {
+                                                                Text(blockDurationOptions[keywordBlockDurationHours] ?: "${keywordBlockDurationHours}시간", color = textColor)
+                                                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                                                            }
+                                                            DropdownMenu(expanded = isKeywordBlockDurationDropdownExpanded, onDismissRequest = { isKeywordBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                                blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { keywordBlockDurationHours = hours; botPref.edit().putInt("keyword_block_duration_hours", hours).apply(); isKeywordBlockDurationDropdownExpanded = false }) }
+                                                            }
+                                                        }
+                                                    }
                                                     Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                                         Text("차단 시 글/댓글 함께 삭제", color = textColor)
-                                                        Switch(checked = keywordDeletePostOnBlock, onCheckedChange = { keywordDeletePostOnBlock = it; botPref.edit().putBoolean("keyword_delete_post_on_block", it).apply() }, enabled = !keywordDeleteOnlyMode, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                                        Switch(checked = keywordDeletePostOnBlock, onCheckedChange = { keywordDeletePostOnBlock = it; botPref.edit().putBoolean("keyword_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
                                                     }
                                                 }
                                             }
                                         }
-                                        if (!keywordDeleteOnlyMode) {
+                                        if (keywordActionMode == "block") {
                                             ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", keywordBlockReasonText, colors) { tempEditText = keywordBlockReasonText; editDialogType = "keyword_block_reason" }
                                         }
                                     }
