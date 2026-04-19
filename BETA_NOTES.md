@@ -37,6 +37,10 @@
   - UI에 `개별 차단 설정 사용` + `처리 방식(삭제/차단)` + 차단 상세 설정 추가
   - 서비스 집행부에서 `IMAGE` / `SPAM` filter source 기준 override 적용
   - 저장 키: `image_*`, `spam_*`
+- 유동 필터 / 깡계 필터 후속 확장 착수
+  - 서비스 집행부에서 `YUDONG` / `KKANG` filter source 기준 override 분기 추가
+  - 차단 사유 저장 키/다이얼로그 준비 (`yudong_*`, `kkang_*`)
+  - 전체 구조를 커스텀 액션 공통화 방향으로 마무리하는 단계 진입
 - beta APK Drive 업로드를 서비스 계정으로 자동화 (수동 OAuth 불필요)
 
 ### 기술 포인트

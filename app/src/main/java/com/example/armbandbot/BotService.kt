@@ -2497,6 +2497,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                         override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "spam"),
                         sourceLabel = "spam_override"
                     )
+                    ModerationFilterSource.YUDONG -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "yudong"),
+                        sourceLabel = "yudong_override"
+                    )
+                    ModerationFilterSource.KKANG -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "kkang"),
+                        sourceLabel = "kkang_override"
+                    )
                     else -> resolveDefaultModerationActionConfig(config)
                 },
                 isBlacklistedUserId = isBlacklistedUserId,
@@ -2643,6 +2653,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     baseConfig = resolveDefaultModerationActionConfig(config),
                                     override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "spam"),
                                     sourceLabel = "spam_override"
+                                )
+                                ModerationFilterSource.YUDONG -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "yudong"),
+                                    sourceLabel = "yudong_override"
+                                )
+                                ModerationFilterSource.KKANG -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "kkang"),
+                                    sourceLabel = "kkang_override"
                                 )
                                 else -> resolveDefaultModerationActionConfig(config)
                             },
