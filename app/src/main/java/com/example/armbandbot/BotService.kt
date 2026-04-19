@@ -2112,7 +2112,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     val aiUrlHasKey = aiProviderName == "GEMINI_DIRECT" && config.aiFilterEndpoint.isBlank()
                     val aiKeyLen = config.aiFilterApiKey.length
                     if (config.isDebugMode && botId.isNotEmpty()) {
-                        sendLog("[AI 배치] 호출 시작 / 묶음 ${flushItems.size}건 / postNos=${flushItems.joinToString(",") { it.postNo }} / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
+                        sendLog("[AI 배치] 호출 시작 / 묶음 ${flushItems.size}건 / postNos=${flushItems.joinToString(",") { it.postNo }} / stamp=b8103ef / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
                     }
                     val aiBatchEvaluation = AiFilterClient(
                         config = AiFilterConfig(
@@ -2136,7 +2136,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (aiBatchEvaluation.failureReason != null) {
                         flushItems.forEach { queue.addOrReplace(it) }
                         if (botId.isNotEmpty()) {
-                            sendLog("[AI 배치] AI 배치 호출 실패: ${aiBatchEvaluation.failureReason.take(500)} / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
+                            sendLog("[AI 배치] AI 배치 호출 실패: ${aiBatchEvaluation.failureReason.take(500)} / stamp=b8103ef / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
                             sendLog("[AI 배치] 검사 실패로 묶음 ${flushItems.size}건 재큐", botId)
                         }
                     }

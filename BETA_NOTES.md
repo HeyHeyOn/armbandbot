@@ -62,3 +62,5 @@
 - debug: AI 내부 logger 대신 BotService sendLog로 호출 메타(provider/model/endpointHost/urlHasKey/key길이) 직접 출력
 
 - debug: 새 AI 로그 줄 대신 기존 '호출 시작'/'AI 배치 호출 실패' 라인에 provider/endpointHost/urlHasKey/keyLen 정보 직접 병합
+
+- debug: 배포물 동일성 검증용 build stamp b8103ef를 기존 AI 로그 본문에 직접 삽입
