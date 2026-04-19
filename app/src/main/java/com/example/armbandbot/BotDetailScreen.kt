@@ -395,6 +395,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_wait_sec", 5).toString()) }
         var aiFilterBatchMaxWeightText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_weight", 20000).toString()) }
         var notiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
+        var aiUseCustomAction by remember { mutableStateOf(botPref.getBoolean("ai_use_custom_action_config", false)) }
+        var aiActionMode by remember { mutableStateOf(if (botPref.getBoolean("ai_delete_only_mode", false)) "delete" else "block") }
+        var aiBlockDurationHours by remember { mutableStateOf(botPref.getInt("ai_block_duration_hours", blockDurationHours)) }
+        var isAiActionModeDropdownExpanded by remember { mutableStateOf(false) }
+        var isAiBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
+        var aiBlockReasonText by remember { mutableStateOf(botPref.getString("ai_block_reason_text", blockReasonText) ?: blockReasonText) }
+        var aiDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("ai_delete_post_on_block")) botPref.getBoolean("ai_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var aiDeleteOnlyMode by remember { mutableStateOf(botPref.getBoolean("ai_delete_only_mode", false)) }
 
         var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
         var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
@@ -1146,6 +1154,60 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 Button(onClick = { tempEditText = aiFilterBatchMaxWeightText; editDialogType = "ai_filter_batch_max_weight" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 누적 용량: ${aiFilterBatchMaxWeightText}") }
                                             }
                                         }
+
+                                        Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Column {
+                                                        Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor)
+                                                        Text("AI block 결과에만 적용됩니다.", fontSize = 12.sp, color = subTextColor)
+                                                    }
+                                                    Switch(checked = aiUseCustomAction, onCheckedChange = { aiUseCustomAction = it; botPref.edit().putBoolean("ai_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                                }
+                                            }
+                                        }
+                                        Column(modifier = if (!aiUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                            Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                                                Column(modifier = Modifier.padding(16.dp)) {
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                        Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor)
+                                                        Box {
+                                                            OutlinedButton(onClick = { if (aiUseCustomAction) isAiActionModeDropdownExpanded = true }) {
+                                                                Text(actionModeOptions[aiActionMode] ?: "차단", color = textColor)
+                                                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                                                            }
+                                                            DropdownMenu(expanded = isAiActionModeDropdownExpanded, onDismissRequest = { isAiActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                                actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { aiActionMode = mode; aiDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("ai_delete_only_mode", aiDeleteOnlyMode).apply(); isAiActionModeDropdownExpanded = false }) }
+                                                            }
+                                                        }
+                                                    }
+                                                    if (aiActionMode == "block") {
+                                                        Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                            Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor)
+                                                            Box {
+                                                                OutlinedButton(onClick = { if (aiUseCustomAction) isAiBlockDurationDropdownExpanded = true }) {
+                                                                    Text(blockDurationOptions[aiBlockDurationHours] ?: "${aiBlockDurationHours}시간", color = textColor)
+                                                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                                                                }
+                                                                DropdownMenu(expanded = isAiBlockDurationDropdownExpanded, onDismissRequest = { isAiBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                                    blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { aiBlockDurationHours = hours; botPref.edit().putInt("ai_block_duration_hours", hours).apply(); isAiBlockDurationDropdownExpanded = false }) }
+                                                                }
+                                                            }
+                                                        }
+                                                        Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                            Text("차단 시 글/댓글 함께 삭제", color = textColor)
+                                                            Switch(checked = aiDeletePostOnBlock, onCheckedChange = { aiDeletePostOnBlock = it; botPref.edit().putBoolean("ai_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if (aiActionMode == "block") {
+                                                ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", aiBlockReasonText, colors) { tempEditText = aiBlockReasonText; editDialogType = "ai_block_reason" }
+                                            }
+                                        }
                                     }
                                 }
                                 "SPAM" -> {
@@ -1644,13 +1706,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         if (editDialogType != null) {
-            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason"
+            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
                 "block_reason" -> "예: 커뮤니티 규칙 위반"
+                "ai_block_reason" -> "예: AI 필터 위반"
                 "keyword_block_reason" -> "예: 금지어 사용"
                 "user_block_reason" -> "예: 유저 필터 위반"
                 "nickname_block_reason" -> "예: 닉네임 필터 위반"
@@ -1684,6 +1747,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                     when(editDialogType) {
                         "bot_name" -> { botName = tempEditText; botPref.edit().putString("bot_name", tempEditText).apply() }
                         "block_reason" -> { blockReasonText = tempEditText; botPref.edit().putString("block_reason_text", tempEditText).apply() }
+                        "ai_block_reason" -> { aiBlockReasonText = tempEditText; botPref.edit().putString("ai_block_reason_text", tempEditText).apply() }
                         "keyword_block_reason" -> { keywordBlockReasonText = tempEditText; botPref.edit().putString("keyword_block_reason_text", tempEditText).apply() }
                         "user_block_reason" -> { userBlockReasonText = tempEditText; botPref.edit().putString("user_block_reason_text", tempEditText).apply() }
                         "nickname_block_reason" -> { nicknameBlockReasonText = tempEditText; botPref.edit().putString("nickname_block_reason_text", tempEditText).apply() }

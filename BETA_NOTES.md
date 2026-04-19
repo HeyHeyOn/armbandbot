@@ -37,10 +37,10 @@
   - UI에 `개별 차단 설정 사용` + `처리 방식(삭제/차단)` + 차단 상세 설정 추가
   - 서비스 집행부에서 `IMAGE` / `SPAM` filter source 기준 override 적용
   - 저장 키: `image_*`, `spam_*`
-- 유동 필터 / 깡계 필터 override 연결 보강
-  - 게시글/댓글 분석 단계에서 `filterSource = YUDONG / KKANG`를 실제로 세팅하도록 수정
-  - 이제 유동/깡계도 UI/저장 키/override 분기/감지 source 연결이 모두 닫힘
-  - rule-based 필터 전체 커스텀 액션 구조 1차 통일 마감
+- AI 필터 개별 차단 설정 1차 적용
+  - AI 설정 화면에 `개별 차단 설정 사용` + `처리 방식(삭제/차단)` + 차단 상세 설정 추가
+  - 저장 키: `ai_use_custom_action_config`, `ai_delete_only_mode`, `ai_block_duration_hours`, `ai_delete_post_on_block`, `ai_block_reason_text`
+  - AI `BLOCK` 결과 집행 지점에서만 `ai_*` override 적용 (review/fallback에는 미적용)
 - beta APK Drive 업로드를 서비스 계정으로 자동화 (수동 OAuth 불필요)
 
 ### 기술 포인트

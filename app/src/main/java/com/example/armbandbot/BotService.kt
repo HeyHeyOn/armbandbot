@@ -2461,7 +2461,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
                 tokenToUse = tokenToUse,
-                actionConfig = when (postAnalysis.filterSource) {
+                actionConfig = when {
+                    aiDecision?.type == AiFilterDecisionType.BLOCK -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "ai"),
+                        sourceLabel = "ai_override"
+                    )
+                    else -> when (postAnalysis.filterSource) {
                     ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
                         override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
@@ -2508,6 +2514,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         sourceLabel = "kkang_override"
                     )
                     else -> resolveDefaultModerationActionConfig(config)
+                }
                 },
                 isBlacklistedUserId = isBlacklistedUserId,
                 isBlacklistedUserNick = isBlacklistedUserNick,
@@ -2618,7 +2625,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                             cookie = cookie,
                             pcPostDetailUrl = pcPostDetailUrl,
                             tokenToUse = tokenToUse,
-                            actionConfig = when (commentAnalysis.filterSource) {
+                            actionConfig = when {
+                                aiCommentPlan != null -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "ai"),
+                                    sourceLabel = "ai_override"
+                                )
+                                else -> when (commentAnalysis.filterSource) {
                                 ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
                                     override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
@@ -2665,6 +2678,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     sourceLabel = "kkang_override"
                                 )
                                 else -> resolveDefaultModerationActionConfig(config)
+                            }
                             },
                             isBlacklistedCmtUserId = isBlacklistedCmtUserId,
                             isBlacklistedCmtUserNick = isBlacklistedCmtUserNick,
