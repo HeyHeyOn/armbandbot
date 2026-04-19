@@ -2477,6 +2477,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                         override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "nickname"),
                         sourceLabel = "nickname_override"
                     )
+                    ModerationFilterSource.URL -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "url"),
+                        sourceLabel = "url_override"
+                    )
+                    ModerationFilterSource.VOICE -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "voice"),
+                        sourceLabel = "voice_override"
+                    )
                     else -> resolveDefaultModerationActionConfig(config)
                 },
                 isBlacklistedUserId = isBlacklistedUserId,
@@ -2603,6 +2613,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     baseConfig = resolveDefaultModerationActionConfig(config),
                                     override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "nickname"),
                                     sourceLabel = "nickname_override"
+                                )
+                                ModerationFilterSource.URL -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "url"),
+                                    sourceLabel = "url_override"
+                                )
+                                ModerationFilterSource.VOICE -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "voice"),
+                                    sourceLabel = "voice_override"
                                 )
                                 else -> resolveDefaultModerationActionConfig(config)
                             },

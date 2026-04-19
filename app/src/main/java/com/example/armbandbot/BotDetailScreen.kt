@@ -233,6 +233,24 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var nicknameDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("nickname_delete_post_on_block")) botPref.getBoolean("nickname_delete_post_on_block", true) else isDeletePostOnBlock) }
         var nicknameDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("nickname_delete_only_mode")) botPref.getBoolean("nickname_delete_only_mode", false) else isDeleteOnlyMode) }
 
+        var urlUseCustomAction by remember { mutableStateOf(botPref.getBoolean("url_use_custom_action_config", false)) }
+        var urlActionMode by remember { mutableStateOf(if ((if (botPref.contains("url_delete_only_mode")) botPref.getBoolean("url_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var urlBlockDurationHours by remember { mutableStateOf(botPref.getInt("url_block_duration_hours", blockDurationHours)) }
+        var isUrlActionModeDropdownExpanded by remember { mutableStateOf(false) }
+        var isUrlBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
+        var urlBlockReasonText by remember { mutableStateOf(botPref.getString("url_block_reason_text", null) ?: blockReasonText) }
+        var urlDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("url_delete_post_on_block")) botPref.getBoolean("url_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var urlDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("url_delete_only_mode")) botPref.getBoolean("url_delete_only_mode", false) else isDeleteOnlyMode) }
+
+        var voiceUseCustomAction by remember { mutableStateOf(botPref.getBoolean("voice_use_custom_action_config", false)) }
+        var voiceActionMode by remember { mutableStateOf(if ((if (botPref.contains("voice_delete_only_mode")) botPref.getBoolean("voice_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var voiceBlockDurationHours by remember { mutableStateOf(botPref.getInt("voice_block_duration_hours", blockDurationHours)) }
+        var isVoiceActionModeDropdownExpanded by remember { mutableStateOf(false) }
+        var isVoiceBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
+        var voiceBlockReasonText by remember { mutableStateOf(botPref.getString("voice_block_reason_text", null) ?: blockReasonText) }
+        var voiceDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("voice_delete_post_on_block")) botPref.getBoolean("voice_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var voiceDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("voice_delete_only_mode")) botPref.getBoolean("voice_delete_only_mode", false) else isDeleteOnlyMode) }
+
         var isNotiMaster by remember { mutableStateOf(botPref.getBoolean("noti_master", true)) }
         var isNotiKeyword by remember { mutableStateOf(botPref.getBoolean("noti_keyword", true)) }
         var isNotiUser by remember { mutableStateOf(botPref.getBoolean("noti_user", true)) }
@@ -763,6 +781,21 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     Column(modifier = if (!isUrlFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                         Text("여기에 없는 외부 링크는 모두 차단됩니다.", fontSize = 12.sp, color = subTextColor, modifier = Modifier.padding(bottom = 8.dp))
                                         ReadOnlyTextCard("허용할 도메인 (화이트리스트)", urlWhitelistText, colors) { tempEditText = urlWhitelistText; editDialogType = "url_whitelist" }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = urlUseCustomAction, onCheckedChange = { urlUseCustomAction = it; botPref.edit().putBoolean("url_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
+                                        Column(modifier = if (!urlUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                            Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (urlUseCustomAction) isUrlActionModeDropdownExpanded = true }) { Text(actionModeOptions[urlActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isUrlActionModeDropdownExpanded, onDismissRequest = { isUrlActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { urlActionMode = mode; urlDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("url_delete_only_mode", urlDeleteOnlyMode).apply(); isUrlActionModeDropdownExpanded = false }) } } } }
+                                                if (urlActionMode == "block") {
+                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (urlUseCustomAction) isUrlBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[urlBlockDurationHours] ?: "${urlBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isUrlBlockDurationDropdownExpanded, onDismissRequest = { isUrlBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { urlBlockDurationHours = hours; botPref.edit().putInt("url_block_duration_hours", hours).apply(); isUrlBlockDurationDropdownExpanded = false }) } } } }
+                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = urlDeletePostOnBlock, onCheckedChange = { urlDeletePostOnBlock = it; botPref.edit().putBoolean("url_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
+                                                }
+                                            } }
+                                            if (urlActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", urlBlockReasonText, colors) { tempEditText = urlBlockReasonText; editDialogType = "url_block_reason" } }
+                                        }
                                     }
                                 }
                                 "IMAGE" -> {
@@ -831,6 +864,21 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     }
                                     Column(modifier = if (!isVoiceFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                     ReadOnlyTextCard("차단할 보이스 ID (블랙리스트)", voiceBlacklistText, colors) { tempEditText = voiceBlacklistText; editDialogType = "voice_blacklist" }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = voiceUseCustomAction, onCheckedChange = { voiceUseCustomAction = it; botPref.edit().putBoolean("voice_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
+                                    Column(modifier = if (!voiceUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (voiceUseCustomAction) isVoiceActionModeDropdownExpanded = true }) { Text(actionModeOptions[voiceActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isVoiceActionModeDropdownExpanded, onDismissRequest = { isVoiceActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { voiceActionMode = mode; voiceDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("voice_delete_only_mode", voiceDeleteOnlyMode).apply(); isVoiceActionModeDropdownExpanded = false }) } } } }
+                                            if (voiceActionMode == "block") {
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (voiceUseCustomAction) isVoiceBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[voiceBlockDurationHours] ?: "${voiceBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isVoiceBlockDurationDropdownExpanded, onDismissRequest = { isVoiceBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { voiceBlockDurationHours = hours; botPref.edit().putInt("voice_block_duration_hours", hours).apply(); isVoiceBlockDurationDropdownExpanded = false }) } } } }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = voiceDeletePostOnBlock, onCheckedChange = { voiceDeletePostOnBlock = it; botPref.edit().putBoolean("voice_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
+                                            }
+                                        } }
+                                        if (voiceActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", voiceBlockReasonText, colors) { tempEditText = voiceBlockReasonText; editDialogType = "voice_block_reason" } }
+                                    }
                                     } // end Column
                                     Spacer(modifier = Modifier.height(24.dp))
                                     Text("도구", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=8.dp))
@@ -1500,9 +1548,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         if (editDialogType != null) {
-            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason"
+            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
@@ -1510,6 +1558,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "keyword_block_reason" -> "예: 금지어 사용"
                 "user_block_reason" -> "예: 유저 필터 위반"
                 "nickname_block_reason" -> "예: 닉네임 필터 위반"
+                "url_block_reason" -> "예: URL 필터 위반"
+                "voice_block_reason" -> "예: 보이스 필터 위반"
                 "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."
                 "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"
                 "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"
@@ -1537,6 +1587,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "keyword_block_reason" -> { keywordBlockReasonText = tempEditText; botPref.edit().putString("keyword_block_reason_text", tempEditText).apply() }
                         "user_block_reason" -> { userBlockReasonText = tempEditText; botPref.edit().putString("user_block_reason_text", tempEditText).apply() }
                         "nickname_block_reason" -> { nicknameBlockReasonText = tempEditText; botPref.edit().putString("nickname_block_reason_text", tempEditText).apply() }
+                        "url_block_reason" -> { urlBlockReasonText = tempEditText; botPref.edit().putString("url_block_reason_text", tempEditText).apply() }
+                        "voice_block_reason" -> { voiceBlockReasonText = tempEditText; botPref.edit().putString("voice_block_reason_text", tempEditText).apply() }
                         "normal" -> { normalWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("normal", tempEditText) }
                         "bypass" -> { bypassWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("bypass", tempEditText) }
                         "search" -> { searchWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("search_keywords", tempEditText) }
