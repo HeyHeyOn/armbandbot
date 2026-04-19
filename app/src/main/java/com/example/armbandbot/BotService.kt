@@ -2461,14 +2461,23 @@ img.written_dccon{max-width:80px;max-height:80px}
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
                 tokenToUse = tokenToUse,
-                actionConfig = if (postAnalysis.filterSource == ModerationFilterSource.KEYWORD) {
-                    resolveModerationActionConfig(
+                actionConfig = when (postAnalysis.filterSource) {
+                    ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
                         override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
                         sourceLabel = "keyword_override"
                     )
-                } else {
-                    resolveDefaultModerationActionConfig(config)
+                    ModerationFilterSource.USER -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "user"),
+                        sourceLabel = "user_override"
+                    )
+                    ModerationFilterSource.NICKNAME -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "nickname"),
+                        sourceLabel = "nickname_override"
+                    )
+                    else -> resolveDefaultModerationActionConfig(config)
                 },
                 isBlacklistedUserId = isBlacklistedUserId,
                 isBlacklistedUserNick = isBlacklistedUserNick,
@@ -2579,14 +2588,23 @@ img.written_dccon{max-width:80px;max-height:80px}
                             cookie = cookie,
                             pcPostDetailUrl = pcPostDetailUrl,
                             tokenToUse = tokenToUse,
-                            actionConfig = if (commentAnalysis.filterSource == ModerationFilterSource.KEYWORD) {
-                                resolveModerationActionConfig(
+                            actionConfig = when (commentAnalysis.filterSource) {
+                                ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
                                     override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
                                     sourceLabel = "keyword_override"
                                 )
-                            } else {
-                                resolveDefaultModerationActionConfig(config)
+                                ModerationFilterSource.USER -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "user"),
+                                    sourceLabel = "user_override"
+                                )
+                                ModerationFilterSource.NICKNAME -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "nickname"),
+                                    sourceLabel = "nickname_override"
+                                )
+                                else -> resolveDefaultModerationActionConfig(config)
                             },
                             isBlacklistedCmtUserId = isBlacklistedCmtUserId,
                             isBlacklistedCmtUserNick = isBlacklistedCmtUserNick,
@@ -3082,8 +3100,10 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         if (isBlacklistedUserId) {
             debugDetail = "ID/IP 블랙리스트 일치 ($postAuthor)"
+            filterSource = ModerationFilterSource.USER
         } else if (isBlacklistedUserNick) {
             debugDetail = "닉네임 블랙리스트 일치 ($postNick)"
+            filterSource = ModerationFilterSource.NICKNAME
         }
 
         val spamCodeRegex = buildSpamCodeRegex(config)
@@ -3284,8 +3304,10 @@ img.written_dccon{max-width:80px;max-height:80px}
         var filterSource = ModerationFilterSource.UNKNOWN
         if (isBlacklistedUserId) {
             debugDetail = "댓글 작성자 ID/IP 블랙리스트 일치 ($cmtAuthor)"
+            filterSource = ModerationFilterSource.USER
         } else if (isBlacklistedUserNick) {
             debugDetail = "댓글 작성자 닉네임 블랙리스트 일치 ($cmtNick)"
+            filterSource = ModerationFilterSource.NICKNAME
         }
 
         val spamCodeRegex = buildSpamCodeRegex(config)
