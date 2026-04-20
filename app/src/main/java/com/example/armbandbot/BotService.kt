@@ -1353,7 +1353,7 @@ class BotService : Service() {
                             val stableListStatus = revalidateSearchLoginRequirement(
                                 botId = botId,
                                 cookie = cookie,
-                                stableListUrl = convertToPcUrl(rawUrl)
+                                stableListUrl = stableListUrl
                             )
                             when (stableListStatus) {
                                 ManagerPermissionStatus.LOGIN_REQUIRED -> return UrlProcessOutcome.LOGIN_REQUIRED
