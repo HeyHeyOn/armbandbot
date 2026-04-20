@@ -34,6 +34,8 @@ class BotService : Service() {
     private val activeBots = ConcurrentHashMap<String, Job>()
     private val aiBatchQueues = ConcurrentHashMap<String, AiBatchQueue>()
     private val aiBatchResults = ConcurrentHashMap<String, ConcurrentHashMap<String, AiFilterPostDecision>>()
+    private val pendingAiPostPlans = ConcurrentHashMap<String, MutableList<AiPostExecutionPlan>>()
+    private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
     private var wakeLock: PowerManager.WakeLock? = null
     private val autoLoginCooldownMs = 10 * 60 * 1000L
     private val autoLoginMaxAttempts = 3
@@ -1963,10 +1965,10 @@ img.written_dccon{max-width:80px;max-height:80px}
             sendLog("[디버그][게시글] 번호: $postNumStr / 댓글 수 (API): ${commentsArray?.length() ?: 0}", botId)
         }
         val postText = "$text $contentText"
-        val aiPostPlans = mutableListOf<AiPostExecutionPlan>()
-        val aiPostPlanNos = mutableSetOf<String>()
-        val aiCommentPlans = mutableListOf<AiCommentExecutionPlan>()
-        val aiCommentPlanKeys = mutableSetOf<String>()
+        val aiPostPlans = pendingAiPostPlans.getOrPut(botId) { mutableListOf() }
+        val aiPostPlanNos = aiPostPlans.mapTo(mutableSetOf()) { it.postNo }
+        val aiCommentPlans = pendingAiCommentPlans.getOrPut(botId) { mutableListOf() }
+        val aiCommentPlanKeys = aiCommentPlans.mapTo(mutableSetOf()) { "${it.postNo}:${it.commentNo}" }
 
         val postAnalysis = analyzePost(
             config = config,
@@ -2216,6 +2218,13 @@ img.written_dccon{max-width:80px;max-height:80px}
         var isPostBlocked = false
 
         val aiPostExecutionPlan = aiPostPlans.firstOrNull { it.postNo == postNumStr }
+        if (aiPostExecutionPlan != null) {
+            aiPostPlans.remove(aiPostExecutionPlan)
+            aiPostPlanNos.remove(aiPostExecutionPlan.postNo)
+            if (config.isDebugMode && botId.isNotEmpty()) {
+                sendLog("[AI 배치][사이클후처리] 글 실행계획 소비 / 글번호: ${aiPostExecutionPlan.postNo} / reason=${aiPostExecutionPlan.reason}", botId)
+            }
+        }
         if (postAnalysis.action != PostModerationAction.BLOCK_EXECUTE) {
             when {
                 aiPostExecutionPlan != null -> {
@@ -2442,6 +2451,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
 
                     val aiCommentPlan = aiCommentPlans.firstOrNull { it.postNo == postNumStr && it.commentNo == commentNo }
+                    if (aiCommentPlan != null) {
+                        aiCommentPlans.remove(aiCommentPlan)
+                        aiCommentPlanKeys.remove("${aiCommentPlan.postNo}:${aiCommentPlan.commentNo}")
+                        if (config.isDebugMode && botId.isNotEmpty()) {
+                            sendLog("[AI 배치][사이클후처리] 댓글 실행계획 소비 / 글번호: ${aiCommentPlan.postNo} / comment=${aiCommentPlan.commentNo} / reason=${aiCommentPlan.reason}", botId)
+                        }
+                    }
                     val isBlacklistedCmtUserId = commentAnalysis.isBlacklistedUserId
                     val isBlacklistedCmtUserNick = commentAnalysis.isBlacklistedUserNick
                     val matchedVoiceIdComment = commentAnalysis.matchedVoiceIdComment
@@ -2580,6 +2596,15 @@ img.written_dccon{max-width:80px;max-height:80px}
                     sendLog("악플 ${badCommentCount}개 차단 완료!", botId)
                 }
             }
+        }
+
+        val pendingAiCommentPlansForOtherPosts = aiCommentPlans.filter { it.postNo != postNumStr }
+        if (pendingAiCommentPlansForOtherPosts.isNotEmpty() && config.isDebugMode) {
+            sendLog("[AI 배치][사이클후처리] 미집행 AI 댓글 계획 대기 / 현재글=$postNumStr / count=${pendingAiCommentPlansForOtherPosts.size}", botId)
+        }
+        val pendingAiPostPlansForOtherPosts = aiPostPlans.filter { it.postNo != postNumStr }
+        if (pendingAiPostPlansForOtherPosts.isNotEmpty() && config.isDebugMode) {
+            sendLog("[AI 배치][사이클후처리] 미집행 AI 글 계획 대기 / 현재글=$postNumStr / count=${pendingAiPostPlansForOtherPosts.size}", botId)
         }
 
         GlobalBotState.savePost(
