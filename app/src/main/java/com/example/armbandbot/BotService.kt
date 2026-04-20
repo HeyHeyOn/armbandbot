@@ -2813,14 +2813,6 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
-        val pendingAiCommentPlansForOtherPosts = aiCommentPlans.filter { it.postNo != postNumStr }
-        if (pendingAiCommentPlansForOtherPosts.isNotEmpty() && config.isDebugMode) {
-            sendLog("[AI 배치][사이클후처리] 미집행 AI 댓글 계획 대기 / 현재글=$postNumStr / count=${pendingAiCommentPlansForOtherPosts.size}", botId)
-        }
-        val pendingAiPostPlansForOtherPosts = aiPostPlans.filter { it.postNo != postNumStr }
-        if (pendingAiPostPlansForOtherPosts.isNotEmpty() && config.isDebugMode) {
-            sendLog("[AI 배치][사이클후처리] 미집행 AI 글 계획 대기 / 현재글=$postNumStr / count=${pendingAiPostPlansForOtherPosts.size}", botId)
-        }
 
         GlobalBotState.savePost(
             gallType = gallType,
