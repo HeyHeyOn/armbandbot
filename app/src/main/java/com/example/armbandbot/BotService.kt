@@ -232,6 +232,22 @@ class BotService : Service() {
         private val SEARCH_PARAM_CLEANER_REGEX = Regex("&s_type=[^&]*|&s_keyword=[^&]*|&search_pos=[^&]*")
     }
 
+    private data class ListQueryOptions(
+        val recommendOnly: Boolean = false,
+        val headId: String? = null
+    ) {
+        fun toPcParams(isSearchMode: Boolean): Map<String, String> {
+            val params = linkedMapOf<String, String>()
+            if (recommendOnly) {
+                params["exception_mode"] = "recommend"
+            }
+            if (!isSearchMode && !headId.isNullOrBlank()) {
+                params["search_head"] = headId
+            }
+            return params
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -506,6 +522,11 @@ class BotService : Service() {
         val url = rawUrl.trim()
         val queryParams = parseQueryParams(url)
         val gallIdFromQuery = queryParams["id"]?.trim().orEmpty()
+        val listQueryOptions = ListQueryOptions(
+            recommendOnly = queryParams["recommend"] == "1" || queryParams["exception_mode"].equals("recommend", ignoreCase = true),
+            headId = queryParams["headid"]?.trim()?.takeIf { it.isNotBlank() }
+                ?: queryParams["search_head"]?.trim()?.takeIf { it.isNotBlank() }
+        )
         val lowerUrl = url.lowercase(Locale.ROOT)
         val gallTypeFromPath = when {
             lowerUrl.contains("/mini/") -> "MI"
@@ -516,7 +537,8 @@ class BotService : Service() {
         if (gallIdFromQuery.isNotBlank()) {
             return ParsedTargetUrl(
                 gallId = gallIdFromQuery,
-                gallType = gallTypeFromPath ?: "M"
+                gallType = gallTypeFromPath ?: "M",
+                listQueryOptions = listQueryOptions
             )
         }
 
@@ -555,16 +577,25 @@ class BotService : Service() {
 
         return ParsedTargetUrl(
             gallId = gallId,
-            gallType = gallType
+            gallType = gallType,
+            listQueryOptions = listQueryOptions
         )
+    }
+
+    private fun buildStableListUrl(parsed: ParsedTargetUrl, isSearchMode: Boolean = false): String {
+        val baseUrl = when (parsed.gallType) {
+            "MI" -> "https://gall.dcinside.com/mini/board/lists/"
+            else -> "https://gall.dcinside.com/mgallery/board/lists/"
+        }
+        val params = linkedMapOf<String, String>()
+        params["id"] = parsed.gallId
+        params.putAll(parsed.listQueryOptions.toPcParams(isSearchMode))
+        return buildUrlWithParams(baseUrl, params)
     }
 
     private fun convertToPcUrl(rawUrl: String): String {
         val parsed = resolveGalleryInfo(rawUrl) ?: return rawUrl.trim()
-        return when (parsed.gallType) {
-            "MI" -> "https://gall.dcinside.com/mini/board/lists/?id=${parsed.gallId}"
-            else -> "https://gall.dcinside.com/mgallery/board/lists/?id=${parsed.gallId}"
-        }
+        return buildStableListUrl(parsed)
     }
 
     private fun parseTargetUrl(rawUrl: String): ParsedTargetUrl? {
@@ -1278,7 +1309,9 @@ class BotService : Service() {
         val gallId = parsedTarget.gallId
         val gallType = parsedTarget.gallType
 
-        var cleanBaseUrl = rawUrl.replace(Regex("&page=[0-9]+"), "")
+        val stableListUrl = buildStableListUrl(parsedTarget, config.isSearchMode)
+        var cleanBaseUrl = stableListUrl.replace(Regex("([?&])page=[0-9]+"), "")
+            .replace(Regex("[?&]$"), "")
         if (config.isSearchMode) cleanBaseUrl = cleanBaseUrl.replace(SEARCH_PARAM_CLEANER_REGEX, "")
 
         val activeKeywords = if (config.isSearchMode && config.searchKeywords.isNotEmpty()) config.searchKeywords else listOf("")
@@ -3783,7 +3816,8 @@ img.written_dccon{max-width:80px;max-height:80px}
 
     private data class ParsedTargetUrl(
         val gallId: String,
-        val gallType: String
+        val gallType: String,
+        val listQueryOptions: ListQueryOptions = ListQueryOptions()
     )
 
     private data class GallogStats(
