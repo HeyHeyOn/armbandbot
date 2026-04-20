@@ -2043,6 +2043,23 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
         }
 
+        val spamBurstDeleteActive = shouldDeletePostBySpamBurst(
+            config = config,
+            botId = botId,
+            filterSource = postAnalysis.filterSource
+        )
+        if (spamBurstDeleteActive) {
+            val deleteResponse = executeDeletePostRequest(
+                cookie = cookie,
+                pcPostDetailUrl = pcPostDetailUrl,
+                gallId = gallId,
+                targetNo = postNumStr,
+                gallType = gallType
+            )
+            sendLog("[도배 방지] 신규 글 삭제 / 글번호: $postNumStr / 유형: ${postAnalysis.filterSource.name} / 응답: $deleteResponse", botId)
+            return
+        }
+
         val isBlacklistedUserId = postAnalysis.isBlacklistedUserId
         val isBlacklistedUserNick = postAnalysis.isBlacklistedUserNick
         val suspiciousUrlInPost = postAnalysis.suspiciousUrlInPost
@@ -3166,6 +3183,21 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
             spamBurstStates[botId] = state
             sendLog("[도배 방지] 감지 시작 / 사유: $reason / 지속=${config.spamBurstDurationMinutes}분 / 기준글=$postNo", botId)
+        }
+    }
+
+    private fun shouldDeletePostBySpamBurst(
+        config: BotConfig,
+        botId: String,
+        filterSource: ModerationFilterSource,
+        now: Long = System.currentTimeMillis()
+    ): Boolean {
+        if (!config.isSpamBurstProtectionEnabled) return false
+        val state = pruneSpamBurstState(botId, now) ?: return false
+        return when (filterSource) {
+            ModerationFilterSource.YUDONG -> state.targetYudong
+            ModerationFilterSource.KKANG -> state.targetKkang
+            else -> false
         }
     }
 
