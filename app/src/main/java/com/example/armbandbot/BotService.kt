@@ -2034,6 +2034,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                 sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 정상${if (postAnalysis.isWhitelistedUser) " (화이트리스트 통과)" else ""}", botId)
             }
         }
+        if (postAnalysis.action == PostModerationAction.BLOCK_EXECUTE) {
+            recordSpamBurstEvent(
+                config = config,
+                botId = botId,
+                filterSource = postAnalysis.filterSource,
+                postNo = postNumStr
+            )
+        }
 
         val isBlacklistedUserId = postAnalysis.isBlacklistedUserId
         val isBlacklistedUserNick = postAnalysis.isBlacklistedUserNick
@@ -3117,6 +3125,48 @@ img.written_dccon{max-width:80px;max-height:80px}
             sendLog("[도배 방지] 감지 종료 / 지속 시간 만료", botId)
         }
         return null
+    }
+
+    private fun recordSpamBurstEvent(
+        config: BotConfig,
+        botId: String,
+        filterSource: ModerationFilterSource,
+        postNo: String,
+        now: Long = System.currentTimeMillis()
+    ) {
+        if (!config.isSpamBurstProtectionEnabled) return
+        if (filterSource != ModerationFilterSource.YUDONG && filterSource != ModerationFilterSource.KKANG) return
+
+        val windowStart = now - (config.spamBurstWindowMinutes.coerceAtLeast(1) * 60_000L)
+        val events = spamBurstRecentEvents.getOrPut(botId) { mutableListOf() }
+        synchronized(events) {
+            events.removeAll { it.detectedAt < windowStart }
+            events.add(SpamBurstEvent(now, filterSource, postNo))
+
+            val yudongCount = events.count { it.type == ModerationFilterSource.YUDONG }
+            val kkangCount = events.count { it.type == ModerationFilterSource.KKANG }
+            val existing = pruneSpamBurstState(botId, now)
+            if (existing != null) return
+
+            val shouldTriggerYudong = config.spamBurstTargetYudong && yudongCount >= config.spamBurstYudongThreshold
+            val shouldTriggerKkang = config.spamBurstTargetKkang && kkangCount >= config.spamBurstKkangThreshold
+            if (!shouldTriggerYudong && !shouldTriggerKkang) return
+
+            val reason = when {
+                shouldTriggerYudong && shouldTriggerKkang -> "최근 ${config.spamBurstWindowMinutes}분 유동/깡계 글 급증"
+                shouldTriggerYudong -> "최근 ${config.spamBurstWindowMinutes}분 유동 글 급증"
+                else -> "최근 ${config.spamBurstWindowMinutes}분 깡계 글 급증"
+            }
+            val state = SpamBurstState(
+                startedAt = now,
+                endsAt = now + (config.spamBurstDurationMinutes.coerceAtLeast(1) * 60_000L),
+                reason = reason,
+                targetYudong = config.spamBurstTargetYudong,
+                targetKkang = config.spamBurstTargetKkang
+            )
+            spamBurstStates[botId] = state
+            sendLog("[도배 방지] 감지 시작 / 사유: $reason / 지속=${config.spamBurstDurationMinutes}분 / 기준글=$postNo", botId)
+        }
     }
 
     private fun executeModerationAction(
