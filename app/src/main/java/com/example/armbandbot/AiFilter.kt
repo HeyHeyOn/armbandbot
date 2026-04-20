@@ -26,6 +26,7 @@ internal data class AiFilterConfig(
     val userPrompt: String,
     val reviewMode: Boolean = true,
     val timeoutMs: Int = 20000,
+    val debugLoggingEnabled: Boolean = false,
 )
 
 internal data class AiFilterCommentInput(
@@ -166,7 +167,9 @@ internal class AiFilterClient(
         }
 
         val evaluation = try {
-            logger("MARKER_AI_ENTER_V2 posts=${request.posts.size}")
+            if (config.debugLoggingEnabled) {
+                logger("MARKER_AI_ENTER_V2 posts=${request.posts.size}")
+            }
             val responseText = callApi(request)
             parseBatchResponse(responseText, request).copy(debugSummary = debugSummary)
         } catch (e: Exception) {
@@ -318,9 +321,11 @@ internal class AiFilterClient(
             AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> "bearer"
             AiFilterProvider.GEMINI_DIRECT -> if (requestUrl.contains("key=")) "url-key" else "x-goog-api-key"
         }
-        logger(
-            "AI REQUEST PREP / provider=${config.provider.name} / model=${config.model} / url=${sanitizedUrl.ifBlank { requestUrl.take(120) }} / apiKey=$keyPreview / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()} / payload=$payloadPreview"
-        )
+        if (config.debugLoggingEnabled) {
+            logger(
+                "AI REQUEST PREP / provider=${config.provider.name} / model=${config.model} / url=${sanitizedUrl.ifBlank { requestUrl.take(120) }} / apiKey=$keyPreview / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()} / payload=$payloadPreview"
+            )
+        }
 
         val retryableStatuses = setOf(429, 500, 502, 503, 504)
         val retryDelaysMs = listOf(1500L, 4000L)
@@ -400,8 +405,10 @@ internal class AiFilterClient(
             return AiFilterBatchEvaluation(failureReason = "AI 응답이 비어 있습니다", rawResponseText = responseText, parsedContentText = content)
         }
 
-        logger("AI raw content 길이=${content.length}")
-        logger("AI raw content 미리보기=${content.take(500)}")
+        if (config.debugLoggingEnabled) {
+            logger("AI raw content 길이=${content.length}")
+            logger("AI raw content 미리보기=${content.take(500)}")
+        }
 
         val parsed = runCatching { JSONObject(content) }.getOrElse {
             logger("AI 배치 JSON 파싱 실패: ${it.message}")

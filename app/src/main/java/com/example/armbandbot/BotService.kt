@@ -2129,6 +2129,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             model = config.aiFilterModel,
                             userPrompt = config.aiFilterUserPrompt,
                             reviewMode = false,
+                            debugLoggingEnabled = config.isDebugMode,
                         ),
                         logger = { if (botId.isNotEmpty()) sendLog("[AI 배치] $it", botId) }
                     ).evaluateBatch(
@@ -2138,7 +2139,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (aiBatchEvaluation.failureReason != null) {
                         flushItems.forEach { queue.addOrReplace(it) }
                         if (botId.isNotEmpty()) {
-                            sendLog("AIFAILSTAMP:b8103ef [AI 배치] AI 배치 호출 실패: ${aiBatchEvaluation.failureReason.take(500)} / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
+                            if (config.isDebugMode) {
+                                sendLog("AIFAILSTAMP:b8103ef [AI 배치] AI 배치 호출 실패: ${aiBatchEvaluation.failureReason.take(500)} / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
+                            } else {
+                                sendLog("[AI 배치] AI 배치 호출 실패: ${aiBatchEvaluation.failureReason.take(500)}", botId)
+                            }
                             sendLog("[AI 배치] 검사 실패로 묶음 ${flushItems.size}건 재큐", botId)
                         }
                     }
