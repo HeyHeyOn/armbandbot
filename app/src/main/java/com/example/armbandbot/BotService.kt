@@ -2178,6 +2178,216 @@ img.written_dccon{max-width:80px;max-height:80px}
                             }
                     }
 
+                    val immediatePostExecutions = aiBatchEvaluation.postDecisions.filter {
+                        it.postNo != postNumStr && it.decision.type == AiFilterDecisionType.BLOCK
+                    }
+                    immediatePostExecutions.forEach { decision ->
+                        val targetInput = flushItems.firstOrNull { it.postNo == decision.postNo }?.postInput
+                        if (targetInput == null) {
+                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                sendLog("[AI 배치][즉시집행 복구] 글 즉시집행 입력 누락 / 글번호: ${decision.postNo}", botId)
+                            }
+                            return@forEach
+                        }
+                        if (config.isDebugMode && botId.isNotEmpty()) {
+                            sendLog("[AI 배치][즉시집행 복구] 글 즉시집행 시작 / 글번호: ${decision.postNo} / reason=${decision.decision.reason} / confidence=${decision.decision.confidence}", botId)
+                        }
+                        runCatching {
+                            val immediatePostDetailUrl = if (gallType == "M") {
+                                "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${decision.postNo}"
+                            } else {
+                                "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${decision.postNo}"
+                            }
+                            val immediatePostDoc = Jsoup.connect(immediatePostDetailUrl)
+                                .userAgent(dcUserAgent)
+                                .header("Cookie", cookie)
+                                .get()
+                            val resolvedPostDate = extractCreationDateFromPostDoc(immediatePostDoc)
+                            val aiPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                            val aiOverride = loadModerationActionOverride(aiPrefs, "ai")
+                            val baseConfig = resolveDefaultModerationActionConfig(config)
+                            val resolvedConfig = resolveModerationActionConfig(
+                                baseConfig = baseConfig,
+                                override = aiOverride,
+                                sourceLabel = "ai_override"
+                            )
+                            if (config.isDebugMode) {
+                                logModerationActionResolution(botId, "ai_post_immediate", aiOverride, resolvedConfig)
+                            }
+                            handleBadPost(
+                                config = config,
+                                botId = botId,
+                                gallType = gallType,
+                                gallId = gallId,
+                                postNumStr = decision.postNo,
+                                postAuthor = targetInput.authorIdOrIp,
+                                postNick = targetInput.nickname,
+                                postDisplayAuthor = if (targetInput.authorIdOrIp.isNotBlank()) "${targetInput.nickname}(${targetInput.authorIdOrIp})" else targetInput.nickname,
+                                postTitle = targetInput.title,
+                                postDate = resolvedPostDate,
+                                cookie = cookie,
+                                pcPostDetailUrl = immediatePostDetailUrl,
+                                tokenToUse = tokenToUse,
+                                actionConfig = resolvedConfig,
+                                isBlacklistedUserId = false,
+                                isBlacklistedUserNick = false,
+                                blockReasonPrefix = "AI 필터 차단",
+                                notiType = "ai",
+                                matchedVoiceIdPost = null,
+                                matchedImageAlt = null,
+                                aiDecision = decision.decision,
+                                aiReviewReason = null,
+                                suspiciousUrlInPost = null,
+                                spamCodeMatchPost = null,
+                                notifyIfEnabled = notifyIfEnabled,
+                                debugDetail = decision.decision.reason,
+                                saveSnapshotFn = {
+                                    if (config.isDebugMode && botId.isNotEmpty()) {
+                                        sendLog("[AI 배치][즉시집행 복구] 글 즉시집행 스냅샷 시도 / 글번호: ${decision.postNo}", botId)
+                                    }
+                                    saveSnapshotFromDocCommon(
+                                        config = config,
+                                        botId = botId,
+                                        gallId = gallId,
+                                        postNumStr = decision.postNo,
+                                        doc = immediatePostDoc,
+                                        comments = null,
+                                        blockedCommentNo = null,
+                                        blockedTs = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                    )
+                                },
+                            )
+                            aiPostPlans.removeAll { it.postNo == decision.postNo }
+                            pendingAiPostPlans[botId] = aiPostPlans
+                            resultCache.remove(decision.postNo)
+                        }.onFailure {
+                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                sendLog("[AI 배치][즉시집행 복구] 글 즉시집행 실패 / 글번호: ${decision.postNo} / error=${it.message ?: "원인 불명"}", botId)
+                            }
+                        }
+                    }
+
+                    val immediateCommentExecutions = aiBatchEvaluation.postDecisions.filter { it.postNo != postNumStr }
+                    immediateCommentExecutions.forEach { postDecision ->
+                        val targetInput = flushItems.firstOrNull { it.postNo == postDecision.postNo }?.postInput
+                        if (targetInput == null) {
+                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 입력 누락 / 글번호: ${postDecision.postNo}", botId)
+                            }
+                            return@forEach
+                        }
+                        postDecision.commentDecisions
+                            .filter { it.decision.type == AiFilterDecisionType.BLOCK }
+                            .forEach { commentDecision ->
+                                val targetComment = targetInput.comments.firstOrNull { it.commentId == commentDecision.commentId }
+                                if (targetComment == null) {
+                                    if (config.isDebugMode && botId.isNotEmpty()) {
+                                        sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 대상 누락 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId}", botId)
+                                    }
+                                    return@forEach
+                                }
+                                if (config.isDebugMode && botId.isNotEmpty()) {
+                                    sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 시작 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId} / reason=${commentDecision.decision.reason} / confidence=${commentDecision.decision.confidence}", botId)
+                                }
+                                runCatching {
+                                    val immediateCommentPostDetailUrl = if (gallType == "M") {
+                                        "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=${postDecision.postNo}"
+                                    } else {
+                                        "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=${postDecision.postNo}"
+                                    }
+                                    val immediateCommentPostDoc = Jsoup.connect(immediateCommentPostDetailUrl)
+                                        .userAgent(dcUserAgent)
+                                        .header("Cookie", cookie)
+                                        .get()
+                                    val esnoToken = immediateCommentPostDoc.select("input[id=e_s_n_o]").attr("value")
+                                    val commentApiResponse = Jsoup.connect("https://gall.dcinside.com/board/comment/")
+                                        .userAgent(dcUserAgent)
+                                        .header("Cookie", cookie)
+                                        .header("Referer", immediateCommentPostDetailUrl)
+                                        .header("X-Requested-With", "XMLHttpRequest")
+                                        .data("id", gallId)
+                                        .data("no", postDecision.postNo)
+                                        .data("cmt_id", gallId)
+                                        .data("cmt_no", postDecision.postNo)
+                                        .data("e_s_n_o", esnoToken)
+                                        .data("comment_page", "1")
+                                        .data("sort", "D")
+                                        .data("_GALLTYPE_", gallType)
+                                        .ignoreContentType(true)
+                                        .method(org.jsoup.Connection.Method.POST)
+                                        .execute()
+                                    val resolvedCommentDate = runCatching {
+                                        val commentsJson = JSONObject(commentApiResponse.body()).optJSONArray("comments") ?: JSONArray()
+                                        var date = ""
+                                        for (i in 0 until commentsJson.length()) {
+                                            val obj = commentsJson.optJSONObject(i) ?: continue
+                                            if (obj.optString("no", "") == commentDecision.commentId) {
+                                                date = normalizeCreationDate(obj.optString("reg_date", obj.optString("date", "")))
+                                                break
+                                            }
+                                        }
+                                        date
+                                    }.getOrDefault("")
+                                    val aiPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                                    val aiOverride = loadModerationActionOverride(aiPrefs, "ai")
+                                    val baseConfig = resolveDefaultModerationActionConfig(config)
+                                    val resolvedConfig = resolveModerationActionConfig(
+                                        baseConfig = baseConfig,
+                                        override = aiOverride,
+                                        sourceLabel = "ai_override"
+                                    )
+                                    if (config.isDebugMode) {
+                                        logModerationActionResolution(botId, "ai_comment_immediate", aiOverride, resolvedConfig)
+                                    }
+                                    handleBadComment(
+                                        config = config,
+                                        botId = botId,
+                                        gallType = gallType,
+                                        gallId = gallId,
+                                        postNumStr = postDecision.postNo,
+                                        commentNo = commentDecision.commentId,
+                                        cmtDisplayAuthor = if (targetComment.authorIdOrIp.isNotBlank()) "${targetComment.nickname}(${targetComment.authorIdOrIp})" else targetComment.nickname,
+                                        cmtNick = targetComment.nickname,
+                                        commentMemo = targetComment.body,
+                                        commentDate = resolvedCommentDate,
+                                        cookie = cookie,
+                                        pcPostDetailUrl = immediateCommentPostDetailUrl,
+                                        tokenToUse = tokenToUse,
+                                        actionConfig = resolvedConfig,
+                                        isBlacklistedCmtUserId = false,
+                                        isBlacklistedCmtUserNick = false,
+                                        blockReasonPrefixCmt = "AI 댓글 차단",
+                                        notiTypeCmt = "ai",
+                                        matchedVoiceIdComment = null,
+                                        suspiciousUrlInComment = null,
+                                        spamCodeMatchComment = null,
+                                        notifyIfEnabled = notifyIfEnabled,
+                                        debugDetail = "AI 댓글 배치 즉시집행",
+                                        saveSnapshotFn = {
+                                            if (config.isDebugMode && botId.isNotEmpty()) {
+                                                sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 스냅샷 시도 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId}", botId)
+                                            }
+                                            captureCommentBlockSnapshot(
+                                                botId = botId,
+                                                gallType = gallType,
+                                                gallId = gallId,
+                                                postNumStr = postDecision.postNo,
+                                                commentNo = commentDecision.commentId,
+                                                cookie = cookie,
+                                                comments = targetInput.comments
+                                            )
+                                        }
+                                    )
+                                    aiCommentPlans.removeAll { it.postNo == postDecision.postNo && it.commentNo == commentDecision.commentId }
+                                    pendingAiCommentPlans[botId] = aiCommentPlans
+                                }.onFailure {
+                                    if (config.isDebugMode && botId.isNotEmpty()) {
+                                        sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 실패 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId} / error=${it.message ?: "원인 불명"}", botId)
+                                    }
+                                }
+                            }
+                    }
+
                     flushItems.forEach { flushedItem ->
                         val flushedDecision = resultCache[flushedItem.postNo] ?: return@forEach
                         if (botId.isNotEmpty() && config.isDebugMode && flushedItem.postNo != postNumStr) {
