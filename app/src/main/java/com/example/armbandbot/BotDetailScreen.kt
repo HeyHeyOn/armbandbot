@@ -420,6 +420,13 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         var rememberedPostCount by remember { mutableStateOf(0) }
         var isDebugMode by remember { mutableStateOf(botPref.getBoolean("is_debug_mode", false)) }
+        var isSpamBurstProtectionEnabled by remember { mutableStateOf(botPref.getBoolean("is_spam_burst_protection_enabled", false)) }
+        var spamBurstWindowMinutesText by remember { mutableStateOf(botPref.getInt("spam_burst_window_minutes", 3).toString()) }
+        var spamBurstYudongThresholdText by remember { mutableStateOf(botPref.getInt("spam_burst_yudong_threshold", 10).toString()) }
+        var spamBurstKkangThresholdText by remember { mutableStateOf(botPref.getInt("spam_burst_kkang_threshold", 10).toString()) }
+        var spamBurstDurationMinutesText by remember { mutableStateOf(botPref.getInt("spam_burst_duration_minutes", 10).toString()) }
+        var spamBurstTargetYudong by remember { mutableStateOf(botPref.getBoolean("spam_burst_target_yudong", true)) }
+        var spamBurstTargetKkang by remember { mutableStateOf(botPref.getBoolean("spam_burst_target_kkang", true)) }
         var lastCheckedNumber by remember { mutableStateOf(GlobalBotState.lastCheckedNumbers[botId] ?: 0) }
         val logListState = rememberLazyListState()
 
@@ -1322,6 +1329,57 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
                                     }
                                 }
+                                "SPAM_BURST" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("도배 방지", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("유동/깡계 급증 시 일정 시간 신규 글을 삭제합니다.", fontSize = 12.sp, color = subTextColor)
+                                                }
+                                                Switch(checked = isSpamBurstProtectionEnabled, onCheckedChange = {
+                                                    isSpamBurstProtectionEnabled = it
+                                                    botPref.edit().putBoolean("is_spam_burst_protection_enabled", it).apply()
+                                                }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                            }
+                                        }
+                                    }
+                                    Column(modifier = if (!isSpamBurstProtectionEnabled) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
+                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("감지 기준 시간(분)", fontWeight = FontWeight.Bold, color = textColor)
+                                                    OutlinedTextField(value = spamBurstWindowMinutesText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstWindowMinutesText = it; botPref.edit().putInt("spam_burst_window_minutes", it.toIntOrNull() ?: 3).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("유동 글 임계치", fontWeight = FontWeight.Bold, color = textColor)
+                                                    OutlinedTextField(value = spamBurstYudongThresholdText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstYudongThresholdText = it; botPref.edit().putInt("spam_burst_yudong_threshold", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("깡계 글 임계치", fontWeight = FontWeight.Bold, color = textColor)
+                                                    OutlinedTextField(value = spamBurstKkangThresholdText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstKkangThresholdText = it; botPref.edit().putInt("spam_burst_kkang_threshold", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("대응 지속 시간(분)", fontWeight = FontWeight.Bold, color = textColor)
+                                                    OutlinedTextField(value = spamBurstDurationMinutesText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstDurationMinutesText = it; botPref.edit().putInt("spam_burst_duration_minutes", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("유동 대상", color = textColor)
+                                                    Switch(checked = spamBurstTargetYudong, onCheckedChange = { spamBurstTargetYudong = it; botPref.edit().putBoolean("spam_burst_target_yudong", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                                }
+                                                Divider(color = dividerColor)
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                    Text("깡계 대상", color = textColor)
+                                                    Switch(checked = spamBurstTargetKkang, onCheckedChange = { spamBurstTargetKkang = it; botPref.edit().putBoolean("spam_burst_target_kkang", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1397,6 +1455,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 ModernSettingItem("닉네임 필터", "닉네임 기반 차단 설정", Icons.Filled.Face, colors, isNicknameFilterMode, { isNicknameFilterMode = it; botPref.edit().putBoolean("is_nickname_filter_mode", it).apply() }) { currentSubScreen = "NICKNAME" }
                                 ModernSettingItem("유동 필터", "비로그인 유저 이용 제한", Icons.Filled.Lock, colors) { currentSubScreen = "YUDONG" }
                                 ModernSettingItem("깡계 필터", "글/댓글 수 미달 유저 차단", Icons.Filled.Info, colors, isKkangFilterMode, { isKkangFilterMode = it; botPref.edit().putBoolean("is_kkang_filter_mode", it).apply() }) { currentSubScreen = "KKANG" }
+                                ModernSettingItem("도배 방지", "유동/깡계 급증 시 일정 시간 신규 글 삭제", Icons.Filled.Warning, colors, isSpamBurstProtectionEnabled, { isSpamBurstProtectionEnabled = it; botPref.edit().putBoolean("is_spam_burst_protection_enabled", it).apply() }) { currentSubScreen = "SPAM_BURST" }
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("고급 미디어 필터", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
