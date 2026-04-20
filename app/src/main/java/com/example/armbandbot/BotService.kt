@@ -2034,11 +2034,31 @@ img.written_dccon{max-width:80px;max-height:80px}
                 sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 정상${if (postAnalysis.isWhitelistedUser) " (화이트리스트 통과)" else ""}", botId)
             }
         }
-        if (postAnalysis.action == PostModerationAction.BLOCK_EXECUTE) {
+        val spamBurstCandidateSource = when {
+            postUid.isBlank() -> ModerationFilterSource.YUDONG
+            config.isKkangFilterMode -> {
+                val gallogStats = getGallogStats(
+                    userId = postUid,
+                    gallogCache = gallogCache,
+                    tokenToUse = tokenToUse,
+                    cookie = cookie,
+                    logTag = "도배 방지 깡계 감지 gallog 조회 실패",
+                    botId = botId,
+                    isDebugMode = config.isDebugMode
+                )
+                if (gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin) {
+                    ModerationFilterSource.KKANG
+                } else {
+                    ModerationFilterSource.UNKNOWN
+                }
+            }
+            else -> ModerationFilterSource.UNKNOWN
+        }
+        if (spamBurstCandidateSource == ModerationFilterSource.YUDONG || spamBurstCandidateSource == ModerationFilterSource.KKANG) {
             recordSpamBurstEvent(
                 config = config,
                 botId = botId,
-                filterSource = postAnalysis.filterSource,
+                filterSource = spamBurstCandidateSource,
                 postNo = postNumStr
             )
         }
@@ -2046,7 +2066,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         val spamBurstDeleteActive = shouldDeletePostBySpamBurst(
             config = config,
             botId = botId,
-            filterSource = postAnalysis.filterSource
+            filterSource = if (spamBurstCandidateSource != ModerationFilterSource.UNKNOWN) spamBurstCandidateSource else postAnalysis.filterSource
         )
         if (spamBurstDeleteActive) {
             val deleteResponse = executeDeletePostRequest(
