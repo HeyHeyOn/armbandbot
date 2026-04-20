@@ -2152,29 +2152,36 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 category = decision.decision.category,
                                 confidence = decision.decision.confidence
                             )
+                            if (botId.isNotEmpty() && config.isDebugMode) {
+                                sendLog("[AI 배치][즉시집행 복구] 글 실행계획 추가 / 글번호: ${decision.postNo} / reason=${decision.decision.reason} / category=${decision.decision.category} / confidence=${decision.decision.confidence}", botId)
+                            }
                         }
 
-                        if (decision.postNo == postNumStr) {
-                            decision.commentDecisions
-                                .filter { it.decision.type == AiFilterDecisionType.BLOCK }
-                                .forEach { commentDecision ->
-                                    val commentKey = "$postNumStr:${commentDecision.commentId}"
-                                    if (aiCommentPlanKeys.add(commentKey)) {
-                                        aiCommentPlans += AiCommentExecutionPlan(
-                                            postNo = postNumStr,
-                                            commentNo = commentDecision.commentId,
-                                            reason = commentDecision.decision.reason,
-                                            category = commentDecision.decision.category,
-                                            confidence = commentDecision.decision.confidence
-                                        )
+                        decision.commentDecisions
+                            .filter { it.decision.type == AiFilterDecisionType.BLOCK }
+                            .forEach { commentDecision ->
+                                val commentKey = "${decision.postNo}:${commentDecision.commentId}"
+                                if (aiCommentPlanKeys.add(commentKey)) {
+                                    aiCommentPlans += AiCommentExecutionPlan(
+                                        postNo = decision.postNo,
+                                        commentNo = commentDecision.commentId,
+                                        reason = commentDecision.decision.reason,
+                                        category = commentDecision.decision.category,
+                                        confidence = commentDecision.decision.confidence
+                                    )
+                                    if (botId.isNotEmpty() && config.isDebugMode) {
+                                        sendLog("[AI 배치][즉시집행 복구] 댓글 실행계획 추가 / 글번호: ${decision.postNo} / comment=${commentDecision.commentId} / reason=${commentDecision.decision.reason} / category=${commentDecision.decision.category} / confidence=${commentDecision.decision.confidence}", botId)
                                     }
                                 }
-                        }
+                            }
                     }
 
-                    // 임시 안정화: 현재 글 외 다른 글/댓글에 대한 AI 즉시집행은 비활성화합니다.
-                    // AI 개별차단 추가 시점과 함께 도입된 배치 즉시집행 경로를 제거하고,
-                    // 현재 글 중심의 기존 안정 흐름만 유지합니다.
+                    flushItems.forEach { flushedItem ->
+                        val flushedDecision = resultCache[flushedItem.postNo] ?: return@forEach
+                        if (botId.isNotEmpty() && config.isDebugMode && flushedItem.postNo != postNumStr) {
+                            sendLog("[AI 배치][즉시집행 복구] 대기 결과 유지 / 글번호: ${flushedItem.postNo} / postDecision=${flushedDecision.decision.type} / commentDecisions=${flushedDecision.commentDecisions.size}", botId)
+                        }
+                    }
 
                     val batchPostDecision = resultCache.remove(postNumStr)
                     if (batchPostDecision != null && config.isDebugMode && botId.isNotEmpty()) {
