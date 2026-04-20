@@ -36,6 +36,8 @@ class BotService : Service() {
     private val aiBatchResults = ConcurrentHashMap<String, ConcurrentHashMap<String, AiFilterPostDecision>>()
     private val pendingAiPostPlans = ConcurrentHashMap<String, MutableList<AiPostExecutionPlan>>()
     private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
+    private val spamBurstRecentEvents = ConcurrentHashMap<String, MutableList<SpamBurstEvent>>()
+    private val spamBurstStates = ConcurrentHashMap<String, SpamBurstState>()
     private var wakeLock: PowerManager.WakeLock? = null
     private val autoLoginCooldownMs = 10 * 60 * 1000L
     private val autoLoginMaxAttempts = 3
@@ -90,6 +92,14 @@ class BotService : Service() {
         val isYudongCommentBlock: Boolean,
         val isYudongImageBlock: Boolean,
         val isYudongVoiceBlock: Boolean,
+
+        val isSpamBurstProtectionEnabled: Boolean,
+        val spamBurstWindowMinutes: Int,
+        val spamBurstYudongThreshold: Int,
+        val spamBurstKkangThreshold: Int,
+        val spamBurstDurationMinutes: Int,
+        val spamBurstTargetYudong: Boolean,
+        val spamBurstTargetKkang: Boolean,
 
         val isUrlFilterMode: Boolean,
         val urlWhitelistList: List<String>,
@@ -3099,6 +3109,16 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
     }
 
+    private fun pruneSpamBurstState(botId: String, now: Long = System.currentTimeMillis()): SpamBurstState? {
+        val current = spamBurstStates[botId] ?: return null
+        if (current.isActive(now)) return current
+        spamBurstStates.remove(botId)
+        if (botId.isNotEmpty()) {
+            sendLog("[도배 방지] 감지 종료 / 지속 시간 만료", botId)
+        }
+        return null
+    }
+
     private fun executeModerationAction(
         actionConfig: ModerationActionConfig,
         cookie: String,
@@ -3229,6 +3249,14 @@ img.written_dccon{max-width:80px;max-height:80px}
             isYudongCommentBlock = botPref.getBoolean("is_yudong_comment_block", false),
             isYudongImageBlock = botPref.getBoolean("is_yudong_image_block", false),
             isYudongVoiceBlock = botPref.getBoolean("is_yudong_voice_block", false),
+
+            isSpamBurstProtectionEnabled = botPref.getBoolean("is_spam_burst_protection_enabled", false),
+            spamBurstWindowMinutes = botPref.getInt("spam_burst_window_minutes", 3),
+            spamBurstYudongThreshold = botPref.getInt("spam_burst_yudong_threshold", 10),
+            spamBurstKkangThreshold = botPref.getInt("spam_burst_kkang_threshold", 10),
+            spamBurstDurationMinutes = botPref.getInt("spam_burst_duration_minutes", 10),
+            spamBurstTargetYudong = botPref.getBoolean("spam_burst_target_yudong", true),
+            spamBurstTargetKkang = botPref.getBoolean("spam_burst_target_kkang", true),
 
             isUrlFilterMode = botPref.getBoolean("is_url_filter_mode", false),
             urlWhitelistList = botPref.getStringSet("url_whitelist", setOf())
@@ -3819,6 +3847,22 @@ img.written_dccon{max-width:80px;max-height:80px}
         val gallType: String,
         val listQueryOptions: ListQueryOptions = ListQueryOptions()
     )
+
+    private data class SpamBurstEvent(
+        val detectedAt: Long,
+        val type: ModerationFilterSource,
+        val postNo: String
+    )
+
+    private data class SpamBurstState(
+        val startedAt: Long,
+        val endsAt: Long,
+        val reason: String,
+        val targetYudong: Boolean,
+        val targetKkang: Boolean
+    ) {
+        fun isActive(now: Long): Boolean = now < endsAt
+    }
 
     private data class GallogStats(
         val postCount: Int,
