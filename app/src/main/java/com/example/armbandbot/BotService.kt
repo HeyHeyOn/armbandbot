@@ -3198,7 +3198,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 (it.type == ModerationFilterSource.YUDONG && config.spamBurstTargetYudong) ||
                     (it.type == ModerationFilterSource.KKANG && config.spamBurstTargetKkang)
             }
-            if (targetEvents.size < 2) return
+            if (targetEvents.size < sampleSize) return
 
             val existing = pruneSpamBurstState(botId, now)
             if (existing != null) return
@@ -3220,7 +3220,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 targetYudong = config.spamBurstTargetYudong,
                 targetKkang = config.spamBurstTargetKkang,
                 anchorPostNo = anchorEvent.postNo,
-                anchorCreatedAtMillis = anchorEvent.createdAtMillis
+                anchorCreatedAtMillis = anchorEvent.createdAtMillis,
+                samplePostNos = targetEvents.map { it.postNo }.toSet()
             )
             spamBurstStates[botId] = state
             sendLog("[도배 방지] 감지 시작 / 사유: $reason / anchor=${anchorEvent.postNo} / 지속=${config.spamBurstDurationMinutes}분", botId)
@@ -3244,11 +3245,12 @@ img.written_dccon{max-width:80px;max-height:80px}
             else -> false
         }
         if (!isTarget) return false
+        if (state.samplePostNos.contains(postNo)) return true
         if (createdAtMillis < state.anchorCreatedAtMillis) return false
         val currentPostNo = postNo.toIntOrNull() ?: Int.MIN_VALUE
         val anchorPostNo = state.anchorPostNo.toIntOrNull() ?: Int.MIN_VALUE
-        if (createdAtMillis == state.anchorCreatedAtMillis && currentPostNo <= anchorPostNo) return false
-        return true
+        if (createdAtMillis == state.anchorCreatedAtMillis && currentPostNo < anchorPostNo) return false
+        return currentPostNo > anchorPostNo || createdAtMillis > state.anchorCreatedAtMillis
     }
 
     private fun executeModerationAction(
@@ -3993,7 +3995,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         val targetYudong: Boolean,
         val targetKkang: Boolean,
         val anchorPostNo: String,
-        val anchorCreatedAtMillis: Long
+        val anchorCreatedAtMillis: Long,
+        val samplePostNos: Set<String>
     ) {
         fun isActive(now: Long): Boolean = now < endsAt
     }
