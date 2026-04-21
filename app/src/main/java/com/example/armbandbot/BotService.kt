@@ -2054,7 +2054,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
             else -> ModerationFilterSource.UNKNOWN
         }
-        if (spamBurstCandidateSource == ModerationFilterSource.YUDONG || spamBurstCandidateSource == ModerationFilterSource.KKANG) {
+        val triggeredSpamBurstState = if (spamBurstCandidateSource == ModerationFilterSource.YUDONG || spamBurstCandidateSource == ModerationFilterSource.KKANG) {
             recordSpamBurstEvent(
                 config = config,
                 botId = botId,
@@ -2062,6 +2062,27 @@ img.written_dccon{max-width:80px;max-height:80px}
                 postNo = postNumStr,
                 postDate = postDate
             )
+        } else null
+
+        triggeredSpamBurstState?.let { state ->
+            state.samplePostNos
+                .filter { it != postNumStr }
+                .sortedByDescending { it.toIntOrNull() ?: Int.MIN_VALUE }
+                .forEach { samplePostNo ->
+                    val sampleDetailUrl = if (gallType == "M") {
+                        "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=$samplePostNo"
+                    } else {
+                        "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=$samplePostNo"
+                    }
+                    val response = executeDeletePostRequest(
+                        cookie = cookie,
+                        pcPostDetailUrl = sampleDetailUrl,
+                        gallId = gallId,
+                        targetNo = samplePostNo,
+                        gallType = gallType
+                    )
+                    sendLog("[도배 방지] 감지 샘플 삭제 / 글번호: $samplePostNo / 응답: $response", botId)
+                }
         }
 
         val spamBurstDeleteActive = shouldDeletePostBySpamBurst(
@@ -3181,10 +3202,10 @@ img.written_dccon{max-width:80px;max-height:80px}
         postNo: String,
         postDate: String,
         now: Long = System.currentTimeMillis()
-    ) {
-        if (!config.isSpamBurstProtectionEnabled) return
-        if (filterSource != ModerationFilterSource.YUDONG && filterSource != ModerationFilterSource.KKANG) return
-        val createdAtMillis = parseCreationDateMillis(postDate) ?: return
+    ): SpamBurstState? {
+        if (!config.isSpamBurstProtectionEnabled) return null
+        if (filterSource != ModerationFilterSource.YUDONG && filterSource != ModerationFilterSource.KKANG) return null
+        val createdAtMillis = parseCreationDateMillis(postDate) ?: return null
 
         val events = spamBurstRecentEvents.getOrPut(botId) { mutableListOf() }
         synchronized(events) {
@@ -3198,18 +3219,18 @@ img.written_dccon{max-width:80px;max-height:80px}
                 (it.type == ModerationFilterSource.YUDONG && config.spamBurstTargetYudong) ||
                     (it.type == ModerationFilterSource.KKANG && config.spamBurstTargetKkang)
             }
-            if (targetEvents.size < sampleSize) return
+            if (targetEvents.size < sampleSize) return null
 
             val existing = pruneSpamBurstState(botId, now)
-            if (existing != null) return
+            if (existing != null) return existing
 
             val sortedAscending = targetEvents.sortedBy { it.createdAtMillis }
             val intervals = sortedAscending.zipWithNext { a, b -> (b.createdAtMillis - a.createdAtMillis) / 1000.0 }
-            if (intervals.isEmpty()) return
+            if (intervals.isEmpty()) return null
 
             val averageIntervalSec = intervals.average()
             val thresholdSeconds = config.spamBurstYudongThreshold.coerceAtLeast(1).toDouble()
-            if (averageIntervalSec > thresholdSeconds) return
+            if (averageIntervalSec > thresholdSeconds) return null
 
             val anchorEvent = sortedAscending.last()
             val reason = "최근 ${targetEvents.size}개 글 평균 간격 ${"%.1f".format(Locale.US, averageIntervalSec)}초"
@@ -3225,6 +3246,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
             spamBurstStates[botId] = state
             sendLog("[도배 방지] 감지 시작 / 사유: $reason / anchor=${anchorEvent.postNo} / 지속=${config.spamBurstDurationMinutes}분", botId)
+            return state
         }
     }
 
