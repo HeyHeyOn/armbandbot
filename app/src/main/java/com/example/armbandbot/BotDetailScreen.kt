@@ -1,4 +1,4 @@
-﻿package com.heyheyon.armbandbot
+package com.heyheyon.armbandbot
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -423,8 +423,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isSpamBurstProtectionEnabled by remember { mutableStateOf(botPref.getBoolean("is_spam_burst_protection_enabled", false)) }
         var spamBurstWindowMinutesText by remember { mutableStateOf(botPref.getInt("spam_burst_window_minutes", 3).toString()) }
         var spamBurstYudongThresholdText by remember { mutableStateOf(botPref.getInt("spam_burst_yudong_threshold", 10).toString()) }
-        var spamBurstKkangThresholdText by remember { mutableStateOf(botPref.getInt("spam_burst_kkang_threshold", 10).toString()) }
-        var spamBurstDurationMinutesText by remember { mutableStateOf(botPref.getInt("spam_burst_duration_minutes", 10).toString()) }
+                var spamBurstDurationMinutesText by remember { mutableStateOf(botPref.getInt("spam_burst_duration_minutes", 10).toString()) }
         var spamBurstTargetYudong by remember { mutableStateOf(botPref.getBoolean("spam_burst_target_yudong", true)) }
         var spamBurstTargetKkang by remember { mutableStateOf(botPref.getBoolean("spam_burst_target_kkang", true)) }
         var lastCheckedNumber by remember { mutableStateOf(GlobalBotState.lastCheckedNumbers[botId] ?: 0) }
@@ -1358,8 +1357,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 }
                                                 Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("깡계 보조 기준", fontWeight = FontWeight.Bold, color = textColor)
-                                                    OutlinedTextField(value = spamBurstKkangThresholdText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstKkangThresholdText = it; botPref.edit().putInt("spam_burst_kkang_threshold", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                    Text("깡계 기준 안내", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("깡계 대상 판정은 기존 깡계 필터의 최소 글 수·댓글 수 설정을 사용합니다.", fontSize = 12.sp, color = subTextColor)
                                                 }
                                                 Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {

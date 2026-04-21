@@ -1,4 +1,4 @@
-﻿package com.heyheyon.armbandbot
+package com.heyheyon.armbandbot
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -2035,18 +2035,26 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
         val spamBurstCandidateSource = when {
-            postUid.isBlank() -> ModerationFilterSource.YUDONG
-            config.isKkangFilterMode -> {
+            config.spamBurstTargetYudong && postUid.isBlank() -> ModerationFilterSource.YUDONG
+            config.spamBurstTargetKkang -> {
                 val gallogStats = getGallogStats(
                     userId = postUid,
                     gallogCache = gallogCache,
                     tokenToUse = tokenToUse,
                     cookie = cookie,
-                    logTag = "도배 방지 깡계 감지 gallog 조회 실패",
+                    logTag = "도배 방지 후보 gallog 조회 실패",
                     botId = botId,
                     isDebugMode = config.isDebugMode
                 )
-                if (gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin) {
+                val isKkangCandidate = postUid.isNotBlank() &&
+                    (gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin)
+                if (config.isDebugMode) {
+                    sendLog(
+                        "[디버그][도배 방지/깡계 후보] userId=${if (postUid.isBlank()) "(blank)" else postUid} / 글=${gallogStats.postCount}/${config.kkangPostMin} / 댓글=${gallogStats.commentCount}/${config.kkangCommentMin} / 결과=${if (isKkangCandidate) "KKANG" else "UNKNOWN"}",
+                        botId
+                    )
+                }
+                if (isKkangCandidate) {
                     ModerationFilterSource.KKANG
                 } else {
                     ModerationFilterSource.UNKNOWN
@@ -2081,10 +2089,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                         targetNo = samplePostNo,
                         gallType = gallType
                     )
+                    val succeeded = response.contains("\"result\":\"success\"")
+                    if (succeeded) {
+                        state.samplePostNos.remove(samplePostNo)
+                    }
                     sendLog("[도배 방지] 감지 샘플 삭제 / 글번호: $samplePostNo / 응답: $response", botId)
                 }
         }
-
         val spamBurstDeleteActive = shouldDeletePostBySpamBurst(
             config = config,
             botId = botId,
@@ -3242,7 +3253,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 targetKkang = config.spamBurstTargetKkang,
                 anchorPostNo = anchorEvent.postNo,
                 anchorCreatedAtMillis = anchorEvent.createdAtMillis,
-                samplePostNos = targetEvents.map { it.postNo }.toSet()
+                samplePostNos = targetEvents.map { it.postNo }.toMutableSet()
             )
             spamBurstStates[botId] = state
             sendLog("[도배 방지] 감지 시작 / 사유: $reason / anchor=${anchorEvent.postNo} / 지속=${config.spamBurstDurationMinutes}분", botId)
@@ -4018,7 +4029,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         val targetKkang: Boolean,
         val anchorPostNo: String,
         val anchorCreatedAtMillis: Long,
-        val samplePostNos: Set<String>
+        val samplePostNos: MutableSet<String>
     ) {
         fun isActive(now: Long): Boolean = now < endsAt
     }
