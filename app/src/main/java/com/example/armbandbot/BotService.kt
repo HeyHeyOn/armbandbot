@@ -2059,14 +2059,17 @@ img.written_dccon{max-width:80px;max-height:80px}
                 config = config,
                 botId = botId,
                 filterSource = spamBurstCandidateSource,
-                postNo = postNumStr
+                postNo = postNumStr,
+                postDate = postDate
             )
         }
 
         val spamBurstDeleteActive = shouldDeletePostBySpamBurst(
             config = config,
             botId = botId,
-            filterSource = if (spamBurstCandidateSource != ModerationFilterSource.UNKNOWN) spamBurstCandidateSource else postAnalysis.filterSource
+            filterSource = if (spamBurstCandidateSource != ModerationFilterSource.UNKNOWN) spamBurstCandidateSource else postAnalysis.filterSource,
+            postNo = postNumStr,
+            postDate = postDate
         )
         if (spamBurstDeleteActive) {
             val deleteResponse = executeDeletePostRequest(
@@ -3164,45 +3167,63 @@ img.written_dccon{max-width:80px;max-height:80px}
         return null
     }
 
+    private fun parseCreationDateMillis(postDate: String): Long? {
+        if (postDate.isBlank()) return null
+        return runCatching {
+            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(postDate)?.time
+        }.getOrNull()
+    }
+
     private fun recordSpamBurstEvent(
         config: BotConfig,
         botId: String,
         filterSource: ModerationFilterSource,
         postNo: String,
+        postDate: String,
         now: Long = System.currentTimeMillis()
     ) {
         if (!config.isSpamBurstProtectionEnabled) return
         if (filterSource != ModerationFilterSource.YUDONG && filterSource != ModerationFilterSource.KKANG) return
+        val createdAtMillis = parseCreationDateMillis(postDate) ?: return
 
-        val windowStart = now - (config.spamBurstWindowMinutes.coerceAtLeast(1) * 60_000L)
         val events = spamBurstRecentEvents.getOrPut(botId) { mutableListOf() }
         synchronized(events) {
-            events.removeAll { it.detectedAt < windowStart }
-            events.add(SpamBurstEvent(now, filterSource, postNo))
+            events.removeAll { it.postNo == postNo }
+            events.add(SpamBurstEvent(createdAtMillis, filterSource, postNo))
+            events.sortByDescending { it.createdAtMillis }
 
-            val yudongCount = events.count { it.type == ModerationFilterSource.YUDONG }
-            val kkangCount = events.count { it.type == ModerationFilterSource.KKANG }
+            val sampleSize = config.spamBurstWindowMinutes.coerceAtLeast(2)
+            val sampledEvents = events.take(sampleSize)
+            val targetEvents = sampledEvents.filter {
+                (it.type == ModerationFilterSource.YUDONG && config.spamBurstTargetYudong) ||
+                    (it.type == ModerationFilterSource.KKANG && config.spamBurstTargetKkang)
+            }
+            if (targetEvents.size < 2) return
+
             val existing = pruneSpamBurstState(botId, now)
             if (existing != null) return
 
-            val shouldTriggerYudong = config.spamBurstTargetYudong && yudongCount >= config.spamBurstYudongThreshold
-            val shouldTriggerKkang = config.spamBurstTargetKkang && kkangCount >= config.spamBurstKkangThreshold
-            if (!shouldTriggerYudong && !shouldTriggerKkang) return
+            val sortedAscending = targetEvents.sortedBy { it.createdAtMillis }
+            val intervals = sortedAscending.zipWithNext { a, b -> (b.createdAtMillis - a.createdAtMillis) / 1000.0 }
+            if (intervals.isEmpty()) return
 
-            val reason = when {
-                shouldTriggerYudong && shouldTriggerKkang -> "최근 ${config.spamBurstWindowMinutes}분 유동/깡계 글 급증"
-                shouldTriggerYudong -> "최근 ${config.spamBurstWindowMinutes}분 유동 글 급증"
-                else -> "최근 ${config.spamBurstWindowMinutes}분 깡계 글 급증"
-            }
+            val averageIntervalSec = intervals.average()
+            val thresholdSeconds = config.spamBurstYudongThreshold.coerceAtLeast(1).toDouble()
+            if (averageIntervalSec > thresholdSeconds) return
+
+            val anchorEvent = sortedAscending.last()
+            val reason = "최근 ${targetEvents.size}개 글 평균 간격 ${"%.1f".format(Locale.US, averageIntervalSec)}초"
             val state = SpamBurstState(
                 startedAt = now,
                 endsAt = now + (config.spamBurstDurationMinutes.coerceAtLeast(1) * 60_000L),
                 reason = reason,
                 targetYudong = config.spamBurstTargetYudong,
-                targetKkang = config.spamBurstTargetKkang
+                targetKkang = config.spamBurstTargetKkang,
+                anchorPostNo = anchorEvent.postNo,
+                anchorCreatedAtMillis = anchorEvent.createdAtMillis
             )
             spamBurstStates[botId] = state
-            sendLog("[도배 방지] 감지 시작 / 사유: $reason / 지속=${config.spamBurstDurationMinutes}분 / 기준글=$postNo", botId)
+            sendLog("[도배 방지] 감지 시작 / 사유: $reason / anchor=${anchorEvent.postNo} / 지속=${config.spamBurstDurationMinutes}분", botId)
         }
     }
 
@@ -3210,15 +3231,24 @@ img.written_dccon{max-width:80px;max-height:80px}
         config: BotConfig,
         botId: String,
         filterSource: ModerationFilterSource,
+        postNo: String,
+        postDate: String,
         now: Long = System.currentTimeMillis()
     ): Boolean {
         if (!config.isSpamBurstProtectionEnabled) return false
         val state = pruneSpamBurstState(botId, now) ?: return false
-        return when (filterSource) {
+        val createdAtMillis = parseCreationDateMillis(postDate) ?: return false
+        val isTarget = when (filterSource) {
             ModerationFilterSource.YUDONG -> state.targetYudong
             ModerationFilterSource.KKANG -> state.targetKkang
             else -> false
         }
+        if (!isTarget) return false
+        if (createdAtMillis < state.anchorCreatedAtMillis) return false
+        val currentPostNo = postNo.toIntOrNull() ?: Int.MIN_VALUE
+        val anchorPostNo = state.anchorPostNo.toIntOrNull() ?: Int.MIN_VALUE
+        if (createdAtMillis == state.anchorCreatedAtMillis && currentPostNo <= anchorPostNo) return false
+        return true
     }
 
     private fun executeModerationAction(
@@ -3951,7 +3981,7 @@ img.written_dccon{max-width:80px;max-height:80px}
     )
 
     private data class SpamBurstEvent(
-        val detectedAt: Long,
+        val createdAtMillis: Long,
         val type: ModerationFilterSource,
         val postNo: String
     )
@@ -3961,7 +3991,9 @@ img.written_dccon{max-width:80px;max-height:80px}
         val endsAt: Long,
         val reason: String,
         val targetYudong: Boolean,
-        val targetKkang: Boolean
+        val targetKkang: Boolean,
+        val anchorPostNo: String,
+        val anchorCreatedAtMillis: Long
     ) {
         fun isActive(now: Long): Boolean = now < endsAt
     }
