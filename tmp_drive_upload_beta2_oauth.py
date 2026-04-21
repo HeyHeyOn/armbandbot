@@ -1,7 +1,7 @@
 import json
 import requests
 
-TOKEN = 'ya29.a0Aa7MYip7_di-dGTN5cI439xfO204PWGV0l2zhe4wJD8SaPm39ggSZgjBza_27eO3ilJhuOqv_uVDJmORX8Wh6TuWKWrO5JN3ljgqqsFzlNQuuQeNF3n70shFzunjNhdFzVKn-hame-XMQHxhzCwEVgGxkjg9K8DgnMzQD8uCXlE4C0Fj4TG6ZPbE6bveXhWQ3gYLr4waCgYKAYUSAQ8SFQHGX2Miaq6drr2u-ddkNE16IG9-Cw0206'
+TOKEN = 'ya29.a0Aa7MYipmvGKlmOfrgW33KQwL9X5QAtt3SDJ6RucjXMlX6mWvKsi-ry20Ldc8jbK5giMX8WCI8CAgFqBWme5oPvAvnktyQLLeLizIasMOJBNFTnasWb35xX4jIcL7XY43Dv-mAwlz6jMq6Q9l1eZzA19OSzxnmRapfXg9qwLWKJnbr2GFlV3D8BYU_DahtbKZnK34VQIaCgYKAR4SAQ8SFQHGX2MiZi2M1NtEkrwxCzXojq3Qvw0206'
 url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart'
 metadata = {
     'name': '완장봇_v1.3.1_beta2.apk',
