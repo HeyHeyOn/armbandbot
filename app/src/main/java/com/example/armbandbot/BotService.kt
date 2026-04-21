@@ -208,6 +208,29 @@ class BotService : Service() {
         val isWhitelistedUser: Boolean
     )
 
+    private data class FilterToggleState(
+        val userEnabled: Boolean,
+        val nicknameEnabled: Boolean,
+        val anyUserFilterEnabled: Boolean,
+        val keywordEnabled: Boolean,
+        val urlEnabled: Boolean,
+        val spamEnabled: Boolean,
+        val imageEnabled: Boolean,
+        val voiceEnabled: Boolean,
+        val yudongPostEnabled: Boolean,
+        val yudongCommentEnabled: Boolean,
+        val yudongImageEnabled: Boolean,
+        val yudongVoiceEnabled: Boolean,
+        val anyYudongPostEnabled: Boolean,
+        val anyYudongCommentEnabled: Boolean,
+        val kkangPostEnabled: Boolean,
+        val kkangCommentEnabled: Boolean,
+        val kkangImageEnabled: Boolean,
+        val kkangVoiceEnabled: Boolean,
+        val anyKkangPostEnabled: Boolean,
+        val anyKkangCommentEnabled: Boolean
+    )
+
     private data class BlockExecutionResult(
         val blockReason: String?,
         val snapshotPath: String?
@@ -1215,10 +1238,21 @@ class BotService : Service() {
         if (config.isDebugMode) {
             sendLog("[디버그][페이지] 처리 URL 접근 시작: $pageUrl", botId)
         }
-        val document = Jsoup.connect(pageUrl)
-            .userAgent("Mozilla/5.0")
-            .header("Cookie", cookie)
-            .get()
+        val pageFetchStartedAt = System.currentTimeMillis()
+        val document = try {
+            Jsoup.connect(pageUrl)
+                .userAgent("Mozilla/5.0")
+                .header("Cookie", cookie)
+                .timeout(15_000)
+                .get()
+        } catch (e: Exception) {
+            val elapsedMs = System.currentTimeMillis() - pageFetchStartedAt
+            sendLog("[오류][페이지] 목록 fetch 실패 / ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"} / ${elapsedMs}ms / url=$pageUrl", botId)
+            throw e
+        }
+        if (config.isDebugMode) {
+            sendLog("[디버그][성능] 페이지 fetch / ${System.currentTimeMillis() - pageFetchStartedAt}ms / url=$pageUrl", botId)
+        }
         val managerPermissionStatus = evaluateManagerPermission(document, pageUrl)
         if (config.isDebugMode) {
             sendLog("[디버그][페이지] 매니저 권한 상태: ${managerPermissionStatus.logLabel}", botId)
@@ -1397,7 +1431,7 @@ class BotService : Service() {
                         }
                     }
                 } catch (e: Exception) {
-                    sendLog("[$currentPage 페이지] 처리 실패.", botId)
+                    sendLog("[$currentPage 페이지] 처리 실패. / ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
                 }
 
                 logicalPageCount++
@@ -1970,6 +2004,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=$postNumStr"
             }
 
+        val detailFetchStartedAt = System.currentTimeMillis()
         val postDoc = Jsoup.connect(pcPostDetailUrl)
             .userAgent("Mozilla/5.0")
             .header("Cookie", cookie)
@@ -1984,7 +2019,11 @@ img.written_dccon{max-width:80px;max-height:80px}
         val freshCiToken = postDoc.select("input[name=ci_t]").attr("value")
         val esnoToken = postDoc.select("input[id=e_s_n_o]").attr("value")
         val tokenToUse = if (freshCiToken.isNotEmpty()) freshCiToken else ciToken
+        if (config.isDebugMode) {
+            sendLog("[디버그][성능] 상세 fetch / 글번호: $postNumStr / ${System.currentTimeMillis() - detailFetchStartedAt}ms", botId)
+        }
 
+        val commentFetchStartedAt = System.currentTimeMillis()
         val commentApiUrl = "https://gall.dcinside.com/board/comment/"
         val commentResponse = Jsoup.connect(commentApiUrl)
             .userAgent("Mozilla/5.0")
@@ -2002,12 +2041,21 @@ img.written_dccon{max-width:80px;max-height:80px}
             .ignoreContentType(true)
             .method(org.jsoup.Connection.Method.POST)
             .execute()
-
         val commentsArray = org.json.JSONObject(commentResponse.body()).optJSONArray("comments")
         if (config.isDebugMode) {
             sendLog("[디버그][게시글] 번호: $postNumStr / 댓글 수 (API): ${commentsArray?.length() ?: 0}", botId)
+            sendLog("[디버그][성능] 댓글 fetch / 글번호: $postNumStr / ${System.currentTimeMillis() - commentFetchStartedAt}ms", botId)
         }
         val postText = "$text $contentText"
+        val postProcessStartedAt = System.currentTimeMillis()
+        val botPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+        val overrideCache = mutableMapOf<String, ModerationActionOverride>()
+        fun getActionOverride(prefix: String): ModerationActionOverride {
+            return overrideCache.getOrPut(prefix) {
+                loadModerationActionOverride(botPrefs, prefix)
+            }
+        }
+        val postDao = GlobalBotState.getDb()?.postDao()
         val aiPostPlans = pendingAiPostPlans.getOrPut(botId) { mutableListOf() }
         val aiPostPlanNos = aiPostPlans.mapTo(mutableSetOf()) { it.postNo }
         val aiCommentPlans = pendingAiCommentPlans.getOrPut(botId) { mutableListOf() }
@@ -2334,8 +2382,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 .header("Cookie", cookie)
                                 .get()
                             val resolvedPostDate = extractCreationDateFromPostDoc(immediatePostDoc)
-                            val aiPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-                            val aiOverride = loadModerationActionOverride(aiPrefs, "ai")
+                            val aiPrefs = botPrefs
+                            val aiOverride = getActionOverride("ai")
                             val baseConfig = resolveDefaultModerationActionConfig(config)
                             val resolvedConfig = resolveModerationActionConfig(
                                 baseConfig = baseConfig,
@@ -2596,7 +2644,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         fun saveSnapshotFromDoc(doc: org.jsoup.nodes.Document, comments: org.json.JSONArray? = null, blockedCommentNo: String? = null, blockedTs: String? = null): String? {
-            return saveSnapshotFromDocCommon(
+            val snapshotStartedAt = System.currentTimeMillis()
+            val result = saveSnapshotFromDocCommon(
                 config = config,
                 botId = botId,
                 gallId = gallId,
@@ -2606,6 +2655,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                 blockedCommentNo = blockedCommentNo,
                 blockedTs = blockedTs
             )
+            if (config.isDebugMode) {
+                sendLog("[디버그][성능] 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)
+            }
+            return result
         }
 
         if (config.isExpertMode && config.isSnapshotAll) {
@@ -2649,8 +2702,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 tokenToUse = tokenToUse,
                 actionConfig = when {
                     aiDecision?.type == AiFilterDecisionType.BLOCK -> {
-                        val aiPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-                        val aiOverride = loadModerationActionOverride(aiPrefs, "ai")
+                        val aiPrefs = botPrefs
+                        val aiOverride = getActionOverride("ai")
                         val baseConfig = resolveDefaultModerationActionConfig(config)
                         val resolvedConfig = resolveModerationActionConfig(
                             baseConfig = baseConfig,
@@ -2673,47 +2726,47 @@ img.written_dccon{max-width:80px;max-height:80px}
                     else -> when (postAnalysis.filterSource) {
                     ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
+                        override = getActionOverride("keyword"),
                         sourceLabel = "keyword_override"
                     )
                     ModerationFilterSource.USER -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "user"),
+                        override = getActionOverride("user"),
                         sourceLabel = "user_override"
                     )
                     ModerationFilterSource.NICKNAME -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "nickname"),
+                        override = getActionOverride("nickname"),
                         sourceLabel = "nickname_override"
                     )
                     ModerationFilterSource.URL -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "url"),
+                        override = getActionOverride("url"),
                         sourceLabel = "url_override"
                     )
                     ModerationFilterSource.VOICE -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "voice"),
+                        override = getActionOverride("voice"),
                         sourceLabel = "voice_override"
                     )
                     ModerationFilterSource.IMAGE -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "image"),
+                        override = getActionOverride("image"),
                         sourceLabel = "image_override"
                     )
                     ModerationFilterSource.SPAM -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "spam"),
+                        override = getActionOverride("spam"),
                         sourceLabel = "spam_override"
                     )
                     ModerationFilterSource.YUDONG -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "yudong"),
+                        override = getActionOverride("yudong"),
                         sourceLabel = "yudong_override"
                     )
                     ModerationFilterSource.KKANG -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "kkang"),
+                        override = getActionOverride("kkang"),
                         sourceLabel = "kkang_override"
                     )
                     else -> resolveDefaultModerationActionConfig(config)
@@ -2861,47 +2914,47 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 else -> when (commentAnalysis.filterSource) {
                                 ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "keyword"),
+                                    override = getActionOverride("keyword"),
                                     sourceLabel = "keyword_override"
                                 )
                                 ModerationFilterSource.USER -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "user"),
+                                    override = getActionOverride("user"),
                                     sourceLabel = "user_override"
                                 )
                                 ModerationFilterSource.NICKNAME -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "nickname"),
+                                    override = getActionOverride("nickname"),
                                     sourceLabel = "nickname_override"
                                 )
                                 ModerationFilterSource.URL -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "url"),
+                                    override = getActionOverride("url"),
                                     sourceLabel = "url_override"
                                 )
                                 ModerationFilterSource.VOICE -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "voice"),
+                                    override = getActionOverride("voice"),
                                     sourceLabel = "voice_override"
                                 )
                                 ModerationFilterSource.IMAGE -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "image"),
+                                    override = getActionOverride("image"),
                                     sourceLabel = "image_override"
                                 )
                                 ModerationFilterSource.SPAM -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "spam"),
+                                    override = getActionOverride("spam"),
                                     sourceLabel = "spam_override"
                                 )
                                 ModerationFilterSource.YUDONG -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "yudong"),
+                                    override = getActionOverride("yudong"),
                                     sourceLabel = "yudong_override"
                                 )
                                 ModerationFilterSource.KKANG -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = loadModerationActionOverride(getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), "kkang"),
+                                    override = getActionOverride("kkang"),
                                     sourceLabel = "kkang_override"
                                 )
                                 else -> resolveDefaultModerationActionConfig(config)
@@ -2952,6 +3005,9 @@ img.written_dccon{max-width:80px;max-height:80px}
             snapshotPath = dbSnapshotPath,
             creationDate = postDate
         )
+        if (config.isDebugMode) {
+            sendLog("[디버그][성능] 게시글 처리 전체 / 글번호: $postNumStr / ${System.currentTimeMillis() - postProcessStartedAt}ms", botId)
+        }
     }
 
     override fun onDestroy() {
@@ -3499,12 +3555,21 @@ img.written_dccon{max-width:80px;max-height:80px}
         tokenToUse: String,
         cookie: String
     ): PostAnalysisResult {
-        val userFilter = evaluateUserFilter(config, postAuthor, postNick)
+        val toggles = buildFilterToggleState(config)
+        val userFilter = if (toggles.anyUserFilterEnabled) {
+            evaluateUserFilter(config, postAuthor, postNick)
+        } else {
+            UserFilterResult(
+                isBlacklistedUserId = false,
+                isBlacklistedUserNick = false,
+                isWhitelistedUser = false
+            )
+        }
         val isBlacklistedUserId = userFilter.isBlacklistedUserId
         val isBlacklistedUserNick = userFilter.isBlacklistedUserNick
         val isWhitelistedUser = userFilter.isWhitelistedUser
 
-        if (config.isDebugMode && botId.isNotEmpty()) {
+        if (config.isDebugMode && botId.isNotEmpty() && toggles.anyUserFilterEnabled) {
             sendLog("[디버그][필터/유저] 작성자: $postAuthor / 닉: $postNick → 블랙(ID): $isBlacklistedUserId, 블랙(닉): $isBlacklistedUserNick, 화이트: $isWhitelistedUser", botId)
         }
 
@@ -3529,31 +3594,32 @@ img.written_dccon{max-width:80px;max-height:80px}
             filterSource = ModerationFilterSource.NICKNAME
         }
 
-        val spamCodeRegex = buildSpamCodeRegex(config)
+        val spamCodeRegex = if (toggles.spamEnabled) buildSpamCodeRegex(config) else null
 
         if (isWhitelistedUser && config.isDebugMode && botId.isNotEmpty()) {
             sendLog("[디버그][필터/화이트] 화이트리스트 유저 → 이후 모든 필터 통과", botId)
         }
 
         if (!shouldBlockExecute && !isWhitelistedUser) {
-            val isYudong = postUid.isEmpty()
-            if (config.isDebugMode && botId.isNotEmpty()) {
+            val shouldCheckYudong = toggles.anyYudongPostEnabled
+            val isYudong = if (shouldCheckYudong) postUid.isEmpty() else false
+            if (config.isDebugMode && botId.isNotEmpty() && shouldCheckYudong) {
                 sendLog("[디버그][필터/유동] 유동 여부: $isYudong", botId)
             }
 
             if (isYudong) {
-                if (config.isYudongPostBlock) {
+                if (toggles.yudongPostEnabled) {
                     blockReasonPrefix = "유동 게시글 금지"
                     notiType = "yudong"
                     debugDetail = "유동 작성자 감지"
                     filterSource = ModerationFilterSource.YUDONG
-                } else if (config.isYudongImageBlock && postImageAlts.isNotEmpty()) {
+                } else if (toggles.yudongImageEnabled && postImageAlts.isNotEmpty()) {
                     blockReasonPrefix = "유동 이미지 첨부 금지"
                     notiType = "yudong"
                     debugDetail = "유동 작성자 + 이미지 첨부 감지"
                     filterSource = ModerationFilterSource.YUDONG
                 } else if (
-                    config.isYudongVoiceBlock &&
+                    toggles.yudongVoiceEnabled &&
                     (postRawHtml.contains("btn-voice") || postRawHtml.contains("voice/player"))
                 ) {
                     blockReasonPrefix = "유동 보이스 첨부 금지"
@@ -3561,10 +3627,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     debugDetail = "유동 작성자 + 보이스 첨부 감지"
                     filterSource = ModerationFilterSource.YUDONG
                 }
-            } else if (
-                config.isKkangFilterMode &&
-                (config.isKkangPostBlock || config.isKkangImageBlock || config.isKkangVoiceBlock)
-            ) {
+            } else if (toggles.anyKkangPostEnabled) {
                 val gallogStats = getGallogStats(
                     userId = postUid,
                     gallogCache = gallogCache,
@@ -3579,18 +3642,18 @@ img.written_dccon{max-width:80px;max-height:80px}
                 val cCount = gallogStats.commentCount
 
                 if (pCount < config.kkangPostMin || cCount < config.kkangCommentMin) {
-                    if (config.isKkangPostBlock) {
+                    if (toggles.kkangPostEnabled) {
                         blockReasonPrefix = "깡계 게시글 금지(글:$pCount/댓:$cCount)"
                         notiType = "kkang"
                         debugDetail = "깡계 기준 미달: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
                         filterSource = ModerationFilterSource.KKANG
-                    } else if (config.isKkangImageBlock && postImageAlts.isNotEmpty()) {
+                    } else if (toggles.kkangImageEnabled && postImageAlts.isNotEmpty()) {
                         blockReasonPrefix = "깡계 이미지 첨부 금지"
                         notiType = "kkang"
                         debugDetail = "깡계 기준 미달 + 이미지 첨부: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
                         filterSource = ModerationFilterSource.KKANG
                     } else if (
-                        config.isKkangVoiceBlock &&
+                        toggles.kkangVoiceEnabled &&
                         (postRawHtml.contains("btn-voice") || postRawHtml.contains("voice/player"))
                     ) {
                         blockReasonPrefix = "깡계 보이스 첨부 금지"
@@ -3605,20 +3668,26 @@ img.written_dccon{max-width:80px;max-height:80px}
                 shouldBlockExecute = true
             } else {
                 val matchedNormalWord =
-                    config.normalWords.firstOrNull { postText.contains(it, ignoreCase = true) }
+                    if (toggles.keywordEnabled) config.normalWords.firstOrNull { postText.contains(it, ignoreCase = true) } else null
 
                 val matchedBypassWord =
-                    config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(postText) }
+                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(postText) } else null
 
                 suspiciousUrlInPost =
-                    if (config.isUrlFilterMode) getSuspiciousUrl(postText, config.urlWhitelistList) else null
+                    if (toggles.urlEnabled) getSuspiciousUrl(postText, config.urlWhitelistList) else null
 
                 spamCodeMatchPost = spamCodeRegex?.find(postText)?.value
 
                 if (config.isDebugMode && botId.isNotEmpty()) {
-                    sendLog("[디버그][필터/keyword] 일반금지어: ${matchedNormalWord ?: "없음"} / 우회금지어: ${matchedBypassWord ?: "없음"}", botId)
-                    sendLog("[디버그][필터/url] 의심 URL: ${suspiciousUrlInPost ?: "없음"}", botId)
-                    sendLog("[디버그][필터/spam] 스팸코드: ${spamCodeMatchPost ?: "없음"}", botId)
+                    if (toggles.keywordEnabled) {
+                        sendLog("[디버그][필터/keyword] 일반금지어: ${matchedNormalWord ?: "없음"} / 우회금지어: ${matchedBypassWord ?: "없음"}", botId)
+                    }
+                    if (toggles.urlEnabled) {
+                        sendLog("[디버그][필터/url] 의심 URL: ${suspiciousUrlInPost ?: "없음"}", botId)
+                    }
+                    if (toggles.spamEnabled) {
+                        sendLog("[디버그][필터/spam] 스팸코드: ${spamCodeMatchPost ?: "없음"}", botId)
+                    }
                 }
 
                 shouldBlockExecute =
@@ -3641,7 +3710,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     filterSource = ModerationFilterSource.SPAM
                 }
 
-                if (!shouldBlockExecute && config.isImageFilterMode) {
+                if (!shouldBlockExecute && toggles.imageEnabled) {
                     for (postAlt in postImageAlts) {
                         for (blackAlt in config.imageAltBlacklist) {
                             if (getAltSimilarity(postAlt, blackAlt) >= config.imageFilterThreshold) {
@@ -3659,7 +3728,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                 }
 
-                if (!shouldBlockExecute && config.isVoiceFilterMode) {
+                if (!shouldBlockExecute && toggles.voiceEnabled) {
                     for (vid in config.voiceBlacklist) {
                         if (postRawHtml.contains(vid)) {
                             shouldBlockExecute = true
@@ -3714,12 +3783,21 @@ img.written_dccon{max-width:80px;max-height:80px}
         tokenToUse: String,
         cookie: String
     ): CommentAnalysisResult {
-        val userFilter = evaluateUserFilter(config, cmtAuthor, cmtNick)
+        val toggles = buildFilterToggleState(config)
+        val userFilter = if (toggles.anyUserFilterEnabled) {
+            evaluateUserFilter(config, cmtAuthor, cmtNick)
+        } else {
+            UserFilterResult(
+                isBlacklistedUserId = false,
+                isBlacklistedUserNick = false,
+                isWhitelistedUser = false
+            )
+        }
         val isBlacklistedUserId = userFilter.isBlacklistedUserId
         val isBlacklistedUserNick = userFilter.isBlacklistedUserNick
         val isWhitelistedUser = userFilter.isWhitelistedUser
 
-        if (config.isDebugMode && botId.isNotEmpty()) {
+        if (config.isDebugMode && botId.isNotEmpty() && toggles.anyUserFilterEnabled) {
             sendLog("[디버그][필터/유저] 댓글 작성자: $cmtAuthor / 닉: $cmtNick → 블랙(ID): $isBlacklistedUserId, 블랙(닉): $isBlacklistedUserNick, 화이트: $isWhitelistedUser", botId)
         }
 
@@ -3739,26 +3817,27 @@ img.written_dccon{max-width:80px;max-height:80px}
             filterSource = ModerationFilterSource.NICKNAME
         }
 
-        val spamCodeRegex = buildSpamCodeRegex(config)
+        val spamCodeRegex = if (toggles.spamEnabled) buildSpamCodeRegex(config) else null
 
         if (isWhitelistedUser && config.isDebugMode && botId.isNotEmpty()) {
             sendLog("[디버그][필터/화이트] 화이트리스트 댓글 작성자 → 이후 모든 필터 통과", botId)
         }
 
         if (!isBadComment && !isWhitelistedUser) {
-            val isYudongComment = cmtUid.isEmpty()
-            if (config.isDebugMode && botId.isNotEmpty()) {
+            val shouldCheckYudongComment = toggles.anyYudongCommentEnabled
+            val isYudongComment = if (shouldCheckYudongComment) cmtUid.isEmpty() else false
+            if (config.isDebugMode && botId.isNotEmpty() && shouldCheckYudongComment) {
                 sendLog("[디버그][필터/유동] 댓글 유동 여부: $isYudongComment", botId)
             }
 
             if (isYudongComment) {
-                if (config.isYudongCommentBlock) {
+                if (toggles.yudongCommentEnabled) {
                     blockReasonPrefix = "유동 댓글 작성 금지"
                     notiType = "yudong"
                     debugDetail = "유동 댓글 작성자 감지"
                     filterSource = ModerationFilterSource.YUDONG
                 } else if (
-                    config.isYudongVoiceBlock &&
+                    toggles.yudongVoiceEnabled &&
                     (commentMemo.contains("voice_wrap") || commentMemo.contains("voice/player"))
                 ) {
                     blockReasonPrefix = "유동 보이스 첨부 금지"
@@ -3766,7 +3845,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     debugDetail = "유동 댓글 작성자 + 보이스 첨부 감지"
                     filterSource = ModerationFilterSource.YUDONG
                 }
-            } else if (config.isKkangFilterMode && (config.isKkangCommentBlock || config.isKkangVoiceBlock)) {
+            } else if (toggles.anyKkangCommentEnabled) {
                 val gallogStats = getGallogStats(
                     userId = cmtUid,
                     gallogCache = gallogCache,
@@ -3781,13 +3860,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                 val cCount = gallogStats.commentCount
 
                 if (pCount < config.kkangPostMin || cCount < config.kkangCommentMin) {
-                    if (config.isKkangCommentBlock) {
+                    if (toggles.kkangCommentEnabled) {
                         blockReasonPrefix = "깡계 댓글 금지(글:$pCount/댓:$cCount)"
                         notiType = "kkang"
                         debugDetail = "깡계 댓글 기준 미달: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
                         filterSource = ModerationFilterSource.KKANG
                     } else if (
-                        config.isKkangVoiceBlock &&
+                        toggles.kkangVoiceEnabled &&
                         (commentMemo.contains("voice_wrap") || commentMemo.contains("voice/player"))
                     ) {
                         blockReasonPrefix = "깡계 보이스 첨부 금지"
@@ -3802,20 +3881,26 @@ img.written_dccon{max-width:80px;max-height:80px}
                 isBadComment = true
             } else {
                 val matchedNormalWord =
-                    config.normalWords.firstOrNull { commentMemo.contains(it, ignoreCase = true) }
+                    if (toggles.keywordEnabled) config.normalWords.firstOrNull { commentMemo.contains(it, ignoreCase = true) } else null
 
                 val matchedBypassWord =
-                    config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(commentMemo) }
+                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(commentMemo) } else null
 
                 suspiciousUrlInComment =
-                    if (config.isUrlFilterMode) getSuspiciousUrl(commentMemo, config.urlWhitelistList) else null
+                    if (toggles.urlEnabled) getSuspiciousUrl(commentMemo, config.urlWhitelistList) else null
 
                 spamCodeMatchComment = spamCodeRegex?.find(commentMemo)?.value
 
                 if (config.isDebugMode && botId.isNotEmpty()) {
-                    sendLog("[디버그][필터/keyword] 댓글 일반금지어: ${matchedNormalWord ?: "없음"} / 우회금지어: ${matchedBypassWord ?: "없음"}", botId)
-                    sendLog("[디버그][필터/url] 댓글 의심 URL: ${suspiciousUrlInComment ?: "없음"}", botId)
-                    sendLog("[디버그][필터/spam] 댓글 스팸코드: ${spamCodeMatchComment ?: "없음"}", botId)
+                    if (toggles.keywordEnabled) {
+                        sendLog("[디버그][필터/keyword] 댓글 일반금지어: ${matchedNormalWord ?: "없음"} / 우회금지어: ${matchedBypassWord ?: "없음"}", botId)
+                    }
+                    if (toggles.urlEnabled) {
+                        sendLog("[디버그][필터/url] 댓글 의심 URL: ${suspiciousUrlInComment ?: "없음"}", botId)
+                    }
+                    if (toggles.spamEnabled) {
+                        sendLog("[디버그][필터/spam] 댓글 스팸코드: ${spamCodeMatchComment ?: "없음"}", botId)
+                    }
                 }
 
                 isBadComment =
@@ -3838,7 +3923,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     filterSource = ModerationFilterSource.SPAM
                 }
 
-                if (!isBadComment && config.isVoiceFilterMode) {
+                if (!isBadComment && toggles.voiceEnabled) {
                     for (vid in config.voiceBlacklist) {
                         if (commentMemo.contains(vid)) {
                             isBadComment = true
@@ -3867,6 +3952,52 @@ img.written_dccon{max-width:80px;max-height:80px}
             notiType = notiType,
             debugDetail = debugDetail,
             filterSource = filterSource
+        )
+    }
+
+    private fun buildFilterToggleState(config: BotConfig): FilterToggleState {
+        val userEnabled = config.isUserFilterMode
+        val nicknameEnabled = config.isNicknameFilterMode
+        val anyUserFilterEnabled = userEnabled || nicknameEnabled
+        val keywordEnabled = config.normalWords.isNotEmpty() || config.bypassWords.isNotEmpty()
+        val urlEnabled = config.isUrlFilterMode
+        val spamEnabled = config.isSpamCodeFilterMode
+        val imageEnabled = config.isImageFilterMode
+        val voiceEnabled = config.isVoiceFilterMode
+        val yudongPostEnabled = config.isYudongPostBlock
+        val yudongCommentEnabled = config.isYudongCommentBlock
+        val yudongImageEnabled = config.isYudongImageBlock
+        val yudongVoiceEnabled = config.isYudongVoiceBlock
+        val anyYudongPostEnabled = yudongPostEnabled || yudongImageEnabled || yudongVoiceEnabled
+        val anyYudongCommentEnabled = yudongCommentEnabled || yudongVoiceEnabled
+        val kkangPostEnabled = config.isKkangFilterMode && config.isKkangPostBlock
+        val kkangCommentEnabled = config.isKkangFilterMode && config.isKkangCommentBlock
+        val kkangImageEnabled = config.isKkangFilterMode && config.isKkangImageBlock
+        val kkangVoiceEnabled = config.isKkangFilterMode && config.isKkangVoiceBlock
+        val anyKkangPostEnabled = kkangPostEnabled || kkangImageEnabled || kkangVoiceEnabled
+        val anyKkangCommentEnabled = kkangCommentEnabled || kkangVoiceEnabled
+
+        return FilterToggleState(
+            userEnabled = userEnabled,
+            nicknameEnabled = nicknameEnabled,
+            anyUserFilterEnabled = anyUserFilterEnabled,
+            keywordEnabled = keywordEnabled,
+            urlEnabled = urlEnabled,
+            spamEnabled = spamEnabled,
+            imageEnabled = imageEnabled,
+            voiceEnabled = voiceEnabled,
+            yudongPostEnabled = yudongPostEnabled,
+            yudongCommentEnabled = yudongCommentEnabled,
+            yudongImageEnabled = yudongImageEnabled,
+            yudongVoiceEnabled = yudongVoiceEnabled,
+            anyYudongPostEnabled = anyYudongPostEnabled,
+            anyYudongCommentEnabled = anyYudongCommentEnabled,
+            kkangPostEnabled = kkangPostEnabled,
+            kkangCommentEnabled = kkangCommentEnabled,
+            kkangImageEnabled = kkangImageEnabled,
+            kkangVoiceEnabled = kkangVoiceEnabled,
+            anyKkangPostEnabled = anyKkangPostEnabled,
+            anyKkangCommentEnabled = anyKkangCommentEnabled
         )
     }
 
@@ -3943,11 +4074,12 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
             if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+                val postDao = GlobalBotState.getDb()?.postDao()
                 try {
-                    val lastId = GlobalBotState.getDb()?.postDao()?.getLastBlockHistoryId()
+                    val lastId = postDao?.getLastBlockHistoryId()
                     val path = saveSnapshotFn()
                     if (lastId != null && path != null) {
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPathById(lastId, path)
+                        postDao?.updateBlockHistorySnapshotPathById(lastId, path)
                         blockHistorySnapshotPath = path
                         dbSnapshotPath = path
                     }
@@ -4123,11 +4255,12 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
             if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+                val postDao = GlobalBotState.getDb()?.postDao()
                 try {
-                    val lastId = GlobalBotState.getDb()?.postDao()?.getLastBlockHistoryId()
+                    val lastId = postDao?.getLastBlockHistoryId()
                     val path = saveSnapshotFn()
                     if (lastId != null && path != null) {
-                        GlobalBotState.getDb()?.postDao()?.updateBlockHistorySnapshotPathById(lastId, path)
+                        postDao?.updateBlockHistorySnapshotPathById(lastId, path)
                         blockHistorySnapshotPath = path
                         dbSnapshotPath = path
                     }
