@@ -1335,7 +1335,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text("도배 방지", fontWeight = FontWeight.Bold, color = textColor)
-                                                    Text("유동/깡계 급증 시 일정 시간 신규 글을 삭제합니다.", fontSize = 12.sp, color = subTextColor)
+                                                    Text("최근 글들의 작성 간격을 기준으로 도배를 감지하고, 기준 글 이후의 유동/깡계 신규 글을 일정 시간 삭제합니다.", fontSize = 12.sp, color = subTextColor)
                                                 }
                                                 Switch(checked = isSpamBurstProtectionEnabled, onCheckedChange = {
                                                     isSpamBurstProtectionEnabled = it
@@ -1348,22 +1348,22 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
                                             Column(modifier = Modifier.padding(16.dp)) {
                                                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("감지 기준 시간(분)", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("최근 글 샘플 수", fontWeight = FontWeight.Bold, color = textColor)
                                                     OutlinedTextField(value = spamBurstWindowMinutesText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstWindowMinutesText = it; botPref.edit().putInt("spam_burst_window_minutes", it.toIntOrNull() ?: 3).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
                                                 }
                                                 Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("유동 글 임계치", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("평균 간격 기준(초)", fontWeight = FontWeight.Bold, color = textColor)
                                                     OutlinedTextField(value = spamBurstYudongThresholdText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstYudongThresholdText = it; botPref.edit().putInt("spam_burst_yudong_threshold", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
                                                 }
                                                 Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("깡계 글 임계치", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("깡계 보조 기준", fontWeight = FontWeight.Bold, color = textColor)
                                                     OutlinedTextField(value = spamBurstKkangThresholdText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstKkangThresholdText = it; botPref.edit().putInt("spam_burst_kkang_threshold", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
                                                 }
                                                 Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("대응 지속 시간(분)", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("삭제 지속 시간(분)", fontWeight = FontWeight.Bold, color = textColor)
                                                     OutlinedTextField(value = spamBurstDurationMinutesText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { spamBurstDurationMinutesText = it; botPref.edit().putInt("spam_burst_duration_minutes", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
                                                 }
                                                 Divider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
