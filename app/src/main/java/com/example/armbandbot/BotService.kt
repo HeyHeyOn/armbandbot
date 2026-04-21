@@ -2111,6 +2111,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                 targetNo = postNumStr,
                 gallType = gallType
             )
+            if (deleteResponse.contains("\"result\":\"success\"")) {
+                spamBurstStates[botId]?.samplePostNos?.remove(postNumStr)
+            }
             sendLog("[도배 방지] 신규 글 삭제 / 글번호: $postNumStr / 유형: ${postAnalysis.filterSource.name} / 응답: $deleteResponse", botId)
             return
         }
