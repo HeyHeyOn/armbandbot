@@ -2133,6 +2133,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     val response = executeDeletePostRequest(
                         cookie = cookie,
                         pcPostDetailUrl = sampleDetailUrl,
+                        tokenToUse = tokenToUse,
                         gallId = gallId,
                         targetNo = samplePostNo,
                         gallType = gallType,
@@ -2157,6 +2158,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             val deleteResponse = executeDeletePostRequest(
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
+                tokenToUse = tokenToUse,
                 gallId = gallId,
                 targetNo = postNumStr,
                 gallType = gallType,
@@ -3378,6 +3380,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     executeDeletePostRequest(
                         cookie = cookie,
                         pcPostDetailUrl = pcPostDetailUrl,
+                        tokenToUse = tokenToUse,
                         gallId = gallId,
                         targetNo = targetNo,
                         gallType = gallType
@@ -4363,6 +4366,7 @@ img.written_dccon{max-width:80px;max-height:80px}
     private fun executeDeletePostRequest(
         cookie: String,
         pcPostDetailUrl: String,
+        tokenToUse: String,
         gallId: String,
         targetNo: String,
         gallType: String,
@@ -4386,7 +4390,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             .header("Cookie", cookie)
             .header("Referer", pcPostDetailUrl)
             .header("X-Requested-With", "XMLHttpRequest")
-            .data("ci_t", extractCookieValue(cookie, "ci_c") ?: "")
+            .data("ci_t", tokenToUse)
             .data("id", gallId)
             .data("nos[]", targetNo)
             .data("_GALLTYPE_", gallType)
