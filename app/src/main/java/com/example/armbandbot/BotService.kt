@@ -2125,15 +2125,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                 .filter { it != postNumStr }
                 .sortedByDescending { it.toIntOrNull() ?: Int.MIN_VALUE }
                 .forEach { samplePostNo ->
-                    val sampleDetailUrl = if (gallType == "M") {
-                        "https://gall.dcinside.com/mgallery/board/view/?id=$gallId&no=$samplePostNo"
-                    } else {
-                        "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=$samplePostNo"
-                    }
+                    val listRefererUrl = buildStableListUrl(
+                        ParsedTargetUrl(gallId = gallId, gallType = gallType, listQueryOptions = ListQueryOptions()),
+                        isSearchMode = false
+                    )
                     val response = executeDeletePostRequest(
                         cookie = cookie,
-                        pcPostDetailUrl = sampleDetailUrl,
-                        tokenToUse = tokenToUse,
+                        listRefererUrl = listRefererUrl,
                         gallId = gallId,
                         targetNo = samplePostNo,
                         gallType = gallType,
@@ -2155,10 +2153,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             postDate = postDate
         )
         if (spamBurstDeleteActive) {
+            val deleteListRefererUrl = buildStableListUrl(
+                ParsedTargetUrl(gallId = gallId, gallType = gallType, listQueryOptions = ListQueryOptions()),
+                isSearchMode = false
+            )
             val deleteResponse = executeDeletePostRequest(
                 cookie = cookie,
-                pcPostDetailUrl = pcPostDetailUrl,
-                tokenToUse = tokenToUse,
+                listRefererUrl = deleteListRefererUrl,
                 gallId = gallId,
                 targetNo = postNumStr,
                 gallType = gallType,
@@ -3290,11 +3291,10 @@ img.written_dccon{max-width:80px;max-height:80px}
             events.sortByDescending { it.createdAtMillis }
 
             val sampleSize = config.spamBurstWindowMinutes.coerceAtLeast(2)
-            val sampledEvents = events.take(sampleSize)
-            val targetEvents = sampledEvents.filter {
+            val targetEvents = events.filter {
                 (it.type == ModerationFilterSource.YUDONG && config.spamBurstTargetYudong) ||
                     (it.type == ModerationFilterSource.KKANG && config.spamBurstTargetKkang)
-            }
+            }.take(sampleSize)
             if (targetEvents.size < sampleSize) return null
 
             val existing = pruneSpamBurstState(botId, now)
@@ -3379,8 +3379,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                 if (parentPostNo.isBlank()) {
                     executeDeletePostRequest(
                         cookie = cookie,
-                        pcPostDetailUrl = pcPostDetailUrl,
-                        tokenToUse = tokenToUse,
+                        listRefererUrl = buildStableListUrl(
+                            ParsedTargetUrl(gallId = gallId, gallType = gallType, listQueryOptions = ListQueryOptions()),
+                            isSearchMode = false
+                        ),
                         gallId = gallId,
                         targetNo = targetNo,
                         gallType = gallType
@@ -4365,8 +4367,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
     private fun executeDeletePostRequest(
         cookie: String,
-        pcPostDetailUrl: String,
-        tokenToUse: String,
+        listRefererUrl: String,
         gallId: String,
         targetNo: String,
         gallType: String,
@@ -4374,13 +4375,15 @@ img.written_dccon{max-width:80px;max-height:80px}
         isDebugMode: Boolean = false
     ): String {
         val deleteUrl = when (gallType) {
-            "M", "MI" -> "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_list"
+            "M" -> "https://gall.dcinside.com/ajax/minor_manager_board_ajax/delete_list"
+            "MI" -> "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_list"
             else -> "https://gall.dcinside.com/ajax/manager_board_ajax/delete_list"
         }
+        val ciToken = extractCookieValue(cookie, "ci_c") ?: ""
 
         if (isDebugMode && botId != null) {
             sendLog(
-                "[디버그][삭제] 게시글 삭제 요청 / gallType=$gallType / gallId=$gallId / 글번호=$targetNo / url=$deleteUrl",
+                "[디버그][삭제] 게시글 삭제 요청 / gallType=$gallType / gallId=$gallId / 글번호=$targetNo / url=$deleteUrl / referer=$listRefererUrl / ci_t=${if (ciToken.isNotBlank()) "present" else "blank"}",
                 botId
             )
         }
@@ -4388,9 +4391,10 @@ img.written_dccon{max-width:80px;max-height:80px}
         return Jsoup.connect(deleteUrl)
             .userAgent(dcUserAgent)
             .header("Cookie", cookie)
-            .header("Referer", pcPostDetailUrl)
+            .header("Referer", listRefererUrl)
+            .header("Origin", "https://gall.dcinside.com")
             .header("X-Requested-With", "XMLHttpRequest")
-            .data("ci_t", tokenToUse)
+            .data("ci_t", ciToken)
             .data("id", gallId)
             .data("nos[]", targetNo)
             .data("_GALLTYPE_", gallType)

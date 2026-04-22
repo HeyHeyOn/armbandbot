@@ -140,12 +140,14 @@
 - 디버그 로그 검토 결과 beta2에서 켜진 필터만 실제 검사되는 동작 확인
 - 2026-04-22 핫픽스 1차: mgallery(`gallType=M`) 게시글 삭제 요청이 일반 gallery 경로로 나가던 문제를 수정해, 게시글 삭제-only와 도배 방지 샘플/신규 글 삭제가 모두 `mini_manager_board_ajax/delete_list` 경로를 사용하도록 보정
 - 2026-04-22 핫픽스 2차: 게시글 삭제 요청의 `ci_t`를 cookie의 `ci_c`가 아니라 상세 페이지에서 읽은 실제 `ci_t(tokenToUse)`로 전송하도록 수정
+- 2026-04-22 핫픽스 3차: 실제 브라우저 cURL 기준으로 마이너(`M`)는 `minor_manager_board_ajax/delete_list`, 미니(`MI`)는 `mini_manager_board_ajax/delete_list`를 사용하고, 게시글 삭제 referer를 목록 URL로 맞춤
+- 2026-04-22 핫픽스 4차: 도배 감지 샘플을 최신 글 전체가 아니라 유동/깡계 후보만 추린 뒤 그중 최신 N개로 계산하도록 수정
 - 도배 방지 삭제 진단용 최소 디버그 로그 추가: 디버그 모드에서 `gallType`, `gallId`, `글번호`, 실제 `deleteUrl` 확인 가능
 
 ### 릴리즈 산출물
 - versionCode = 49
 - versionName = 1.3.2
 - APK 파일명: 완장봇_v1.3.2.apk
-- SHA256: 16885F3B260EF059443EF363137DB0D5FAD58FB37BE22E900C30A3BBAFBE9D6A
+- SHA256: 747EDA3E82F9FB46B19B0678F24222FDBE4105680CFEC9DFA2599B176F0C91B6
 - Release Drive file ID: 1NgWtWqghsrUWEYsXGnv1KGmDkt7RwbQ7
 - Google Docs `완장봇 매뉴얼 & 패치노트`에 1.3.2 항목 추가 반영
