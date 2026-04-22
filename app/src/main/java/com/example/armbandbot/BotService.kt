@@ -2135,7 +2135,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                         pcPostDetailUrl = sampleDetailUrl,
                         gallId = gallId,
                         targetNo = samplePostNo,
-                        gallType = gallType
+                        gallType = gallType,
+                        botId = botId,
+                        isDebugMode = config.isDebugMode
                     )
                     val succeeded = response.contains("\"result\":\"success\"")
                     if (succeeded) {
@@ -2157,7 +2159,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                 pcPostDetailUrl = pcPostDetailUrl,
                 gallId = gallId,
                 targetNo = postNumStr,
-                gallType = gallType
+                gallType = gallType,
+                botId = botId,
+                isDebugMode = config.isDebugMode
             )
             if (deleteResponse.contains("\"result\":\"success\"")) {
                 spamBurstStates[botId]?.samplePostNos?.remove(postNumStr)
@@ -4361,11 +4365,20 @@ img.written_dccon{max-width:80px;max-height:80px}
         pcPostDetailUrl: String,
         gallId: String,
         targetNo: String,
-        gallType: String
+        gallType: String,
+        botId: String? = null,
+        isDebugMode: Boolean = false
     ): String {
         val deleteUrl = when (gallType) {
-            "MI" -> "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_list"
+            "M", "MI" -> "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_list"
             else -> "https://gall.dcinside.com/ajax/manager_board_ajax/delete_list"
+        }
+
+        if (isDebugMode && botId != null) {
+            sendLog(
+                "[디버그][삭제] 게시글 삭제 요청 / gallType=$gallType / gallId=$gallId / 글번호=$targetNo / url=$deleteUrl",
+                botId
+            )
         }
 
         return Jsoup.connect(deleteUrl)

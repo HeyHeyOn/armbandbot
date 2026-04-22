@@ -138,11 +138,13 @@
 - 꺼진 필터는 실제 검사에서 제외하도록 최적화해 불필요한 검사와 디버그 로그 감소
 - 디버그 성능 로그 추가: 페이지 fetch, 상세 fetch, 댓글 fetch, 스냅샷 저장, 게시글 전체 처리 시간 확인 가능
 - 디버그 로그 검토 결과 beta2에서 켜진 필터만 실제 검사되는 동작 확인
+- 2026-04-22 핫픽스: mgallery(`gallType=M`) 게시글 삭제 요청이 일반 gallery 경로로 나가던 문제를 수정해, 게시글 삭제-only와 도배 방지 샘플/신규 글 삭제가 모두 `mini_manager_board_ajax/delete_list` 경로를 사용하도록 보정
+- 도배 방지 삭제 진단용 최소 디버그 로그 추가: 디버그 모드에서 `gallType`, `gallId`, `글번호`, 실제 `deleteUrl` 확인 가능
 
 ### 릴리즈 산출물
 - versionCode = 48
 - versionName = 1.3.1
 - APK 파일명: 완장봇_v1.3.1.apk
-- SHA256: 8C7A0C085E8F90FE70D8AA079BECD2D95B414A0EAFBBAEFBBCD2C9141A554772
+- SHA256: 052E422C499B0D0B69F6E4C20122D3EF93A9862827F4EABEA9949094BAD5D7BB
 - Release Drive file ID: 1XAvjB7GUTJtuwl2amKzMurlrJC9qfNxU
 - Google Docs `완장봇 매뉴얼 & 패치노트`에 1.3.1 항목 추가 반영
