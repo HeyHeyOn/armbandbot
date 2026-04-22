@@ -129,7 +129,7 @@
 
 - 1.3.1-beta2: 꺼진 필터 검사 생략 수정본을 별도 베타2 파일명으로 재빌드하고 업로드해, 기존 beta1과 구분해서 재설치 검증할 수 있도록 정리
 
-## 1.3.1 release
+## 1.3.2 release
 
 ### 주요 변화
 - 도배 방지 기능 추가: 최근 글의 작성 시각 간격을 기준으로 도배 상황을 감지하고, 감지에 사용된 샘플 글부터 이후 대상 글까지 삭제하도록 정리
@@ -142,9 +142,9 @@
 - 도배 방지 삭제 진단용 최소 디버그 로그 추가: 디버그 모드에서 `gallType`, `gallId`, `글번호`, 실제 `deleteUrl` 확인 가능
 
 ### 릴리즈 산출물
-- versionCode = 48
-- versionName = 1.3.1
-- APK 파일명: 완장봇_v1.3.1.apk
-- SHA256: 052E422C499B0D0B69F6E4C20122D3EF93A9862827F4EABEA9949094BAD5D7BB
-- Release Drive file ID: 1XAvjB7GUTJtuwl2amKzMurlrJC9qfNxU
-- Google Docs `완장봇 매뉴얼 & 패치노트`에 1.3.1 항목 추가 반영
+- versionCode = 49
+- versionName = 1.3.2
+- APK 파일명: 완장봇_v1.3.2.apk
+- SHA256: 24E7DD3D297A111020CC09AC9E1311EBEA684FB30DF8DD540C70B332AB14EAE0
+- Release Drive file ID: 1NgWtWqghsrUWEYsXGnv1KGmDkt7RwbQ7
+- Google Docs `완장봇 매뉴얼 & 패치노트`에 1.3.2 항목 추가 반영
