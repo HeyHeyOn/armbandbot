@@ -142,12 +142,13 @@
 - 2026-04-22 핫픽스 2차: 게시글 삭제 요청의 `ci_t`를 cookie의 `ci_c`가 아니라 상세 페이지에서 읽은 실제 `ci_t(tokenToUse)`로 전송하도록 수정
 - 2026-04-22 핫픽스 3차: 실제 브라우저 cURL 기준으로 마이너(`M`)는 `minor_manager_board_ajax/delete_list`, 미니(`MI`)는 `mini_manager_board_ajax/delete_list`를 사용하고, 게시글 삭제 referer를 목록 URL로 맞춤
 - 2026-04-22 핫픽스 4차: 도배 감지 샘플을 최신 글 전체가 아니라 유동/깡계 후보만 추린 뒤 그중 최신 N개로 계산하도록 수정
+- 2026-04-23 핫픽스 5차: 도배 방지 깡계 후보 판정은 UID가 있는 작성자에만 적용되도록 정리해, 유동 글이 깡계로 섞여 보이거나 오판정되는 문제를 줄임
 - 도배 방지 삭제 진단용 최소 디버그 로그 추가: 디버그 모드에서 `gallType`, `gallId`, `글번호`, 실제 `deleteUrl` 확인 가능
 
 ### 릴리즈 산출물
 - versionCode = 49
 - versionName = 1.3.2
 - APK 파일명: 완장봇_v1.3.2.apk
-- SHA256: 747EDA3E82F9FB46B19B0678F24222FDBE4105680CFEC9DFA2599B176F0C91B6
+- SHA256: 68DDE79EA0EC0922F7665F5646A2126313544EB86FF84ABE5D9AA07D2B3D6517
 - Release Drive file ID: 1NgWtWqghsrUWEYsXGnv1KGmDkt7RwbQ7
 - Google Docs `완장봇 매뉴얼 & 패치노트`에 1.3.2 항목 추가 반영

@@ -2084,7 +2084,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
         val spamBurstCandidateSource = when {
             config.spamBurstTargetYudong && postUid.isBlank() -> ModerationFilterSource.YUDONG
-            config.spamBurstTargetKkang -> {
+            config.spamBurstTargetKkang && postUid.isNotBlank() -> {
                 val gallogStats = getGallogStats(
                     userId = postUid,
                     gallogCache = gallogCache,
@@ -2094,11 +2094,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                     botId = botId,
                     isDebugMode = config.isDebugMode
                 )
-                val isKkangCandidate = postUid.isNotBlank() &&
-                    (gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin)
+                val isKkangCandidate =
+                    gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin
                 if (config.isDebugMode) {
                     sendLog(
-                        "[디버그][도배 방지/깡계 후보] userId=${if (postUid.isBlank()) "(blank)" else postUid} / 글=${gallogStats.postCount}/${config.kkangPostMin} / 댓글=${gallogStats.commentCount}/${config.kkangCommentMin} / 결과=${if (isKkangCandidate) "KKANG" else "UNKNOWN"}",
+                        "[디버그][도배 방지/깡계 후보] userId=$postUid / 글=${gallogStats.postCount}/${config.kkangPostMin} / 댓글=${gallogStats.commentCount}/${config.kkangCommentMin} / 결과=${if (isKkangCandidate) "KKANG" else "UNKNOWN"}",
                         botId
                     )
                 }
