@@ -7,7 +7,7 @@ package com.heyheyon.armbandbot
  */
 object KoreanIpv4Prefixes {
     val prefixes: Set<String> = setOf(
-        "﻿1.11",
+        "1.11",
         "1.16",
         "1.17",
         "1.18",
