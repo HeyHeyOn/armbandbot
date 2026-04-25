@@ -168,3 +168,22 @@
 - APK: 완장봇_v1.3.4-beta1.apk
 - SHA256: 6F18599320592BDC88E1EFFE0B061CC780DD4186DE743EA844FF26C8DD9EDB40
 - Drive file ID: 1pziDpqOOiFSUkrl_sTNGuEFAtDzaQMmn
+
+## 1.3.4-beta2 구현 완료
+
+### 주요 변화
+- 해외 IP 필터의 한국 IP 기준 목록을 IP2Location LITE KR 데이터로 확장
+- DC에 표시되는 앞 두 자리 IP 기준 한국 prefix가 2,130개에서 2,927개로 증가
+- 해외 IP 필터에도 개별 차단 설정 추가
+  - 차단 없이 삭제만 실행
+  - 차단 기간
+  - 차단 시 글/댓글 함께 삭제
+  - 차단 사유 개별 설정
+- 해외 IP 게시글/댓글 차단 모두 개별 설정을 따르도록 연결
+
+### 빌드 정보
+- versionCode = 52
+- versionName = 1.3.4-beta2
+- APK: 완장봇_v1.3.4-beta2.apk
+- SHA256: 91439E6264152DB92AA17ADFC27F3C62585174055880B6E01B333415349CA329
+- Drive file ID: 13uxZtcROtND6immCGvSekKHvcTo5reT4

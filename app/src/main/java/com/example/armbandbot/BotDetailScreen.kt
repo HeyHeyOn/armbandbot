@@ -278,6 +278,15 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var yudongDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("yudong_delete_post_on_block")) botPref.getBoolean("yudong_delete_post_on_block", true) else isDeletePostOnBlock) }
         var yudongDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("yudong_delete_only_mode")) botPref.getBoolean("yudong_delete_only_mode", false) else isDeleteOnlyMode) }
 
+        var overseasIpUseCustomAction by remember { mutableStateOf(botPref.getBoolean("overseas_ip_use_custom_action_config", false)) }
+        var overseasIpActionMode by remember { mutableStateOf(if ((if (botPref.contains("overseas_ip_delete_only_mode")) botPref.getBoolean("overseas_ip_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var overseasIpBlockDurationHours by remember { mutableStateOf(botPref.getInt("overseas_ip_block_duration_hours", blockDurationHours)) }
+        var isOverseasIpActionModeDropdownExpanded by remember { mutableStateOf(false) }
+        var isOverseasIpBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
+        var overseasIpBlockReasonText by remember { mutableStateOf(botPref.getString("overseas_ip_block_reason_text", null) ?: blockReasonText) }
+        var overseasIpDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("overseas_ip_delete_post_on_block")) botPref.getBoolean("overseas_ip_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var overseasIpDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("overseas_ip_delete_only_mode")) botPref.getBoolean("overseas_ip_delete_only_mode", false) else isDeleteOnlyMode) }
+
         var kkangUseCustomAction by remember { mutableStateOf(botPref.getBoolean("kkang_use_custom_action_config", false)) }
         var kkangActionMode by remember { mutableStateOf(if ((if (botPref.contains("kkang_delete_only_mode")) botPref.getBoolean("kkang_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
         var kkangBlockDurationHours by remember { mutableStateOf(botPref.getInt("kkang_block_duration_hours", blockDurationHours)) }
@@ -800,7 +809,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text("해외 IP 필터 사용", fontWeight = FontWeight.Bold, color = textColor)
-                                                    Text("DC에 표시되는 IP 앞 두 자리 기준으로 한국 할당 대역이 아니면 차단합니다.", fontSize = 12.sp, color = subTextColor)
+                                                    Text("DC에 표시되는 IP 앞 두 자리 기준으로 한국 대역이 아니면 차단합니다.", fontSize = 12.sp, color = subTextColor)
                                                 }
                                                 Switch(checked = isOverseasIpFilterMode, onCheckedChange = { isOverseasIpFilterMode = it; botPref.edit().putBoolean("is_overseas_ip_filter_mode", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
                                             }
@@ -816,7 +825,22 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             }
                                         }
                                     }
-                                    Text("표시 예: 123.45.x.x처럼 앞 두 자리만 보이는 유동 IP에 적용됩니다. ID가 있는 고닉/반고닉은 이 필터 대상이 아닙니다.", fontSize = 12.sp, color = subTextColor, modifier = Modifier.padding(horizontal = 4.dp))
+                                    Text("표시 예: 123.45.x.x처럼 앞 두 자리만 보이는 유동 IP에 적용됩니다. ID가 있는 고닉/반고닉은 이 필터 대상이 아닙니다. 한국 IP 목록은 IP2Location LITE KR 기준입니다.", fontSize = 12.sp, color = subTextColor, modifier = Modifier.padding(horizontal = 4.dp))
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = overseasIpUseCustomAction, onCheckedChange = { overseasIpUseCustomAction = it; botPref.edit().putBoolean("overseas_ip_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
+                                    Column(modifier = if (!overseasIpUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (overseasIpUseCustomAction) isOverseasIpActionModeDropdownExpanded = true }) { Text(actionModeOptions[overseasIpActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isOverseasIpActionModeDropdownExpanded, onDismissRequest = { isOverseasIpActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { overseasIpActionMode = mode; overseasIpDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("overseas_ip_delete_only_mode", overseasIpDeleteOnlyMode).apply(); isOverseasIpActionModeDropdownExpanded = false }) } } } }
+                                            if (overseasIpActionMode == "block") {
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (overseasIpUseCustomAction) isOverseasIpBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[overseasIpBlockDurationHours] ?: "${overseasIpBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isOverseasIpBlockDurationDropdownExpanded, onDismissRequest = { isOverseasIpBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { overseasIpBlockDurationHours = hours; botPref.edit().putInt("overseas_ip_block_duration_hours", hours).apply(); isOverseasIpBlockDurationDropdownExpanded = false }) } } } }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = overseasIpDeletePostOnBlock, onCheckedChange = { overseasIpDeletePostOnBlock = it; botPref.edit().putBoolean("overseas_ip_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
+                                            }
+                                        } }
+                                        if (overseasIpActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", overseasIpBlockReasonText, colors) { tempEditText = overseasIpBlockReasonText; editDialogType = "overseas_ip_block_reason" } }
+                                    }
                                 }
                                 "KKANG" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
@@ -1793,9 +1817,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         if (editDialogType != null) {
-            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason"
+            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason" || editDialogType == "overseas_ip_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
@@ -1810,6 +1834,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "spam_block_reason" -> "예: 스팸코드 필터 위반"
                 "yudong_block_reason" -> "예: 유동 필터 위반"
                 "kkang_block_reason" -> "예: 깡계 필터 위반"
+                "overseas_ip_block_reason" -> "예: 해외 IP 작성 제한"
                 "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."
                 "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"
                 "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"
@@ -1844,6 +1869,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "spam_block_reason" -> { spamBlockReasonText = tempEditText; botPref.edit().putString("spam_block_reason_text", tempEditText).apply() }
                         "yudong_block_reason" -> { yudongBlockReasonText = tempEditText; botPref.edit().putString("yudong_block_reason_text", tempEditText).apply() }
                         "kkang_block_reason" -> { kkangBlockReasonText = tempEditText; botPref.edit().putString("kkang_block_reason_text", tempEditText).apply() }
+                        "overseas_ip_block_reason" -> { overseasIpBlockReasonText = tempEditText; botPref.edit().putString("overseas_ip_block_reason_text", tempEditText).apply() }
                         "normal" -> { normalWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("normal", tempEditText) }
                         "bypass" -> { bypassWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("bypass", tempEditText) }
                         "search" -> { searchWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("search_keywords", tempEditText) }

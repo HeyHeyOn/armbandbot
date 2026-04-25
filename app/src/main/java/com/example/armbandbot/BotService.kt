@@ -2783,7 +2783,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                         override = getActionOverride("kkang"),
                         sourceLabel = "kkang_override"
                     )
-                    ModerationFilterSource.OVERSEAS_IP -> resolveDefaultModerationActionConfig(config)
+                    ModerationFilterSource.OVERSEAS_IP -> resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = getActionOverride("overseas_ip"),
+                        sourceLabel = "overseas_ip_override"
+                    )
                     else -> resolveDefaultModerationActionConfig(config)
                 }
                 },
@@ -2972,7 +2976,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     override = getActionOverride("kkang"),
                                     sourceLabel = "kkang_override"
                                 )
-                                ModerationFilterSource.OVERSEAS_IP -> resolveDefaultModerationActionConfig(config)
+                                ModerationFilterSource.OVERSEAS_IP -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = getActionOverride("overseas_ip"),
+                                    sourceLabel = "overseas_ip_override"
+                                )
                                 else -> resolveDefaultModerationActionConfig(config)
                             }
                             },
