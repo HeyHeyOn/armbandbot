@@ -93,6 +93,10 @@ class BotService : Service() {
         val isYudongImageBlock: Boolean,
         val isYudongVoiceBlock: Boolean,
 
+        val isOverseasIpFilterMode: Boolean,
+        val isOverseasIpPostBlock: Boolean,
+        val isOverseasIpCommentBlock: Boolean,
+
         val isSpamBurstProtectionEnabled: Boolean,
         val spamBurstWindowMinutes: Int,
         val spamBurstYudongThreshold: Int,
@@ -147,6 +151,7 @@ class BotService : Service() {
         NICKNAME,
         YUDONG,
         KKANG,
+        OVERSEAS_IP,
         URL,
         SPAM,
         IMAGE,
@@ -223,6 +228,8 @@ class BotService : Service() {
         val yudongVoiceEnabled: Boolean,
         val anyYudongPostEnabled: Boolean,
         val anyYudongCommentEnabled: Boolean,
+        val overseasIpPostEnabled: Boolean,
+        val overseasIpCommentEnabled: Boolean,
         val kkangPostEnabled: Boolean,
         val kkangCommentEnabled: Boolean,
         val kkangImageEnabled: Boolean,
@@ -2776,6 +2783,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         override = getActionOverride("kkang"),
                         sourceLabel = "kkang_override"
                     )
+                    ModerationFilterSource.OVERSEAS_IP -> resolveDefaultModerationActionConfig(config)
                     else -> resolveDefaultModerationActionConfig(config)
                 }
                 },
@@ -2964,6 +2972,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     override = getActionOverride("kkang"),
                                     sourceLabel = "kkang_override"
                                 )
+                                ModerationFilterSource.OVERSEAS_IP -> resolveDefaultModerationActionConfig(config)
                                 else -> resolveDefaultModerationActionConfig(config)
                             }
                             },
@@ -3056,6 +3065,20 @@ img.written_dccon{max-width:80px;max-height:80px}
         return Regex(
             "(?<![a-zA-Z0-9])$excludeAllDigits(?:$codeChar$separator){${config.spamCodeLength - 1}}$codeChar(?![a-zA-Z0-9])"
         )
+    }
+
+    private fun visibleIpv4Prefix(authorIdOrIp: String): String? {
+        val parts = authorIdOrIp.trim().split('.')
+        if (parts.size < 2) return null
+        val first = parts[0].toIntOrNull() ?: return null
+        val second = parts[1].toIntOrNull() ?: return null
+        if (first !in 0..255 || second !in 0..255) return null
+        return "$first.$second"
+    }
+
+    private fun isOverseasVisibleIpv4(authorIdOrIp: String): Boolean {
+        val prefix = visibleIpv4Prefix(authorIdOrIp) ?: return false
+        return !KoreanIpv4Prefixes.prefixes.contains(prefix)
     }
 
     private fun evaluateUserFilter(
@@ -3485,6 +3508,10 @@ img.written_dccon{max-width:80px;max-height:80px}
             isYudongImageBlock = botPref.getBoolean("is_yudong_image_block", false),
             isYudongVoiceBlock = botPref.getBoolean("is_yudong_voice_block", false),
 
+            isOverseasIpFilterMode = botPref.getBoolean("is_overseas_ip_filter_mode", false),
+            isOverseasIpPostBlock = botPref.getBoolean("is_overseas_ip_post_block", true),
+            isOverseasIpCommentBlock = botPref.getBoolean("is_overseas_ip_comment_block", true),
+
             isSpamBurstProtectionEnabled = botPref.getBoolean("is_spam_burst_protection_enabled", false),
             spamBurstWindowMinutes = botPref.getInt("spam_burst_window_minutes", 3),
             spamBurstYudongThreshold = botPref.getInt("spam_burst_yudong_threshold", 10),
@@ -3607,6 +3634,16 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         if (isWhitelistedUser && config.isDebugMode && botId.isNotEmpty()) {
             sendLog("[디버그][필터/화이트] 화이트리스트 유저 → 이후 모든 필터 통과", botId)
+        }
+
+        if (!shouldBlockExecute && !isWhitelistedUser) {
+            if (toggles.overseasIpPostEnabled && postUid.isBlank() && isOverseasVisibleIpv4(postAuthor)) {
+                blockReasonPrefix = "해외 IP 게시글 차단"
+                notiType = "user"
+                debugDetail = "해외 IP 대역 감지: $postAuthor"
+                filterSource = ModerationFilterSource.OVERSEAS_IP
+                shouldBlockExecute = true
+            }
         }
 
         if (!shouldBlockExecute && !isWhitelistedUser) {
@@ -3833,6 +3870,16 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         if (!isBadComment && !isWhitelistedUser) {
+            if (toggles.overseasIpCommentEnabled && cmtUid.isBlank() && isOverseasVisibleIpv4(cmtAuthor)) {
+                blockReasonPrefix = "해외 IP 댓글 차단"
+                notiType = "user"
+                debugDetail = "해외 IP 대역 감지: $cmtAuthor"
+                filterSource = ModerationFilterSource.OVERSEAS_IP
+                isBadComment = true
+            }
+        }
+
+        if (!isBadComment && !isWhitelistedUser) {
             val shouldCheckYudongComment = toggles.anyYudongCommentEnabled
             val isYudongComment = if (shouldCheckYudongComment) cmtUid.isEmpty() else false
             if (config.isDebugMode && botId.isNotEmpty() && shouldCheckYudongComment) {
@@ -3979,6 +4026,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         val yudongVoiceEnabled = config.isYudongVoiceBlock
         val anyYudongPostEnabled = yudongPostEnabled || yudongImageEnabled || yudongVoiceEnabled
         val anyYudongCommentEnabled = yudongCommentEnabled || yudongVoiceEnabled
+        val overseasIpPostEnabled = config.isOverseasIpFilterMode && config.isOverseasIpPostBlock
+        val overseasIpCommentEnabled = config.isOverseasIpFilterMode && config.isOverseasIpCommentBlock
         val kkangPostEnabled = config.isKkangFilterMode && config.isKkangPostBlock
         val kkangCommentEnabled = config.isKkangFilterMode && config.isKkangCommentBlock
         val kkangImageEnabled = config.isKkangFilterMode && config.isKkangImageBlock
@@ -4001,6 +4050,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             yudongVoiceEnabled = yudongVoiceEnabled,
             anyYudongPostEnabled = anyYudongPostEnabled,
             anyYudongCommentEnabled = anyYudongCommentEnabled,
+            overseasIpPostEnabled = overseasIpPostEnabled,
+            overseasIpCommentEnabled = overseasIpCommentEnabled,
             kkangPostEnabled = kkangPostEnabled,
             kkangCommentEnabled = kkangCommentEnabled,
             kkangImageEnabled = kkangImageEnabled,

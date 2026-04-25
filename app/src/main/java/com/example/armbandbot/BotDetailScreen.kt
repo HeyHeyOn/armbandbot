@@ -338,6 +338,10 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isYudongImageBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_image_block", false)) }
         var isYudongVoiceBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_voice_block", false)) }
 
+        var isOverseasIpFilterMode by remember { mutableStateOf(botPref.getBoolean("is_overseas_ip_filter_mode", false)) }
+        var isOverseasIpPostBlock by remember { mutableStateOf(botPref.getBoolean("is_overseas_ip_post_block", true)) }
+        var isOverseasIpCommentBlock by remember { mutableStateOf(botPref.getBoolean("is_overseas_ip_comment_block", true)) }
+
         var isUrlFilterMode by remember { mutableStateOf(botPref.getBoolean("is_url_filter_mode", false)) }
         var urlWhitelistText by remember { mutableStateOf(botPref.getStringSet("url_whitelist", setOf())?.joinToString("\n") ?: "") }
 
@@ -490,6 +494,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     "USER" -> "유저 ID/IP 필터"
                                     "NICKNAME" -> "닉네임 필터"
                                     "YUDONG" -> "유동 필터"
+                                    "OVERSEAS_IP" -> "해외 IP 필터"
                                     "URL" -> "URL 필터"
                                     "IMAGE" -> "이미지 필터"
                                     "VOICE" -> "보이스 필터"
@@ -788,6 +793,30 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         } }
                                         if (yudongActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", yudongBlockReasonText, colors) { tempEditText = yudongBlockReasonText; editDialogType = "yudong_block_reason" } }
                                     }
+                                }
+                                "OVERSEAS_IP" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("해외 IP 필터 사용", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Text("DC에 표시되는 IP 앞 두 자리 기준으로 한국 할당 대역이 아니면 차단합니다.", fontSize = 12.sp, color = subTextColor)
+                                                }
+                                                Switch(checked = isOverseasIpFilterMode, onCheckedChange = { isOverseasIpFilterMode = it; botPref.edit().putBoolean("is_overseas_ip_filter_mode", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                            }
+                                            Divider(color = dividerColor)
+                                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Text("해외 IP 게시글 차단", color = textColor)
+                                                Switch(checked = isOverseasIpPostBlock, onCheckedChange = { isOverseasIpPostBlock = it; botPref.edit().putBoolean("is_overseas_ip_post_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                            }
+                                            Divider(color = dividerColor)
+                                            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Text("해외 IP 댓글 차단", color = textColor)
+                                                Switch(checked = isOverseasIpCommentBlock, onCheckedChange = { isOverseasIpCommentBlock = it; botPref.edit().putBoolean("is_overseas_ip_comment_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                            }
+                                        }
+                                    }
+                                    Text("표시 예: 123.45.x.x처럼 앞 두 자리만 보이는 유동 IP에 적용됩니다. ID가 있는 고닉/반고닉은 이 필터 대상이 아닙니다.", fontSize = 12.sp, color = subTextColor, modifier = Modifier.padding(horizontal = 4.dp))
                                 }
                                 "KKANG" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
@@ -1452,6 +1481,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 ModernSettingItem("유저 ID/IP 필터", "식별코드/IP 기반 차단 설정", Icons.Filled.Person, colors, isUserFilterMode, { isUserFilterMode = it; botPref.edit().putBoolean("is_user_filter_mode", it).apply() }) { currentSubScreen = "USER" }
                                 ModernSettingItem("닉네임 필터", "닉네임 기반 차단 설정", Icons.Filled.Face, colors, isNicknameFilterMode, { isNicknameFilterMode = it; botPref.edit().putBoolean("is_nickname_filter_mode", it).apply() }) { currentSubScreen = "NICKNAME" }
                                 ModernSettingItem("유동 필터", "비로그인 유저 이용 제한", Icons.Filled.Lock, colors) { currentSubScreen = "YUDONG" }
+                                ModernSettingItem("해외 IP 필터", "한국 할당 대역이 아닌 유동 IP 차단", Icons.Filled.Public, colors, isOverseasIpFilterMode, { isOverseasIpFilterMode = it; botPref.edit().putBoolean("is_overseas_ip_filter_mode", it).apply() }) { currentSubScreen = "OVERSEAS_IP" }
                                 ModernSettingItem("깡계 필터", "글/댓글 수 미달 유저 차단", Icons.Filled.Info, colors, isKkangFilterMode, { isKkangFilterMode = it; botPref.edit().putBoolean("is_kkang_filter_mode", it).apply() }) { currentSubScreen = "KKANG" }
                                 ModernSettingItem("도배 방지", "유동/깡계 급증 시 일정 시간 신규 글 삭제", Icons.Filled.Warning, colors, isSpamBurstProtectionEnabled, { isSpamBurstProtectionEnabled = it; botPref.edit().putBoolean("is_spam_burst_protection_enabled", it).apply() }) { currentSubScreen = "SPAM_BURST" }
 

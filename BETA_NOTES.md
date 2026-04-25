@@ -164,3 +164,16 @@
 - versionCode = 51
 - versionName = 1.3.4-beta1
 
+
+## 1.3.4-beta1 구현 완료
+
+### 주요 변화
+- 해외 IP 필터 추가
+- DC에 표시되는 IP 앞 두 자리 기준으로 한국 할당 IPv4 대역이 아니면 해외 IP로 판단
+- 해외 IP 게시글/댓글 차단 토글 추가
+- 해외 IP 차단 로그와 사유 문구 추가
+
+### 빌드 정보
+- APK: 완장봇_v1.3.4-beta1.apk
+- SHA256: 0E9E98E0BE1847C950BFAA39BAA80A83E5311B7EB4CA7B18394AC79ABF762E8C
+- Drive file ID: 1Xu0TS8AOvyThVvii8OZmc_d-5LyQzo9O
