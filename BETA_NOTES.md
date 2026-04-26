@@ -555,3 +555,19 @@
 - APK: 완장봇_v1.3.4-beta23.apk
 - SHA256: D16FEF8E7A943073AEA7AD9EDE576D6FB85FE1B688EEF83A93D7DD0001C576ED
 - Drive file ID: 1tmMnGcqAVwsaTuhCcCu4IafaBLjfad26
+
+## 1.3.4-beta24 구현 완료
+
+### 주요 변화
+- DB 대시보드 개별 기록 삭제 범위 분리
+- 공용 모니터링 기록 탭에서 일반 기록을 삭제해도 같은 글의 차단 상세 기록은 삭제하지 않도록 수정
+- 차단 상세 기록 탭에서 차단 기록을 삭제해도 같은 글의 일반 기록은 삭제하지 않도록 유지
+- 각 탭에서 삭제한 기록의 자체 스냅샷만 삭제
+- 메인 화면 표시 버전을 1.3.4-beta24로 갱신
+
+### 빌드 정보
+- versionCode = 74
+- versionName = 1.3.4-beta24
+- APK: 완장봇_v1.3.4-beta24.apk
+- SHA256: 0969F36E0A1A466CE15D51167BCF612CED9DE36A84E20B1B31B41EEE6447D385
+- Drive file ID: 1Y61z4Q2zkjnzVyBAd9sDas1fP7zIxZaJ

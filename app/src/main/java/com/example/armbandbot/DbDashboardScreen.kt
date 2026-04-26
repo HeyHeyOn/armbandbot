@@ -217,9 +217,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         withContext(Dispatchers.IO) {
                             if (targetPost != null) {
                                 deleteSnapshotFiles(targetPost.snapshotPath)
-                                postDao?.getBlockSnapshotPathsForPost(targetPost.gallType, targetPost.gallId, targetPost.postNum)?.forEach { deleteSnapshotFiles(it) }
                                 postDao?.deletePost(targetPost.gallType, targetPost.gallId, targetPost.postNum)
-                                postDao?.deleteBlockHistoryForPost(targetPost.gallType, targetPost.gallId, targetPost.postNum)
                             } else if (targetBlock != null) {
                                 deleteSnapshotFiles(targetBlock.snapshotPath)
                                 postDao?.deleteBlockHistoryById(targetBlock.id)
