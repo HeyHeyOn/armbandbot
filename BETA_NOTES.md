@@ -263,3 +263,19 @@
 - APK: 완장봇_v1.3.4-beta7.apk
 - SHA256: 03A60D55268487F7892747A71EF2AE89C875C8261844D66D989A5B427FEE04F0
 - Drive file ID: 19G5QHUD1uKg8RFcT3j4Qh3bILfkwnJ0D
+
+## 1.3.4-beta8 구현 완료
+
+### 주요 변화
+- 금지어 필터 적용 대상 제한 추가
+- 금지어 필터 화면에 `유동에게만 적용`, `깡계에게만 적용` 토글 추가
+- 두 토글이 모두 꺼져 있으면 기존처럼 모든 작성자에게 금지어 필터 적용
+- 유동/깡계 토글 중 하나 이상 켜져 있으면 금지어가 감지된 경우에만 작성자 조건을 확인해 최종 차단 여부 결정
+- 유동 판정은 기존 UID 없음 기준을 재사용하고, 깡계 판정은 기존 갤로그 글/댓글 수 기준과 캐시를 재사용
+
+### 빌드 정보
+- versionCode = 58
+- versionName = 1.3.4-beta8
+- APK: 완장봇_v1.3.4-beta8.apk
+- SHA256: 7BAE1B021DC42C85EF0B8066D60372EC92F2D4F34963E7BF9F6060A13F8890C6
+- Drive file ID: 1iyQafdAKchHAQ-UdLumA_lJgDA4ccxvs

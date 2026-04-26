@@ -151,7 +151,9 @@ class BotService : Service() {
         val cycleMaxMs: Long,
 
         val normalWords: Array<String>,
-        val bypassWords: Array<String>
+        val bypassWords: Array<String>,
+        val keywordApplyYudongOnly: Boolean,
+        val keywordApplyKkangOnly: Boolean
     )
     private enum class PostModerationAction {
         ALLOW,
@@ -3742,9 +3744,48 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?.map { it.removeCommentAndTrim() }
                 ?.filter { it.isNotEmpty() }
                 ?.toTypedArray()
-                ?: arrayOf()
+                ?: arrayOf(),
+            keywordApplyYudongOnly = botPref.getBoolean("keyword_apply_yudong_only", false),
+            keywordApplyKkangOnly = botPref.getBoolean("keyword_apply_kkang_only", false)
         )
     }
+    private fun isKeywordTargetAllowed(
+        config: BotConfig,
+        botId: String,
+        uid: String,
+        gallogCache: MutableMap<String, Pair<Int, Int>>,
+        tokenToUse: String,
+        cookie: String,
+        isComment: Boolean
+    ): Boolean {
+        val yudongOnly = config.keywordApplyYudongOnly
+        val kkangOnly = config.keywordApplyKkangOnly
+        if (!yudongOnly && !kkangOnly) return true
+
+        val isYudong = uid.isBlank()
+        if (yudongOnly && isYudong) return true
+        if (!kkangOnly || isYudong) {
+            if (config.isDebugMode && botId.isNotEmpty()) {
+                sendLog("[디버그][금지어 대상] ${if (isComment) "댓글" else "게시글"} 대상 제한 불일치 / uid=${if (uid.isBlank()) "유동" else "회원"} / 유동만=$yudongOnly / 깡계만=$kkangOnly", botId)
+            }
+            return false
+        }
+
+        val gallogStats = getGallogStats(
+            userId = uid,
+            gallogCache = gallogCache,
+            tokenToUse = tokenToUse,
+            cookie = cookie,
+            botId = botId,
+            logTag = if (isComment) "댓글 금지어 대상 깡계 gallog 조회 실패" else "게시글 금지어 대상 깡계 gallog 조회 실패"
+        )
+        val isKkang = gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin
+        if (config.isDebugMode && botId.isNotEmpty()) {
+            sendLog("[디버그][금지어 대상] ${if (isComment) "댓글" else "게시글"} 깡계 판정 / 글=${gallogStats.postCount}/${config.kkangPostMin} / 댓글=${gallogStats.commentCount}/${config.kkangCommentMin} / 결과=${if (isKkang) "통과" else "불통과"}", botId)
+        }
+        return isKkang
+    }
+
     private fun analyzePost(
         config: BotConfig,
         botId: String = "",
@@ -3904,22 +3945,40 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                 }
 
+                val keywordMatched = matchedNormalWord != null || matchedBypassWord != null
+                val keywordTargetAllowed = if (keywordMatched) {
+                    isKeywordTargetAllowed(
+                        config = config,
+                        botId = botId,
+                        uid = postUid,
+                        gallogCache = gallogCache,
+                        tokenToUse = tokenToUse,
+                        cookie = cookie,
+                        isComment = false
+                    )
+                } else {
+                    false
+                }
+
                 shouldBlockExecute =
-                    (matchedNormalWord != null) ||
-                            (matchedBypassWord != null) ||
+                    (keywordMatched && keywordTargetAllowed) ||
                             (suspiciousUrlInPost != null) ||
                             (spamCodeMatchPost != null)
 
-                if (matchedNormalWord != null) {
+                if (matchedNormalWord != null && keywordTargetAllowed) {
                     debugDetail = "일반 금지어 감지 ($matchedNormalWord)"
                     filterSource = ModerationFilterSource.KEYWORD
-                } else if (matchedBypassWord != null) {
+                } else if (matchedBypassWord != null && keywordTargetAllowed) {
                     debugDetail = "우회 금지어 감지 ($matchedBypassWord)"
                     filterSource = ModerationFilterSource.KEYWORD
-                } else if (suspiciousUrlInPost != null) {
+                } else if (keywordMatched && config.isDebugMode && botId.isNotEmpty()) {
+                    sendLog("[디버그][금지어 대상] 게시글 금지어 감지됨 but 적용 대상 제한으로 통과", botId)
+                }
+
+                if (filterSource == ModerationFilterSource.UNKNOWN && suspiciousUrlInPost != null) {
                     debugDetail = "허용되지 않은 URL 감지 ($suspiciousUrlInPost)"
                     filterSource = ModerationFilterSource.URL
-                } else if (spamCodeMatchPost != null) {
+                } else if (filterSource == ModerationFilterSource.UNKNOWN && spamCodeMatchPost != null) {
                     debugDetail = "스팸코드 감지 ($spamCodeMatchPost)"
                     filterSource = ModerationFilterSource.SPAM
                 }
@@ -4127,22 +4186,40 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                 }
 
+                val keywordMatched = matchedNormalWord != null || matchedBypassWord != null
+                val keywordTargetAllowed = if (keywordMatched) {
+                    isKeywordTargetAllowed(
+                        config = config,
+                        botId = botId,
+                        uid = cmtUid,
+                        gallogCache = gallogCache,
+                        tokenToUse = tokenToUse,
+                        cookie = cookie,
+                        isComment = true
+                    )
+                } else {
+                    false
+                }
+
                 isBadComment =
-                    (matchedNormalWord != null) ||
-                            (matchedBypassWord != null) ||
+                    (keywordMatched && keywordTargetAllowed) ||
                             (suspiciousUrlInComment != null) ||
                             (spamCodeMatchComment != null)
 
-                if (matchedNormalWord != null) {
+                if (matchedNormalWord != null && keywordTargetAllowed) {
                     debugDetail = "댓글 일반 금지어 감지 ($matchedNormalWord)"
                     filterSource = ModerationFilterSource.KEYWORD
-                } else if (matchedBypassWord != null) {
+                } else if (matchedBypassWord != null && keywordTargetAllowed) {
                     debugDetail = "댓글 우회 금지어 감지 ($matchedBypassWord)"
                     filterSource = ModerationFilterSource.KEYWORD
-                } else if (suspiciousUrlInComment != null) {
+                } else if (keywordMatched && config.isDebugMode && botId.isNotEmpty()) {
+                    sendLog("[디버그][금지어 대상] 댓글 금지어 감지됨 but 적용 대상 제한으로 통과", botId)
+                }
+
+                if (filterSource == ModerationFilterSource.UNKNOWN && suspiciousUrlInComment != null) {
                     debugDetail = "댓글 허용되지 않은 URL 감지 ($suspiciousUrlInComment)"
                     filterSource = ModerationFilterSource.URL
-                } else if (spamCodeMatchComment != null) {
+                } else if (filterSource == ModerationFilterSource.UNKNOWN && spamCodeMatchComment != null) {
                     debugDetail = "댓글 스팸코드 감지 ($spamCodeMatchComment)"
                     filterSource = ModerationFilterSource.SPAM
                 }
