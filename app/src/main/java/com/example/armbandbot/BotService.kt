@@ -38,10 +38,18 @@ class BotService : Service() {
     private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
     private val spamBurstRecentEvents = ConcurrentHashMap<String, MutableList<SpamBurstEvent>>()
     private val spamBurstStates = ConcurrentHashMap<String, SpamBurstState>()
+    private val lastHealthLogAt = ConcurrentHashMap<String, Long>()
+    private val runtimeProtectionLastGcAt = ConcurrentHashMap<String, Long>()
     private var wakeLock: PowerManager.WakeLock? = null
     private val autoLoginCooldownMs = 10 * 60 * 1000L
     private val autoLoginMaxAttempts = 3
     private val dcUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    private val healthLogIntervalMs = 60 * 60 * 1000L
+    private val runtimeProtectionGcIntervalMs = 6 * 60 * 60 * 1000L
+    private val maxAiBatchResultEntriesPerBot = 120
+    private val maxPendingAiPlansPerBot = 200
+    private val maxSpamBurstEventsPerKey = 300
+
     private data class BotConfig(
         val isDebugMode: Boolean,
         val isExpertMode: Boolean,
@@ -459,6 +467,7 @@ class BotService : Service() {
         reason: String
     ) {
         val removedJob = activeBots.remove(botId)
+        cleanupRuntimeState(botId, aggressive = true)
         sendLog("[복구 점검] finalizeBot에서 Job 제거: ${removedJob != null}", botId)
         sendLog("[$botName] 종료: $reason", botId)
 
@@ -470,6 +479,63 @@ class BotService : Service() {
                 stopForeground(true)
             }
             stopSelf()
+        }
+    }
+
+    private fun cleanupRuntimeState(botId: String, aggressive: Boolean = false) {
+        runCatching {
+            if (aggressive) {
+                aiBatchQueues.remove(botId)
+                aiBatchResults.remove(botId)
+                pendingAiPostPlans.remove(botId)
+                pendingAiCommentPlans.remove(botId)
+                spamBurstRecentEvents.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstRecentEvents.remove(it) }
+                spamBurstStates.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstStates.remove(it) }
+                lastHealthLogAt.remove(botId)
+                runtimeProtectionLastGcAt.remove(botId)
+                return@runCatching
+            }
+
+            aiBatchResults[botId]?.let { results ->
+                if (results.size > maxAiBatchResultEntriesPerBot) {
+                    results.keys.take(results.size - maxAiBatchResultEntriesPerBot).forEach { results.remove(it) }
+                }
+            }
+            pendingAiPostPlans[botId]?.let { plans ->
+                if (plans.size > maxPendingAiPlansPerBot) plans.subList(0, plans.size - maxPendingAiPlansPerBot).clear()
+            }
+            pendingAiCommentPlans[botId]?.let { plans ->
+                if (plans.size > maxPendingAiPlansPerBot) plans.subList(0, plans.size - maxPendingAiPlansPerBot).clear()
+            }
+            spamBurstRecentEvents.values.forEach { events ->
+                if (events.size > maxSpamBurstEventsPerKey) events.subList(0, events.size - maxSpamBurstEventsPerKey).clear()
+            }
+        }
+    }
+
+    private fun maybeLogRuntimeHealth(botId: String) {
+        val now = System.currentTimeMillis()
+        val last = lastHealthLogAt[botId] ?: 0L
+        if (now - last < healthLogIntervalMs) return
+        lastHealthLogAt[botId] = now
+
+        val runtime = Runtime.getRuntime()
+        val usedMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val totalMb = runtime.totalMemory() / (1024 * 1024)
+        val maxMb = runtime.maxMemory() / (1024 * 1024)
+        val threadCount = Thread.getAllStackTraces().size
+        val aiResults = aiBatchResults[botId]?.size ?: 0
+        val aiPostPlans = pendingAiPostPlans[botId]?.size ?: 0
+        val aiCommentPlans = pendingAiCommentPlans[botId]?.size ?: 0
+        val spamEvents = spamBurstRecentEvents.values.sumOf { it.size }
+        val inMemoryLogs = GlobalBotState.logs[botId]?.size ?: 0
+        sendLog("[헬스] mem=${usedMb}/${totalMb}MB max=${maxMb}MB / threads=$threadCount / activeBots=${activeBots.size} / snapshotQueue=${GlobalBotState.getSnapshotQueuePending()} / aiResults=$aiResults / aiPlans=${aiPostPlans + aiCommentPlans} / spamEvents=$spamEvents / logs=$inMemoryLogs", botId)
+
+        val lastGc = runtimeProtectionLastGcAt[botId] ?: 0L
+        if (now - lastGc > runtimeProtectionGcIntervalMs && usedMb > maxMb * 0.70) {
+            runtimeProtectionLastGcAt[botId] = now
+            System.gc()
+            sendLog("[헬스] 장시간 운용 보호: 메모리 사용량이 높아 정리 요청을 실행했습니다.", botId)
         }
     }
 
@@ -528,6 +594,7 @@ class BotService : Service() {
 
             activeBots[botId]?.cancel()
             activeBots.remove(botId)
+            cleanupRuntimeState(botId, aggressive = true)
 
             val masterPref = getSharedPreferences("bot_master", Context.MODE_PRIVATE)
             val botIds = (masterPref.getString("bot_ids_list", "") ?: "")
@@ -1118,6 +1185,8 @@ class BotService : Service() {
             val delChk = if (config.deletePostOnBlock) "1" else "0"
 
             cleanupOldSnapshots(config.snapshotKeepDays, botId)
+            cleanupRuntimeState(botId)
+            maybeLogRuntimeHealth(botId)
 
             val isNotiMaster = config.isNotiMaster
             val notiSettings = mapOf(
@@ -1259,6 +1328,8 @@ class BotService : Service() {
                 }
             }
             GlobalBotState.saveDb(this@BotService)
+            cleanupRuntimeState(botId)
+            maybeLogRuntimeHealth(botId)
             val randomCycleDelay = randomDelay(cycleMinMs, cycleMaxMs)
             sendLog("[$botName] 사이클 완료! ${String.format("%.1f", randomCycleDelay / 1000f)}초 대기.", botId)
             delay(randomCycleDelay)

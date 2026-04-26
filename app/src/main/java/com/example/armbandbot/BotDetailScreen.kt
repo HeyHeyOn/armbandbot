@@ -1806,6 +1806,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         "BLOCK" -> logMessages.filter { it.category == BotLogCategory.BLOCK }
                                         "DEBUG" -> logMessages.filter { it.category == BotLogCategory.DEBUG }
                                         "AI" -> logMessages.filter { it.category == BotLogCategory.AI }
+                                        "HEALTH" -> logMessages.filter { it.category == BotLogCategory.HEALTH }
                                         "SESSION" -> logMessages.filter { it.category == BotLogCategory.SESSION }
                                         "ERROR" -> logMessages.filter { it.category == BotLogCategory.ERROR }
                                         else -> logMessages.toList()
@@ -1929,6 +1930,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     FilterChip(selected = logFilterTab == "BLOCK", onClick = { logFilterTab = "BLOCK" }, label = { Text("차단", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "DEBUG", onClick = { logFilterTab = "DEBUG" }, label = { Text("디버그", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFFFB300), selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "AI", onClick = { logFilterTab = "AI" }, label = { Text("AI", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF00897B), selectedLabelColor = Color.White))
+                                    FilterChip(selected = logFilterTab == "HEALTH", onClick = { logFilterTab = "HEALTH" }, label = { Text("헬스", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF546E7A), selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "SESSION", onClick = { logFilterTab = "SESSION" }, label = { Text("세션/복구", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF6A1B9A), selectedLabelColor = Color.White))
                                     FilterChip(selected = logFilterTab == "ERROR", onClick = { logFilterTab = "ERROR" }, label = { Text("오류", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFD32F2F), selectedLabelColor = Color.White))
                                 }
@@ -1943,6 +1945,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     BotLogCategory.ERROR -> Color(0xFFFF6E6E)
                                                     BotLogCategory.DEBUG -> Color(0xFFFFD740)
                                                     BotLogCategory.AI -> Color(0xFF4DB6AC)
+                                                    BotLogCategory.HEALTH -> Color(0xFFB0BEC5)
                                                     BotLogCategory.SESSION -> Color(0xFFCE93D8)
                                                     BotLogCategory.CYCLE -> Color(0xFF69F0AE)
                                                     BotLogCategory.SYSTEM -> Color(0xFF90CAF9)

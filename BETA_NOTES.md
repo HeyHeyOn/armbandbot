@@ -529,3 +529,29 @@
 - APK: 완장봇_v1.3.4-beta22.apk
 - SHA256: 4B8E8CBA0303EAE8BBDE766F49DD726221CA0D6249384EC33417FFB2A8FA9710
 - Drive file ID: 1wDisVKtFnttdcyr20fEm0jxzM-VErnVp
+
+## 1.3.4-beta23 구현 완료
+
+### 주요 변화
+- 장시간 운용 중 런타임 자원 누적 방어 로직 추가
+- 스냅샷 큐를 무제한에서 최대 80개 대기 제한으로 변경
+- AI 배치 결과/대기 실행 계획/도배 이벤트 런타임 캐시 상한 정리 추가
+- 봇 STOP/종료 시 해당 봇의 런타임 캐시와 헬스 상태 정리
+- 사이클 시작/종료 시 런타임 캐시 정리 수행
+- 활동 로그 메모리 상한을 5000개에서 3000개로 축소
+- 1시간 주기 헬스 로그 추가
+  - 메모리 사용량
+  - 스레드 수
+  - 활성 봇 수
+  - 스냅샷 큐 대기 수
+  - AI/도배/로그 메모리 상태
+- 메모리 사용량이 높고 장시간 운용 중일 때 보수적 정리 요청 실행
+- 헬스 로그를 별도 카테고리로 분류
+- 활동 로그 필터에 `헬스` 탭 추가
+
+### 빌드 정보
+- versionCode = 73
+- versionName = 1.3.4-beta23
+- APK: 완장봇_v1.3.4-beta23.apk
+- SHA256: D16FEF8E7A943073AEA7AD9EDE576D6FB85FE1B688EEF83A93D7DD0001C576ED
+- Drive file ID: 1tmMnGcqAVwsaTuhCcCu4IafaBLjfad26
