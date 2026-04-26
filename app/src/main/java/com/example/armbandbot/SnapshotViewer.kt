@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -342,7 +342,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                     val suggestedFileName = File(currentPath).name
                     exportLauncher.launch(suggestedFileName)
                 }) {
-                    Icon(Icons.Filled.Save, contentDescription = "추출", tint = PastelNavy)
+                    Icon(Icons.Filled.FileUpload, contentDescription = "추출", tint = PastelNavy)
                 }
                 TextButton(onClick = { showWebView = true }) {
                     Text("원본 HTML", color = PastelNavy, fontSize = 13.sp)

@@ -13,8 +13,8 @@ android {
         applicationId = "com.heyheyon.armbandbot"
         minSdk = 24
         targetSdk = 35
-        versionCode = 64
-        versionName = "1.3.4-beta14"
+        versionCode = 65
+        versionName = "1.3.4-beta15"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

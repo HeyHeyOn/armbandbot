@@ -384,3 +384,24 @@
 - APK: 완장봇_v1.3.4-beta14.apk
 - SHA256: F5BF8E1FD3E5A3CAEBD4E2BD53A582897A0D8F416CCA412ECBB363CD695715DD
 - Drive file ID: 1J5a9rglsDHrDEoJr1CHFn7_LzrudH4IK
+
+## 1.3.4-beta15 구현 완료
+
+### 주요 변화
+- 봇 목록 하단 액션 바를 더 얇게 조정
+  - 버튼 크기 축소
+  - 상하 여백 축소
+- 활동 로그 액션 바를 별도 블록처럼 보이지 않도록 조정
+  - 둥근 모서리/그림자/상단 여백 제거
+  - 하단에 붙은 전체 폭 액션 바 형태로 변경
+  - 버튼 크기와 상하 여백 축소
+- 활동 로그 `로그 저장` 아이콘을 저장 아이콘에서 내보내기 아이콘으로 변경
+- 스냅샷 상세 페이지의 스냅샷 저장/추출 아이콘도 내보내기 아이콘으로 변경
+- 메인 화면 표시 버전을 1.3.4-beta15로 갱신
+
+### 빌드 정보
+- versionCode = 65
+- versionName = 1.3.4-beta15
+- APK: 완장봇_v1.3.4-beta15.apk
+- SHA256: 11DB269303485A8198316A0CFEC67FBE14A1AC7A79309833EEAB3B38CA5A4B60
+- Drive file ID: 1_HSoQ-1ffywyEHQ0TDCqfpMOprzAc70-

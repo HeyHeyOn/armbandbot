@@ -1838,7 +1838,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             val isAtBottom by remember { derivedStateOf { val info = logListState.layoutInfo.visibleItemsInfo; if (info.isEmpty()) true else info.last().index >= logListState.layoutInfo.totalItemsCount - 8 } }
                             LaunchedEffect(filteredLogs.size) { if (isAtBottom && filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) }
 
-                            Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp)) {
+                            Column(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
                                 val exportLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
                                     if (uri == null) return@rememberLauncherForActivityResult
                                     runCatching {
@@ -1937,25 +1937,25 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 }
                                 Surface(
                                     color = if (isDarkMode) Color(0xFF1A1A1A) else cardColor,
-                                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
                                 ) {
                                     val actionIconColor = if (isDarkMode) Color.White else PastelNavy
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                                         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, modifier = Modifier.size(40.dp)) {
-                                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "맨 위로", tint = actionIconColor, modifier = Modifier.size(25.dp))
+                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, modifier = Modifier.size(38.dp)) {
+                                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "맨 위로", tint = actionIconColor, modifier = Modifier.size(24.dp))
                                         }
-                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, modifier = Modifier.size(40.dp)) {
-                                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "맨 밑으로", tint = actionIconColor, modifier = Modifier.size(25.dp))
+                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, modifier = Modifier.size(38.dp)) {
+                                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "맨 밑으로", tint = actionIconColor, modifier = Modifier.size(24.dp))
                                         }
-                                        IconButton(onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") }, modifier = Modifier.size(40.dp)) {
-                                            Icon(Icons.Filled.Save, contentDescription = "로그 저장", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                                        IconButton(onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") }, modifier = Modifier.size(38.dp)) {
+                                            Icon(Icons.Filled.FileUpload, contentDescription = "로그 저장", tint = actionIconColor, modifier = Modifier.size(23.dp))
                                         }
-                                        IconButton(onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") }, modifier = Modifier.size(40.dp)) {
-                                            Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                                        IconButton(onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") }, modifier = Modifier.size(38.dp)) {
+                                            Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장", tint = actionIconColor, modifier = Modifier.size(23.dp))
                                         }
                                         IconButton(
                                             onClick = {
@@ -1966,9 +1966,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 } catch (_: Exception) {
                                                 }
                                             },
-                                            modifier = Modifier.size(40.dp)
+                                            modifier = Modifier.size(38.dp)
                                         ) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "로그 지우기", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                                            Icon(Icons.Filled.Delete, contentDescription = "로그 지우기", tint = actionIconColor, modifier = Modifier.size(23.dp))
                                         }
                                     }
                                 }
