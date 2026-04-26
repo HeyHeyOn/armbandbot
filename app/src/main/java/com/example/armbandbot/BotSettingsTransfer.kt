@@ -16,7 +16,8 @@ private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtub
 internal val EXPORTABLE_STRING_KEYS = listOf(
     "target_urls",
     "search_type",
-    "block_reason_text"
+    "block_reason_text",
+    "kkang_detection_mode"
 )
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
@@ -30,7 +31,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
 )
 
 internal val EXPORTABLE_INT_KEYS = listOf(
-    "block_duration_hours", "kkang_post_min", "kkang_comment_min", "spam_code_length",
+    "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days"
 )
 
@@ -201,6 +202,7 @@ private fun defaultIntValue(key: String): Int = when (key) {
     "block_duration_hours" -> 6
     "kkang_post_min" -> 5
     "kkang_comment_min" -> 10
+    "kkang_total_min" -> 15
     "spam_code_length" -> 6
     "image_filter_threshold" -> 80
     "scan_page_count" -> 1

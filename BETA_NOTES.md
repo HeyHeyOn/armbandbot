@@ -328,3 +328,21 @@
 - APK: 완장봇_v1.3.4-beta11.apk
 - SHA256: E1CB2251175BB4D38C715814A22844960B1FC43CA35E616F4C5A7B0E984AA458
 - Drive file ID: 1qDxCaEzdaYdt-PWJ1clD-F9tYwyD3cd5
+
+## 1.3.4-beta12 구현 완료
+
+### 주요 변화
+- 도배 방지의 `깡계 대상` 판정을 깡계 필터 설정의 판정 방식과 통합
+  - `글+댓글 수`, `글 수/댓글 수`, `신규 고정닉 표시` 모두 반영
+  - 신규 고정닉 표시 방식에서는 게시글 작성자 영역의 `newnik.gif`, `fix_newnik.gif` 감지 결과 사용
+- 금지어 필터의 `깡계에게만 적용` 설명에 현재 깡계 판정 기준 표시 추가
+- 도배 방지의 `깡계 대상` 설명에 현재 깡계 판정 기준 표시 추가
+- 봇 설정 내보내기/가져오기에 `kkang_detection_mode`, `kkang_total_min` 포함
+- BotService 설정 로딩에서도 깡계 판정 방식/기준값을 타입 안전하게 읽도록 보강
+
+### 빌드 정보
+- versionCode = 62
+- versionName = 1.3.4-beta12
+- APK: 완장봇_v1.3.4-beta12.apk
+- SHA256: A44759C10DEF7A1731513FF9CCB4B66D60102D8DDD99B573111DC1F1156BA81C
+- Drive file ID: 1IfUUaer4QFbQFY1bhyi28rLwN4tFEEJ_

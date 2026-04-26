@@ -2134,20 +2134,19 @@ img.written_dccon{max-width:80px;max-height:80px}
         val spamBurstCandidateSource = when {
             config.spamBurstTargetYudong && postUid.isBlank() -> ModerationFilterSource.YUDONG
             config.spamBurstTargetKkang && postUid.isNotBlank() -> {
-                val gallogStats = getGallogStats(
-                    userId = postUid,
+                val (isKkangCandidate, kkangDetail) = isKkangByConfiguredMode(
+                    config = config,
+                    uid = postUid,
+                    dcNewNicknameMarked = isDcNewNicknameMarked(postWriterHtml),
                     gallogCache = gallogCache,
                     tokenToUse = tokenToUse,
                     cookie = cookie,
-                    logTag = "도배 방지 후보 gallog 조회 실패",
                     botId = botId,
-                    isDebugMode = config.isDebugMode
+                    logTag = "도배 방지 후보 gallog 조회 실패"
                 )
-                val isKkangCandidate =
-                    gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin
                 if (config.isDebugMode) {
                     sendLog(
-                        "[디버그][도배 방지/깡계 후보] userId=$postUid / 글=${gallogStats.postCount}/${config.kkangPostMin} / 댓글=${gallogStats.commentCount}/${config.kkangCommentMin} / 결과=${if (isKkangCandidate) "KKANG" else "UNKNOWN"}",
+                        "[디버그][도배 방지/깡계 후보] userId=$postUid / $kkangDetail / 결과=${if (isKkangCandidate) "KKANG" else "UNKNOWN"}",
                         botId
                     )
                 }
@@ -3641,6 +3640,13 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         val cycleMinMs = (botPref.getFloat("delay_cycle_min_sec", 45.0f) * 1000).toLong()
         val cycleMaxMs = maxOf((botPref.getFloat("delay_cycle_max_sec", 90.0f) * 1000).toLong(), cycleMinMs + 1L)
+        fun safePrefString(key: String, defaultValue: String): String = (botPref.all[key] as? String) ?: defaultValue
+        fun safePrefInt(key: String, defaultValue: Int): Int = when (val value = botPref.all[key]) {
+            is Int -> value
+            is String -> value.toIntOrNull() ?: defaultValue
+            is Long -> value.toInt()
+            else -> defaultValue
+        }
 
         return BotConfig(
             isDebugMode = botPref.getBoolean("is_debug_mode", false),
@@ -3669,10 +3675,10 @@ img.written_dccon{max-width:80px;max-height:80px}
             targetUrls = targetUrls,
 
             isKkangFilterMode = botPref.getBoolean("is_kkang_filter_mode", false),
-            kkangDetectionMode = botPref.getString("kkang_detection_mode", "separate")?.takeIf { it in setOf("total", "separate", "dc_mark") } ?: "separate",
-            kkangTotalMin = botPref.getInt("kkang_total_min", 15),
-            kkangPostMin = botPref.getInt("kkang_post_min", 5),
-            kkangCommentMin = botPref.getInt("kkang_comment_min", 10),
+            kkangDetectionMode = safePrefString("kkang_detection_mode", "separate").takeIf { it in setOf("total", "separate", "dc_mark") } ?: "separate",
+            kkangTotalMin = safePrefInt("kkang_total_min", 15),
+            kkangPostMin = safePrefInt("kkang_post_min", 5),
+            kkangCommentMin = safePrefInt("kkang_comment_min", 10),
             isKkangPostBlock = botPref.getBoolean("is_kkang_post_block", false),
             isKkangCommentBlock = botPref.getBoolean("is_kkang_comment_block", false),
             isKkangImageBlock = botPref.getBoolean("is_kkang_image_block", false),

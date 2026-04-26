@@ -78,6 +78,24 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     val warningRed = if (isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F)
     val colors = botColors(isDarkMode)
 
+    fun safeKkangCriteriaInt(key: String, defaultValue: Int): Int = when (val value = botPref.all[key]) {
+        is Int -> value
+        is String -> value.toIntOrNull() ?: defaultValue
+        is Long -> value.toInt()
+        else -> defaultValue
+    }
+    fun currentKkangCriteriaDescription(): String {
+        val mode = (botPref.all["kkang_detection_mode"] as? String)
+            ?.takeIf { it in setOf("total", "separate", "dc_mark") }
+            ?: "separate"
+        return when (mode) {
+            "total" -> "글+댓글 수 ${safeKkangCriteriaInt("kkang_total_min", 15)} 미만"
+            "dc_mark" -> "신규 고정닉 표시"
+            else -> "글 수 ${safeKkangCriteriaInt("kkang_post_min", 5)} 미만 또는 댓글 수 ${safeKkangCriteriaInt("kkang_comment_min", 10)} 미만"
+        }
+    }
+    fun kkangCriteriaGuideText(): String = "깡계 필터 설정의 판정 기준을 따릅니다. (현재 기준: ${currentKkangCriteriaDescription()})"
+
     var isNotiKkang by remember { mutableStateOf(botPref.getBoolean("noti_kkang", true)) }
     var isKkangFilterMode by remember { mutableStateOf(botPref.getBoolean("is_kkang_filter_mode", false)) }
     var kkangPostMinText by remember { mutableStateOf(botPref.getInt("kkang_post_min", 5).toString()) }
@@ -1447,7 +1465,11 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             }
                                             Divider(color = dividerColor)
                                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Text("깡계에게만 적용", color = textColor, fontWeight = FontWeight.Bold)
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("깡계에게만 적용", color = textColor, fontWeight = FontWeight.Bold)
+                                                    Text(kkangCriteriaGuideText(), fontSize = 12.sp, color = subTextColor)
+                                                }
+                                                Spacer(modifier = Modifier.width(12.dp))
                                                 Switch(checked = keywordApplyKkangOnly, onCheckedChange = { keywordApplyKkangOnly = it; botPref.edit().putBoolean("keyword_apply_kkang_only", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
                                             }
                                         }
@@ -1568,7 +1590,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                                     Column(modifier = Modifier.weight(1f)) {
                                                         Text("깡계 대상", color = textColor)
-                                                        Text("기존 깡계 필터의 최소 글 수·댓글 수 설정을 사용합니다.", fontSize = 12.sp, color = subTextColor)
+                                                        Text(kkangCriteriaGuideText(), fontSize = 12.sp, color = subTextColor)
                                                     }
                                                     Spacer(modifier = Modifier.width(12.dp))
                                                     Switch(checked = spamBurstTargetKkang, onCheckedChange = { spamBurstTargetKkang = it; botPref.edit().putBoolean("spam_burst_target_kkang", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
