@@ -205,3 +205,16 @@
 - APK: 완장봇_v1.3.4-beta3.apk
 - SHA256: DD5B9606FD0CB229F951FF5994F66395A39A3E1A78F560D4B36912DB0A15B2A1
 - Drive file ID: 1eRljHma1fHRYfXQm_ojDo5_FKSubtxuJ
+
+## 1.3.4-beta4 구현 완료
+
+### 주요 변화
+- 봇 설정 메인 목록에 `갤러리 설정 자동 갱신` 진입 항목 추가
+- 자동 갱신 상세 화면은 유지하고, 기본 탐색 설정 영역에서 바로 들어갈 수 있도록 연결
+
+### 빌드 정보
+- versionCode = 54
+- versionName = 1.3.4-beta4
+- APK: 완장봇_v1.3.4-beta4.apk
+- SHA256: 5EBD32E8C4816BB0D7D948195BE8D5B01FD2644866201C1944D23AB6702A4942
+- Drive file ID: 1BHUQF3EBTwsmrLJhDX4sgwmbJNEZQMuy
