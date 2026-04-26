@@ -609,3 +609,21 @@
 - Google Docs 매뉴얼/패치노트 탭을 1.3.4 기준으로 재작성.
 - 매뉴얼은 신규 사용자도 흐름을 이해할 수 있도록 봇 목록, 활동 로그, 필터, AI, DB/스냅샷, 장시간 운용 섹션을 전체 맥락 기준으로 정리.
 - 패치노트는 DB 대시보드, 스냅샷 분리, 깡계 판정 방식, 금지어 대상 제한, 갤러리 설정 자동 갱신, 헬스 로그/런타임 보호를 1.3.4 항목으로 반영.
+
+
+## 1.3.5-beta1 (2026-04-26)
+
+### 주요 변화
+- 갤러리 설정 자동 갱신의 ci_t 토큰 확보 로직 보강.
+- 기존에는 저장 쿠키의 ci_c 값만 사용했으나, 이제 갤러리 관리 페이지를 먼저 열어 input[name=ci_t] 값을 직접 추출합니다.
+- 관리 페이지 토큰 추출에 실패할 때만 기존 ci_c 쿠키를 fallback으로 사용합니다.
+- 토큰이 없을 때 로그를 ci_t 토큰 없음(관리 페이지/쿠키 모두 실패)로 구체화했습니다.
+- 갱신 성공/실패 메시지에 토큰 출처(management_page 또는 cookie_ci_c)를 표시해 기기별 쿠키 차이 진단이 쉬워졌습니다.
+
+### Release
+- VersionCode: 77
+- VersionName: 1.3.5-beta1
+- APK: 완장봇_v1.3.5-beta1.apk
+- SHA256: 6EA34B1C7EAB0FFF356F9D9CAC8EE528C443A09C88CB4BE43597F3B47CB27D9E
+- Drive file ID: 164ryIvndVyI_dMIB8NsLvYGIyygj61nc
+- Drive link: https://drive.google.com/file/d/164ryIvndVyI_dMIB8NsLvYGIyygj61nc/view?usp=drivesdk

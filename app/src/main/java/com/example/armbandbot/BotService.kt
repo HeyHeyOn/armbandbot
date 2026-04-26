@@ -3651,12 +3651,14 @@ img.written_dccon{max-width:80px;max-height:80px}
         config: BotConfig,
         target: GallerySettingRefreshTarget
     ): GallerySettingRefreshResult {
-        val ciToken = extractCookieValue(cookie, "ci_c") ?: ""
-        if (ciToken.isBlank()) return GallerySettingRefreshResult(false, "ci_t 토큰 없음")
-
         val referer = when (target.gallType) {
             "MI" -> "https://gall.dcinside.com/mini/management/gallery?id=${target.gallId}"
             else -> "https://gall.dcinside.com/mgallery/management/gallery?id=${target.gallId}"
+        }
+
+        val (ciToken, ciTokenSource) = resolveGallerySettingCiToken(cookie, referer)
+        if (ciToken.isBlank()) {
+            return GallerySettingRefreshResult(false, "ci_t 토큰 없음(관리 페이지/쿠키 모두 실패)")
         }
 
         val connection = Jsoup.connect("https://gall.dcinside.com/ajax/managements_ajax/update_ipblock")
@@ -3690,10 +3692,31 @@ img.written_dccon{max-width:80px;max-height:80px}
         val responseBody = connection.execute().body()
         val result = runCatching { JSONObject(responseBody).optString("result") }.getOrDefault("")
         return if (result == "success") {
-            GallerySettingRefreshResult(true, "success")
+            GallerySettingRefreshResult(true, "success(token=$ciTokenSource)")
         } else {
-            GallerySettingRefreshResult(false, responseBody.take(300))
+            GallerySettingRefreshResult(false, "token=$ciTokenSource / ${responseBody.take(300)}")
         }
+    }
+
+    private fun resolveGallerySettingCiToken(cookie: String, managementUrl: String): Pair<String, String> {
+        val pageToken = runCatching {
+            Jsoup.connect(managementUrl)
+                .userAgent(dcUserAgent)
+                .header("Cookie", cookie)
+                .header("Referer", managementUrl)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .get()
+                .select("input[name=ci_t]")
+                .attr("value")
+                .trim()
+        }.getOrDefault("")
+
+        if (pageToken.isNotBlank()) return pageToken to "management_page"
+
+        val cookieToken = extractCookieValue(cookie, "ci_c") ?: ""
+        if (cookieToken.isNotBlank()) return cookieToken to "cookie_ci_c"
+
+        return "" to "missing"
     }
 
     private fun loadBotConfig(botPref: android.content.SharedPreferences): BotConfig {
