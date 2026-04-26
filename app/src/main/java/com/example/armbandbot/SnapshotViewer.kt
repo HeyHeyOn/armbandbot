@@ -275,15 +275,23 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
     var showWebView by remember { mutableStateOf(false) }
 
     val initialPath = remember(snapshotPath) {
-        if (snapshotPath.endsWith("_latest.html"))
-            snapshotPath.replace("_latest.html", "_initial.html")
-        else null
+        when {
+            snapshotPath.endsWith("_latest.html") -> snapshotPath.replace("_latest.html", "_initial.html")
+            snapshotPath.endsWith("_initial.html") -> snapshotPath
+            else -> null
+        }
     }
-    val hasInitial = remember(initialPath) {
-        initialPath?.let { File(it).exists() } ?: false
+    val latestPath = remember(snapshotPath) {
+        when {
+            snapshotPath.endsWith("_initial.html") -> snapshotPath.replace("_initial.html", "_latest.html")
+            else -> snapshotPath
+        }
+    }
+    val hasInitial = remember(initialPath, latestPath) {
+        initialPath?.let { File(it).exists() && File(latestPath).exists() && it != latestPath } ?: false
     }
 
-    var currentPath by remember { mutableStateOf(snapshotPath) }
+    var currentPath by remember { mutableStateOf(if (File(latestPath).exists()) latestPath else snapshotPath) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri ->
         if (uri != null) {
@@ -367,7 +375,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                         modifier = Modifier.weight(1f)
                     ) { Text("최초 스냅샷", fontSize = 13.sp) }
                     Button(
-                        onClick = { if (!isShowingLatest) currentPath = snapshotPath },
+                        onClick = { if (!isShowingLatest) currentPath = latestPath },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isShowingLatest) PastelNavy else Color.Gray.copy(alpha = 0.2f),
                             contentColor = if (isShowingLatest) Color.White else textColor

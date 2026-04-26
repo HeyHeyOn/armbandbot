@@ -2027,11 +2027,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                 } else {
                     val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
                     val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
-                    latestFile.writeText(html)
                     if (!initialFile.exists()) {
                         initialFile.writeText(html)
+                        if (latestFile.exists()) latestFile.delete()
+                        initialFile.absolutePath
+                    } else {
+                        latestFile.writeText(html)
+                        latestFile.absolutePath
                     }
-                    latestFile.absolutePath
                 }
             } catch (e: Exception) {
                 Log.e("BotService", "[$botId] snapshot save failed", e)
@@ -2922,7 +2925,6 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
 
             dbBlockReason = postBlockResult.blockReason
-            dbSnapshotPath = postBlockResult.snapshotPath
         } else if (postAnalysis.action == PostModerationAction.REVIEW_ONLY || aiDecision?.type == AiFilterDecisionType.REVIEW) {
             val reviewReason = aiReviewReason ?: postAnalysis.reviewReason ?: postAnalysis.aiReviewReason ?: "AI 검토 필요"
             sendLog("[AI 검토] 번호: $postNumStr / $reviewReason", botId)
@@ -3113,7 +3115,6 @@ img.written_dccon{max-width:80px;max-height:80px}
                         )
 
                         dbBlockReason = commentBlockResult.blockReason
-                        dbSnapshotPath = commentBlockResult.snapshotPath
                         isPostBlocked = true
                         badCommentCount++
                     }

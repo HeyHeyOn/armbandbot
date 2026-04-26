@@ -571,3 +571,23 @@
 - APK: 완장봇_v1.3.4-beta24.apk
 - SHA256: 0969F36E0A1A466CE15D51167BCF612CED9DE36A84E20B1B31B41EEE6447D385
 - Drive file ID: 1Y61z4Q2zkjnzVyBAd9sDas1fP7zIxZaJ
+
+## 1.3.4-beta25 구현 완료
+
+### 주요 변화
+- 일반 스냅샷과 차단 스냅샷의 DB 경로 분리 문제 수정
+- 차단 발생 시 일반 DB 기록의 snapshotPath가 차단 스냅샷 경로로 덮이지 않도록 변경
+- 일반 DB 기록 삭제 시 차단 스냅샷 HTML이 함께 삭제되던 문제 수정
+- 일반 스냅샷은 최초/최신 구조 유지
+  - 최초 저장 시 `_initial.html`만 저장
+  - 이후 변경 저장 시 `_latest.html`을 새 내용으로 교체
+  - 중간 일반 스냅샷 파일은 별도 누적하지 않음
+- 스냅샷 뷰어가 `_initial.html`만 있는 첫 저장 상태와 `_latest.html`이 생긴 이후 상태를 모두 처리하도록 보강
+- 메인 화면 표시 버전을 1.3.4-beta25로 갱신
+
+### 빌드 정보
+- versionCode = 75
+- versionName = 1.3.4-beta25
+- APK: 완장봇_v1.3.4-beta25.apk
+- SHA256: 958B2ECF9A22C275221B45F8827782B17827DDFD57369D3F18F2924BD0C0D34A
+- Drive file ID: 1BXIhzvz8ckKj973rSkRWP_11JOE4sTYD
