@@ -3656,14 +3656,14 @@ img.written_dccon{max-width:80px;max-height:80px}
             else -> "https://gall.dcinside.com/mgallery/management/gallery?id=${target.gallId}"
         }
 
-        val (ciToken, ciTokenSource) = resolveGallerySettingCiToken(cookie, referer)
+        val (ciToken, ciTokenSource, requestCookie) = resolveGallerySettingCiToken(cookie, referer)
         if (ciToken.isBlank()) {
-            return GallerySettingRefreshResult(false, "ci_t 토큰 없음(관리 페이지/쿠키 모두 실패)")
+            return GallerySettingRefreshResult(false, "ci_t 토큰 없음($ciTokenSource)")
         }
 
         val connection = Jsoup.connect("https://gall.dcinside.com/ajax/managements_ajax/update_ipblock")
             .userAgent(dcUserAgent)
-            .header("Cookie", cookie)
+            .header("Cookie", requestCookie)
             .header("Referer", referer)
             .header("Origin", "https://gall.dcinside.com")
             .header("X-Requested-With", "XMLHttpRequest")
@@ -3698,25 +3698,60 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
-    private fun resolveGallerySettingCiToken(cookie: String, managementUrl: String): Pair<String, String> {
-        val pageToken = runCatching {
-            Jsoup.connect(managementUrl)
+    private fun resolveGallerySettingCiToken(cookie: String, managementUrl: String): Triple<String, String, String> {
+        val savedCookieToken = extractCookieValue(cookie, "ci_c") ?: ""
+        var requestCookie = cookie
+        var statusInfo = "page=not_requested"
+        var pageHasCiInput = false
+        var responseCookieToken = ""
+
+        runCatching {
+            val response = Jsoup.connect(managementUrl)
                 .userAgent(dcUserAgent)
                 .header("Cookie", cookie)
                 .header("Referer", managementUrl)
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .get()
+                .followRedirects(true)
+                .ignoreHttpErrors(true)
+                .execute()
+
+            statusInfo = "pageStatus=${response.statusCode()}"
+            responseCookieToken = response.cookies()["ci_c"].orEmpty().trim()
+            if (responseCookieToken.isNotBlank()) {
+                requestCookie = mergeCookieHeader(cookie, "ci_c", responseCookieToken)
+            }
+
+            val pageToken = response.parse()
                 .select("input[name=ci_t]")
                 .attr("value")
                 .trim()
-        }.getOrDefault("")
+            pageHasCiInput = pageToken.isNotBlank()
+            if (pageToken.isNotBlank()) {
+                return Triple(pageToken, "management_page/$statusInfo", requestCookie)
+            }
+        }.getOrElse { e ->
+            statusInfo = "pageError=${e.javaClass.simpleName}"
+        }
 
-        if (pageToken.isNotBlank()) return pageToken to "management_page"
+        if (responseCookieToken.isNotBlank()) {
+            return Triple(responseCookieToken, "management_set_cookie/$statusInfo/input=$pageHasCiInput", requestCookie)
+        }
 
-        val cookieToken = extractCookieValue(cookie, "ci_c") ?: ""
-        if (cookieToken.isNotBlank()) return cookieToken to "cookie_ci_c"
+        if (savedCookieToken.isNotBlank()) {
+            return Triple(savedCookieToken, "saved_cookie_ci_c/$statusInfo/input=$pageHasCiInput", requestCookie)
+        }
 
-        return "" to "missing"
+        return Triple("", "$statusInfo/input=$pageHasCiInput/setCookie=false/savedCookie=false", requestCookie)
+    }
+
+    private fun mergeCookieHeader(cookieHeader: String, key: String, value: String): String {
+        val parts = cookieHeader
+            .split(';')
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.startsWith("$key=") }
+            .toMutableList()
+        parts += "$key=$value"
+        return parts.joinToString("; ")
     }
 
     private fun loadBotConfig(botPref: android.content.SharedPreferences): BotConfig {
