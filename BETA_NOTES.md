@@ -313,3 +313,18 @@
 - APK: 완장봇_v1.3.4-beta10.apk
 - SHA256: F77B9212FBEF0A7AA5DBB968BE5ABFFB825A0551552DA94E1A91DDD815A8D4EC
 - Drive file ID: 1jq_pduzgVPrUf9bysb9swQt-Qho2U2wq
+
+## 1.3.4-beta11 구현 완료
+
+### 주요 변화
+- beta9 이후 봇 상세 화면 진입 직후 종료되는 문제 대응 범위 확대
+- 깡계 판정 방식 드롭다운 관련 상태/설정 읽기를 BotDetailScreen 최상단 초기화에서 제거
+- 해당 상태는 실제 `깡계` 설정 화면을 열 때만 초기화되도록 변경하여, 봇 상세 기본 진입 경로와 신규 UI 상태를 분리
+- beta10의 SharedPreferences 타입 안전 처리도 유지
+
+### 빌드 정보
+- versionCode = 61
+- versionName = 1.3.4-beta11
+- APK: 완장봇_v1.3.4-beta11.apk
+- SHA256: E1CB2251175BB4D38C715814A22844960B1FC43CA35E616F4C5A7B0E984AA458
+- Drive file ID: 1qDxCaEzdaYdt-PWJ1clD-F9tYwyD3cd5
