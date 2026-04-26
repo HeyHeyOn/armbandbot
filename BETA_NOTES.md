@@ -187,3 +187,21 @@
 - APK: 완장봇_v1.3.4-beta2.apk
 - SHA256: 91439E6264152DB92AA17ADFC27F3C62585174055880B6E01B333415349CA329
 - Drive file ID: 13uxZtcROtND6immCGvSekKHvcTo5reT4
+
+## 1.3.4-beta3 구현 완료
+
+### 주요 변화
+- 갤러리 설정 자동 갱신 기능 추가
+- 봇 사이클 시작 시 마지막 갱신 성공 시각과 현재 시각을 비교해, 설정한 주기가 지났을 때만 갱신 요청 실행
+- 실패 시 성공 시각은 갱신하지 않고 최소 5분 간격으로 재시도하도록 보호
+- 마이너/미니 갤러리 모두 `update_ipblock` 저장 요청 지원
+- VPN 제한, 전체 통신사 IP 제한, 특정 통신사 IP 대역 제한, 이미지/동영상 첨부 제한 갱신 설정 추가
+- DC 드롭다운에 있는 허용 시간만 선택 가능하도록 고정 선택지 적용
+- 여러 대상 URL이 있을 경우 갤러리별로 중복 없이 갱신 요청 수행
+
+### 빌드 정보
+- versionCode = 53
+- versionName = 1.3.4-beta3
+- APK: 완장봇_v1.3.4-beta3.apk
+- SHA256: DD5B9606FD0CB229F951FF5994F66395A39A3E1A78F560D4B36912DB0A15B2A1
+- Drive file ID: 1eRljHma1fHRYfXQm_ojDo5_FKSubtxuJ

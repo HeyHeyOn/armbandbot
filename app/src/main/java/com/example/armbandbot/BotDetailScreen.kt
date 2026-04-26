@@ -195,6 +195,55 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         val actionModeOptions = linkedMapOf("delete" to "삭제", "block" to "차단")
         val blockDurationOptions = linkedMapOf(1 to "1시간", 6 to "6시간", 24 to "24시간 (1일)", 168 to "168시간 (7일)", 336 to "336시간 (14일)", 744 to "744시간 (31일)")
+        val galleryRefreshIntervalOptions = linkedMapOf(5 to "5분", 10 to "10분", 30 to "30분", 60 to "1시간", 180 to "3시간", 360 to "6시간")
+        val galleryProxyTimeOptions = linkedMapOf(60 to "1시간", 360 to "6시간", 1440 to "24시간", 2880 to "48시간")
+        val galleryMobileTimeOptions = linkedMapOf(10 to "10분", 30 to "30분", 60 to "1시간", 180 to "3시간", 720 to "12시간")
+        val galleryMobileIpsTimeOptions = linkedMapOf(180 to "3시간", 360 to "6시간", 720 to "12시간", 1440 to "24시간")
+        val galleryImageBlockTimeOptions = linkedMapOf(60 to "1시간", 360 to "6시간", 1440 to "24시간", 2880 to "48시간")
+
+        var isGallerySettingRefreshEnabled by remember { mutableStateOf(botPref.getBoolean("gallery_setting_refresh_enabled", false)) }
+        var gallerySettingRefreshIntervalMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_refresh_interval_minutes", 30).takeIf { it in galleryRefreshIntervalOptions.keys } ?: 30) }
+        var gallerySettingProxyUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_proxy_use", false)) }
+        var gallerySettingProxyTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_proxy_time_minutes", 2880).takeIf { it in galleryProxyTimeOptions.keys } ?: 2880) }
+        var gallerySettingMobileUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_mobile_use", false)) }
+        var gallerySettingMobileTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_mobile_time_minutes", 720).takeIf { it in galleryMobileTimeOptions.keys } ?: 720) }
+        var gallerySettingMobileIpsUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_mobile_ips_use", false)) }
+        var gallerySettingMobileIpsTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_mobile_ips_time_minutes", 1440).takeIf { it in galleryMobileIpsTimeOptions.keys } ?: 1440) }
+        var gallerySettingImageBlockUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_use", false)) }
+        var gallerySettingImageBlockTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_image_block_time_minutes", 2880).takeIf { it in galleryImageBlockTimeOptions.keys } ?: 2880) }
+        var gallerySettingImageBlockProxy by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_proxy", true)) }
+        var gallerySettingImageBlockMobile by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_mobile", false)) }
+        var gallerySettingImageBlockAll by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_all", false)) }
+        var gallerySettingDropdownKey by remember { mutableStateOf<String?>(null) }
+
+        @Composable
+        fun MinuteDropdownRow(title: String, value: Int, options: Map<Int, String>, dropdownKey: String, onSelect: (Int) -> Unit) {
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(title, color = textColor, fontWeight = FontWeight.Bold)
+                Box {
+                    OutlinedButton(onClick = { gallerySettingDropdownKey = dropdownKey }) {
+                        Text(options[value] ?: "${value}분", color = textColor)
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                    }
+                    DropdownMenu(expanded = gallerySettingDropdownKey == dropdownKey, onDismissRequest = { gallerySettingDropdownKey = null }, modifier = Modifier.background(dialogBgColor)) {
+                        options.forEach { (minutes, label) ->
+                            DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { onSelect(minutes); gallerySettingDropdownKey = null })
+                        }
+                    }
+                }
+            }
+        }
+
+        @Composable
+        fun GallerySwitchRow(title: String, subtitle: String? = null, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(title, color = textColor, fontWeight = FontWeight.Bold)
+                    if (subtitle != null) Text(subtitle, color = subTextColor, fontSize = 12.sp)
+                }
+                Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+            }
+        }
 
         // 기본 차단 설정
         var blockActionMode by remember { mutableStateOf(if (botPref.getBoolean("delete_only_mode", false)) "delete" else "block") }
@@ -510,6 +559,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     "SPAM" -> "스팸코드 필터"
                                     "WORD" -> "금지어 필터"
                                     "SPEED" -> "탐색 범위 및 속도 설정"
+                                    "GALLERY_REFRESH" -> "갤러리 설정 자동 갱신"
                                     "BLOCK_SETTING" -> "차단 기본 설정"
                                     "NOTI_SETTING" -> "차단 알림 상세 설정"
                                     else -> "상세 설정"
@@ -519,6 +569,52 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
                             when (activeSubScreen) {
+                                "GALLERY_REFRESH" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            GallerySwitchRow(
+                                                title = "갤러리 설정 자동 갱신",
+                                                subtitle = "사이클 시작 시 마지막 성공 시각을 확인하고, 설정 주기가 지나면 DC 관리 설정을 다시 저장합니다.",
+                                                checked = isGallerySettingRefreshEnabled,
+                                                onCheckedChange = { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }
+                                            )
+                                            Divider(color = dividerColor)
+                                            MinuteDropdownRow("갱신 주기", gallerySettingRefreshIntervalMinutes, galleryRefreshIntervalOptions, "refresh_interval") { minutes ->
+                                                gallerySettingRefreshIntervalMinutes = minutes
+                                                botPref.edit().putInt("gallery_setting_refresh_interval_minutes", minutes).apply()
+                                            }
+                                            Text("실패 시에는 성공 시각을 갱신하지 않고, 최소 5분 간격으로 재시도합니다.", color = subTextColor, fontSize = 12.sp)
+                                        }
+                                    }
+
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("IP 제한 갱신 payload", fontWeight = FontWeight.Bold, color = textColor, modifier = Modifier.padding(bottom = 8.dp))
+                                            GallerySwitchRow("VPN 제한", "선택한 시간으로 VPN 제한을 다시 저장합니다.", gallerySettingProxyUse) { gallerySettingProxyUse = it; botPref.edit().putBoolean("gallery_setting_proxy_use", it).apply() }
+                                            if (gallerySettingProxyUse) MinuteDropdownRow("VPN 제한 시간", gallerySettingProxyTimeMinutes, galleryProxyTimeOptions, "proxy_time") { minutes -> gallerySettingProxyTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_proxy_time_minutes", minutes).apply() }
+                                            Divider(color = dividerColor)
+                                            GallerySwitchRow("전체 통신사 IP 제한", "모든 통신사 IP 제한을 다시 저장합니다.", gallerySettingMobileUse) { gallerySettingMobileUse = it; botPref.edit().putBoolean("gallery_setting_mobile_use", it).apply() }
+                                            if (gallerySettingMobileUse) MinuteDropdownRow("전체 통신사 IP 제한 시간", gallerySettingMobileTimeMinutes, galleryMobileTimeOptions, "mobile_time") { minutes -> gallerySettingMobileTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_mobile_time_minutes", minutes).apply() }
+                                            Divider(color = dividerColor)
+                                            GallerySwitchRow("특정 통신사 IP 대역 제한", "특정 통신사 IP 대역 제한을 다시 저장합니다.", gallerySettingMobileIpsUse) { gallerySettingMobileIpsUse = it; botPref.edit().putBoolean("gallery_setting_mobile_ips_use", it).apply() }
+                                            if (gallerySettingMobileIpsUse) MinuteDropdownRow("특정 통신사 IP 제한 시간", gallerySettingMobileIpsTimeMinutes, galleryMobileIpsTimeOptions, "mobile_ips_time") { minutes -> gallerySettingMobileIpsTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_mobile_ips_time_minutes", minutes).apply() }
+                                        }
+                                    }
+
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            GallerySwitchRow("이미지/동영상 첨부 제한", "선택한 비회원 대상의 첨부 제한을 다시 저장합니다.", gallerySettingImageBlockUse) { gallerySettingImageBlockUse = it; botPref.edit().putBoolean("gallery_setting_image_block_use", it).apply() }
+                                            if (gallerySettingImageBlockUse) {
+                                                MinuteDropdownRow("첨부 제한 시간", gallerySettingImageBlockTimeMinutes, galleryImageBlockTimeOptions, "img_time") { minutes -> gallerySettingImageBlockTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_image_block_time_minutes", minutes).apply() }
+                                                Divider(color = dividerColor)
+                                                GallerySwitchRow("대상: VPN", null, gallerySettingImageBlockProxy) { gallerySettingImageBlockProxy = it; botPref.edit().putBoolean("gallery_setting_image_block_proxy", it).apply() }
+                                                GallerySwitchRow("대상: 통신사 IP", null, gallerySettingImageBlockMobile) { gallerySettingImageBlockMobile = it; botPref.edit().putBoolean("gallery_setting_image_block_mobile", it).apply() }
+                                                GallerySwitchRow("대상: 전체 비회원", null, gallerySettingImageBlockAll) { gallerySettingImageBlockAll = it; botPref.edit().putBoolean("gallery_setting_image_block_all", it).apply() }
+                                            }
+                                            Text("주의: DC 저장 API는 전체 상태 저장형이라, 켜진 항목의 현재 앱 설정 전체를 함께 전송합니다.", color = subTextColor, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                                        }
+                                    }
+                                }
                                 "NOTI_SETTING" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {

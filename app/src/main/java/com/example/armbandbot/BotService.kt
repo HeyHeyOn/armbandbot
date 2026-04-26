@@ -97,6 +97,20 @@ class BotService : Service() {
         val isOverseasIpPostBlock: Boolean,
         val isOverseasIpCommentBlock: Boolean,
 
+        val isGallerySettingRefreshEnabled: Boolean,
+        val gallerySettingRefreshIntervalMinutes: Int,
+        val gallerySettingProxyUse: Boolean,
+        val gallerySettingProxyTimeMinutes: Int,
+        val gallerySettingMobileUse: Boolean,
+        val gallerySettingMobileTimeMinutes: Int,
+        val gallerySettingMobileIpsUse: Boolean,
+        val gallerySettingMobileIpsTimeMinutes: Int,
+        val gallerySettingImageBlockUse: Boolean,
+        val gallerySettingImageBlockTimeMinutes: Int,
+        val gallerySettingImageBlockProxy: Boolean,
+        val gallerySettingImageBlockMobile: Boolean,
+        val gallerySettingImageBlockAll: Boolean,
+
         val isSpamBurstProtectionEnabled: Boolean,
         val spamBurstWindowMinutes: Int,
         val spamBurstYudongThreshold: Int,
@@ -236,6 +250,16 @@ class BotService : Service() {
         val kkangVoiceEnabled: Boolean,
         val anyKkangPostEnabled: Boolean,
         val anyKkangCommentEnabled: Boolean
+    )
+
+    private data class GallerySettingRefreshTarget(
+        val gallId: String,
+        val gallType: String
+    )
+
+    private data class GallerySettingRefreshResult(
+        val success: Boolean,
+        val message: String
     )
 
     private data class BlockExecutionResult(
@@ -1151,6 +1175,14 @@ class BotService : Service() {
                 delay(500)
                 break
             }
+
+            maybeRefreshGallerySettings(
+                botId = botId,
+                botPref = botPref,
+                config = config,
+                cookie = currentCookie,
+                urlList = urlList
+            )
 
             val gallogCache = mutableMapOf<String, Pair<Int, Int>>()
             val pageMinMs = config.pageMinMs
@@ -3433,6 +3465,117 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
+    private fun sanitizeAllowedInt(value: Int, allowed: List<Int>, fallback: Int): Int {
+        return if (value in allowed) value else fallback
+    }
+
+    private suspend fun maybeRefreshGallerySettings(
+        botId: String,
+        botPref: android.content.SharedPreferences,
+        config: BotConfig,
+        cookie: String,
+        urlList: List<String>
+    ) {
+        if (!config.isGallerySettingRefreshEnabled) return
+
+        val hasAnyRestriction = config.gallerySettingProxyUse ||
+            config.gallerySettingMobileUse ||
+            config.gallerySettingMobileIpsUse ||
+            config.gallerySettingImageBlockUse
+        if (!hasAnyRestriction) {
+            if (config.isDebugMode) sendLog("[갤러리 설정 갱신] 켜진 갱신 대상이 없어 건너뜁니다.", botId)
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val intervalMs = config.gallerySettingRefreshIntervalMinutes * 60_000L
+        val retryIntervalMs = 5 * 60_000L
+        val lastSuccessAt = botPref.getLong("gallery_setting_refresh_last_success_at", 0L)
+        val lastAttemptAt = botPref.getLong("gallery_setting_refresh_last_attempt_at", 0L)
+        if (now - lastSuccessAt < intervalMs) return
+        if (now - lastAttemptAt < retryIntervalMs) return
+
+        val targets = urlList.mapNotNull { parseTargetUrl(it) }
+            .map { GallerySettingRefreshTarget(it.gallId, it.gallType) }
+            .distinct()
+
+        if (targets.isEmpty()) {
+            sendLog("[갤러리 설정 갱신] 대상 갤러리 정보를 읽지 못해 건너뜁니다.", botId)
+            return
+        }
+
+        botPref.edit().putLong("gallery_setting_refresh_last_attempt_at", now).apply()
+        var allSuccess = true
+        val messages = mutableListOf<String>()
+
+        for (target in targets) {
+            val result = runCatching {
+                executeGallerySettingRefresh(cookie, config, target)
+            }.getOrElse { e ->
+                GallerySettingRefreshResult(false, "${e.javaClass.simpleName}: ${e.message ?: "알 수 없는 오류"}")
+            }
+            if (!result.success) allSuccess = false
+            messages += "${target.gallId}/${target.gallType}: ${result.message}"
+        }
+
+        if (allSuccess) {
+            botPref.edit().putLong("gallery_setting_refresh_last_success_at", now).apply()
+            sendLog("[갤러리 설정 갱신] 성공 - ${messages.joinToString(" / ")}", botId)
+        } else {
+            sendLog("[갤러리 설정 갱신] 실패 - ${messages.joinToString(" / ")}", botId)
+        }
+    }
+
+    private fun executeGallerySettingRefresh(
+        cookie: String,
+        config: BotConfig,
+        target: GallerySettingRefreshTarget
+    ): GallerySettingRefreshResult {
+        val ciToken = extractCookieValue(cookie, "ci_c") ?: ""
+        if (ciToken.isBlank()) return GallerySettingRefreshResult(false, "ci_t 토큰 없음")
+
+        val referer = when (target.gallType) {
+            "MI" -> "https://gall.dcinside.com/mini/management/gallery?id=${target.gallId}"
+            else -> "https://gall.dcinside.com/mgallery/management/gallery?id=${target.gallId}"
+        }
+
+        val connection = Jsoup.connect("https://gall.dcinside.com/ajax/managements_ajax/update_ipblock")
+            .userAgent(dcUserAgent)
+            .header("Cookie", cookie)
+            .header("Referer", referer)
+            .header("Origin", "https://gall.dcinside.com")
+            .header("X-Requested-With", "XMLHttpRequest")
+            .header("Accept", "application/json, text/javascript, */*; q=0.01")
+            .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+            .data("ci_t", ciToken)
+            .data("gallery_id", target.gallId)
+            .data("_GALLTYPE_", target.gallType)
+            .data("proxy_use", if (config.gallerySettingProxyUse) "1" else "0")
+            .data("proxy_time", config.gallerySettingProxyTimeMinutes.toString())
+            .data("mobile_use", if (config.gallerySettingMobileUse) "1" else "0")
+            .data("mobile_time", if (config.gallerySettingMobileUse) config.gallerySettingMobileTimeMinutes.toString() else "")
+            .data("mobile_ips_use", if (config.gallerySettingMobileIpsUse) "1" else "0")
+            .data("mobile_ips_time", if (config.gallerySettingMobileIpsUse) config.gallerySettingMobileIpsTimeMinutes.toString() else "")
+            .data("img_block_use", if (config.gallerySettingImageBlockUse) "1" else "-1")
+            .data("img_block_time", if (config.gallerySettingImageBlockUse) config.gallerySettingImageBlockTimeMinutes.toString() else "")
+            .ignoreContentType(true)
+            .method(Connection.Method.POST)
+
+        if (config.gallerySettingImageBlockUse) {
+            if (config.gallerySettingImageBlockProxy) connection.data("img_block[]", "P")
+            if (config.gallerySettingImageBlockMobile) connection.data("img_block[]", "M")
+            if (config.gallerySettingImageBlockAll) connection.data("img_block[]", "A")
+        }
+
+        val responseBody = connection.execute().body()
+        val result = runCatching { JSONObject(responseBody).optString("result") }.getOrDefault("")
+        return if (result == "success") {
+            GallerySettingRefreshResult(true, "success")
+        } else {
+            GallerySettingRefreshResult(false, responseBody.take(300))
+        }
+    }
+
     private fun loadBotConfig(botPref: android.content.SharedPreferences): BotConfig {
         val rawUrlsText = botPref.getString("target_urls", "") ?: ""
         val targetUrls = rawUrlsText
@@ -3519,6 +3662,20 @@ img.written_dccon{max-width:80px;max-height:80px}
             isOverseasIpFilterMode = botPref.getBoolean("is_overseas_ip_filter_mode", false),
             isOverseasIpPostBlock = botPref.getBoolean("is_overseas_ip_post_block", true),
             isOverseasIpCommentBlock = botPref.getBoolean("is_overseas_ip_comment_block", true),
+
+            isGallerySettingRefreshEnabled = botPref.getBoolean("gallery_setting_refresh_enabled", false),
+            gallerySettingRefreshIntervalMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_refresh_interval_minutes", 30), listOf(5, 10, 30, 60, 180, 360), 30),
+            gallerySettingProxyUse = botPref.getBoolean("gallery_setting_proxy_use", false),
+            gallerySettingProxyTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_proxy_time_minutes", 2880), listOf(60, 360, 1440, 2880), 2880),
+            gallerySettingMobileUse = botPref.getBoolean("gallery_setting_mobile_use", false),
+            gallerySettingMobileTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_mobile_time_minutes", 720), listOf(10, 30, 60, 180, 720), 720),
+            gallerySettingMobileIpsUse = botPref.getBoolean("gallery_setting_mobile_ips_use", false),
+            gallerySettingMobileIpsTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_mobile_ips_time_minutes", 1440), listOf(180, 360, 720, 1440), 1440),
+            gallerySettingImageBlockUse = botPref.getBoolean("gallery_setting_image_block_use", false),
+            gallerySettingImageBlockTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_image_block_time_minutes", 2880), listOf(60, 360, 1440, 2880), 2880),
+            gallerySettingImageBlockProxy = botPref.getBoolean("gallery_setting_image_block_proxy", true),
+            gallerySettingImageBlockMobile = botPref.getBoolean("gallery_setting_image_block_mobile", false),
+            gallerySettingImageBlockAll = botPref.getBoolean("gallery_setting_image_block_all", false),
 
             isSpamBurstProtectionEnabled = botPref.getBoolean("is_spam_burst_protection_enabled", false),
             spamBurstWindowMinutes = botPref.getInt("spam_burst_window_minutes", 3),
