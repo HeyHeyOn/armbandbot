@@ -1838,66 +1838,105 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             val isAtBottom by remember { derivedStateOf { val info = logListState.layoutInfo.visibleItemsInfo; if (info.isEmpty()) true else info.last().index >= logListState.layoutInfo.totalItemsCount - 8 } }
                             LaunchedEffect(filteredLogs.size) { if (isAtBottom && filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) }
 
-                            Column(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
                                 val exportLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
-                                    if (uri == null) return@rememberLauncherForActivityResult
-                                    runCatching {
-                                        val content = logMessages.joinToString("\n") { it.raw }
-                                        context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(content) }
-                                    }.onSuccess {
-                                        Toast.makeText(context, "로그 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
-                                    }.onFailure {
-                                        Toast.makeText(context, it.message ?: "로그 파일 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
+                                if (uri == null) return@rememberLauncherForActivityResult
+                                runCatching {
+                                    val content = logMessages.joinToString("\n") { it.raw }
+                                    context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(content) }
+                                }.onSuccess {
+                                    Toast.makeText(context, "로그 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    Toast.makeText(context, it.message ?: "로그 파일 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            val exportDebugLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
+                                if (uri == null) return@rememberLauncherForActivityResult
+                                runCatching {
+                                    fun sanitizeDebugValue(key: String, value: Any?): String {
+                                        val lower = key.lowercase(Locale.getDefault())
+                                        return when {
+                                            lower.contains("pw") || lower.contains("password") -> "[REDACTED_PASSWORD]"
+                                            lower.contains("api_key") || lower.contains("apikey") || lower.contains("token") || lower.contains("secret") -> "[REDACTED_SECRET]"
+                                            lower.contains("cookie") || lower.contains("session") -> "[REDACTED_SESSION]"
+                                            lower.contains("id") && lower.startsWith("auto_login_") -> "[REDACTED_LOGIN_ID]"
+                                            else -> value?.toString() ?: "null"
+                                        }
+                                    }
+
+                                    val debugLogs = logMessages
+                                        .joinToString("\n") { line ->
+                                            line.raw
+                                                .replace(Regex("""(?i)(api[_-]?key\s*[=:]\s*)([^\s]+)"""), "$1[REDACTED_SECRET]")
+                                                .replace(Regex("""(?i)(authorization\s*[:=]\s*bearer\s+)([^\s]+)"""), "$1[REDACTED_SECRET]")
+                                                .replace(Regex("""(?i)(cookie\s*[=:]\s*)(.+)$"""), "$1[REDACTED_SESSION]")
+                                        }
+                                    val settingsDump = buildString {
+                                        appendLine("[bot_id]")
+                                        appendLine(botId)
+                                        appendLine()
+                                        appendLine("[bot_name]")
+                                        appendLine(botName)
+                                        appendLine()
+                                        appendLine("[bot_prefs]")
+                                        botPref.all.toSortedMap(compareBy<String> { it }).forEach { (key, value) ->
+                                            appendLine("$key=${sanitizeDebugValue(key, value)}")
+                                        }
+                                    }
+                                    val content = buildString {
+                                        appendLine("[debug_logs]")
+                                        appendLine(debugLogs)
+                                        appendLine()
+                                        appendLine("[settings_dump]")
+                                        append(settingsDump)
+                                    }
+                                    context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(content) }
+                                }.onSuccess {
+                                    Toast.makeText(context, "디버그 로그 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    Toast.makeText(context, it.message ?: "디버그 로그 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
+                                }
+                            }
+
+                            val logActionIconColor = if (isDarkMode) Color.White else PastelNavy
+                            Scaffold(
+                                containerColor = bgColor,
+                                bottomBar = {
+                                    Surface(color = if (isDarkMode) Color(0xFF1A1A1A) else cardColor) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, modifier = Modifier.size(38.dp)) {
+                                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "맨 위로", tint = logActionIconColor, modifier = Modifier.size(24.dp))
+                                            }
+                                            IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, modifier = Modifier.size(38.dp)) {
+                                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "맨 밑으로", tint = logActionIconColor, modifier = Modifier.size(24.dp))
+                                            }
+                                            IconButton(onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") }, modifier = Modifier.size(38.dp)) {
+                                                Icon(Icons.Filled.FileUpload, contentDescription = "로그 저장", tint = logActionIconColor, modifier = Modifier.size(23.dp))
+                                            }
+                                            IconButton(onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") }, modifier = Modifier.size(38.dp)) {
+                                                Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장", tint = logActionIconColor, modifier = Modifier.size(23.dp))
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    logMessages.clear()
+                                                    try {
+                                                        val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
+                                                        if (logFile.exists()) logFile.delete()
+                                                    } catch (_: Exception) {
+                                                    }
+                                                },
+                                                modifier = Modifier.size(38.dp)
+                                            ) {
+                                                Icon(Icons.Filled.Delete, contentDescription = "로그 지우기", tint = logActionIconColor, modifier = Modifier.size(23.dp))
+                                            }
+                                        }
                                     }
                                 }
-                                val exportDebugLogLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
-                                    if (uri == null) return@rememberLauncherForActivityResult
-                                    runCatching {
-                                        fun sanitizeDebugValue(key: String, value: Any?): String {
-                                            val lower = key.lowercase(Locale.getDefault())
-                                            return when {
-                                                lower.contains("pw") || lower.contains("password") -> "[REDACTED_PASSWORD]"
-                                                lower.contains("api_key") || lower.contains("apikey") || lower.contains("token") || lower.contains("secret") -> "[REDACTED_SECRET]"
-                                                lower.contains("cookie") || lower.contains("session") -> "[REDACTED_SESSION]"
-                                                lower.contains("id") && lower.startsWith("auto_login_") -> "[REDACTED_LOGIN_ID]"
-                                                else -> value?.toString() ?: "null"
-                                            }
-                                        }
-
-                                        val debugLogs = logMessages
-                                            .joinToString("\n") { line ->
-                                                line.raw
-                                                    .replace(Regex("""(?i)(api[_-]?key\s*[=:]\s*)([^\s]+)"""), "$1[REDACTED_SECRET]")
-                                                    .replace(Regex("""(?i)(authorization\s*[:=]\s*bearer\s+)([^\s]+)"""), "$1[REDACTED_SECRET]")
-                                                    .replace(Regex("""(?i)(cookie\s*[=:]\s*)(.+)$"""), "$1[REDACTED_SESSION]")
-                                            }
-                                        val settingsDump = buildString {
-                                            appendLine("[bot_id]")
-                                            appendLine(botId)
-                                            appendLine()
-                                            appendLine("[bot_name]")
-                                            appendLine(botName)
-                                            appendLine()
-                                            appendLine("[bot_prefs]")
-                                            botPref.all.toSortedMap(compareBy<String> { it }).forEach { (key, value) ->
-                                                appendLine("$key=${sanitizeDebugValue(key, value)}")
-                                            }
-                                        }
-                                        val content = buildString {
-                                            appendLine("[debug_logs]")
-                                            appendLine(debugLogs)
-                                            appendLine()
-                                            appendLine("[settings_dump]")
-                                            append(settingsDump)
-                                        }
-                                        context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(content) }
-                                    }.onSuccess {
-                                        Toast.makeText(context, "디버그 로그 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
-                                    }.onFailure {
-                                        Toast.makeText(context, it.message ?: "디버그 로그 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-
+                            ) { logInnerPadding ->
+                                Column(modifier = Modifier.fillMaxSize().padding(logInnerPadding).padding(top = 16.dp)) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1935,47 +1974,11 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
                                     }
                                 }
-                                Surface(
-                                    color = if (isDarkMode) Color(0xFF1A1A1A) else cardColor,
-                                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
-                                ) {
-                                    val actionIconColor = if (isDarkMode) Color.White else PastelNavy
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, modifier = Modifier.size(38.dp)) {
-                                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "맨 위로", tint = actionIconColor, modifier = Modifier.size(24.dp))
-                                        }
-                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, modifier = Modifier.size(38.dp)) {
-                                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "맨 밑으로", tint = actionIconColor, modifier = Modifier.size(24.dp))
-                                        }
-                                        IconButton(onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") }, modifier = Modifier.size(38.dp)) {
-                                            Icon(Icons.Filled.FileUpload, contentDescription = "로그 저장", tint = actionIconColor, modifier = Modifier.size(23.dp))
-                                        }
-                                        IconButton(onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") }, modifier = Modifier.size(38.dp)) {
-                                            Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장", tint = actionIconColor, modifier = Modifier.size(23.dp))
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                logMessages.clear()
-                                                try {
-                                                    val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
-                                                    if (logFile.exists()) logFile.delete()
-                                                } catch (_: Exception) {
-                                                }
-                                            },
-                                            modifier = Modifier.size(38.dp)
-                                        ) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "로그 지우기", tint = actionIconColor, modifier = Modifier.size(23.dp))
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
                 }
+            }
             }
             if (showEditNameDialog) {
                 AlertDialog(

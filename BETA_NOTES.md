@@ -421,3 +421,19 @@
 - APK: 완장봇_v1.3.4-beta16.apk
 - SHA256: AEEE4D63F5E7B56E9918E8DA2D66A73E69938A43C7BF7AEB0C552A83DE27D0A6
 - Drive file ID: 1rbskRFIzUa8ZlSPJrhNodqJ4X-OCsUCb
+
+## 1.3.4-beta17 구현 완료
+
+### 주요 변화
+- 활동 로그 액션 바를 로그 콘텐츠 Column 내부에서 분리해, 로그 탭 전용 `Scaffold(bottomBar)`의 하단 바 영역으로 이동
+- 이제 로그 필터/로그 박스와 액션 바가 같은 수준의 콘텐츠에 들어가지 않고, 액션 바가 별도 하단 영역으로 배치됨
+- 봇 목록 화면처럼 액션 바가 화면 하단 전체 폭에 붙도록 구조 조정
+- 기존 로그 저장/디버그 로그 저장/삭제/맨위/맨아래 동작 유지
+- 메인 화면 표시 버전을 1.3.4-beta17로 갱신
+
+### 빌드 정보
+- versionCode = 67
+- versionName = 1.3.4-beta17
+- APK: 완장봇_v1.3.4-beta17.apk
+- SHA256: 9EE334CCA1604D7A1B28241BC284E307D91CE76E0BB5CB76E7CBA4F4D4BA1748
+- Drive file ID: 1tgPcZAEvdyuNuAfVgKFf6tmQXeqzdloM
