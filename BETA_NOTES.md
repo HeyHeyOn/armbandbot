@@ -405,3 +405,19 @@
 - APK: 완장봇_v1.3.4-beta15.apk
 - SHA256: 11DB269303485A8198316A0CFEC67FBE14A1AC7A79309833EEAB3B38CA5A4B60
 - Drive file ID: 1_HSoQ-1ffywyEHQ0TDCqfpMOprzAc70-
+
+## 1.3.4-beta16 구현 완료
+
+### 주요 변화
+- 활동 로그 액션 바가 화면 하단에 붙지 않고 떠 보이던 문제 수정
+- 원인: 활동 로그/설정 탭 공용 콘텐츠 `Box`에 좌우 패딩이 적용되어 액션 바도 그 내부 폭과 위치에 갇혀 있었음
+- 수정: 공용 콘텐츠 영역의 전역 좌우 패딩을 제거하고, 설정 탭/로그 필터/로그 박스에만 개별 패딩 적용
+- 활동 로그 액션 바는 전체 폭을 사용하도록 분리되어 봇 목록 화면 액션 바처럼 하단에 붙도록 조정
+- 메인 화면 표시 버전을 1.3.4-beta16으로 갱신
+
+### 빌드 정보
+- versionCode = 66
+- versionName = 1.3.4-beta16
+- APK: 완장봇_v1.3.4-beta16.apk
+- SHA256: AEEE4D63F5E7B56E9918E8DA2D66A73E69938A43C7BF7AEB0C552A83DE27D0A6
+- Drive file ID: 1rbskRFIzUa8ZlSPJrhNodqJ4X-OCsUCb

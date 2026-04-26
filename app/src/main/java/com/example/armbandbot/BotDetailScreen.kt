@@ -1655,9 +1655,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         tabs.forEachIndexed { index, title -> Tab(selected = selectedTabIndex == index, onClick = { selectedTabIndex = index }, text = { Text(title, fontWeight = FontWeight.Bold, color = if(selectedTabIndex==index) PastelNavy else subTextColor) }) }
                     }
 
-                    Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                    Box(modifier = Modifier.fillMaxSize()) {
                         if (selectedTabIndex == 0) {
-                            Column(modifier = Modifier.fillMaxSize().verticalScroll(settingsScrollState).padding(vertical = 16.dp)) {
+                            Column(modifier = Modifier.fillMaxSize().verticalScroll(settingsScrollState).padding(horizontal = 16.dp, vertical = 16.dp)) {
                                 Text("기본 탐색 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
                                 ModernSettingItem("관리할 갤러리 및 검색 모드", if (targetUrlsText.isBlank()) "대상 없음" else "대상 설정됨", Icons.Filled.List, colors) { currentSubScreen = "TARGET" }
                                 ModernSettingItem("탐색 속도 및 범위", "페이지 수 및 딜레이 설정", Icons.Filled.Build, colors) { currentSubScreen = "SPEED" }
@@ -1902,7 +1902,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .horizontalScroll(rememberScrollState())
-                                        .padding(top = 16.dp, bottom = 8.dp),
+                                        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     FilterChip(selected = logFilterTab == "ALL", onClick = { logFilterTab = "ALL" }, label = { Text("전체", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
@@ -1914,7 +1914,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     FilterChip(selected = logFilterTab == "ERROR", onClick = { logFilterTab = "ERROR" }, label = { Text("오류", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFD32F2F), selectedLabelColor = Color.White))
                                 }
 
-                                Box(modifier = Modifier.weight(1f).fillMaxWidth().background(DarkTerminal, RoundedCornerShape(12.dp)).padding(12.dp)) {
+                                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp).background(DarkTerminal, RoundedCornerShape(12.dp)).padding(12.dp)) {
                                     SelectionContainer {
                                         LazyColumn(state = logListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 8.dp)) {
                                             items(filteredLogs.size) { index ->
