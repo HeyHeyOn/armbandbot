@@ -279,3 +279,23 @@
 - APK: 완장봇_v1.3.4-beta8.apk
 - SHA256: 7BAE1B021DC42C85EF0B8066D60372EC92F2D4F34963E7BF9F6060A13F8890C6
 - Drive file ID: 1iyQafdAKchHAQ-UdLumA_lJgDA4ccxvs
+
+## 1.3.4-beta9 구현 완료
+
+### 주요 변화
+- 깡계 판정 방식 선택 추가
+  - 글+댓글 수
+  - 글 수/댓글 수
+  - 신규 고정닉 표시
+- 글+댓글 수 방식에서는 글 수와 댓글 수의 합이 기준값 미만이면 깡계로 판단
+- 글 수/댓글 수 방식은 기존처럼 둘 중 하나라도 기준 미만이면 깡계로 판단
+- 신규 고정닉 표시 방식에서는 `newnik.gif`, `fix_newnik.gif`를 모두 감지해 디시 자체 신규 고정닉 표시 계정으로 판단
+- 댓글은 댓글 API의 `gallog_icon` 필드에서 신규 고정닉 표시를 감지하도록 연결
+- 신규 고정닉 표시 선택 시 설정 방법 안내 문구 추가
+
+### 빌드 정보
+- versionCode = 59
+- versionName = 1.3.4-beta9
+- APK: 완장봇_v1.3.4-beta9.apk
+- SHA256: F4E6A82D66574DC872743080A466020C7980F44F87672D9D1E85E5DCE1CB139D
+- Drive file ID: 1uRZ_uvzlOdafLCA2OSMc4k2g_Rzl8VWz

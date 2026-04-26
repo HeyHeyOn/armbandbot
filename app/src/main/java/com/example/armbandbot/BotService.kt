@@ -69,6 +69,8 @@ class BotService : Service() {
         val targetUrls: List<String>,
 
         val isKkangFilterMode: Boolean,
+        val kkangDetectionMode: String,
+        val kkangTotalMin: Int,
         val kkangPostMin: Int,
         val kkangCommentMin: Int,
         val isKkangPostBlock: Boolean,
@@ -1323,6 +1325,7 @@ class BotService : Service() {
             val postNumStr = Regex("no=([0-9]+)").find(link)?.groupValues?.get(1) ?: "0"
             val postNumber = postNumStr.toIntOrNull() ?: 0
             val writerElement = row.selectFirst(".gall_writer")
+            val postWriterHtml = writerElement?.outerHtml() ?: ""
             val postUid = writerElement?.attr("data-uid") ?: ""
             val postIp = writerElement?.attr("data-ip") ?: ""
             val postNick = writerElement?.attr("data-nick") ?: ""
@@ -1341,7 +1344,7 @@ class BotService : Service() {
             }
             if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변경 감지 (저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
             try {
-                processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, notifyIfEnabled)
+                processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, notifyIfEnabled)
             } catch (e: Exception) {
                 sendLog("[처리 오류] 번호: $postNumStr", botId)
             }
@@ -2027,6 +2030,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         blockDuration: String,
         blockReason: String,
         delChk: String,
+        postWriterHtml: String,
         notifyIfEnabled: (String, String, String) -> Unit
     ) {
         if (config.isDebugMode) {
@@ -2115,6 +2119,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             postText = postText,
             postImageAlts = postImageAlts,
             postRawHtml = postRawHtml,
+            postWriterHtml = postWriterHtml,
             gallogCache = gallogCache,
             tokenToUse = tokenToUse,
             cookie = cookie
@@ -2887,6 +2892,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         cmtAuthor = cmtAuthor,
                         cmtNick = cmtNick,
                         cmtUid = cmtUid,
+                        cmtGallogIconHtml = commentObj.optString("gallog_icon", ""),
                         commentMemo = commentMemo,
                         gallogCache = gallogCache,
                         tokenToUse = tokenToUse,
@@ -3340,6 +3346,44 @@ img.written_dccon{max-width:80px;max-height:80px}
         }.getOrNull()
     }
 
+    private fun isDcNewNicknameMarked(rawHtml: String): Boolean {
+        return rawHtml.contains("newnik.gif", ignoreCase = true) ||
+            rawHtml.contains("fix_newnik.gif", ignoreCase = true)
+    }
+
+    private fun isKkangByConfiguredMode(
+        config: BotConfig,
+        uid: String,
+        dcNewNicknameMarked: Boolean,
+        gallogCache: MutableMap<String, Pair<Int, Int>>,
+        tokenToUse: String,
+        cookie: String,
+        botId: String,
+        logTag: String
+    ): Pair<Boolean, String> {
+        if (uid.isBlank()) return false to "UID 없음"
+        if (config.kkangDetectionMode == "dc_mark") {
+            return dcNewNicknameMarked to "신규 고정닉 표시=${if (dcNewNicknameMarked) "감지" else "없음"}"
+        }
+        val gallogStats = getGallogStats(
+            userId = uid,
+            gallogCache = gallogCache,
+            tokenToUse = tokenToUse,
+            cookie = cookie,
+            logTag = logTag,
+            botId = botId,
+            isDebugMode = config.isDebugMode
+        )
+        val pCount = gallogStats.postCount
+        val cCount = gallogStats.commentCount
+        return if (config.kkangDetectionMode == "total") {
+            val total = pCount + cCount
+            (total < config.kkangTotalMin) to "글댓합=$total/${config.kkangTotalMin}"
+        } else {
+            (pCount < config.kkangPostMin || cCount < config.kkangCommentMin) to "글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+        }
+    }
+
     private fun recordSpamBurstEvent(
         config: BotConfig,
         botId: String,
@@ -3625,6 +3669,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             targetUrls = targetUrls,
 
             isKkangFilterMode = botPref.getBoolean("is_kkang_filter_mode", false),
+            kkangDetectionMode = botPref.getString("kkang_detection_mode", "separate")?.takeIf { it in setOf("total", "separate", "dc_mark") } ?: "separate",
+            kkangTotalMin = botPref.getInt("kkang_total_min", 15),
             kkangPostMin = botPref.getInt("kkang_post_min", 5),
             kkangCommentMin = botPref.getInt("kkang_comment_min", 10),
             isKkangPostBlock = botPref.getBoolean("is_kkang_post_block", false),
@@ -3753,6 +3799,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         config: BotConfig,
         botId: String,
         uid: String,
+        dcNewNicknameMarked: Boolean,
         gallogCache: MutableMap<String, Pair<Int, Int>>,
         tokenToUse: String,
         cookie: String,
@@ -3771,17 +3818,18 @@ img.written_dccon{max-width:80px;max-height:80px}
             return false
         }
 
-        val gallogStats = getGallogStats(
-            userId = uid,
+        val (isKkang, kkangDetail) = isKkangByConfiguredMode(
+            config = config,
+            uid = uid,
+            dcNewNicknameMarked = dcNewNicknameMarked,
             gallogCache = gallogCache,
             tokenToUse = tokenToUse,
             cookie = cookie,
             botId = botId,
             logTag = if (isComment) "댓글 금지어 대상 깡계 gallog 조회 실패" else "게시글 금지어 대상 깡계 gallog 조회 실패"
         )
-        val isKkang = gallogStats.postCount < config.kkangPostMin || gallogStats.commentCount < config.kkangCommentMin
         if (config.isDebugMode && botId.isNotEmpty()) {
-            sendLog("[디버그][금지어 대상] ${if (isComment) "댓글" else "게시글"} 깡계 판정 / 글=${gallogStats.postCount}/${config.kkangPostMin} / 댓글=${gallogStats.commentCount}/${config.kkangCommentMin} / 결과=${if (isKkang) "통과" else "불통과"}", botId)
+            sendLog("[디버그][금지어 대상] ${if (isComment) "댓글" else "게시글"} 깡계 판정 / $kkangDetail / 결과=${if (isKkang) "통과" else "불통과"}", botId)
         }
         return isKkang
     }
@@ -3796,6 +3844,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         postText: String,
         postImageAlts: List<String>,
         postRawHtml: String,
+        postWriterHtml: String,
         gallogCache: MutableMap<String, Pair<Int, Int>>,
         tokenToUse: String,
         cookie: String
@@ -3883,29 +3932,27 @@ img.written_dccon{max-width:80px;max-height:80px}
                     filterSource = ModerationFilterSource.YUDONG
                 }
             } else if (toggles.anyKkangPostEnabled) {
-                val gallogStats = getGallogStats(
-                    userId = postUid,
+                val (isKkang, kkangDetail) = isKkangByConfiguredMode(
+                    config = config,
+                    uid = postUid,
+                    dcNewNicknameMarked = isDcNewNicknameMarked(postWriterHtml),
                     gallogCache = gallogCache,
                     tokenToUse = tokenToUse,
                     cookie = cookie,
-                    logTag = "깡계 판별용 gallog 조회 실패",
                     botId = botId,
-                    isDebugMode = config.isDebugMode
+                    logTag = "깡계 판별용 gallog 조회 실패"
                 )
 
-                val pCount = gallogStats.postCount
-                val cCount = gallogStats.commentCount
-
-                if (pCount < config.kkangPostMin || cCount < config.kkangCommentMin) {
+                if (isKkang) {
                     if (toggles.kkangPostEnabled) {
-                        blockReasonPrefix = "깡계 게시글 금지(글:$pCount/댓:$cCount)"
+                        blockReasonPrefix = "깡계 게시글 금지"
                         notiType = "kkang"
-                        debugDetail = "깡계 기준 미달: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        debugDetail = "깡계 기준 감지: $kkangDetail"
                         filterSource = ModerationFilterSource.KKANG
                     } else if (toggles.kkangImageEnabled && postImageAlts.isNotEmpty()) {
                         blockReasonPrefix = "깡계 이미지 첨부 금지"
                         notiType = "kkang"
-                        debugDetail = "깡계 기준 미달 + 이미지 첨부: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        debugDetail = "깡계 기준 감지 + 이미지 첨부: $kkangDetail"
                         filterSource = ModerationFilterSource.KKANG
                     } else if (
                         toggles.kkangVoiceEnabled &&
@@ -3913,7 +3960,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     ) {
                         blockReasonPrefix = "깡계 보이스 첨부 금지"
                         notiType = "kkang"
-                        debugDetail = "깡계 기준 미달 + 보이스 첨부: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        debugDetail = "깡계 기준 감지 + 보이스 첨부: $kkangDetail"
                         filterSource = ModerationFilterSource.KKANG
                     }
                 }
@@ -3951,6 +3998,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         config = config,
                         botId = botId,
                         uid = postUid,
+                        dcNewNicknameMarked = isDcNewNicknameMarked(postWriterHtml),
                         gallogCache = gallogCache,
                         tokenToUse = tokenToUse,
                         cookie = cookie,
@@ -4051,6 +4099,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         cmtAuthor: String,
         cmtNick: String,
         cmtUid: String,
+        cmtGallogIconHtml: String,
         commentMemo: String,
         gallogCache: MutableMap<String, Pair<Int, Int>>,
         tokenToUse: String,
@@ -4129,24 +4178,22 @@ img.written_dccon{max-width:80px;max-height:80px}
                     filterSource = ModerationFilterSource.YUDONG
                 }
             } else if (toggles.anyKkangCommentEnabled) {
-                val gallogStats = getGallogStats(
-                    userId = cmtUid,
+                val (isKkang, kkangDetail) = isKkangByConfiguredMode(
+                    config = config,
+                    uid = cmtUid,
+                    dcNewNicknameMarked = isDcNewNicknameMarked(cmtGallogIconHtml),
                     gallogCache = gallogCache,
                     tokenToUse = tokenToUse,
                     cookie = cookie,
-                    logTag = "댓글 깡계 판별용 gallog 조회 실패",
                     botId = botId,
-                    isDebugMode = config.isDebugMode
+                    logTag = "댓글 깡계 판별용 gallog 조회 실패"
                 )
 
-                val pCount = gallogStats.postCount
-                val cCount = gallogStats.commentCount
-
-                if (pCount < config.kkangPostMin || cCount < config.kkangCommentMin) {
+                if (isKkang) {
                     if (toggles.kkangCommentEnabled) {
-                        blockReasonPrefix = "깡계 댓글 금지(글:$pCount/댓:$cCount)"
+                        blockReasonPrefix = "깡계 댓글 금지"
                         notiType = "kkang"
-                        debugDetail = "깡계 댓글 기준 미달: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        debugDetail = "깡계 댓글 기준 감지: $kkangDetail"
                         filterSource = ModerationFilterSource.KKANG
                     } else if (
                         toggles.kkangVoiceEnabled &&
@@ -4154,7 +4201,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     ) {
                         blockReasonPrefix = "깡계 보이스 첨부 금지"
                         notiType = "kkang"
-                        debugDetail = "깡계 기준 미달 + 댓글 보이스 첨부: 글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+                        debugDetail = "깡계 기준 감지 + 댓글 보이스 첨부: $kkangDetail"
                         filterSource = ModerationFilterSource.KKANG
                     }
                 }
@@ -4192,6 +4239,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         config = config,
                         botId = botId,
                         uid = cmtUid,
+                        dcNewNicknameMarked = isDcNewNicknameMarked(cmtGallogIconHtml),
                         gallogCache = gallogCache,
                         tokenToUse = tokenToUse,
                         cookie = cookie,

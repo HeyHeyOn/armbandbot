@@ -80,6 +80,10 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
     var isNotiKkang by remember { mutableStateOf(botPref.getBoolean("noti_kkang", true)) }
     var isKkangFilterMode by remember { mutableStateOf(botPref.getBoolean("is_kkang_filter_mode", false)) }
+    val kkangDetectionModeOptions = linkedMapOf("total" to "글+댓글 수", "separate" to "글 수/댓글 수", "dc_mark" to "신규 고정닉 표시")
+    var kkangDetectionMode by remember { mutableStateOf(botPref.getString("kkang_detection_mode", "separate")?.takeIf { it in kkangDetectionModeOptions.keys } ?: "separate") }
+    var isKkangDetectionModeDropdownExpanded by remember { mutableStateOf(false) }
+    var kkangTotalMinText by remember { mutableStateOf(botPref.getInt("kkang_total_min", 15).toString()) }
     var kkangPostMinText by remember { mutableStateOf(botPref.getInt("kkang_post_min", 5).toString()) }
     var kkangCmtMinText by remember { mutableStateOf(botPref.getInt("kkang_comment_min", 10).toString()) }
     var isKkangPostBlock by remember { mutableStateOf(botPref.getBoolean("is_kkang_post_block", false)) }
@@ -957,14 +961,36 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
                                             Column(modifier = Modifier.padding(16.dp)) {
                                                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("작성 게시글 기준 수", fontWeight = FontWeight.Bold, color = textColor)
-                                                    OutlinedTextField(value = kkangPostMinText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { kkangPostMinText = it; botPref.edit().putInt("kkang_post_min", it.toIntOrNull() ?: 5).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                    Text("깡계 판정 방식", fontWeight = FontWeight.Bold, color = textColor)
+                                                    Box {
+                                                        OutlinedButton(onClick = { if (isKkangFilterMode) isKkangDetectionModeDropdownExpanded = true }) {
+                                                            Text(kkangDetectionModeOptions[kkangDetectionMode] ?: "글 수/댓글 수", color = textColor)
+                                                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                                                        }
+                                                        DropdownMenu(expanded = isKkangDetectionModeDropdownExpanded, onDismissRequest = { isKkangDetectionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                                            kkangDetectionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { kkangDetectionMode = mode; botPref.edit().putString("kkang_detection_mode", mode).apply(); isKkangDetectionModeDropdownExpanded = false }) }
+                                                        }
+                                                    }
                                                 }
-                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("작성 댓글 기준 수", fontWeight = FontWeight.Bold, color = textColor)
-                                                    OutlinedTextField(value = kkangCmtMinText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { kkangCmtMinText = it; botPref.edit().putInt("kkang_comment_min", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                if (kkangDetectionMode == "total") {
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                        Text("글+댓글 기준 수", fontWeight = FontWeight.Bold, color = textColor)
+                                                        OutlinedTextField(value = kkangTotalMinText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { kkangTotalMinText = it; botPref.edit().putInt("kkang_total_min", it.toIntOrNull() ?: 15).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                    }
+                                                    Text("※ 글 수와 댓글 수의 합이 기준 수 미만이면 깡계로 간주합니다.", fontSize = 12.sp, color = subTextColor)
+                                                } else if (kkangDetectionMode == "separate") {
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                        Text("작성 게시글 기준 수", fontWeight = FontWeight.Bold, color = textColor)
+                                                        OutlinedTextField(value = kkangPostMinText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { kkangPostMinText = it; botPref.edit().putInt("kkang_post_min", it.toIntOrNull() ?: 5).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                    }
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                        Text("작성 댓글 기준 수", fontWeight = FontWeight.Bold, color = textColor)
+                                                        OutlinedTextField(value = kkangCmtMinText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { kkangCmtMinText = it; botPref.edit().putInt("kkang_comment_min", it.toIntOrNull() ?: 10).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                                                    }
+                                                    Text("※ 위 두 숫자 중 하나라도 미달하면 깡계로 간주합니다.", fontSize = 12.sp, color = subTextColor)
+                                                } else {
+                                                    Text("디시인사이드의 신규 고정닉 표시를 감지합니다. (설정 방법: 해당 갤러리>관리>갤러리 설정>신규 고정닉 표시)", fontSize = 12.sp, color = subTextColor)
                                                 }
-                                                Text("※ 위 두 숫자 중 하나라도 미달하면 깡계로 간주합니다.", fontSize = 12.sp, color = subTextColor)
 
                                                 Divider(color = dividerColor, modifier = Modifier.padding(vertical=8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
