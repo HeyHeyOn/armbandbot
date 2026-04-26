@@ -120,33 +120,25 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     Scaffold(
         containerColor = bgColor,
         bottomBar = {
-            Surface(color = if (isDarkMode) Color(0xFF1A1A1A) else Color.White, shadowElevation = 8.dp) {
+            Surface(color = if (isDarkMode) Color(0xFF1A1A1A) else Color.White) {
+                val actionIconColor = if (isDarkMode) Color.White else PastelNavy
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FloatingActionButton(
-                        onClick = { showAddDialog = true },
-                        containerColor = PastelNavy,
-                        contentColor = Color.White,
-                        modifier = Modifier.size(52.dp)
-                    ) { Icon(Icons.Filled.Add, contentDescription = "봇 추가") }
-                    FloatingActionButton(
-                        onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                        containerColor = if (isDarkMode) Color(0xFF2A3542) else Color.White,
-                        contentColor = PastelNavy,
-                        modifier = Modifier.size(52.dp)
-                    ) { Icon(Icons.Filled.FileDownload, contentDescription = "설정 파일 불러오기") }
-                    FloatingActionButton(
-                        onClick = { onThemeToggle(!isDarkMode) },
-                        containerColor = if (isDarkMode) Color(0xFF333333) else Color.White,
-                        contentColor = if (isDarkMode) Color(0xFFFFD54F) else PastelNavy,
-                        modifier = Modifier.size(52.dp)
-                    ) { Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환") }
+                    IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(44.dp)) {
+                        Icon(Icons.Filled.Add, contentDescription = "봇 추가", tint = actionIconColor, modifier = Modifier.size(26.dp))
+                    }
+                    IconButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }, modifier = Modifier.size(44.dp)) {
+                        Icon(Icons.Filled.FileDownload, contentDescription = "설정 파일 불러오기", tint = actionIconColor, modifier = Modifier.size(26.dp))
+                    }
+                    IconButton(onClick = { onThemeToggle(!isDarkMode) }, modifier = Modifier.size(44.dp)) {
+                        Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(26.dp))
+                    }
                 }
             }
         }
@@ -168,7 +160,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.3.4-beta13", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.3.4-beta14", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
             }

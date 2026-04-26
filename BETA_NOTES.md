@@ -365,3 +365,22 @@
 - APK: 완장봇_v1.3.4-beta13.apk
 - SHA256: 12A2E5564EB2F581342279B0A5220248EEE6B67B7D55CD60CD561769C79E7AC4
 - Drive file ID: 1SWFKsv5js1_tZefzBME13ly3l5dtH2oj
+
+## 1.3.4-beta14 구현 완료
+
+### 주요 변화
+- 봇 목록/활동 로그 액션 바 스타일 통일
+- 두 화면 모두 하단 전체를 차지하는 얇은 액션 바 형태로 정리
+- 액션 바 버튼별 배경/그림자 제거
+- 아이콘 색상 통일
+  - 라이트 모드: 짙은 남색
+  - 다크 모드: 흰색
+- 버튼 크기와 액션 바 두께를 줄여 더 가볍고 모던하게 조정
+- 메인 화면 표시 버전을 1.3.4-beta14로 갱신
+
+### 빌드 정보
+- versionCode = 64
+- versionName = 1.3.4-beta14
+- APK: 완장봇_v1.3.4-beta14.apk
+- SHA256: F5BF8E1FD3E5A3CAEBD4E2BD53A582897A0D8F416CCA412ECBB363CD695715DD
+- Drive file ID: 1J5a9rglsDHrDEoJr1CHFn7_LzrudH4IK

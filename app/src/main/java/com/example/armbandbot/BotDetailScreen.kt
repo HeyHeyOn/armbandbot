@@ -1937,30 +1937,27 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 }
                                 Surface(
                                     color = if (isDarkMode) Color(0xFF1A1A1A) else cardColor,
-                                    shape = RoundedCornerShape(12.dp),
-                                    shadowElevation = 4.dp,
                                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
                                 ) {
+                                    val actionIconColor = if (isDarkMode) Color.White else PastelNavy
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Button(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha=0.2f)), contentPadding = PaddingValues(0.dp), modifier = Modifier.size(44.dp)) { Text("▲", color = if (isDarkMode) Color.White else PastelNavy) }
-                                        Button(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha=0.2f)), contentPadding = PaddingValues(0.dp), modifier = Modifier.size(44.dp)) { Text("▼", color = if (isDarkMode) Color.White else PastelNavy) }
-                                        FloatingActionButton(
-                                            onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") },
-                                            containerColor = if (isDarkMode) Color(0xFF2E3B55) else Color.White,
-                                            contentColor = if (isDarkMode) Color.White else PastelNavy,
-                                            modifier = Modifier.size(44.dp)
-                                        ) { Icon(Icons.Filled.Save, contentDescription = "로그 저장") }
-                                        FloatingActionButton(
-                                            onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") },
-                                            containerColor = if (isDarkMode) Color(0xFF4527A0) else Color.White,
-                                            contentColor = if (isDarkMode) Color.White else Color(0xFF4527A0),
-                                            modifier = Modifier.size(44.dp)
-                                        ) { Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장") }
-                                        FloatingActionButton(
+                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, modifier = Modifier.size(40.dp)) {
+                                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "맨 위로", tint = actionIconColor, modifier = Modifier.size(25.dp))
+                                        }
+                                        IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, modifier = Modifier.size(40.dp)) {
+                                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "맨 밑으로", tint = actionIconColor, modifier = Modifier.size(25.dp))
+                                        }
+                                        IconButton(onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") }, modifier = Modifier.size(40.dp)) {
+                                            Icon(Icons.Filled.Save, contentDescription = "로그 저장", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                                        }
+                                        IconButton(onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") }, modifier = Modifier.size(40.dp)) {
+                                            Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                                        }
+                                        IconButton(
                                             onClick = {
                                                 logMessages.clear()
                                                 try {
@@ -1969,10 +1966,10 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 } catch (_: Exception) {
                                                 }
                                             },
-                                            containerColor = if (isDarkMode) Color(0xFF37474F) else Color.White,
-                                            contentColor = if (isDarkMode) Color.White else warningRed,
-                                            modifier = Modifier.size(44.dp)
-                                        ) { Icon(Icons.Filled.Delete, contentDescription = "로그 지우기") }
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Delete, contentDescription = "로그 지우기", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                                        }
                                     }
                                 }
                             }
