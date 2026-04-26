@@ -88,6 +88,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     var isBlockRefreshing by remember { mutableStateOf(false) }
 
     var snapshotViewerPath by remember { mutableStateOf<String?>(null) }
+    var showClearDbConfirm by remember { mutableStateOf(false) }
 
     val postDao = GlobalBotState.getDb()?.postDao()
 
@@ -152,6 +153,36 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         return@DbDashboardScreen
     }
 
+    if (showClearDbConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearDbConfirm = false },
+            title = { Text("DB 삭제", fontWeight = FontWeight.Bold) },
+            text = { Text("공용 DB를 전체 초기화할까요?\n검사 기록과 차단 기록이 모두 삭제됩니다.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        GlobalBotState.clearDb(context)
+                        generalPosts = emptyList()
+                        blockPosts = emptyList()
+                        galleries = emptyList()
+                        generalLimit = 100
+                        blockLimit = 100
+                        showClearDbConfirm = false
+                        coroutineScope.launch {
+                            withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
+                            loadGeneralData()
+                            loadBlockData()
+                        }
+                        Toast.makeText(context, "DB를 초기화했습니다.", Toast.LENGTH_SHORT).show()
+                    }
+                ) { Text("삭제", color = warningRed, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDbConfirm = false }) { Text("취소") }
+            }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
         Row(
             modifier = Modifier
@@ -181,6 +212,10 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     fontSize = 11.sp,
                     color = subTextColor
                 )
+            }
+
+            IconButton(onClick = { showClearDbConfirm = true }) {
+                Icon(Icons.Filled.DeleteForever, contentDescription = "DB 삭제", tint = warningRed, modifier = Modifier.size(24.dp))
             }
 
             Box {

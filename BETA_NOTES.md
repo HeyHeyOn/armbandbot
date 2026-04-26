@@ -463,3 +463,23 @@
 - APK: 완장봇_v1.3.4-beta19.apk
 - SHA256: 2A3206D436372CE21B343126C6C9A9DBC521A6EF7ADA9400480B1603758EA7F8
 - Drive file ID: 1fpDkmY0upkTuuZ7Uu2sFg9gtt81SZLy3
+
+## 1.3.4-beta20 구현 완료
+
+### 주요 변화
+- 하단 액션 바 아이콘 크기를 더 크게 조정
+- 아이콘뿐 아니라 라벨까지 포함한 전체 영역이 버튼으로 동작하도록 변경
+- 봇 목록 하단 액션 바에 DB 대시보드 이동 버튼 추가
+  - 아이콘: 플로피디스크
+  - 라벨: DB
+- DB 대시보드 우측 상단에 DB 삭제 버튼 추가
+  - 삭제 전 확인 팝업 표시
+  - 공용 DB의 검사 기록/차단 기록 전체 초기화
+- 메인 화면 표시 버전을 1.3.4-beta20으로 갱신
+
+### 빌드 정보
+- versionCode = 70
+- versionName = 1.3.4-beta20
+- APK: 완장봇_v1.3.4-beta20.apk
+- SHA256: 02260B40F2F36D1BFFB7B86654ACDACA9D2D5ED29B06DF53A0E17AF687196129
+- Drive file ID: 1yydxRrCNIm3OCd6-CnVzrT0hTktDHLMA

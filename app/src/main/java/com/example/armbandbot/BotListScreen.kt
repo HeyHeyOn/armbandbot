@@ -85,6 +85,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     var dragDy by remember { mutableStateOf(0f) }
     var swipedBotId by remember { mutableStateOf<String?>(null) }
     var pendingExportBotId by remember { mutableStateOf<String?>(null) }
+    var showDbDashboard by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -118,6 +119,11 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     val density = LocalDensity.current
     val itemHeightPx = remember(density) { with(density) { 60.dp.toPx() } }
 
+    if (showDbDashboard) {
+        DbDashboardScreen(botId = "GLOBAL", onBack = { showDbDashboard = false })
+        return
+    }
+
     Scaffold(
         containerColor = bgColor,
         bottomBar = {
@@ -127,26 +133,24 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp)) {
-                        IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Filled.Add, contentDescription = "봇 추가", tint = actionIconColor, modifier = Modifier.size(23.dp))
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { showAddDialog = true }.padding(vertical = 2.dp)) {
+                        Icon(Icons.Filled.Add, contentDescription = "봇 추가", tint = actionIconColor, modifier = Modifier.size(30.dp))
                         Text("봇 추가", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp)) {
-                        IconButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Filled.FileDownload, contentDescription = "불러오기", tint = actionIconColor, modifier = Modifier.size(23.dp))
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }.padding(vertical = 2.dp)) {
+                        Icon(Icons.Filled.FileDownload, contentDescription = "불러오기", tint = actionIconColor, modifier = Modifier.size(30.dp))
                         Text("불러오기", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp)) {
-                        IconButton(onClick = { onThemeToggle(!isDarkMode) }, modifier = Modifier.size(34.dp)) {
-                            Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(23.dp))
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { showDbDashboard = true }.padding(vertical = 2.dp)) {
+                        Icon(Icons.Filled.Save, contentDescription = "DB", tint = actionIconColor, modifier = Modifier.size(30.dp))
+                        Text("DB", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { onThemeToggle(!isDarkMode) }.padding(vertical = 2.dp)) {
+                        Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(30.dp))
                         Text(if (isDarkMode) "라이트 모드" else "다크 모드", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
                 }
@@ -170,7 +174,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.3.4-beta19", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.3.4-beta20", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
             }
