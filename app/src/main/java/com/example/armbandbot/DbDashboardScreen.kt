@@ -270,79 +270,6 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 )
             }
 
-            Box {
-                Row(modifier = Modifier.clickable { isSortMenuExpanded = true }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (sortField == "CHECK") "검사/차단 기준" else "작성일 기준", fontSize = 12.sp, color = PastelNavy, fontWeight = FontWeight.Bold)
-                    Icon(if (isAscending) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = PastelNavy, modifier = Modifier.size(20.dp))
-                }
-                DropdownMenu(
-                    expanded = isSortMenuExpanded,
-                    onDismissRequest = { isSortMenuExpanded = false },
-                    modifier = Modifier.background(if(isDarkMode) Color(0xFF2C323A) else Color.White)
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("검사/차단일 최신순 (▼)", color = textColor) },
-                        onClick = {
-                            sortField = "CHECK"
-                            isAscending = false
-                            masterPref.edit()
-                                .putString("db_sort_field", sortField)
-                                .putBoolean("db_sort_ascending", isAscending)
-                                .apply()
-                            isSortMenuExpanded = false
-                            generalLimit = 100
-                            blockLimit = 100
-                        }
-                    )
-
-                    DropdownMenuItem(
-                        text = { Text("검사/차단일 과거순 (▲)", color = textColor) },
-                        onClick = {
-                            sortField = "CHECK"
-                            isAscending = true
-                            masterPref.edit()
-                                .putString("db_sort_field", sortField)
-                                .putBoolean("db_sort_ascending", isAscending)
-                                .apply()
-                            isSortMenuExpanded = false
-                            generalLimit = 100
-                            blockLimit = 100
-                        }
-                    )
-
-                    Divider(color = dividerColor)
-
-                    DropdownMenuItem(
-                        text = { Text("작성일 최신순 (▼)", color = textColor) },
-                        onClick = {
-                            sortField = "CREATE"
-                            isAscending = false
-                            masterPref.edit()
-                                .putString("db_sort_field", sortField)
-                                .putBoolean("db_sort_ascending", isAscending)
-                                .apply()
-                            isSortMenuExpanded = false
-                            generalLimit = 100
-                            blockLimit = 100
-                        }
-                    )
-
-                    DropdownMenuItem(
-                        text = { Text("작성일 과거순 (▲)", color = textColor) },
-                        onClick = {
-                            sortField = "CREATE"
-                            isAscending = true
-                            masterPref.edit()
-                                .putString("db_sort_field", sortField)
-                                .putBoolean("db_sort_ascending", isAscending)
-                                .apply()
-                            isSortMenuExpanded = false
-                            generalLimit = 100
-                            blockLimit = 100
-                        }
-                    )
-                }
-            }
 
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
@@ -374,18 +301,37 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text("차단 상세 기록", fontWeight = FontWeight.Bold, color = if(tabIndex==1) warningRed else subTextColor) })
         }
 
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("제목, 작성자, 내용 검색...", fontSize = 14.sp) },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "검색", tint = Color.Gray) },
-            trailingIcon = { if (searchQuery.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "지우기", modifier = Modifier.clickable { searchQuery = ""; generalLimit=100; blockLimit=100 }, tint = Color.Gray) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).background(if(isDarkMode) Color(0xFF2C323A) else Color.White, RoundedCornerShape(8.dp)),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor, unfocusedBorderColor = Color.Transparent, focusedBorderColor = PastelNavy)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("글 번호, 제목, 작성자, 내용 검색...", fontSize = 14.sp) },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "검색", tint = Color.Gray) },
+                trailingIcon = { if (searchQuery.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "지우기", modifier = Modifier.clickable { searchQuery = ""; generalLimit=100; blockLimit=100 }, tint = Color.Gray) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                modifier = Modifier.weight(1f).background(if(isDarkMode) Color(0xFF2C323A) else Color.White, RoundedCornerShape(8.dp)),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor, unfocusedBorderColor = Color.Transparent, focusedBorderColor = PastelNavy)
+            )
+            Box {
+                Row(modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { isSortMenuExpanded = true }.padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (sortField == "CHECK") "검사" else "작성", fontSize = 12.sp, color = PastelNavy, fontWeight = FontWeight.Bold)
+                    Icon(if (isAscending) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = PastelNavy, modifier = Modifier.size(20.dp))
+                }
+                DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }, modifier = Modifier.background(if(isDarkMode) Color(0xFF2C323A) else Color.White)) {
+                    DropdownMenuItem(text = { Text("검사/차단일 최신순 (▼)", color = textColor) }, onClick = { sortField = "CHECK"; isAscending = false; masterPref.edit().putString("db_sort_field", sortField).putBoolean("db_sort_ascending", isAscending).apply(); isSortMenuExpanded = false; generalLimit = 100; blockLimit = 100 })
+                    DropdownMenuItem(text = { Text("검사/차단일 과거순 (▲)", color = textColor) }, onClick = { sortField = "CHECK"; isAscending = true; masterPref.edit().putString("db_sort_field", sortField).putBoolean("db_sort_ascending", isAscending).apply(); isSortMenuExpanded = false; generalLimit = 100; blockLimit = 100 })
+                    Divider(color = dividerColor)
+                    DropdownMenuItem(text = { Text("작성일 최신순 (▼)", color = textColor) }, onClick = { sortField = "CREATE"; isAscending = false; masterPref.edit().putString("db_sort_field", sortField).putBoolean("db_sort_ascending", isAscending).apply(); isSortMenuExpanded = false; generalLimit = 100; blockLimit = 100 })
+                    DropdownMenuItem(text = { Text("작성일 과거순 (▲)", color = textColor) }, onClick = { sortField = "CREATE"; isAscending = true; masterPref.edit().putString("db_sort_field", sortField).putBoolean("db_sort_ascending", isAscending).apply(); isSortMenuExpanded = false; generalLimit = 100; blockLimit = 100 })
+                }
+            }
+        }
 
         LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (tabIndex == 0) {
@@ -526,8 +472,9 @@ private fun SwipeDeleteDbRow(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val buttonWidth = 72.dp
-    val maxSwipePx = with(density) { buttonWidth.toPx() }
+    val buttonSize = 58.dp
+    val buttonGap = 8.dp
+    val maxSwipePx = with(density) { -(buttonSize + buttonGap * 2).toPx() }
     val swipeOffset = remember(rowKey) { androidx.compose.animation.core.Animatable(0f) }
 
     LaunchedEffect(isOpen) {
@@ -538,17 +485,17 @@ private fun SwipeDeleteDbRow(
     Box(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(vertical = 4.dp)
-                .width(64.dp)
-                .fillMaxHeight()
+                .align(Alignment.CenterEnd)
+                .padding(end = buttonGap, top = 4.dp, bottom = 4.dp)
+                .size(buttonSize)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFFD32F2F))
                 .clickable { onDeleteClick() },
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = Color.White, modifier = Modifier.size(22.dp))
+                Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text("삭제", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
@@ -560,7 +507,7 @@ private fun SwipeDeleteDbRow(
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             coroutineScope.launch {
-                                if (swipeOffset.value > maxSwipePx / 2) {
+                                if (swipeOffset.value < maxSwipePx / 2) {
                                     swipeOffset.animateTo(maxSwipePx, androidx.compose.animation.core.tween(240))
                                     onOpenChange(true)
                                 } else {
@@ -572,7 +519,7 @@ private fun SwipeDeleteDbRow(
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
                             coroutineScope.launch {
-                                swipeOffset.snapTo((swipeOffset.value + dragAmount).coerceIn(0f, maxSwipePx))
+                                swipeOffset.snapTo((swipeOffset.value + dragAmount).coerceIn(maxSwipePx, 0f))
                             }
                         }
                     )

@@ -155,8 +155,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -197,7 +196,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.3.4-beta21", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.3.4-beta22", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                     IconButton(onClick = { showHelpDialog = true }) {
                         Icon(Icons.Filled.HelpOutline, contentDescription = "도움말", tint = Color.White, modifier = Modifier.size(28.dp))

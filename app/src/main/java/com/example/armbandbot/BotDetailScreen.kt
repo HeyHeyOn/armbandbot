@@ -1921,7 +1921,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .horizontalScroll(rememberScrollState())
-                                        .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                                        .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     FilterChip(selected = logFilterTab == "ALL", onClick = { logFilterTab = "ALL" }, label = { Text("전체", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
@@ -1949,7 +1949,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     else -> Color(0xFFE0E0E0)
                                                 }
                                                 Text(text = entry.raw, color = logTextColor, fontSize = 13.sp)
-                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Spacer(modifier = Modifier.height(3.dp))
                                             }
                                         }
                                     }

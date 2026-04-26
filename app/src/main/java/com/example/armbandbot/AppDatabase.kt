@@ -62,7 +62,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM checked_posts
         WHERE (:gallId = 'ALL' OR gallId = :gallId)
-          AND (:query = '' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
         ORDER BY checkTime DESC
         LIMIT :limit OFFSET :offset
     """)
@@ -71,7 +71,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM checked_posts
         WHERE (:gallId = 'ALL' OR gallId = :gallId)
-          AND (:query = '' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
         ORDER BY checkTime ASC
         LIMIT :limit OFFSET :offset
     """)
@@ -80,7 +80,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM checked_posts
         WHERE (:gallId = 'ALL' OR gallId = :gallId)
-          AND (:query = '' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
         ORDER BY creationDate DESC
         LIMIT :limit OFFSET :offset
     """)
@@ -89,7 +89,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM checked_posts
         WHERE (:gallId = 'ALL' OR gallId = :gallId)
-          AND (:query = '' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
         ORDER BY creationDate ASC
         LIMIT :limit OFFSET :offset
     """)
@@ -128,7 +128,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM block_history
         WHERE (:type = 'ALL' OR targetType = :type)
-          AND (:query = '' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
         ORDER BY blockTime DESC
         LIMIT :limit OFFSET :offset
     """)
@@ -137,7 +137,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM block_history
         WHERE (:type = 'ALL' OR targetType = :type)
-          AND (:query = '' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
         ORDER BY blockTime ASC
         LIMIT :limit OFFSET :offset
     """)
@@ -146,7 +146,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM block_history
         WHERE (:type = 'ALL' OR targetType = :type)
-          AND (:query = '' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
         ORDER BY creationDate DESC
         LIMIT :limit OFFSET :offset
     """)
@@ -155,7 +155,7 @@ interface PostDao {
     @Query("""
         SELECT * FROM block_history
         WHERE (:type = 'ALL' OR targetType = :type)
-          AND (:query = '' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
         ORDER BY creationDate ASC
         LIMIT :limit OFFSET :offset
     """)

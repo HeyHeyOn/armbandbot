@@ -510,3 +510,22 @@
 - APK: 완장봇_v1.3.4-beta21.apk
 - SHA256: AF46DF9AE8845AC3189F81D61A527C22D22CD1E29D24332A2EE41CB1501C7A54
 - Drive file ID: 17vtC7HQRJ-sIa1mawAUxJy9FWoBvN4bk
+
+## 1.3.4-beta22 구현 완료
+
+### 주요 변화
+- 봇 목록 하단 액션바의 버튼 아래 공백 최소화
+- DB 대시보드 기록 스와이프 방향을 왼쪽으로 변경
+- DB 대시보드 스와이프 삭제 버튼 크기/모양을 봇 목록 삭제 버튼과 통일
+- DB 대시보드 정렬 버튼을 검색창 우측으로 이동하고 검색창 폭 조정
+- DB 대시보드 검색에서 글 번호(postNum) 검색 지원
+- 활동 로그 태그 버튼 상단 공백 추가 축소
+- 활동 로그 줄 간격을 절반 수준으로 축소
+- 메인 화면 표시 버전을 1.3.4-beta22로 갱신
+
+### 빌드 정보
+- versionCode = 72
+- versionName = 1.3.4-beta22
+- APK: 완장봇_v1.3.4-beta22.apk
+- SHA256: 4B8E8CBA0303EAE8BBDE766F49DD726221CA0D6249384EC33417FFB2A8FA9710
+- Drive file ID: 1wDisVKtFnttdcyr20fEm0jxzM-VErnVp
