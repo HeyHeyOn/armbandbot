@@ -47,8 +47,14 @@ interface PostDao {
     @Query("SELECT COUNT(*) FROM checked_posts")
     fun getPostCount(): Int
 
+    @Query("SELECT snapshotPath FROM checked_posts WHERE snapshotPath IS NOT NULL UNION SELECT snapshotPath FROM block_history WHERE snapshotPath IS NOT NULL")
+    fun getAllSnapshotPaths(): List<String>
+
     @Query("DELETE FROM checked_posts")
     fun clearAllPosts()
+
+    @Query("DELETE FROM checked_posts WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
+    fun deletePost(gallType: String, gallId: String, postNum: String)
 
     @Query("SELECT DISTINCT gallId FROM checked_posts")
     fun getGalleries(): List<String>
@@ -109,6 +115,15 @@ interface PostDao {
 
     @Query("DELETE FROM block_history")
     fun clearAllBlockHistory()
+
+    @Query("SELECT snapshotPath FROM block_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum AND snapshotPath IS NOT NULL")
+    fun getBlockSnapshotPathsForPost(gallType: String, gallId: String, postNum: String): List<String>
+
+    @Query("DELETE FROM block_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
+    fun deleteBlockHistoryForPost(gallType: String, gallId: String, postNum: String)
+
+    @Query("DELETE FROM block_history WHERE id = :id")
+    fun deleteBlockHistoryById(id: Int)
 
     @Query("""
         SELECT * FROM block_history

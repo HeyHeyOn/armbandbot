@@ -85,6 +85,21 @@ import kotlin.math.roundToInt
 
 
 
+fun deleteSnapshotFiles(path: String?) {
+    if (path.isNullOrBlank()) return
+    try {
+        val file = java.io.File(path)
+        val candidates = buildSet {
+            add(file)
+            val absolutePath = file.absolutePath
+            if (absolutePath.endsWith("_latest.html")) add(java.io.File(absolutePath.replace("_latest.html", "_initial.html")))
+            if (absolutePath.endsWith("_initial.html")) add(java.io.File(absolutePath.replace("_initial.html", "_latest.html")))
+        }
+        candidates.forEach { if (it.exists()) it.delete() }
+    } catch (_: Exception) {
+    }
+}
+
 object GlobalBotState {
     val logs = mutableMapOf<String, SnapshotStateList<BotLogEntry>>()
     val lastCheckedNumbers = mutableMapOf<String, Int>()
@@ -214,8 +229,16 @@ object GlobalBotState {
     @Synchronized
     fun clearDb(context: Context) {
         Thread {
-            db?.postDao()?.clearAllPosts()
-            db?.postDao()?.clearAllBlockHistory()
+            try {
+                val dao = db?.postDao()
+                dao?.getAllSnapshotPaths()?.forEach { path -> deleteSnapshotFiles(path) }
+                context.cacheDir.listFiles()
+                    ?.filter { it.isDirectory && it.name.startsWith("snapshots_") }
+                    ?.forEach { it.deleteRecursively() }
+                dao?.clearAllPosts()
+                dao?.clearAllBlockHistory()
+            } catch (_: Exception) {
+            }
         }.start()
         lastCheckedNumbers.clear()
     }

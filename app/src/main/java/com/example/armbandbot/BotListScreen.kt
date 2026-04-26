@@ -5,8 +5,16 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -46,6 +54,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolean) -> Unit) {
     val context = LocalContext.current
@@ -86,6 +95,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     var swipedBotId by remember { mutableStateOf<String?>(null) }
     var pendingExportBotId by remember { mutableStateOf<String?>(null) }
     var showDbDashboard by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -119,11 +129,24 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     val density = LocalDensity.current
     val itemHeightPx = remember(density) { with(density) { 60.dp.toPx() } }
 
-    if (showDbDashboard) {
-        DbDashboardScreen(botId = "GLOBAL", onBack = { showDbDashboard = false })
-        return
-    }
+    BackHandler(enabled = showDbDashboard) { showDbDashboard = false }
 
+    AnimatedContent(
+        targetState = showDbDashboard,
+        transitionSpec = {
+            if (targetState && !initialState) {
+                slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it / 2 } + fadeOut()
+            } else if (!targetState && initialState) {
+                slideInHorizontally { -it / 2 } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+            } else {
+                fadeIn() togetherWith fadeOut()
+            }
+        },
+        label = "BotListDbDashboardAnimation"
+    ) { showingDbDashboard ->
+        if (showingDbDashboard) {
+            DbDashboardScreen(botId = "GLOBAL", onBack = { showDbDashboard = false })
+        } else {
     Scaffold(
         containerColor = bgColor,
         bottomBar = {
@@ -174,34 +197,14 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.3.4-beta20", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.3.4-beta21", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                    }
+                    IconButton(onClick = { showHelpDialog = true }) {
+                        Icon(Icons.Filled.HelpOutline, contentDescription = "도움말", tint = Color.White, modifier = Modifier.size(28.dp))
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.AddCircle, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("하단 버튼 영역에서 봇을 추가하세요.", fontSize = 13.sp, color = subTextColor)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Menu, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("블록을 길게 눌러 순서를 변경할 수 있습니다.", fontSize = 13.sp, color = subTextColor)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("블록을 왼쪽으로 밀면 내보내기/복사/삭제가 가능합니다.", fontSize = 13.sp, color = subTextColor)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (botIds.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("생성된 봇이 없습니다.", color = subTextColor) }
@@ -291,6 +294,36 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
             )
         }
 
+        if (showHelpDialog) {
+            AlertDialog(
+                containerColor = cardColor,
+                titleContentColor = textColor,
+                textContentColor = textColor,
+                onDismissRequest = { showHelpDialog = false },
+                title = { Text("기본 안내", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.AddCircle, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("하단 버튼 영역에서 봇을 추가하세요.", fontSize = 13.sp, color = subTextColor)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Menu, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("블록을 길게 눌러 순서를 변경할 수 있습니다.", fontSize = 13.sp, color = subTextColor)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("블록을 왼쪽으로 밀면 내보내기/복사/삭제가 가능합니다.", fontSize = 13.sp, color = subTextColor)
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showHelpDialog = false }) { Text("확인", color = PastelNavy) } }
+            )
+        }
+
         if (botToDelete != null) {
             val delPref = context.getSharedPreferences("bot_prefs_${botToDelete!!}", Context.MODE_PRIVATE)
             val delName = delPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇"
@@ -311,6 +344,8 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                 }, colors = ButtonDefaults.buttonColors(containerColor = if (isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F))) { Text("삭제", color = Color.White) } },
                 dismissButton = { TextButton(onClick = { botToDelete = null }) { Text("취소", color = subTextColor) } }
             )
+        }
+        }
         }
     }
 }

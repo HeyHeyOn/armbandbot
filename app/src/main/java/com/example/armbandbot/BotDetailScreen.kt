@@ -1759,18 +1759,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                                             Spacer(modifier = Modifier.height(16.dp))
                                             Button(
-                                                onClick = { currentSubScreen = "DB_DASHBOARD" },
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = if(isDarkMode) Color(0xFF424242) else Color.DarkGray,
-                                                    contentColor = Color.White
-                                                ),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text("DB 대시보드")
-                                            }
-                                            Spacer(modifier = Modifier.height(8.dp))
-
-                                            Button(
                                                 onClick = { showConfirmDialog = "crash_test" },
                                                 colors = ButtonDefaults.buttonColors(
                                                     containerColor = if (isDarkMode) Color(0xFF5D4037) else Color(0xFFFFCDD2),
@@ -1801,17 +1789,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
 
                                         Spacer(modifier = Modifier.height(16.dp))
-                                        Button(
-                                            onClick = { showConfirmDialog = "db_reset" },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight,
-                                                contentColor = if(isDarkMode) Color.White else PastelNavy
-                                            ),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text("공용 DB 초기화 (공유 기록: $rememberedPostCount)")
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
                                         Button(onClick = { showConfirmDialog = "logout" }, colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE), contentColor = textColor), modifier = Modifier.fillMaxWidth()) { Text("계정 로그아웃") }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Button(onClick = { showConfirmDialog = "delete" }, colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF3E2723) else Color(0xFFFFEBEE), contentColor = warningRed), modifier = Modifier.fillMaxWidth()) { Text("봇 삭제") }
@@ -1939,12 +1916,12 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     }
                                 }
                             ) { logInnerPadding ->
-                                Column(modifier = Modifier.fillMaxSize().padding(logInnerPadding).padding(top = 16.dp)) {
+                                Column(modifier = Modifier.fillMaxSize().padding(logInnerPadding)) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .horizontalScroll(rememberScrollState())
-                                        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+                                        .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     FilterChip(selected = logFilterTab == "ALL", onClick = { logFilterTab = "ALL" }, label = { Text("전체", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))

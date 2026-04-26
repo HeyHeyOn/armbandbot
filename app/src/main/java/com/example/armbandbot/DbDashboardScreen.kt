@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,12 +25,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
@@ -38,9 +41,11 @@ import com.heyheyon.armbandbot.ui.botColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -89,6 +94,10 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
     var snapshotViewerPath by remember { mutableStateOf<String?>(null) }
     var showClearDbConfirm by remember { mutableStateOf(false) }
+    var recordedPostCount by remember { mutableStateOf(0) }
+    var pendingDeletePost by remember { mutableStateOf<CheckedPost?>(null) }
+    var pendingDeleteBlock by remember { mutableStateOf<BlockHistory?>(null) }
+    var openSwipeKey by remember { mutableStateOf<String?>(null) }
 
     val postDao = GlobalBotState.getDb()?.postDao()
 
@@ -103,6 +112,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             }
         }
         generalPosts = data ?: emptyList()
+        recordedPostCount = withContext(Dispatchers.IO) { postDao?.getPostCount() ?: 0 }
     }
 
     suspend fun loadBlockData() {
@@ -116,6 +126,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             }
         }
         blockPosts = data ?: emptyList()
+        recordedPostCount = withContext(Dispatchers.IO) { postDao?.getPostCount() ?: 0 }
     }
 
     LaunchedEffect(botId) {
@@ -156,30 +167,75 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     if (showClearDbConfirm) {
         AlertDialog(
             onDismissRequest = { showClearDbConfirm = false },
-            title = { Text("DB 삭제", fontWeight = FontWeight.Bold) },
-            text = { Text("공용 DB를 전체 초기화할까요?\n검사 기록과 차단 기록이 모두 삭제됩니다.") },
+            title = { Text("DB 초기화", fontWeight = FontWeight.Bold) },
+            text = { Text("공용 DB를 전체 초기화할까요?\n검사 기록과 차단 기록, 저장된 스냅샷이 모두 삭제됩니다.\n(기록된 게시글 수: ${recordedPostCount}개)") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        GlobalBotState.clearDb(context)
-                        generalPosts = emptyList()
-                        blockPosts = emptyList()
-                        galleries = emptyList()
-                        generalLimit = 100
-                        blockLimit = 100
-                        showClearDbConfirm = false
                         coroutineScope.launch {
-                            withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
-                            loadGeneralData()
-                            loadBlockData()
+                            withContext(Dispatchers.IO) {
+                                postDao?.getAllSnapshotPaths()?.forEach { deleteSnapshotFiles(it) }
+                                context.cacheDir.listFiles()
+                                    ?.filter { it.isDirectory && it.name.startsWith("snapshots_") }
+                                    ?.forEach { it.deleteRecursively() }
+                                postDao?.clearAllPosts()
+                                postDao?.clearAllBlockHistory()
+                            }
+                            GlobalBotState.lastCheckedNumbers.clear()
+                            generalPosts = emptyList()
+                            blockPosts = emptyList()
+                            galleries = emptyList()
+                            recordedPostCount = 0
+                            generalLimit = 100
+                            blockLimit = 100
+                            showClearDbConfirm = false
+                            Toast.makeText(context, "DB를 초기화했습니다.", Toast.LENGTH_SHORT).show()
                         }
-                        Toast.makeText(context, "DB를 초기화했습니다.", Toast.LENGTH_SHORT).show()
                     }
-                ) { Text("삭제", color = warningRed, fontWeight = FontWeight.Bold) }
+                ) { Text("초기화", color = warningRed, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDbConfirm = false }) { Text("취소") }
             }
+        )
+    }
+
+    if (pendingDeletePost != null || pendingDeleteBlock != null) {
+        val deleteTitle = if (pendingDeletePost != null) "게시글 기록 삭제" else "차단 기록 삭제"
+        val deleteMessage = pendingDeletePost?.let { "[${it.gallId}] ${it.postNum}번 글의 DB 정보와 스냅샷을 삭제할까요?" }
+            ?: pendingDeleteBlock?.let { "[${it.gallId}] ${it.postNum}번 차단 기록과 스냅샷을 삭제할까요?" }
+            ?: "삭제할까요?"
+        AlertDialog(
+            onDismissRequest = { pendingDeletePost = null; pendingDeleteBlock = null },
+            title = { Text(deleteTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(deleteMessage) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val targetPost = pendingDeletePost
+                    val targetBlock = pendingDeleteBlock
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            if (targetPost != null) {
+                                deleteSnapshotFiles(targetPost.snapshotPath)
+                                postDao?.getBlockSnapshotPathsForPost(targetPost.gallType, targetPost.gallId, targetPost.postNum)?.forEach { deleteSnapshotFiles(it) }
+                                postDao?.deletePost(targetPost.gallType, targetPost.gallId, targetPost.postNum)
+                                postDao?.deleteBlockHistoryForPost(targetPost.gallType, targetPost.gallId, targetPost.postNum)
+                            } else if (targetBlock != null) {
+                                deleteSnapshotFiles(targetBlock.snapshotPath)
+                                postDao?.deleteBlockHistoryById(targetBlock.id)
+                            }
+                        }
+                        pendingDeletePost = null
+                        pendingDeleteBlock = null
+                        openSwipeKey = null
+                        withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
+                        loadGeneralData()
+                        loadBlockData()
+                        Toast.makeText(context, "삭제했습니다.", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("삭제", color = warningRed, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeletePost = null; pendingDeleteBlock = null }) { Text("취소") } }
         )
     }
 
@@ -212,10 +268,6 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     fontSize = 11.sp,
                     color = subTextColor
                 )
-            }
-
-            IconButton(onClick = { showClearDbConfirm = true }) {
-                Icon(Icons.Filled.DeleteForever, contentDescription = "DB 삭제", tint = warningRed, modifier = Modifier.size(24.dp))
             }
 
             Box {
@@ -291,6 +343,20 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { showClearDbConfirm = true },
+                color = if (isDarkMode) Color(0xFF3E2723) else Color(0xFFFFEBEE),
+                contentColor = warningRed,
+                shape = RoundedCornerShape(50)
+            ) {
+                Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Delete, contentDescription = "DB 초기화", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("초기화", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
         TabRow(selectedTabIndex = tabIndex, containerColor = topBarColor, contentColor = PastelNavy) {
@@ -344,12 +410,19 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 }
                 else {
                     LazyColumn(state = generalListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
-                        items(generalPosts) { post ->
+                        items(generalPosts, key = { "post_${it.gallType}_${it.gallId}_${it.postNum}" }) { post ->
                             val checkTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(post.checkTime))
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (post.snapshotPath != null) snapshotViewerPath = post.snapshotPath!! else Toast.makeText(context, "스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
-                                colors = CardDefaults.cardColors(containerColor = cardBgColor)
+                            val rowKey = "post_${post.gallType}_${post.gallId}_${post.postNum}"
+                            SwipeDeleteDbRow(
+                                rowKey = rowKey,
+                                isOpen = openSwipeKey == rowKey,
+                                onOpenChange = { isOpen -> openSwipeKey = if (isOpen) rowKey else null },
+                                onDeleteClick = { pendingDeletePost = post }
                             ) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (post.snapshotPath != null) snapshotViewerPath = post.snapshotPath!! else Toast.makeText(context, "스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
+                                    colors = CardDefaults.cardColors(containerColor = cardBgColor)
+                                ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                         Text("[${post.gallId}] 글 번호: ${post.postNum} (${post.gallType})", fontWeight = FontWeight.Bold, color = PastelNavy)
@@ -364,6 +437,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                         Text("작성: ${post.creationDate ?: "정보 없음"}", fontSize = 11.sp, color = subTextColor)
                                         Text("검사: $checkTimeStr", fontSize = 11.sp, color = subTextColor)
                                     }
+                                }
                                 }
                             }
                         }
@@ -388,13 +462,20 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 }
                 else {
                     LazyColumn(state = blockListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
-                        items(blockPosts) { history ->
+                        items(blockPosts, key = { "block_${it.id}" }) { history ->
                             val blockTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(history.blockTime))
                             val detailedReason = history.blockReason
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) snapshotViewerPath = history.snapshotPath!! else Toast.makeText(context, "차단 스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
-                                colors = CardDefaults.cardColors(containerColor = blockCardBgColor)
+                            val rowKey = "block_${history.id}"
+                            SwipeDeleteDbRow(
+                                rowKey = rowKey,
+                                isOpen = openSwipeKey == rowKey,
+                                onOpenChange = { isOpen -> openSwipeKey = if (isOpen) rowKey else null },
+                                onDeleteClick = { pendingDeleteBlock = history }
                             ) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) snapshotViewerPath = history.snapshotPath!! else Toast.makeText(context, "차단 스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
+                                    colors = CardDefaults.cardColors(containerColor = blockCardBgColor)
+                                ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(if (history.targetType == "POST") "[게시글]" else "[댓글]", fontWeight = FontWeight.Bold, color = warningRed)
@@ -417,6 +498,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                         Text("차단: $blockTimeStr", fontSize = 11.sp, color = subTextColor)
                                     }
                                 }
+                                }
                             }
                         }
                         item { Button(onClick = { blockLimit += 100 }, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF5D4037) else Color(0xFFFFCDD2), contentColor = if(isDarkMode) Color.White else warningRed)) { Text("더 보기 (현재 $blockLimit 개)") } }
@@ -431,5 +513,70 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 } // end blockPullRefreshBox
             }
         }
+    }
+}
+
+@Composable
+private fun SwipeDeleteDbRow(
+    rowKey: String,
+    isOpen: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    onDeleteClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val buttonWidth = 72.dp
+    val maxSwipePx = with(density) { buttonWidth.toPx() }
+    val swipeOffset = remember(rowKey) { androidx.compose.animation.core.Animatable(0f) }
+
+    LaunchedEffect(isOpen) {
+        if (!isOpen && swipeOffset.value != 0f) swipeOffset.animateTo(0f, androidx.compose.animation.core.tween(240))
+        if (isOpen && swipeOffset.value == 0f) swipeOffset.animateTo(maxSwipePx, androidx.compose.animation.core.tween(240))
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(vertical = 4.dp)
+                .width(64.dp)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFD32F2F))
+                .clickable { onDeleteClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = Color.White, modifier = Modifier.size(22.dp))
+                Text("삭제", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(swipeOffset.value.roundToInt(), 0) }
+                .pointerInput(rowKey) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            coroutineScope.launch {
+                                if (swipeOffset.value > maxSwipePx / 2) {
+                                    swipeOffset.animateTo(maxSwipePx, androidx.compose.animation.core.tween(240))
+                                    onOpenChange(true)
+                                } else {
+                                    swipeOffset.animateTo(0f, androidx.compose.animation.core.tween(240))
+                                    onOpenChange(false)
+                                }
+                            }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            coroutineScope.launch {
+                                swipeOffset.snapTo((swipeOffset.value + dragAmount).coerceIn(0f, maxSwipePx))
+                            }
+                        }
+                    )
+                }
+        ) { content() }
     }
 }
