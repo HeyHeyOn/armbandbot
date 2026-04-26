@@ -81,9 +81,11 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var isNotiKkang by remember { mutableStateOf(botPref.getBoolean("noti_kkang", true)) }
     var isKkangFilterMode by remember { mutableStateOf(botPref.getBoolean("is_kkang_filter_mode", false)) }
     val kkangDetectionModeOptions = linkedMapOf("total" to "글+댓글 수", "separate" to "글 수/댓글 수", "dc_mark" to "신규 고정닉 표시")
-    var kkangDetectionMode by remember { mutableStateOf(botPref.getString("kkang_detection_mode", "separate")?.takeIf { it in kkangDetectionModeOptions.keys } ?: "separate") }
+    fun safePrefString(key: String, defaultValue: String): String = (botPref.all[key] as? String) ?: defaultValue
+    fun safePrefInt(key: String, defaultValue: Int): Int = when (val value = botPref.all[key]) { is Int -> value; is String -> value.toIntOrNull() ?: defaultValue; is Long -> value.toInt(); else -> defaultValue }
+    var kkangDetectionMode by remember { mutableStateOf(safePrefString("kkang_detection_mode", "separate").takeIf { it in kkangDetectionModeOptions.keys } ?: "separate") }
     var isKkangDetectionModeDropdownExpanded by remember { mutableStateOf(false) }
-    var kkangTotalMinText by remember { mutableStateOf(botPref.getInt("kkang_total_min", 15).toString()) }
+    var kkangTotalMinText by remember { mutableStateOf(safePrefInt("kkang_total_min", 15).toString()) }
     var kkangPostMinText by remember { mutableStateOf(botPref.getInt("kkang_post_min", 5).toString()) }
     var kkangCmtMinText by remember { mutableStateOf(botPref.getInt("kkang_comment_min", 10).toString()) }
     var isKkangPostBlock by remember { mutableStateOf(botPref.getBoolean("is_kkang_post_block", false)) }

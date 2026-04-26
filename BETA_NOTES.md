@@ -299,3 +299,17 @@
 - APK: 완장봇_v1.3.4-beta9.apk
 - SHA256: F4E6A82D66574DC872743080A466020C7980F44F87672D9D1E85E5DCE1CB139D
 - Drive file ID: 1uRZ_uvzlOdafLCA2OSMc4k2g_Rzl8VWz
+
+## 1.3.4-beta10 구현 완료
+
+### 주요 변화
+- 봇 상세 화면 진입 시 크래시 가능성 보완
+- 새로 추가된 깡계 판정 방식/글댓합 기준 설정을 읽을 때 SharedPreferences 타입이 예상과 달라도 안전하게 기본값으로 처리하도록 수정
+- 기존 설정 복사/백업/이전 베타 설치 상태에서 설정 타입이 꼬여도 상세 화면이 종료되지 않도록 보호
+
+### 빌드 정보
+- versionCode = 60
+- versionName = 1.3.4-beta10
+- APK: 완장봇_v1.3.4-beta10.apk
+- SHA256: F77B9212FBEF0A7AA5DBB968BE5ABFFB825A0551552DA94E1A91DDD815A8D4EC
+- Drive file ID: 1jq_pduzgVPrUf9bysb9swQt-Qho2U2wq
