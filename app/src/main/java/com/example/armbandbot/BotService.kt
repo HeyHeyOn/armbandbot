@@ -553,8 +553,11 @@ class BotService : Service() {
         botPref.edit()
             .putBoolean("is_running", true)
             .putBoolean("should_restore_after_restart", true)
+            .remove("gallery_setting_refresh_last_success_at")
+            .remove("gallery_setting_refresh_last_attempt_at")
             .apply()
 
+        sendLog("[갤러리 설정 갱신] 봇 시작으로 마지막 갱신 시각을 초기화했습니다.", botId)
         sendLog("[복구 점검] 새 Job 생성을 시작합니다.", botId)
         markStartupPhase(botId, "job_creating")
         scheduleAutoRestart(botId)

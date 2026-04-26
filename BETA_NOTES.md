@@ -218,3 +218,17 @@
 - APK: 완장봇_v1.3.4-beta4.apk
 - SHA256: 5EBD32E8C4816BB0D7D948195BE8D5B01FD2644866201C1944D23AB6702A4942
 - Drive file ID: 1BHUQF3EBTwsmrLJhDX4sgwmbJNEZQMuy
+
+## 1.3.4-beta5 구현 완료
+
+### 주요 변화
+- 갤러리 설정 자동 갱신의 마지막 성공/시도 시각이 봇별 설정 저장소에 저장되는 구조 확인
+- 봇을 새로 시작할 때 해당 봇의 마지막 갱신 성공 시각과 마지막 시도 시각을 초기화하도록 수정
+- 긴급 설정 변경 후 봇 재시작 시 다음 사이클에서 즉시 갱신 요청을 보낼 수 있도록 개선
+
+### 빌드 정보
+- versionCode = 55
+- versionName = 1.3.4-beta5
+- APK: 완장봇_v1.3.4-beta5.apk
+- SHA256: 3145A889461C69C14B5F0C7E6F044AF85E633FC507979F255F76316D27B903C7
+- Drive file ID: 1AiMvDQmwpt5UVgHkfuIw3sJhj630g0e4
