@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -126,18 +127,27 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(38.dp)) {
-                        Icon(Icons.Filled.Add, contentDescription = "봇 추가", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp)) {
+                        IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Filled.Add, contentDescription = "봇 추가", tint = actionIconColor, modifier = Modifier.size(23.dp))
+                        }
+                        Text("봇 추가", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
-                    IconButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }, modifier = Modifier.size(38.dp)) {
-                        Icon(Icons.Filled.FileDownload, contentDescription = "설정 파일 불러오기", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp)) {
+                        IconButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Filled.FileDownload, contentDescription = "불러오기", tint = actionIconColor, modifier = Modifier.size(23.dp))
+                        }
+                        Text("불러오기", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
-                    IconButton(onClick = { onThemeToggle(!isDarkMode) }, modifier = Modifier.size(38.dp)) {
-                        Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(24.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp)) {
+                        IconButton(onClick = { onThemeToggle(!isDarkMode) }, modifier = Modifier.size(34.dp)) {
+                            Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(23.dp))
+                        }
+                        Text(if (isDarkMode) "라이트 모드" else "다크 모드", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
                 }
             }
@@ -160,7 +170,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.3.4-beta17", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: 1.3.4-beta19", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
             }

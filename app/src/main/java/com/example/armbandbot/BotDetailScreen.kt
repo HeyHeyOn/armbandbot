@@ -1903,34 +1903,49 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 bottomBar = {
                                     Surface(color = if (isDarkMode) Color(0xFF1A1A1A) else cardColor) {
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceEvenly,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, modifier = Modifier.size(38.dp)) {
-                                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "맨 위로", tint = logActionIconColor, modifier = Modifier.size(24.dp))
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(58.dp)) {
+                                                IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(0) } }, modifier = Modifier.size(32.dp)) {
+                                                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "맨 위로", tint = logActionIconColor, modifier = Modifier.size(22.dp))
+                                                }
+                                                Text("맨 위로", color = logActionIconColor, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
                                             }
-                                            IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, modifier = Modifier.size(38.dp)) {
-                                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "맨 밑으로", tint = logActionIconColor, modifier = Modifier.size(24.dp))
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(58.dp)) {
+                                                IconButton(onClick = { coroutineScope.launch { if (filteredLogs.isNotEmpty()) logListState.scrollToItem(filteredLogs.size - 1) } }, modifier = Modifier.size(32.dp)) {
+                                                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "맨 아래로", tint = logActionIconColor, modifier = Modifier.size(22.dp))
+                                                }
+                                                Text("맨 아래로", color = logActionIconColor, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
                                             }
-                                            IconButton(onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") }, modifier = Modifier.size(38.dp)) {
-                                                Icon(Icons.Filled.FileUpload, contentDescription = "로그 저장", tint = logActionIconColor, modifier = Modifier.size(23.dp))
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(58.dp)) {
+                                                IconButton(onClick = { exportLogLauncher.launch("완장봇_${botName}_활동로그.txt") }, modifier = Modifier.size(32.dp)) {
+                                                    Icon(Icons.Filled.FileUpload, contentDescription = "내보내기", tint = logActionIconColor, modifier = Modifier.size(21.dp))
+                                                }
+                                                Text("내보내기", color = logActionIconColor, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
                                             }
-                                            IconButton(onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") }, modifier = Modifier.size(38.dp)) {
-                                                Icon(Icons.Filled.BugReport, contentDescription = "디버그 로그 저장", tint = logActionIconColor, modifier = Modifier.size(23.dp))
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(58.dp)) {
+                                                IconButton(onClick = { exportDebugLogLauncher.launch("완장봇_${botName}_디버그로그.txt") }, modifier = Modifier.size(32.dp)) {
+                                                    Icon(Icons.Filled.BugReport, contentDescription = "디버그", tint = logActionIconColor, modifier = Modifier.size(21.dp))
+                                                }
+                                                Text("디버그", color = logActionIconColor, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
                                             }
-                                            IconButton(
-                                                onClick = {
-                                                    logMessages.clear()
-                                                    try {
-                                                        val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
-                                                        if (logFile.exists()) logFile.delete()
-                                                    } catch (_: Exception) {
-                                                    }
-                                                },
-                                                modifier = Modifier.size(38.dp)
-                                            ) {
-                                                Icon(Icons.Filled.Delete, contentDescription = "로그 지우기", tint = logActionIconColor, modifier = Modifier.size(23.dp))
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(58.dp)) {
+                                                IconButton(
+                                                    onClick = {
+                                                        logMessages.clear()
+                                                        try {
+                                                            val logFile = File(File(context.filesDir, "bot_logs"), "log_$botId.txt")
+                                                            if (logFile.exists()) logFile.delete()
+                                                        } catch (_: Exception) {
+                                                        }
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(Icons.Filled.Delete, contentDescription = "로그 삭제", tint = logActionIconColor, modifier = Modifier.size(21.dp))
+                                                }
+                                                Text("로그 삭제", color = logActionIconColor, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
                                             }
                                         }
                                     }

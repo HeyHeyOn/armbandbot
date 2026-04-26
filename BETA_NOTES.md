@@ -437,3 +437,29 @@
 - APK: 완장봇_v1.3.4-beta17.apk
 - SHA256: 9EE334CCA1604D7A1B28241BC284E307D91CE76E0BB5CB76E7CBA4F4D4BA1748
 - Drive file ID: 1tgPcZAEvdyuNuAfVgKFf6tmQXeqzdloM
+
+## 1.3.4-beta19 구현 완료
+
+### 주요 변화
+- 봇 목록/활동 로그 하단 액션 바를 유튜브식 `아이콘 + 한글 라벨` 구조로 변경
+- 봇 목록 라벨
+  - 봇 추가
+  - 불러오기
+  - 다크 모드 / 라이트 모드
+- 활동 로그 라벨
+  - 맨 위로
+  - 맨 아래로
+  - 내보내기
+  - 디버그
+  - 로그 삭제
+- 기존 아이콘 색상 정책 유지
+  - 라이트 모드: 짙은 남색
+  - 다크 모드: 흰색
+- 메인 화면 표시 버전을 1.3.4-beta19로 갱신
+
+### 빌드 정보
+- versionCode = 69
+- versionName = 1.3.4-beta19
+- APK: 완장봇_v1.3.4-beta19.apk
+- SHA256: 2A3206D436372CE21B343126C6C9A9DBC521A6EF7ADA9400480B1603758EA7F8
+- Drive file ID: 1fpDkmY0upkTuuZ7Uu2sFg9gtt81SZLy3
