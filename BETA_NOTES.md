@@ -645,3 +645,21 @@
 - SHA256: 80C4E8DA6D3C4853EF50AD7D8812BDA7A1C167F59C3A1569EE3129CE12A80233
 - Drive file ID: 137p_aYqBjE32OCaTDatex7QFMA__dUba
 - Drive link: https://drive.google.com/file/d/137p_aYqBjE32OCaTDatex7QFMA__dUba/view?usp=drivesdk
+
+
+## 1.3.5 official release (2026-04-27)
+
+### Release
+- VersionCode: 79
+- VersionName: 1.3.5
+- APK: 완장봇_v1.3.5.apk
+- SHA256: 50D4F2EF45748FC4457D7812BEFEAE109C3EE9EBB842EE2AC978634F634EB268
+- Drive file ID: 1TAFZxJJ_uR61F1xf1GPYxgs-GqyIAmsL
+- Drive link: https://drive.google.com/file/d/1TAFZxJJ_uR61F1xf1GPYxgs-GqyIAmsL/view?usp=drivesdk
+
+### 주요 반영
+- 1.3.5-beta2 검증 성공 후 정식 릴리즈 전환.
+- 갤러리 설정 자동 갱신의 ci_t 확보 로직을 안정화했습니다.
+- 관리 페이지 input ci_t, 관리 페이지 응답 ci_c, 기존 저장 쿠키 ci_c 순서로 토큰을 확보합니다.
+- 응답 Set-Cookie의 ci_c가 새로 내려오면 POST 요청 Cookie에 병합해 갤러리 설정 저장 요청에 사용합니다.
+- 일부 기기에서 오래된 로그인 쿠키에 ci_c가 없어 갤러리 설정 갱신이 실패하던 문제를 보완했습니다.
