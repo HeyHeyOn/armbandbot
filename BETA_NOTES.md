@@ -232,3 +232,19 @@
 - APK: 완장봇_v1.3.4-beta5.apk
 - SHA256: 3145A889461C69C14B5F0C7E6F044AF85E633FC507979F255F76316D27B903C7
 - Drive file ID: 1AiMvDQmwpt5UVgHkfuIw3sJhj630g0e4
+
+## 1.3.4-beta6 구현 완료
+
+### 주요 변화
+- 갤러리 설정 자동 갱신 상세 화면 UI 정리
+- 마스터 토글이 꺼져 있으면 하위 설정을 흐리게 표시하고 조작되지 않도록 변경
+- `IP 제한 갱신 payload` 문구를 `IP 제한 갱신`으로 변경
+- VPN/전체 통신사 IP/특정 통신사 IP 대역 토글의 개별 설명을 제거하고, 상위 설명으로 통합
+- 전체 상태 저장형 주의 문구를 마스터 토글 상세 설명으로 이동
+
+### 빌드 정보
+- versionCode = 56
+- versionName = 1.3.4-beta6
+- APK: 완장봇_v1.3.4-beta6.apk
+- SHA256: C45B5B3009652540639717D152199433FB23DDC76CAAB48D0303A3CEC63EA965
+- Drive file ID: 1In6DxtlxgCtenWEARBcJEEMVuirueY9d

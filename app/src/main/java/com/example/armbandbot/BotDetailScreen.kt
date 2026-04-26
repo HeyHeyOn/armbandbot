@@ -217,11 +217,11 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var gallerySettingDropdownKey by remember { mutableStateOf<String?>(null) }
 
         @Composable
-        fun MinuteDropdownRow(title: String, value: Int, options: Map<Int, String>, dropdownKey: String, onSelect: (Int) -> Unit) {
+        fun MinuteDropdownRow(title: String, value: Int, options: Map<Int, String>, dropdownKey: String, enabled: Boolean = true, onSelect: (Int) -> Unit) {
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(title, color = textColor, fontWeight = FontWeight.Bold)
                 Box {
-                    OutlinedButton(onClick = { gallerySettingDropdownKey = dropdownKey }) {
+                    OutlinedButton(enabled = enabled, onClick = { gallerySettingDropdownKey = dropdownKey }) {
                         Text(options[value] ?: "${value}분", color = textColor)
                         Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
                     }
@@ -235,13 +235,13 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         @Composable
-        fun GallerySwitchRow(title: String, subtitle: String? = null, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+        fun GallerySwitchRow(title: String, subtitle: String? = null, checked: Boolean, enabled: Boolean = true, onCheckedChange: (Boolean) -> Unit) {
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(title, color = textColor, fontWeight = FontWeight.Bold)
                     if (subtitle != null) Text(subtitle, color = subTextColor, fontSize = 12.sp)
                 }
-                Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
             }
         }
 
@@ -570,48 +570,51 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
                             when (activeSubScreen) {
                                 "GALLERY_REFRESH" -> {
+                                    val galleryRefreshEnabled = isGallerySettingRefreshEnabled
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                                         Column(modifier = Modifier.padding(16.dp)) {
                                             GallerySwitchRow(
                                                 title = "갤러리 설정 자동 갱신",
-                                                subtitle = "사이클 시작 시 마지막 성공 시각을 확인하고, 설정 주기가 지나면 DC 관리 설정을 다시 저장합니다.",
+                                                subtitle = "사이클 시작 시 마지막 성공 시각을 확인하고, 설정 주기가 지나면 DC 관리 설정을 다시 저장합니다. DC 저장 방식상 켜진 항목의 현재 앱 설정 전체를 함께 전송합니다.",
                                                 checked = isGallerySettingRefreshEnabled,
                                                 onCheckedChange = { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }
                                             )
                                             Divider(color = dividerColor)
-                                            MinuteDropdownRow("갱신 주기", gallerySettingRefreshIntervalMinutes, galleryRefreshIntervalOptions, "refresh_interval") { minutes ->
-                                                gallerySettingRefreshIntervalMinutes = minutes
-                                                botPref.edit().putInt("gallery_setting_refresh_interval_minutes", minutes).apply()
+                                            Column(modifier = Modifier.alpha(if (galleryRefreshEnabled) 1f else 0.45f)) {
+                                                MinuteDropdownRow("갱신 주기", gallerySettingRefreshIntervalMinutes, galleryRefreshIntervalOptions, "refresh_interval", enabled = galleryRefreshEnabled) { minutes ->
+                                                    gallerySettingRefreshIntervalMinutes = minutes
+                                                    botPref.edit().putInt("gallery_setting_refresh_interval_minutes", minutes).apply()
+                                                }
+                                                Text("실패 시에는 성공 시각을 갱신하지 않고, 최소 5분 간격으로 재시도합니다.", color = subTextColor, fontSize = 12.sp)
                                             }
-                                            Text("실패 시에는 성공 시각을 갱신하지 않고, 최소 5분 간격으로 재시도합니다.", color = subTextColor, fontSize = 12.sp)
                                         }
                                     }
 
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp).alpha(if (galleryRefreshEnabled) 1f else 0.45f)) {
                                         Column(modifier = Modifier.padding(16.dp)) {
-                                            Text("IP 제한 갱신 payload", fontWeight = FontWeight.Bold, color = textColor, modifier = Modifier.padding(bottom = 8.dp))
-                                            GallerySwitchRow("VPN 제한", "선택한 시간으로 VPN 제한을 다시 저장합니다.", gallerySettingProxyUse) { gallerySettingProxyUse = it; botPref.edit().putBoolean("gallery_setting_proxy_use", it).apply() }
-                                            if (gallerySettingProxyUse) MinuteDropdownRow("VPN 제한 시간", gallerySettingProxyTimeMinutes, galleryProxyTimeOptions, "proxy_time") { minutes -> gallerySettingProxyTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_proxy_time_minutes", minutes).apply() }
+                                            Text("IP 제한 갱신", fontWeight = FontWeight.Bold, color = textColor, modifier = Modifier.padding(bottom = 4.dp))
+                                            Text("갱신 주기마다 아래 설정한 시간으로 IP 제한이 다시 설정됩니다.", color = subTextColor, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+                                            GallerySwitchRow("VPN 제한", null, gallerySettingProxyUse, enabled = galleryRefreshEnabled) { gallerySettingProxyUse = it; botPref.edit().putBoolean("gallery_setting_proxy_use", it).apply() }
+                                            if (gallerySettingProxyUse) MinuteDropdownRow("VPN 제한 시간", gallerySettingProxyTimeMinutes, galleryProxyTimeOptions, "proxy_time", enabled = galleryRefreshEnabled) { minutes -> gallerySettingProxyTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_proxy_time_minutes", minutes).apply() }
                                             Divider(color = dividerColor)
-                                            GallerySwitchRow("전체 통신사 IP 제한", "모든 통신사 IP 제한을 다시 저장합니다.", gallerySettingMobileUse) { gallerySettingMobileUse = it; botPref.edit().putBoolean("gallery_setting_mobile_use", it).apply() }
-                                            if (gallerySettingMobileUse) MinuteDropdownRow("전체 통신사 IP 제한 시간", gallerySettingMobileTimeMinutes, galleryMobileTimeOptions, "mobile_time") { minutes -> gallerySettingMobileTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_mobile_time_minutes", minutes).apply() }
+                                            GallerySwitchRow("전체 통신사 IP 제한", null, gallerySettingMobileUse, enabled = galleryRefreshEnabled) { gallerySettingMobileUse = it; botPref.edit().putBoolean("gallery_setting_mobile_use", it).apply() }
+                                            if (gallerySettingMobileUse) MinuteDropdownRow("전체 통신사 IP 제한 시간", gallerySettingMobileTimeMinutes, galleryMobileTimeOptions, "mobile_time", enabled = galleryRefreshEnabled) { minutes -> gallerySettingMobileTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_mobile_time_minutes", minutes).apply() }
                                             Divider(color = dividerColor)
-                                            GallerySwitchRow("특정 통신사 IP 대역 제한", "특정 통신사 IP 대역 제한을 다시 저장합니다.", gallerySettingMobileIpsUse) { gallerySettingMobileIpsUse = it; botPref.edit().putBoolean("gallery_setting_mobile_ips_use", it).apply() }
-                                            if (gallerySettingMobileIpsUse) MinuteDropdownRow("특정 통신사 IP 제한 시간", gallerySettingMobileIpsTimeMinutes, galleryMobileIpsTimeOptions, "mobile_ips_time") { minutes -> gallerySettingMobileIpsTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_mobile_ips_time_minutes", minutes).apply() }
+                                            GallerySwitchRow("특정 통신사 IP 대역 제한", null, gallerySettingMobileIpsUse, enabled = galleryRefreshEnabled) { gallerySettingMobileIpsUse = it; botPref.edit().putBoolean("gallery_setting_mobile_ips_use", it).apply() }
+                                            if (gallerySettingMobileIpsUse) MinuteDropdownRow("특정 통신사 IP 제한 시간", gallerySettingMobileIpsTimeMinutes, galleryMobileIpsTimeOptions, "mobile_ips_time", enabled = galleryRefreshEnabled) { minutes -> gallerySettingMobileIpsTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_mobile_ips_time_minutes", minutes).apply() }
                                         }
                                     }
 
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.alpha(if (galleryRefreshEnabled) 1f else 0.45f)) {
                                         Column(modifier = Modifier.padding(16.dp)) {
-                                            GallerySwitchRow("이미지/동영상 첨부 제한", "선택한 비회원 대상의 첨부 제한을 다시 저장합니다.", gallerySettingImageBlockUse) { gallerySettingImageBlockUse = it; botPref.edit().putBoolean("gallery_setting_image_block_use", it).apply() }
+                                            GallerySwitchRow("이미지/동영상 첨부 제한", "선택한 비회원 대상의 첨부 제한을 다시 저장합니다.", gallerySettingImageBlockUse, enabled = galleryRefreshEnabled) { gallerySettingImageBlockUse = it; botPref.edit().putBoolean("gallery_setting_image_block_use", it).apply() }
                                             if (gallerySettingImageBlockUse) {
-                                                MinuteDropdownRow("첨부 제한 시간", gallerySettingImageBlockTimeMinutes, galleryImageBlockTimeOptions, "img_time") { minutes -> gallerySettingImageBlockTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_image_block_time_minutes", minutes).apply() }
+                                                MinuteDropdownRow("첨부 제한 시간", gallerySettingImageBlockTimeMinutes, galleryImageBlockTimeOptions, "img_time", enabled = galleryRefreshEnabled) { minutes -> gallerySettingImageBlockTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_image_block_time_minutes", minutes).apply() }
                                                 Divider(color = dividerColor)
-                                                GallerySwitchRow("대상: VPN", null, gallerySettingImageBlockProxy) { gallerySettingImageBlockProxy = it; botPref.edit().putBoolean("gallery_setting_image_block_proxy", it).apply() }
-                                                GallerySwitchRow("대상: 통신사 IP", null, gallerySettingImageBlockMobile) { gallerySettingImageBlockMobile = it; botPref.edit().putBoolean("gallery_setting_image_block_mobile", it).apply() }
-                                                GallerySwitchRow("대상: 전체 비회원", null, gallerySettingImageBlockAll) { gallerySettingImageBlockAll = it; botPref.edit().putBoolean("gallery_setting_image_block_all", it).apply() }
+                                                GallerySwitchRow("대상: VPN", null, gallerySettingImageBlockProxy, enabled = galleryRefreshEnabled) { gallerySettingImageBlockProxy = it; botPref.edit().putBoolean("gallery_setting_image_block_proxy", it).apply() }
+                                                GallerySwitchRow("대상: 통신사 IP", null, gallerySettingImageBlockMobile, enabled = galleryRefreshEnabled) { gallerySettingImageBlockMobile = it; botPref.edit().putBoolean("gallery_setting_image_block_mobile", it).apply() }
+                                                GallerySwitchRow("대상: 전체 비회원", null, gallerySettingImageBlockAll, enabled = galleryRefreshEnabled) { gallerySettingImageBlockAll = it; botPref.edit().putBoolean("gallery_setting_image_block_all", it).apply() }
                                             }
-                                            Text("주의: DC 저장 API는 전체 상태 저장형이라, 켜진 항목의 현재 앱 설정 전체를 함께 전송합니다.", color = subTextColor, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                                         }
                                     }
                                 }
