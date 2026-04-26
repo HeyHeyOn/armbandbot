@@ -575,7 +575,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Column(modifier = Modifier.padding(16.dp)) {
                                             GallerySwitchRow(
                                                 title = "갤러리 설정 자동 갱신",
-                                                subtitle = "사이클 시작 시 마지막 성공 시각을 확인하고, 설정 주기가 지나면 DC 관리 설정을 다시 저장합니다. DC 저장 방식상 켜진 항목의 현재 앱 설정 전체를 함께 전송합니다.",
+                                                subtitle = "갤러리 설정을 자동으로 갱신합니다. 갱신 시 켜져 있는 모든 설정이 다시 설정됩니다.",
                                                 checked = isGallerySettingRefreshEnabled,
                                                 onCheckedChange = { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }
                                             )
@@ -585,7 +585,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     gallerySettingRefreshIntervalMinutes = minutes
                                                     botPref.edit().putInt("gallery_setting_refresh_interval_minutes", minutes).apply()
                                                 }
-                                                Text("실패 시에는 성공 시각을 갱신하지 않고, 최소 5분 간격으로 재시도합니다.", color = subTextColor, fontSize = 12.sp)
+                                                Text("갱신은 사이클 시작 시 이루어지므로 사이클이 길어지면 실제 갱신 주기와 차이가 있을 수 있습니다.", color = subTextColor, fontSize = 12.sp)
                                             }
                                         }
                                     }
@@ -607,7 +607,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.alpha(if (galleryRefreshEnabled) 1f else 0.45f)) {
                                         Column(modifier = Modifier.padding(16.dp)) {
-                                            GallerySwitchRow("이미지/동영상 첨부 제한", "선택한 비회원 대상의 첨부 제한을 다시 저장합니다.", gallerySettingImageBlockUse, enabled = galleryRefreshEnabled) { gallerySettingImageBlockUse = it; botPref.edit().putBoolean("gallery_setting_image_block_use", it).apply() }
+                                            GallerySwitchRow("이미지/동영상 첨부 제한", "갱신 주기마다 아래 설정한 시간으로 이미지/동영상 첨부 제한이 다시 설정됩니다.", gallerySettingImageBlockUse, enabled = galleryRefreshEnabled) { gallerySettingImageBlockUse = it; botPref.edit().putBoolean("gallery_setting_image_block_use", it).apply() }
                                             if (gallerySettingImageBlockUse) {
                                                 MinuteDropdownRow("첨부 제한 시간", gallerySettingImageBlockTimeMinutes, galleryImageBlockTimeOptions, "img_time", enabled = galleryRefreshEnabled) { minutes -> gallerySettingImageBlockTimeMinutes = minutes; botPref.edit().putInt("gallery_setting_image_block_time_minutes", minutes).apply() }
                                                 Divider(color = dividerColor)

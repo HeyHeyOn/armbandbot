@@ -248,3 +248,18 @@
 - APK: 완장봇_v1.3.4-beta6.apk
 - SHA256: C45B5B3009652540639717D152199433FB23DDC76CAAB48D0303A3CEC63EA965
 - Drive file ID: 1In6DxtlxgCtenWEARBcJEEMVuirueY9d
+
+## 1.3.4-beta7 구현 완료
+
+### 주요 변화
+- 갤러리 설정 자동 갱신 상세 화면 문구 정리
+- 마스터 토글 설명을 짧고 명확하게 변경
+- 갱신 주기 안내를 사이클 시작 기준 동작 설명으로 변경
+- 이미지/동영상 첨부 제한 안내를 갱신 주기 기준 설명으로 변경
+
+### 빌드 정보
+- versionCode = 57
+- versionName = 1.3.4-beta7
+- APK: 완장봇_v1.3.4-beta7.apk
+- SHA256: 03A60D55268487F7892747A71EF2AE89C875C8261844D66D989A5B427FEE04F0
+- Drive file ID: 19G5QHUD1uKg8RFcT3j4Qh3bILfkwnJ0D
