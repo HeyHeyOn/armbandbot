@@ -591,3 +591,21 @@
 - APK: 완장봇_v1.3.4-beta25.apk
 - SHA256: 958B2ECF9A22C275221B45F8827782B17827DDFD57369D3F18F2924BD0C0D34A
 - Drive file ID: 1BXIhzvz8ckKj973rSkRWP_11JOE4sTYD
+
+
+## 1.3.4 official release (2026-04-26)
+
+### Release
+- VersionCode: 76
+- VersionName: 1.3.4
+- APK: 완장봇_v1.3.4.apk
+- SHA256: BE87CEDF9FA05C3B23D4C35743FFE6901F12AC83FF340D40758F98FD10D4E9AF
+- Drive file ID: 1xAzbaky0WkllgLBaXLqlk6_4UDc8Wl5J
+- Drive link: https://drive.google.com/file/d/1xAzbaky0WkllgLBaXLqlk6_4UDc8Wl5J/view?usp=drivesdk
+
+### 주요 반영
+- 1.3.4-beta25 기반 정식 릴리즈 전환.
+- 앱 표시 버전과 Gradle versionName을 1.3.4로 변경.
+- Google Docs 매뉴얼/패치노트 탭을 1.3.4 기준으로 재작성.
+- 매뉴얼은 신규 사용자도 흐름을 이해할 수 있도록 봇 목록, 활동 로그, 필터, AI, DB/스냅샷, 장시간 운용 섹션을 전체 맥락 기준으로 정리.
+- 패치노트는 DB 대시보드, 스냅샷 분리, 깡계 판정 방식, 금지어 대상 제한, 갤러리 설정 자동 갱신, 헬스 로그/런타임 보호를 1.3.4 항목으로 반영.
