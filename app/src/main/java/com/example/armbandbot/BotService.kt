@@ -279,7 +279,8 @@ class BotService : Service() {
         val blockReason: String?,
         val snapshotPath: String?,
         val success: Boolean,
-        val response: String
+        val response: String,
+        val deletesTarget: Boolean
     )
 
     private enum class ModerationActionMode {
@@ -2789,6 +2790,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         var dbBlockReason: String? = null
         var dbSnapshotPath: String? = null
         var isPostBlocked = false
+        var moderationFailed = false
+        var deletedCommentCount = 0
 
         val aiPostExecutionPlan = aiPostPlans.firstOrNull { it.postNo == postNumStr }
         if (aiPostExecutionPlan != null) {
@@ -2843,6 +2846,30 @@ img.written_dccon{max-width:80px;max-height:80px}
                 sendLog("[디버그][성능] 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)
             }
             return result
+        }
+
+        fun fetchLatestCommentsArray(): org.json.JSONArray? {
+            return runCatching {
+                val latestResponse = Jsoup.connect("https://gall.dcinside.com/board/comment/")
+                    .userAgent("Mozilla/5.0")
+                    .header("Cookie", cookie)
+                    .header("Referer", pcPostDetailUrl)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .data("id", gallId)
+                    .data("no", postNumStr)
+                    .data("cmt_id", gallId)
+                    .data("cmt_no", postNumStr)
+                    .data("e_s_n_o", esnoToken)
+                    .data("comment_page", "1")
+                    .data("sort", "D")
+                    .data("_GALLTYPE_", gallType)
+                    .ignoreContentType(true)
+                    .method(org.jsoup.Connection.Method.POST)
+                    .execute()
+                org.json.JSONObject(latestResponse.body()).optJSONArray("comments")
+            }.onFailure {
+                sendLog("[스냅샷][전체] 최신 댓글 재조회 실패: ${it.javaClass.simpleName} / ${it.message ?: "원인 불명"}", botId)
+            }.getOrNull()
         }
 
         if (config.isExpertMode && config.isSnapshotAll) {
@@ -2980,6 +3007,15 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (postBlockResult.success) {
                 isPostBlocked = true
                 dbBlockReason = postBlockResult.blockReason
+            } else {
+                moderationFailed = true
+                if (aiPostExecutionPlan != null && aiPostPlans.none { it.postNo == aiPostExecutionPlan.postNo }) {
+                    aiPostPlans.add(aiPostExecutionPlan)
+                    aiPostPlanNos.add(aiPostExecutionPlan.postNo)
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[AI 배치][재시도] 글 차단 실패로 실행계획 복원 / 글번호: ${aiPostExecutionPlan.postNo}", botId)
+                    }
+                }
             }
         } else if (postAnalysis.action == PostModerationAction.REVIEW_ONLY || aiDecision?.type == AiFilterDecisionType.REVIEW) {
             val reviewReason = aiReviewReason ?: postAnalysis.reviewReason ?: postAnalysis.aiReviewReason ?: "AI 검토 필요"
@@ -3174,6 +3210,18 @@ img.written_dccon{max-width:80px;max-height:80px}
                             dbBlockReason = commentBlockResult.blockReason
                             isPostBlocked = true
                             badCommentCount++
+                            if (commentBlockResult.deletesTarget) {
+                                deletedCommentCount++
+                            }
+                        } else {
+                            moderationFailed = true
+                            if (aiCommentPlan != null && aiCommentPlans.none { it.postNo == aiCommentPlan.postNo && it.commentNo == aiCommentPlan.commentNo }) {
+                                aiCommentPlans.add(aiCommentPlan)
+                                aiCommentPlanKeys.add("${aiCommentPlan.postNo}:${aiCommentPlan.commentNo}")
+                                if (config.isDebugMode && botId.isNotEmpty()) {
+                                    sendLog("[AI 배치][재시도] 댓글 차단 실패로 실행계획 복원 / 글번호: ${aiCommentPlan.postNo} / comment=${aiCommentPlan.commentNo}", botId)
+                                }
+                            }
                         }
                     }
                 }
@@ -3188,12 +3236,36 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
+        if (moderationFailed) {
+            if (config.isDebugMode) {
+                sendLog("[디버그][재시도] 차단/삭제 실패가 있어 DB 검사 완료 상태를 갱신하지 않음 / 글번호: $postNumStr", botId)
+            }
+            return
+        }
+
+        val adjustedCommentCount = (currentCommentCount - deletedCommentCount).coerceAtLeast(0)
+        if (deletedCommentCount > 0 && config.isExpertMode && config.isSnapshotAll) {
+            val latestCommentsArray = fetchLatestCommentsArray()
+            if (GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
+                try {
+                    val refreshedSnapshotPath = saveSnapshotFromDoc(postDoc, latestCommentsArray ?: org.json.JSONArray())
+                    if (!refreshedSnapshotPath.isNullOrBlank()) {
+                        dbSnapshotPath = refreshedSnapshotPath
+                        sendLog("[스냅샷][전체] 댓글 삭제 반영 저장 완료: $refreshedSnapshotPath", botId)
+                    } else {
+                        sendLog("[스냅샷][전체] 댓글 삭제 반영 저장 실패 또는 경로 없음", botId)
+                    }
+                } finally {
+                    GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
+                }
+            }
+        }
 
         GlobalBotState.savePost(
             gallType = gallType,
             gallId = gallId,
             postNum = postNumStr,
-            commentCount = currentCommentCount,
+            commentCount = adjustedCommentCount,
             title = text,
             author = postDisplayAuthor,
             isBlocked = isPostBlocked,
@@ -4666,7 +4738,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             blockReason = if (actionSucceeded) dbBlockReason else null,
             snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
             success = actionSucceeded,
-            response = actionResponse
+            response = actionResponse,
+            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || actionConfig.deletePostOnBlock
         )
     }
 
@@ -4852,7 +4925,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             blockReason = if (actionSucceeded) dbBlockReason else null,
             snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
             success = actionSucceeded,
-            response = actionResponse
+            response = actionResponse,
+            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || actionConfig.deletePostOnBlock
         )
     }
 
