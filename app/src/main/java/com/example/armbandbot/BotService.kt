@@ -277,7 +277,9 @@ class BotService : Service() {
 
     private data class BlockExecutionResult(
         val blockReason: String?,
-        val snapshotPath: String?
+        val snapshotPath: String?,
+        val success: Boolean,
+        val response: String
     )
 
     private enum class ModerationActionMode {
@@ -2866,8 +2868,6 @@ img.written_dccon{max-width:80px;max-height:80px}
                 sendLog("[디버그][게시글 차단 상세] 번호: $postNumStr / ${postAnalysis.debugDetail}", botId)
             }
 
-            isPostBlocked = true
-
             val postBlockResult = handleBadPost(
                 config = config,
                 botId = botId,
@@ -2977,7 +2977,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                 }
             )
 
-            dbBlockReason = postBlockResult.blockReason
+            if (postBlockResult.success) {
+                isPostBlocked = true
+                dbBlockReason = postBlockResult.blockReason
+            }
         } else if (postAnalysis.action == PostModerationAction.REVIEW_ONLY || aiDecision?.type == AiFilterDecisionType.REVIEW) {
             val reviewReason = aiReviewReason ?: postAnalysis.reviewReason ?: postAnalysis.aiReviewReason ?: "AI 검토 필요"
             sendLog("[AI 검토] 번호: $postNumStr / $reviewReason", botId)
@@ -3167,9 +3170,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                             }
                         )
 
-                        dbBlockReason = commentBlockResult.blockReason
-                        isPostBlocked = true
-                        badCommentCount++
+                        if (commentBlockResult.success) {
+                            dbBlockReason = commentBlockResult.blockReason
+                            isPostBlocked = true
+                            badCommentCount++
+                        }
                     }
                 }
             }
@@ -4577,7 +4582,6 @@ img.written_dccon{max-width:80px;max-height:80px}
         debugDetail: String?,
         saveSnapshotFn: (() -> String?)? = null,
     ): BlockExecutionResult {
-        var dbBlockReason: String? = null
         var dbSnapshotPath: String? = null
         var blockHistorySnapshotPath: String? = null
 
@@ -4599,34 +4603,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             debugDetail = debugDetail
         )
 
-        dbBlockReason = presentation.detailedBlockReason
-        logBlock(botId, presentation.logCategory, presentation.logMessage)
-        notifyIfEnabled(
-            presentation.notificationType,
-            presentation.notificationTitle,
-            presentation.notificationMessage
-        )
-
-        GlobalBotState.saveBlockHistory(
-            gallType = gallType,
-            gallId = gallId,
-            postNum = postNumStr,
-            targetType = "POST",
-            targetAuthor = postDisplayAuthor,
-            targetContent = postTitle,
-            blockReason = dbBlockReason ?: "알 수 없음",
-            snapshotPath = null,
-            creationDate = postDate
-        )
+        val dbBlockReason = presentation.detailedBlockReason
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
             if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                val postDao = GlobalBotState.getDb()?.postDao()
                 try {
-                    val lastId = postDao?.getLastBlockHistoryId()
                     val path = saveSnapshotFn()
-                    if (lastId != null && path != null) {
-                        postDao?.updateBlockHistorySnapshotPathById(lastId, path)
+                    if (path != null) {
                         blockHistorySnapshotPath = path
                         dbSnapshotPath = path
                     }
@@ -4649,14 +4632,41 @@ img.written_dccon{max-width:80px;max-height:80px}
             parentPostNo = "",
             gallType = gallType
         )
+        val actionSucceeded = isModerationActionSuccess(actionResponse)
         if (config.isDebugMode) {
             val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제요청" else "차단요청"
-            sendLog("[디버그][$modeLabel] 게시글 처리 완료 → 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
+            sendLog("[디버그][$modeLabel] 게시글 처리 ${if (actionSucceeded) "성공" else "실패"} → 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
+        }
+
+        if (actionSucceeded) {
+            logBlock(botId, presentation.logCategory, presentation.logMessage)
+            notifyIfEnabled(
+                presentation.notificationType,
+                presentation.notificationTitle,
+                presentation.notificationMessage
+            )
+
+            GlobalBotState.saveBlockHistory(
+                gallType = gallType,
+                gallId = gallId,
+                postNum = postNumStr,
+                targetType = "POST",
+                targetAuthor = postDisplayAuthor,
+                targetContent = postTitle,
+                blockReason = dbBlockReason,
+                snapshotPath = blockHistorySnapshotPath,
+                creationDate = postDate
+            )
+        } else {
+            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제" else "차단"
+            sendLog("[$modeLabel 실패] 게시글 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
         }
 
         return BlockExecutionResult(
-            blockReason = dbBlockReason,
-            snapshotPath = dbSnapshotPath
+            blockReason = if (actionSucceeded) dbBlockReason else null,
+            snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
+            success = actionSucceeded,
+            response = actionResponse
         )
     }
 
@@ -4763,7 +4773,6 @@ img.written_dccon{max-width:80px;max-height:80px}
         debugDetail: String?,
         saveSnapshotFn: (() -> String?)? = null,
     ): BlockExecutionResult {
-        var dbBlockReason: String? = null
         var dbSnapshotPath: String? = null
         var blockHistorySnapshotPath: String? = null
 
@@ -4780,34 +4789,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             debugDetail = debugDetail
         )
 
-        dbBlockReason = presentation.detailedBlockReason
-        logBlock(botId, presentation.logCategory, presentation.logMessage)
-        notifyIfEnabled(
-            presentation.notificationType,
-            presentation.notificationTitle,
-            presentation.notificationMessage
-        )
-
-        GlobalBotState.saveBlockHistory(
-            gallType = gallType,
-            gallId = gallId,
-            postNum = postNumStr,
-            targetType = "COMMENT",
-            targetAuthor = cmtDisplayAuthor,
-            targetContent = commentMemo,
-            blockReason = dbBlockReason ?: "알 수 없음",
-            snapshotPath = null,
-            creationDate = commentDate
-        )
+        val dbBlockReason = presentation.detailedBlockReason
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
             if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
-                val postDao = GlobalBotState.getDb()?.postDao()
                 try {
-                    val lastId = postDao?.getLastBlockHistoryId()
                     val path = saveSnapshotFn()
-                    if (lastId != null && path != null) {
-                        postDao?.updateBlockHistorySnapshotPathById(lastId, path)
+                    if (path != null) {
                         blockHistorySnapshotPath = path
                         dbSnapshotPath = path
                     }
@@ -4830,15 +4818,48 @@ img.written_dccon{max-width:80px;max-height:80px}
             parentPostNo = postNumStr,
             gallType = gallType
         )
+        val actionSucceeded = isModerationActionSuccess(actionResponse)
         if (config.isDebugMode) {
             val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제요청" else "차단요청"
-            sendLog("[디버그][$modeLabel] 댓글 처리 완료 → 번호: $commentNo / 응답: ${actionResponse.take(300)}", botId)
+            sendLog("[디버그][$modeLabel] 댓글 처리 ${if (actionSucceeded) "성공" else "실패"} → 번호: $commentNo / 응답: ${actionResponse.take(300)}", botId)
+        }
+
+        if (actionSucceeded) {
+            logBlock(botId, presentation.logCategory, presentation.logMessage)
+            notifyIfEnabled(
+                presentation.notificationType,
+                presentation.notificationTitle,
+                presentation.notificationMessage
+            )
+
+            GlobalBotState.saveBlockHistory(
+                gallType = gallType,
+                gallId = gallId,
+                postNum = postNumStr,
+                targetType = "COMMENT",
+                targetAuthor = cmtDisplayAuthor,
+                targetContent = commentMemo,
+                blockReason = dbBlockReason,
+                snapshotPath = blockHistorySnapshotPath,
+                creationDate = commentDate
+            )
+        } else {
+            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제" else "차단"
+            sendLog("[$modeLabel 실패] 댓글 번호: $commentNo (게시글: $postNumStr) / 응답: ${actionResponse.take(300)}", botId)
         }
 
         return BlockExecutionResult(
-            blockReason = dbBlockReason,
-            snapshotPath = dbSnapshotPath
+            blockReason = if (actionSucceeded) dbBlockReason else null,
+            snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
+            success = actionSucceeded,
+            response = actionResponse
         )
+    }
+
+    private fun isModerationActionSuccess(response: String): Boolean {
+        return runCatching {
+            JSONObject(response).optString("result", "").equals("success", ignoreCase = true)
+        }.getOrDefault(false)
     }
 
     private fun executeBlockRequest(
@@ -4853,7 +4874,11 @@ img.written_dccon{max-width:80px;max-height:80px}
         delChk: String,
         gallType: String
     ): String {
-        val blockUrl = "https://gall.dcinside.com/ajax/minor_manager_board_ajax/update_avoid_list"
+        val blockUrl = when (gallType) {
+            "M" -> "https://gall.dcinside.com/ajax/minor_manager_board_ajax/update_avoid_list"
+            "MI" -> "https://gall.dcinside.com/ajax/mini_manager_board_ajax/update_avoid_list"
+            else -> "https://gall.dcinside.com/ajax/manager_board_ajax/update_avoid_list"
+        }
 
         return Jsoup.connect(blockUrl)
             .userAgent("Mozilla/5.0")
@@ -4885,7 +4910,11 @@ img.written_dccon{max-width:80px;max-height:80px}
         commentNo: String,
         gallType: String
     ): String {
-        val deleteUrl = "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_comment"
+        val deleteUrl = when (gallType) {
+            "M" -> "https://gall.dcinside.com/ajax/minor_manager_board_ajax/delete_comment"
+            "MI" -> "https://gall.dcinside.com/ajax/mini_manager_board_ajax/delete_comment"
+            else -> "https://gall.dcinside.com/ajax/manager_board_ajax/delete_comment"
+        }
 
         return Jsoup.connect(deleteUrl)
             .userAgent(dcUserAgent)
