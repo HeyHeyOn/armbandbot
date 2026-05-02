@@ -2187,6 +2187,32 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (config.isDebugMode) {
                 sendLog("[디버그][차단 예외 글] 번호: $postNumStr / 게시글과 댓글 차단 검사 건너뜀", botId)
             }
+            val exemptSnapshotPath = if (config.isExpertMode && config.isSnapshotAll && GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
+                try {
+                    val snapshotStartedAt = System.currentTimeMillis()
+                    val result = saveSnapshotFromDocCommon(
+                        config = config,
+                        botId = botId,
+                        gallId = gallId,
+                        postNumStr = postNumStr,
+                        doc = postDoc,
+                        comments = commentsArray
+                    )
+                    if (!result.isNullOrBlank()) {
+                        sendLog("[스냅샷][전체] 저장 완료: $result", botId)
+                    } else {
+                        sendLog("[스냅샷][전체] 저장 실패 또는 경로 없음", botId)
+                    }
+                    if (config.isDebugMode) {
+                        sendLog("[디버그][성능] 차단 예외 글 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)
+                    }
+                    result
+                } finally {
+                    GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
+                }
+            } else {
+                null
+            }
             GlobalBotState.savePost(
                 gallType = gallType,
                 gallId = gallId,
@@ -2196,7 +2222,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 author = postDisplayAuthor,
                 isBlocked = false,
                 blockReason = null,
-                snapshotPath = null,
+                snapshotPath = exemptSnapshotPath,
                 creationDate = postDate
             )
             if (config.isDebugMode) {

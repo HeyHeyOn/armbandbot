@@ -694,3 +694,17 @@
 - SHA256: 8AAC9E9F012502C26D929FA5F00BD3B3E9B8B5A2547477686217B6CE61E07E40
 - Drive file ID: 1ynOXC3jexBRz08KTFQf8_BJg2iy8PGDi
 - Drive link: https://drive.google.com/file/d/1ynOXC3jexBRz08KTFQf8_BJg2iy8PGDi/view?usp=drivesdk
+
+## 1.3.6-beta3 (2026-05-02)
+
+### 주요 변경
+- 차단 예외 글도 `모든 글 스냅샷`이 켜져 있으면 일반 글처럼 스냅샷을 저장하도록 수정.
+- 예외 처리로 차단 검사는 건너뛰되, 전체 스냅샷 저장과 DB snapshotPath 기록은 유지.
+
+### Release
+- VersionCode: 82
+- VersionName: 1.3.6-beta3
+- APK: 완장봇_v1.3.6-beta3.apk
+- SHA256: 1A309D73D12CBFC4A326A3799408C3C0E6B899E4D897AF7628459A1EC3ADE2C9
+- Drive file ID: 19CEyvp7rHqClIjYcm3pN-CP3dB6Y2zkw
+- Drive link: https://drive.google.com/file/d/19CEyvp7rHqClIjYcm3pN-CP3dB6Y2zkw/view?usp=drivesdk
