@@ -583,6 +583,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     "SPEED" -> "탐색 범위 및 속도 설정"
                                     "GALLERY_REFRESH" -> "갤러리 설정 자동 갱신"
                                     "BLOCK_SETTING" -> "차단 기본 설정"
+                                    "BLOCK_EXEMPT_POSTS" -> "차단 예외 글 설정"
                                     "NOTI_SETTING" -> "차단 알림 상세 설정"
                                     else -> "상세 설정"
                                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor, modifier = Modifier.weight(1f)
@@ -720,13 +721,20 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     if (blockActionMode == "block") {
                                         ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", blockReasonText, colors) { tempEditText = blockReasonText; editDialogType = "block_reason" }
                                     }
-                                    ReadOnlyTextCard("차단 예외 글 설정", blockExemptPostNumbersText, colors) { tempEditText = blockExemptPostNumbersText; editDialogType = "block_exempt_post_numbers" }
-                                    Text(
-                                        "글 번호를 줄바꿈으로 입력하면 해당 글과 그 글의 댓글은 모든 차단 대상에서 제외됩니다.",
-                                        color = subTextColor,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 8.dp)
-                                    )
+                                }
+                                "BLOCK_EXEMPT_POSTS" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("차단 예외 글 설정", fontWeight = FontWeight.Bold, color = textColor)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                "필터별 개별 차단 설정과 관계없이, 등록한 글 번호의 게시글과 댓글은 모든 차단 검사에서 제외됩니다.",
+                                                color = subTextColor,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                    ReadOnlyTextCard("예외 처리할 글 번호", blockExemptPostNumbersText, colors) { tempEditText = blockExemptPostNumbersText; editDialogType = "block_exempt_post_numbers" }
                                 }
                                 "TARGET" -> {
                                     ReadOnlyTextCard("관리할 갤러리 URL", targetUrlsText, colors) { tempEditText = targetUrlsText; editDialogType = "url" }
@@ -1675,6 +1683,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("차단 후속 동작", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
                                 ModernSettingItem("차단 기본 설정", "차단 시간, 사유, 글 삭제 여부", Icons.Filled.Settings, colors) { currentSubScreen = "BLOCK_SETTING" }
+                                ModernSettingItem("차단 예외 글 설정", "특정 글과 해당 댓글 전체를 차단 예외 처리", Icons.Filled.Forum, colors) { currentSubScreen = "BLOCK_EXEMPT_POSTS" }
                                 ModernSettingItem("차단 알림 상세 설정", "어떤 경우에 알림을 받을지 설정", Icons.Filled.Notifications, colors) { currentSubScreen = "NOTI_SETTING" }
 
                                 Spacer(modifier = Modifier.height(24.dp))

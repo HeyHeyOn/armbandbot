@@ -679,3 +679,18 @@
 - SHA256: BB8811E7CA748BBB6D51CA31C13CE48F2911DF3A90556819312190A81CCC3B68
 - Drive file ID: 12Hq9r12zGPcahKmgtL_jrpx--itdQ-bG
 - Drive link: https://drive.google.com/file/d/12Hq9r12zGPcahKmgtL_jrpx--itdQ-bG/view?usp=drivesdk
+
+## 1.3.6-beta2 (2026-05-02)
+
+### 주요 변경
+- `차단 예외 글 설정`을 차단 기본 설정 화면에서 분리.
+- 차단 후속 동작 섹션에 별도 항목으로 배치해 필터별 개별 차단 설정과 무관하게 작동한다는 점을 명확히 표시.
+- 예외 글 설정 상세 화면에 “게시글과 댓글 전체가 모든 차단 검사에서 제외됨” 안내 문구 추가.
+
+### Release
+- VersionCode: 81
+- VersionName: 1.3.6-beta2
+- APK: 완장봇_v1.3.6-beta2.apk
+- SHA256: 8AAC9E9F012502C26D929FA5F00BD3B3E9B8B5A2547477686217B6CE61E07E40
+- Drive file ID: 1ynOXC3jexBRz08KTFQf8_BJg2iy8PGDi
+- Drive link: https://drive.google.com/file/d/1ynOXC3jexBRz08KTFQf8_BJg2iy8PGDi/view?usp=drivesdk
