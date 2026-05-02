@@ -708,3 +708,20 @@
 - SHA256: 1A309D73D12CBFC4A326A3799408C3C0E6B899E4D897AF7628459A1EC3ADE2C9
 - Drive file ID: 19CEyvp7rHqClIjYcm3pN-CP3dB6Y2zkw
 - Drive link: https://drive.google.com/file/d/19CEyvp7rHqClIjYcm3pN-CP3dB6Y2zkw/view?usp=drivesdk
+
+## 1.3.6 official release (2026-05-02)
+
+### Release
+- VersionCode: 83
+- VersionName: 1.3.6
+- APK: 완장봇_v1.3.6.apk
+- SHA256: BE5E574E2BAD666369A485C668BE5BD5DDF1886676DE585A32BC4F040AF7EBC4
+- Drive file ID: 1ay9xwfDDnjdJ-sAYTgzzpoFVX1HedltH
+- Drive link: https://drive.google.com/file/d/1ay9xwfDDnjdJ-sAYTgzzpoFVX1HedltH/view?usp=drivesdk
+
+### 주요 반영
+- 1.3.6-beta3 검증 완료 후 정식 릴리즈 전환.
+- `차단 예외 글 설정` 추가: 등록한 글 번호의 게시글과 해당 댓글 전체를 모든 차단 검사에서 제외.
+- 필터별 개별 차단 설정과 관계없이 작동하도록 차단 후속 동작 섹션의 별도 설정으로 분리.
+- 차단 예외 글도 `모든 글 스냅샷`이 켜져 있으면 일반 글처럼 스냅샷을 저장하고 DB snapshotPath를 기록.
+- 설정 내보내기/가져오기에 차단 예외 글 번호 목록 포함.
