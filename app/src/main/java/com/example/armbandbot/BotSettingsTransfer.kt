@@ -9,7 +9,7 @@ import java.io.InputStreamReader
 import java.util.UUID
 
 private const val BOT_SETTINGS_EXPORT_VERSION = 1
-private const val BOT_SETTINGS_APP_VERSION = "1.1.1-beta17"
+private const val BOT_SETTINGS_APP_VERSION = "1.3.6-beta1"
 private const val BOT_SETTINGS_FILE_TYPE = "armbandbot_bot_settings"
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 
@@ -42,7 +42,7 @@ internal val EXPORTABLE_FLOAT_KEYS = listOf(
 
 internal val EXPORTABLE_STRING_SET_KEYS = listOf(
     "normal", "bypass", "search_keywords", "user_blacklist", "user_whitelist",
-    "nickname_blacklist", "nickname_whitelist", "url_whitelist", "image_alt_blacklist", "voice_blacklist"
+    "nickname_blacklist", "nickname_whitelist", "url_whitelist", "block_exempt_post_numbers", "image_alt_blacklist", "voice_blacklist"
 )
 
 data class BotSettingsExport(

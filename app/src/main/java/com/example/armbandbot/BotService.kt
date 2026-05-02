@@ -61,6 +61,7 @@ class BotService : Service() {
         val blockReason: String,
         val deletePostOnBlock: Boolean,
         val deleteOnlyMode: Boolean,
+        val blockExemptPostNumbers: Set<String>,
 
         val isNotiMaster: Boolean,
         val notiKeyword: Boolean,
@@ -2178,6 +2179,32 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
         val postDao = GlobalBotState.getDb()?.postDao()
+
+        if (config.blockExemptPostNumbers.contains(postNumStr)) {
+            pendingAiPostPlans[botId]?.removeAll { it.postNo == postNumStr }
+            pendingAiCommentPlans[botId]?.removeAll { it.postNo == postNumStr }
+            aiBatchResults[botId]?.remove(postNumStr)
+            if (config.isDebugMode) {
+                sendLog("[디버그][차단 예외 글] 번호: $postNumStr / 게시글과 댓글 차단 검사 건너뜀", botId)
+            }
+            GlobalBotState.savePost(
+                gallType = gallType,
+                gallId = gallId,
+                postNum = postNumStr,
+                commentCount = currentCommentCount,
+                title = text,
+                author = postDisplayAuthor,
+                isBlocked = false,
+                blockReason = null,
+                snapshotPath = null,
+                creationDate = postDate
+            )
+            if (config.isDebugMode) {
+                sendLog("[디버그][성능] 차단 예외 글 처리 / 글번호: $postNumStr / ${System.currentTimeMillis() - postProcessStartedAt}ms", botId)
+            }
+            return
+        }
+
         val aiPostPlans = pendingAiPostPlans.getOrPut(botId) { mutableListOf() }
         val aiPostPlanNos = aiPostPlans.mapTo(mutableSetOf()) { it.postNo }
         val aiCommentPlans = pendingAiCommentPlans.getOrPut(botId) { mutableListOf() }
@@ -3789,6 +3816,11 @@ img.written_dccon{max-width:80px;max-height:80px}
             blockReason = botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반",
             deletePostOnBlock = botPref.getBoolean("delete_post_on_block", true),
             deleteOnlyMode = botPref.getBoolean("delete_only_mode", false),
+            blockExemptPostNumbers = botPref.getStringSet("block_exempt_post_numbers", setOf())
+                ?.map { it.removeCommentAndTrim() }
+                ?.filter { it.isNotEmpty() }
+                ?.toSet()
+                ?: emptySet(),
 
             isNotiMaster = botPref.getBoolean("noti_master", true),
             notiKeyword = botPref.getBoolean("noti_keyword", true),

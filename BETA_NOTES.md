@@ -663,3 +663,19 @@
 - 관리 페이지 input ci_t, 관리 페이지 응답 ci_c, 기존 저장 쿠키 ci_c 순서로 토큰을 확보합니다.
 - 응답 Set-Cookie의 ci_c가 새로 내려오면 POST 요청 Cookie에 병합해 갤러리 설정 저장 요청에 사용합니다.
 - 일부 기기에서 오래된 로그인 쿠키에 ci_c가 없어 갤러리 설정 갱신이 실패하던 문제를 보완했습니다.
+
+## 1.3.6-beta1 (2026-05-02)
+
+### 주요 변경
+- 차단 후속/기본 설정에 `차단 예외 글 설정` 추가.
+- 줄바꿈으로 입력한 글 번호는 게시글과 해당 글의 댓글 전체를 차단 예외 처리.
+- 예외 글 처리 시 기존 AI 대기/결과 계획도 정리하여 뒤늦은 AI 차단이 실행되지 않도록 보강.
+- 설정 내보내기/가져오기에 차단 예외 글 번호 목록 포함.
+
+### Release
+- VersionCode: 80
+- VersionName: 1.3.6-beta1
+- APK: 완장봇_v1.3.6-beta1.apk
+- SHA256: BB8811E7CA748BBB6D51CA31C13CE48F2911DF3A90556819312190A81CCC3B68
+- Drive file ID: 12Hq9r12zGPcahKmgtL_jrpx--itdQ-bG
+- Drive link: https://drive.google.com/file/d/12Hq9r12zGPcahKmgtL_jrpx--itdQ-bG/view?usp=drivesdk

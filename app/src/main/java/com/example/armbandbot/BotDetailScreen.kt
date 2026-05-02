@@ -272,6 +272,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var blockReasonText by remember { mutableStateOf(botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반") }
         var isDeletePostOnBlock by remember { mutableStateOf(botPref.getBoolean("delete_post_on_block", true)) }
         var isDeleteOnlyMode by remember { mutableStateOf(botPref.getBoolean("delete_only_mode", false)) }
+        var blockExemptPostNumbersText by remember { mutableStateOf(botPref.getStringSet("block_exempt_post_numbers", setOf())?.joinToString("\n") ?: "") }
 
         // 금지어 필터 개별 차단 설정
         var keywordUseCustomAction by remember { mutableStateOf(botPref.getBoolean("keyword_use_custom_action_config", false)) }
@@ -719,6 +720,13 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     if (blockActionMode == "block") {
                                         ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", blockReasonText, colors) { tempEditText = blockReasonText; editDialogType = "block_reason" }
                                     }
+                                    ReadOnlyTextCard("차단 예외 글 설정", blockExemptPostNumbersText, colors) { tempEditText = blockExemptPostNumbersText; editDialogType = "block_exempt_post_numbers" }
+                                    Text(
+                                        "글 번호를 줄바꿈으로 입력하면 해당 글과 그 글의 댓글은 모든 차단 대상에서 제외됩니다.",
+                                        color = subTextColor,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 8.dp)
+                                    )
                                 }
                                 "TARGET" -> {
                                     ReadOnlyTextCard("관리할 갤러리 URL", targetUrlsText, colors) { tempEditText = targetUrlsText; editDialogType = "url" }
@@ -1978,7 +1986,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         if (editDialogType != null) {
             val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason" || editDialogType == "overseas_ip_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "block_exempt_post_numbers" -> "차단 예외 글 번호 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
@@ -1994,6 +2002,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "yudong_block_reason" -> "예: 유동 필터 위반"
                 "kkang_block_reason" -> "예: 깡계 필터 위반"
                 "overseas_ip_block_reason" -> "예: 해외 IP 작성 제한"
+                "block_exempt_post_numbers" -> "줄바꿈으로 글 번호를 입력합니다. (# ← 뒷부분은 무시됨)\n[예시]\n12345 #신문고\n67890"
                 "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."
                 "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"
                 "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"
@@ -2034,6 +2043,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "search" -> { searchWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("search_keywords", tempEditText) }
                         "url" -> { targetUrlsText = tempEditText; botPref.edit().putString("target_urls", tempEditText).apply() }
                         "url_whitelist" -> { urlWhitelistText = tempEditText; botPref.edit().putStringSet("url_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "block_exempt_post_numbers" -> { blockExemptPostNumbersText = tempEditText; botPref.edit().putStringSet("block_exempt_post_numbers", tempEditText.split("\n").map{it.substringBefore("#").trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "user_blacklist" -> { userBlacklistText = tempEditText; botPref.edit().putStringSet("user_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "user_whitelist" -> { userWhitelistText = tempEditText; botPref.edit().putStringSet("user_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "nickname_blacklist" -> { nicknameBlacklistText = tempEditText; botPref.edit().putStringSet("nickname_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
