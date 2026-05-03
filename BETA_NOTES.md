@@ -831,3 +831,28 @@
 - APK: 완장봇_v1.3.7-beta6.apk
 - SHA256: A3DD07CD3C96EF7337A99121A7E325EA409FD0312928A53FC0959ED93B545B8F
 - Beta Drive file ID: 1-gHRziAs0sPMDTpejoHOIpPv0kyd_NP6
+
+## 1.3.7 정식 릴리즈 완료
+
+### 주요 변화
+- 처리 방식 `보류` 정식 반영
+  - 삭제/차단 없이 알림, 활동 로그, 보류 기록, 스냅샷만 남김
+  - 동일 글/댓글의 보류 알림·기록 중복 생성 방지
+  - DB 대시보드에 주황 톤의 `보류 기록` 탭 추가
+- 활동 로그 필터 개선
+  - 다중 선택 지원
+  - `전체` 선택/해제 연동
+  - 봇별 활동 로그 탭 선택 상태 저장
+  - 삭제/차단/보류 관련 로그는 `처리 내역` 탭으로 분류
+- 처리 결과 표기 개선
+  - 알림, 활동 로그, DB 기록에 실제 처리 방식(`삭제`/`차단`/`보류`) 표시
+  - 보류 중복 건너뜀 시 차단/삭제 완료 요약이 나오지 않도록 수정
+
+### 릴리즈 정보
+- versionCode = 90
+- versionName = 1.3.7
+- APK: 완장봇_v1.3.7.apk
+- SHA256: 27E9BFF40EA21703E93596970F39A5A6A9C58891FC3A7E75CE1E90CACF078C8A
+- Release Drive file ID: 1P7Qm-mUDwGQANN47-deo4C32bNIWhc5K
+- Release Drive folder ID: 1zyy7Yl8nmAge83JOaFBONm438432rxA3
+- Google Docs 매뉴얼/패치노트 및 처음 사용자 가이드에 1.3.7 내용 반영
