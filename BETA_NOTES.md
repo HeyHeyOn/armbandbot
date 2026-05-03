@@ -778,3 +778,23 @@
 
 ### 정정
 - 직전 `1.3.4_beta25` 업로드는 잘못된 워크스페이스에서 생성된 실수 업로드이며, 이번 APK는 실제 `projects/armbandbot` 1.3.7 코드베이스 기준으로 재빌드함
+
+## 1.3.7-beta4 구현 완료
+
+### 주요 변화
+- 보류 처리 로그가 `처리 내역` 탭에 표시되도록 로그 분류 규칙 수정
+  - `보류`가 포함된 활동 로그를 처리 내역(BLOCK category)으로 분류해 빨간색 로그로 표시
+- 활동 로그 탭 선택 상태를 봇별로 저장
+  - 저장 키: `activity_log_selected_filters`
+  - 뒤로 나갔다가 다시 들어와도 마지막 선택 상태 유지
+- 보류 중복 건너뜀 시 엉뚱한 차단/삭제 완료 요약 로그가 나오지 않도록 수정
+  - `BlockExecutionResult`에 실제 처리 모드 정보를 포함
+  - HOLD 처리/중복 HOLD는 악플 차단 카운트에서 제외
+- HOLD 처리 시작 디버그 문구가 `차단요청`이 아니라 `보류처리`로 나오도록 정리
+
+### 빌드 정보
+- versionCode = 87
+- versionName = 1.3.7-beta4
+- APK: 완장봇_v1.3.7-beta4.apk
+- SHA256: 1DAF42A70566BF22A9A81B666F926202376D9F61DDF0418A9EE452CC0617E380
+- Beta Drive file ID: 1CBGSQDmOmkRXLS9oV75pS8FPzF1hqy1Y

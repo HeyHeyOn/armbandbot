@@ -28,7 +28,7 @@ fun classifyBotLog(message: String): BotLogCategory {
         message.contains("[헬스]") || message.contains("[HEALTH]") -> BotLogCategory.HEALTH
         message.contains("[디버그]") -> BotLogCategory.DEBUG
         message.contains("[자동 로그인") || message.contains("[세션 ") || message.contains("[시작 ") || message.contains("[복구 ") || message.contains("로그인") -> BotLogCategory.SESSION
-        message.contains("[차단", ignoreCase = false) || message.contains("차단 요청") || message.contains("삭제 요청") || message.contains("차단!") -> BotLogCategory.BLOCK
+        message.contains("[차단", ignoreCase = false) || message.contains("차단 요청") || message.contains("삭제 요청") || message.contains("보류") || message.contains("차단!") -> BotLogCategory.BLOCK
         message.contains("[치명적 오류]") || message.contains("오류") || message.contains("실패") || message.contains("Exception") -> BotLogCategory.ERROR
         message.contains("사이클") || message.contains("탐색") || message.contains("페이지") || message.contains("대기") || message.contains("검색") -> BotLogCategory.CYCLE
         message.contains("SYSTEM") || message.contains("시스템") -> BotLogCategory.SYSTEM

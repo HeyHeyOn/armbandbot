@@ -175,7 +175,13 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val coroutineScope = rememberCoroutineScope()
         var selectedTabIndex by remember { mutableStateOf(0) }
         val logFilterKeys = listOf("CYCLE", "BLOCK", "DEBUG", "AI", "HEALTH", "SESSION", "ERROR")
-        val selectedLogFilters = remember { mutableStateListOf<String>().apply { addAll(logFilterKeys) } }
+        val savedLogFilters = botPref.getStringSet("activity_log_selected_filters", logFilterKeys.toSet())
+            ?.filter { it in logFilterKeys }
+            ?: logFilterKeys
+        val selectedLogFilters = remember(botId) { mutableStateListOf<String>().apply { addAll(savedLogFilters) } }
+        fun persistLogFilters() {
+            botPref.edit().putStringSet("activity_log_selected_filters", selectedLogFilters.toSet()).apply()
+        }
         val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
             if (uri == null) return@rememberLauncherForActivityResult
             runCatching {
@@ -188,7 +194,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         LaunchedEffect(openBlockLogTrigger) {
-            if (openBlockLogTrigger) { selectedTabIndex = 1; selectedLogFilters.clear(); selectedLogFilters.add("BLOCK"); onTriggerConsumed() }
+            if (openBlockLogTrigger) { selectedTabIndex = 1; selectedLogFilters.clear(); selectedLogFilters.add("BLOCK"); persistLogFilters(); onTriggerConsumed() }
         }
 
         val tabs = listOf("기본 설정", "활동 로그")
@@ -1972,6 +1978,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         } else {
                                             if (selectedLogFilters.contains(key)) selectedLogFilters.remove(key) else selectedLogFilters.add(key)
                                         }
+                                        persistLogFilters()
                                     }
                                     FilterChip(selected = selectedLogFilters.containsAll(logFilterKeys), onClick = { toggleLogFilter("ALL") }, label = { Text("전체", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
                                     FilterChip(selected = "CYCLE" in selectedLogFilters, onClick = { toggleLogFilter("CYCLE") }, label = { Text("탐색", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))

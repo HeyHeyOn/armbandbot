@@ -281,7 +281,8 @@ class BotService : Service() {
         val snapshotPath: String?,
         val success: Boolean,
         val response: String,
-        val deletesTarget: Boolean
+        val deletesTarget: Boolean,
+        val mode: ModerationActionMode? = null
     )
 
     private enum class ModerationActionMode {
@@ -3008,7 +3009,9 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
 
             if (postBlockResult.success) {
-                isPostBlocked = true
+                if (postBlockResult.mode != ModerationActionMode.HOLD) {
+                    isPostBlocked = true
+                }
                 dbBlockReason = postBlockResult.blockReason
             } else {
                 moderationFailed = true
@@ -3211,8 +3214,10 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                         if (commentBlockResult.success) {
                             dbBlockReason = commentBlockResult.blockReason
-                            isPostBlocked = true
-                            badCommentCount++
+                            if (commentBlockResult.mode != ModerationActionMode.HOLD) {
+                                isPostBlocked = true
+                                badCommentCount++
+                            }
                             if (commentBlockResult.deletesTarget) {
                                 deletedCommentCount++
                             }
@@ -4728,12 +4733,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                 snapshotPath = null,
                 success = true,
                 response = "{\"result\":\"skipped\",\"reason\":\"duplicate_hold\"}",
-                deletesTarget = false
+                deletesTarget = false,
+                mode = ModerationActionMode.HOLD
             )
         }
 
         if (config.isDebugMode) {
-            sendLog("[디버그][차단요청] 게시글 차단 요청 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
+            val requestLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
+            sendLog("[디버그][$requestLabel] 게시글 처리 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
         val actionResponse = executeModerationAction(
             actionConfig = actionConfig,
@@ -4800,7 +4807,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
             success = actionSucceeded,
             response = actionResponse,
-            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || (actionConfig.mode != ModerationActionMode.HOLD && actionConfig.deletePostOnBlock)
+            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || (actionConfig.mode != ModerationActionMode.HOLD && actionConfig.deletePostOnBlock),
+            mode = actionConfig.mode
         )
     }
 
@@ -4946,12 +4954,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                 snapshotPath = null,
                 success = true,
                 response = "{\"result\":\"skipped\",\"reason\":\"duplicate_hold\"}",
-                deletesTarget = false
+                deletesTarget = false,
+                mode = ModerationActionMode.HOLD
             )
         }
 
         if (config.isDebugMode) {
-            sendLog("[디버그][차단요청] 댓글 차단 요청 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
+            val requestLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
+            sendLog("[디버그][$requestLabel] 댓글 처리 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
         val actionResponse = executeModerationAction(
             actionConfig = actionConfig,
@@ -5018,7 +5028,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
             success = actionSucceeded,
             response = actionResponse,
-            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || (actionConfig.mode != ModerationActionMode.HOLD && actionConfig.deletePostOnBlock)
+            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || (actionConfig.mode != ModerationActionMode.HOLD && actionConfig.deletePostOnBlock),
+            mode = actionConfig.mode
         )
     }
 
