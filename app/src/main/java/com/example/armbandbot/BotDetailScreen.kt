@@ -174,7 +174,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     } else {
         val coroutineScope = rememberCoroutineScope()
         var selectedTabIndex by remember { mutableStateOf(0) }
-        var logFilterTab by remember { mutableStateOf("ALL") }
+        val logFilterKeys = listOf("CYCLE", "BLOCK", "DEBUG", "AI", "HEALTH", "SESSION", "ERROR")
+        val selectedLogFilters = remember { mutableStateListOf<String>().apply { addAll(logFilterKeys) } }
         val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
             if (uri == null) return@rememberLauncherForActivityResult
             runCatching {
@@ -187,7 +188,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         LaunchedEffect(openBlockLogTrigger) {
-            if (openBlockLogTrigger) { selectedTabIndex = 1; logFilterTab = "BLOCK"; onTriggerConsumed() }
+            if (openBlockLogTrigger) { selectedTabIndex = 1; selectedLogFilters.clear(); selectedLogFilters.add("BLOCK"); onTriggerConsumed() }
         }
 
         val tabs = listOf("기본 설정", "활동 로그")
@@ -212,7 +213,26 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         BackHandler(enabled = currentSubScreen != null) { currentSubScreen = null }
         BackHandler(enabled = currentSubScreen == null) { onBack() }
 
-        val actionModeOptions = linkedMapOf("delete" to "삭제", "block" to "차단")
+        val actionModeOptions = linkedMapOf("delete" to "삭제", "block" to "차단", "hold" to "보류")
+        fun actionModeToPref(mode: String): String = when (mode) { "delete" -> "DELETE"; "hold" -> "HOLD"; else -> "BLOCK" }
+        fun readActionMode(prefix: String? = null, fallbackDeleteOnly: Boolean = false): String {
+            val processKey = prefix?.let { "${it}_block_process_mode" } ?: "block_process_mode"
+            val deleteKey = prefix?.let { "${it}_delete_only_mode" } ?: "delete_only_mode"
+            return when (botPref.getString(processKey, null)) {
+                "HOLD" -> "hold"
+                "DELETE" -> "delete"
+                "BLOCK" -> "block"
+                else -> if (botPref.getBoolean(deleteKey, fallbackDeleteOnly)) "delete" else "block"
+            }
+        }
+        fun saveActionMode(prefix: String? = null, mode: String) {
+            val processKey = prefix?.let { "${it}_block_process_mode" } ?: "block_process_mode"
+            val deleteKey = prefix?.let { "${it}_delete_only_mode" } ?: "delete_only_mode"
+            botPref.edit()
+                .putString(processKey, actionModeToPref(mode))
+                .putBoolean(deleteKey, mode == "delete")
+                .apply()
+        }
         val blockDurationOptions = linkedMapOf(1 to "1시간", 6 to "6시간", 24 to "24시간 (1일)", 168 to "168시간 (7일)", 336 to "336시간 (14일)", 744 to "744시간 (31일)")
         val galleryRefreshIntervalOptions = linkedMapOf(5 to "5분", 10 to "10분", 30 to "30분", 60 to "1시간", 180 to "3시간", 360 to "6시간")
         val galleryProxyTimeOptions = linkedMapOf(60 to "1시간", 360 to "6시간", 1440 to "24시간", 2880 to "48시간")
@@ -265,7 +285,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         // 기본 차단 설정
-        var blockActionMode by remember { mutableStateOf(if (botPref.getBoolean("delete_only_mode", false)) "delete" else "block") }
+        var blockActionMode by remember { mutableStateOf(readActionMode()) }
         var blockDurationHours by remember { mutableStateOf(botPref.getInt("block_duration_hours", 6)) }
         var isBlockActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -276,7 +296,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         // 금지어 필터 개별 차단 설정
         var keywordUseCustomAction by remember { mutableStateOf(botPref.getBoolean("keyword_use_custom_action_config", false)) }
-        var keywordActionMode by remember { mutableStateOf(if ((if (botPref.contains("keyword_delete_only_mode")) botPref.getBoolean("keyword_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var keywordActionMode by remember { mutableStateOf(readActionMode("keyword", isDeleteOnlyMode)) }
         var keywordBlockDurationHours by remember { mutableStateOf(botPref.getInt("keyword_block_duration_hours", blockDurationHours)) }
         var isKeywordActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isKeywordBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -287,7 +307,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var keywordApplyKkangOnly by remember { mutableStateOf(botPref.getBoolean("keyword_apply_kkang_only", false)) }
 
         var userUseCustomAction by remember { mutableStateOf(botPref.getBoolean("user_use_custom_action_config", false)) }
-        var userActionMode by remember { mutableStateOf(if ((if (botPref.contains("user_delete_only_mode")) botPref.getBoolean("user_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var userActionMode by remember { mutableStateOf(readActionMode("user", isDeleteOnlyMode)) }
         var userBlockDurationHours by remember { mutableStateOf(botPref.getInt("user_block_duration_hours", blockDurationHours)) }
         var isUserActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isUserBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -296,7 +316,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var userDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("user_delete_only_mode")) botPref.getBoolean("user_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var nicknameUseCustomAction by remember { mutableStateOf(botPref.getBoolean("nickname_use_custom_action_config", false)) }
-        var nicknameActionMode by remember { mutableStateOf(if ((if (botPref.contains("nickname_delete_only_mode")) botPref.getBoolean("nickname_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var nicknameActionMode by remember { mutableStateOf(readActionMode("nickname", isDeleteOnlyMode)) }
         var nicknameBlockDurationHours by remember { mutableStateOf(botPref.getInt("nickname_block_duration_hours", blockDurationHours)) }
         var isNicknameActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isNicknameBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -305,7 +325,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var nicknameDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("nickname_delete_only_mode")) botPref.getBoolean("nickname_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var urlUseCustomAction by remember { mutableStateOf(botPref.getBoolean("url_use_custom_action_config", false)) }
-        var urlActionMode by remember { mutableStateOf(if ((if (botPref.contains("url_delete_only_mode")) botPref.getBoolean("url_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var urlActionMode by remember { mutableStateOf(readActionMode("url", isDeleteOnlyMode)) }
         var urlBlockDurationHours by remember { mutableStateOf(botPref.getInt("url_block_duration_hours", blockDurationHours)) }
         var isUrlActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isUrlBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -314,7 +334,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var urlDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("url_delete_only_mode")) botPref.getBoolean("url_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var voiceUseCustomAction by remember { mutableStateOf(botPref.getBoolean("voice_use_custom_action_config", false)) }
-        var voiceActionMode by remember { mutableStateOf(if ((if (botPref.contains("voice_delete_only_mode")) botPref.getBoolean("voice_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var voiceActionMode by remember { mutableStateOf(readActionMode("voice", isDeleteOnlyMode)) }
         var voiceBlockDurationHours by remember { mutableStateOf(botPref.getInt("voice_block_duration_hours", blockDurationHours)) }
         var isVoiceActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isVoiceBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -323,7 +343,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var voiceDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("voice_delete_only_mode")) botPref.getBoolean("voice_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var imageUseCustomAction by remember { mutableStateOf(botPref.getBoolean("image_use_custom_action_config", false)) }
-        var imageActionMode by remember { mutableStateOf(if ((if (botPref.contains("image_delete_only_mode")) botPref.getBoolean("image_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var imageActionMode by remember { mutableStateOf(readActionMode("image", isDeleteOnlyMode)) }
         var imageBlockDurationHours by remember { mutableStateOf(botPref.getInt("image_block_duration_hours", blockDurationHours)) }
         var isImageActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isImageBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -332,7 +352,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var imageDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("image_delete_only_mode")) botPref.getBoolean("image_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var spamUseCustomAction by remember { mutableStateOf(botPref.getBoolean("spam_use_custom_action_config", false)) }
-        var spamActionMode by remember { mutableStateOf(if ((if (botPref.contains("spam_delete_only_mode")) botPref.getBoolean("spam_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var spamActionMode by remember { mutableStateOf(readActionMode("spam", isDeleteOnlyMode)) }
         var spamBlockDurationHours by remember { mutableStateOf(botPref.getInt("spam_block_duration_hours", blockDurationHours)) }
         var isSpamActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isSpamBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -341,7 +361,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var spamDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("spam_delete_only_mode")) botPref.getBoolean("spam_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var yudongUseCustomAction by remember { mutableStateOf(botPref.getBoolean("yudong_use_custom_action_config", false)) }
-        var yudongActionMode by remember { mutableStateOf(if ((if (botPref.contains("yudong_delete_only_mode")) botPref.getBoolean("yudong_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var yudongActionMode by remember { mutableStateOf(readActionMode("yudong", isDeleteOnlyMode)) }
         var yudongBlockDurationHours by remember { mutableStateOf(botPref.getInt("yudong_block_duration_hours", blockDurationHours)) }
         var isYudongActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isYudongBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -350,7 +370,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var yudongDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("yudong_delete_only_mode")) botPref.getBoolean("yudong_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var overseasIpUseCustomAction by remember { mutableStateOf(botPref.getBoolean("overseas_ip_use_custom_action_config", false)) }
-        var overseasIpActionMode by remember { mutableStateOf(if ((if (botPref.contains("overseas_ip_delete_only_mode")) botPref.getBoolean("overseas_ip_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var overseasIpActionMode by remember { mutableStateOf(readActionMode("overseas_ip", isDeleteOnlyMode)) }
         var overseasIpBlockDurationHours by remember { mutableStateOf(botPref.getInt("overseas_ip_block_duration_hours", blockDurationHours)) }
         var isOverseasIpActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isOverseasIpBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -359,7 +379,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var overseasIpDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("overseas_ip_delete_only_mode")) botPref.getBoolean("overseas_ip_delete_only_mode", false) else isDeleteOnlyMode) }
 
         var kkangUseCustomAction by remember { mutableStateOf(botPref.getBoolean("kkang_use_custom_action_config", false)) }
-        var kkangActionMode by remember { mutableStateOf(if ((if (botPref.contains("kkang_delete_only_mode")) botPref.getBoolean("kkang_delete_only_mode", false) else isDeleteOnlyMode)) "delete" else "block") }
+        var kkangActionMode by remember { mutableStateOf(readActionMode("kkang", isDeleteOnlyMode)) }
         var kkangBlockDurationHours by remember { mutableStateOf(botPref.getInt("kkang_block_duration_hours", blockDurationHours)) }
         var isKkangActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isKkangBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
@@ -690,7 +710,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                         actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
                                                             blockActionMode = mode
                                                             isDeleteOnlyMode = mode == "delete"
-                                                            botPref.edit().putBoolean("delete_only_mode", isDeleteOnlyMode).apply()
+                                                            saveActionMode(null, mode)
                                                             isBlockActionModeDropdownExpanded = false
                                                         }) }
                                                     }
@@ -798,7 +818,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                                 Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
                                                             }
                                                             DropdownMenu(expanded = isUserActionModeDropdownExpanded, onDismissRequest = { isUserActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                                actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { userActionMode = mode; userDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("user_delete_only_mode", userDeleteOnlyMode).apply(); isUserActionModeDropdownExpanded = false }) }
+                                                                actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { userActionMode = mode; userDeleteOnlyMode = mode == "delete"; saveActionMode("user", mode); isUserActionModeDropdownExpanded = false }) }
                                                             }
                                                         }
                                                     }
@@ -867,7 +887,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                                 Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
                                                             }
                                                             DropdownMenu(expanded = isNicknameActionModeDropdownExpanded, onDismissRequest = { isNicknameActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                                actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { nicknameActionMode = mode; nicknameDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("nickname_delete_only_mode", nicknameDeleteOnlyMode).apply(); isNicknameActionModeDropdownExpanded = false }) }
+                                                                actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { nicknameActionMode = mode; nicknameDeleteOnlyMode = mode == "delete"; saveActionMode("nickname", mode); isNicknameActionModeDropdownExpanded = false }) }
                                                             }
                                                         }
                                                     }
@@ -928,7 +948,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = yudongUseCustomAction, onCheckedChange = { yudongUseCustomAction = it; botPref.edit().putBoolean("yudong_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
                                     Column(modifier = if (!yudongUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (yudongUseCustomAction) isYudongActionModeDropdownExpanded = true }) { Text(actionModeOptions[yudongActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isYudongActionModeDropdownExpanded, onDismissRequest = { isYudongActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { yudongActionMode = mode; yudongDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("yudong_delete_only_mode", yudongDeleteOnlyMode).apply(); isYudongActionModeDropdownExpanded = false }) } } } }
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (yudongUseCustomAction) isYudongActionModeDropdownExpanded = true }) { Text(actionModeOptions[yudongActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isYudongActionModeDropdownExpanded, onDismissRequest = { isYudongActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { yudongActionMode = mode; yudongDeleteOnlyMode = mode == "delete"; saveActionMode("yudong", mode); isYudongActionModeDropdownExpanded = false }) } } } }
                                             if (yudongActionMode == "block") {
                                                 Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (yudongUseCustomAction) isYudongBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[yudongBlockDurationHours] ?: "${yudongBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isYudongBlockDurationDropdownExpanded, onDismissRequest = { isYudongBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { yudongBlockDurationHours = hours; botPref.edit().putInt("yudong_block_duration_hours", hours).apply(); isYudongBlockDurationDropdownExpanded = false }) } } } }
@@ -967,7 +987,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = overseasIpUseCustomAction, onCheckedChange = { overseasIpUseCustomAction = it; botPref.edit().putBoolean("overseas_ip_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
                                     Column(modifier = if (!overseasIpUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (overseasIpUseCustomAction) isOverseasIpActionModeDropdownExpanded = true }) { Text(actionModeOptions[overseasIpActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isOverseasIpActionModeDropdownExpanded, onDismissRequest = { isOverseasIpActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { overseasIpActionMode = mode; overseasIpDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("overseas_ip_delete_only_mode", overseasIpDeleteOnlyMode).apply(); isOverseasIpActionModeDropdownExpanded = false }) } } } }
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (overseasIpUseCustomAction) isOverseasIpActionModeDropdownExpanded = true }) { Text(actionModeOptions[overseasIpActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isOverseasIpActionModeDropdownExpanded, onDismissRequest = { isOverseasIpActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { overseasIpActionMode = mode; overseasIpDeleteOnlyMode = mode == "delete"; saveActionMode("overseas_ip", mode); isOverseasIpActionModeDropdownExpanded = false }) } } } }
                                             if (overseasIpActionMode == "block") {
                                                 Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (overseasIpUseCustomAction) isOverseasIpBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[overseasIpBlockDurationHours] ?: "${overseasIpBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isOverseasIpBlockDurationDropdownExpanded, onDismissRequest = { isOverseasIpBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { overseasIpBlockDurationHours = hours; botPref.edit().putInt("overseas_ip_block_duration_hours", hours).apply(); isOverseasIpBlockDurationDropdownExpanded = false }) } } } }
@@ -1053,7 +1073,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = kkangUseCustomAction, onCheckedChange = { kkangUseCustomAction = it; botPref.edit().putBoolean("kkang_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
                                         Column(modifier = if (!kkangUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                             Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (kkangUseCustomAction) isKkangActionModeDropdownExpanded = true }) { Text(actionModeOptions[kkangActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isKkangActionModeDropdownExpanded, onDismissRequest = { isKkangActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { kkangActionMode = mode; kkangDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("kkang_delete_only_mode", kkangDeleteOnlyMode).apply(); isKkangActionModeDropdownExpanded = false }) } } } }
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (kkangUseCustomAction) isKkangActionModeDropdownExpanded = true }) { Text(actionModeOptions[kkangActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isKkangActionModeDropdownExpanded, onDismissRequest = { isKkangActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { kkangActionMode = mode; kkangDeleteOnlyMode = mode == "delete"; saveActionMode("kkang", mode); isKkangActionModeDropdownExpanded = false }) } } } }
                                                 if (kkangActionMode == "block") {
                                                     Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (kkangUseCustomAction) isKkangBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[kkangBlockDurationHours] ?: "${kkangBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isKkangBlockDurationDropdownExpanded, onDismissRequest = { isKkangBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { kkangBlockDurationHours = hours; botPref.edit().putInt("kkang_block_duration_hours", hours).apply(); isKkangBlockDurationDropdownExpanded = false }) } } } }
@@ -1083,7 +1103,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = urlUseCustomAction, onCheckedChange = { urlUseCustomAction = it; botPref.edit().putBoolean("url_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
                                         Column(modifier = if (!urlUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                             Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (urlUseCustomAction) isUrlActionModeDropdownExpanded = true }) { Text(actionModeOptions[urlActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isUrlActionModeDropdownExpanded, onDismissRequest = { isUrlActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { urlActionMode = mode; urlDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("url_delete_only_mode", urlDeleteOnlyMode).apply(); isUrlActionModeDropdownExpanded = false }) } } } }
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (urlUseCustomAction) isUrlActionModeDropdownExpanded = true }) { Text(actionModeOptions[urlActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isUrlActionModeDropdownExpanded, onDismissRequest = { isUrlActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { urlActionMode = mode; urlDeleteOnlyMode = mode == "delete"; saveActionMode("url", mode); isUrlActionModeDropdownExpanded = false }) } } } }
                                                 if (urlActionMode == "block") {
                                                     Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (urlUseCustomAction) isUrlBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[urlBlockDurationHours] ?: "${urlBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isUrlBlockDurationDropdownExpanded, onDismissRequest = { isUrlBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { urlBlockDurationHours = hours; botPref.edit().putInt("url_block_duration_hours", hours).apply(); isUrlBlockDurationDropdownExpanded = false }) } } } }
@@ -1118,7 +1138,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = imageUseCustomAction, onCheckedChange = { imageUseCustomAction = it; botPref.edit().putBoolean("image_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
                                     Column(modifier = if (!imageUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageActionModeDropdownExpanded = true }) { Text(actionModeOptions[imageActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageActionModeDropdownExpanded, onDismissRequest = { isImageActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageActionMode = mode; imageDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("image_delete_only_mode", imageDeleteOnlyMode).apply(); isImageActionModeDropdownExpanded = false }) } } } }
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageActionModeDropdownExpanded = true }) { Text(actionModeOptions[imageActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageActionModeDropdownExpanded, onDismissRequest = { isImageActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageActionMode = mode; imageDeleteOnlyMode = mode == "delete"; saveActionMode("image", mode); isImageActionModeDropdownExpanded = false }) } } } }
                                             if (imageActionMode == "block") {
                                                 Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[imageBlockDurationHours] ?: "${imageBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageBlockDurationDropdownExpanded, onDismissRequest = { isImageBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageBlockDurationHours = hours; botPref.edit().putInt("image_block_duration_hours", hours).apply(); isImageBlockDurationDropdownExpanded = false }) } } } }
@@ -1181,7 +1201,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = voiceUseCustomAction, onCheckedChange = { voiceUseCustomAction = it; botPref.edit().putBoolean("voice_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
                                     Column(modifier = if (!voiceUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (voiceUseCustomAction) isVoiceActionModeDropdownExpanded = true }) { Text(actionModeOptions[voiceActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isVoiceActionModeDropdownExpanded, onDismissRequest = { isVoiceActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { voiceActionMode = mode; voiceDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("voice_delete_only_mode", voiceDeleteOnlyMode).apply(); isVoiceActionModeDropdownExpanded = false }) } } } }
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (voiceUseCustomAction) isVoiceActionModeDropdownExpanded = true }) { Text(actionModeOptions[voiceActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isVoiceActionModeDropdownExpanded, onDismissRequest = { isVoiceActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { voiceActionMode = mode; voiceDeleteOnlyMode = mode == "delete"; saveActionMode("voice", mode); isVoiceActionModeDropdownExpanded = false }) } } } }
                                             if (voiceActionMode == "block") {
                                                 Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (voiceUseCustomAction) isVoiceBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[voiceBlockDurationHours] ?: "${voiceBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isVoiceBlockDurationDropdownExpanded, onDismissRequest = { isVoiceBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { voiceBlockDurationHours = hours; botPref.edit().putInt("voice_block_duration_hours", hours).apply(); isVoiceBlockDurationDropdownExpanded = false }) } } } }
@@ -1401,7 +1421,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                                 Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
                                                             }
                                                             DropdownMenu(expanded = isAiActionModeDropdownExpanded, onDismissRequest = { isAiActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                                actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { aiActionMode = mode; aiDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("ai_delete_only_mode", aiDeleteOnlyMode).apply(); isAiActionModeDropdownExpanded = false }) }
+                                                                actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { aiActionMode = mode; aiDeleteOnlyMode = mode == "delete"; saveActionMode("ai", mode); isAiActionModeDropdownExpanded = false }) }
                                                             }
                                                         }
                                                     }
@@ -1455,7 +1475,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = spamUseCustomAction, onCheckedChange = { spamUseCustomAction = it; botPref.edit().putBoolean("spam_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
                                         Column(modifier = if (!spamUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                             Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (spamUseCustomAction) isSpamActionModeDropdownExpanded = true }) { Text(actionModeOptions[spamActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isSpamActionModeDropdownExpanded, onDismissRequest = { isSpamActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { spamActionMode = mode; spamDeleteOnlyMode = mode == "delete"; botPref.edit().putBoolean("spam_delete_only_mode", spamDeleteOnlyMode).apply(); isSpamActionModeDropdownExpanded = false }) } } } }
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (spamUseCustomAction) isSpamActionModeDropdownExpanded = true }) { Text(actionModeOptions[spamActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isSpamActionModeDropdownExpanded, onDismissRequest = { isSpamActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { spamActionMode = mode; spamDeleteOnlyMode = mode == "delete"; saveActionMode("spam", mode); isSpamActionModeDropdownExpanded = false }) } } } }
                                                 if (spamActionMode == "block") {
                                                     Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
                                                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (spamUseCustomAction) isSpamBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[spamBlockDurationHours] ?: "${spamBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isSpamBlockDurationDropdownExpanded, onDismissRequest = { isSpamBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { spamBlockDurationHours = hours; botPref.edit().putInt("spam_block_duration_hours", hours).apply(); isSpamBlockDurationDropdownExpanded = false }) } } } }
@@ -1519,7 +1539,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                             actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
                                                                 keywordActionMode = mode
                                                                 keywordDeleteOnlyMode = mode == "delete"
-                                                                botPref.edit().putBoolean("keyword_delete_only_mode", keywordDeleteOnlyMode).apply()
+                                                                saveActionMode("keyword", mode)
                                                                 isKeywordActionModeDropdownExpanded = false
                                                             }) }
                                                         }
@@ -1816,17 +1836,20 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         }
 
                         else if (selectedTabIndex == 1) {
-                            val filteredLogs by remember(logMessages.size, logFilterTab) {
+                            val filteredLogs by remember(logMessages.size, selectedLogFilters.size) {
                                 derivedStateOf {
-                                    when(logFilterTab) {
-                                        "CYCLE" -> logMessages.filter { it.category == BotLogCategory.CYCLE }
-                                        "BLOCK" -> logMessages.filter { it.category == BotLogCategory.BLOCK }
-                                        "DEBUG" -> logMessages.filter { it.category == BotLogCategory.DEBUG }
-                                        "AI" -> logMessages.filter { it.category == BotLogCategory.AI }
-                                        "HEALTH" -> logMessages.filter { it.category == BotLogCategory.HEALTH }
-                                        "SESSION" -> logMessages.filter { it.category == BotLogCategory.SESSION }
-                                        "ERROR" -> logMessages.filter { it.category == BotLogCategory.ERROR }
-                                        else -> logMessages.toList()
+                                    if (selectedLogFilters.containsAll(logFilterKeys)) logMessages.toList()
+                                    else logMessages.filter { entry ->
+                                        when (entry.category) {
+                                            BotLogCategory.CYCLE -> "CYCLE" in selectedLogFilters
+                                            BotLogCategory.BLOCK -> "BLOCK" in selectedLogFilters
+                                            BotLogCategory.DEBUG -> "DEBUG" in selectedLogFilters
+                                            BotLogCategory.AI -> "AI" in selectedLogFilters
+                                            BotLogCategory.HEALTH -> "HEALTH" in selectedLogFilters
+                                            BotLogCategory.SESSION -> "SESSION" in selectedLogFilters
+                                            BotLogCategory.ERROR -> "ERROR" in selectedLogFilters
+                                            else -> selectedLogFilters.containsAll(logFilterKeys)
+                                        }
                                     }
                                 }
                             }
@@ -1942,14 +1965,22 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    FilterChip(selected = logFilterTab == "ALL", onClick = { logFilterTab = "ALL" }, label = { Text("전체", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "CYCLE", onClick = { logFilterTab = "CYCLE" }, label = { Text("탐색", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "BLOCK", onClick = { logFilterTab = "BLOCK" }, label = { Text("차단", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "DEBUG", onClick = { logFilterTab = "DEBUG" }, label = { Text("디버그", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFFFB300), selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "AI", onClick = { logFilterTab = "AI" }, label = { Text("AI", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF00897B), selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "HEALTH", onClick = { logFilterTab = "HEALTH" }, label = { Text("헬스", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF546E7A), selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "SESSION", onClick = { logFilterTab = "SESSION" }, label = { Text("세션/복구", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF6A1B9A), selectedLabelColor = Color.White))
-                                    FilterChip(selected = logFilterTab == "ERROR", onClick = { logFilterTab = "ERROR" }, label = { Text("오류", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFD32F2F), selectedLabelColor = Color.White))
+                                    fun toggleLogFilter(key: String) {
+                                        if (key == "ALL") {
+                                            if (selectedLogFilters.containsAll(logFilterKeys)) selectedLogFilters.clear()
+                                            else { selectedLogFilters.clear(); selectedLogFilters.addAll(logFilterKeys) }
+                                        } else {
+                                            if (selectedLogFilters.contains(key)) selectedLogFilters.remove(key) else selectedLogFilters.add(key)
+                                        }
+                                    }
+                                    FilterChip(selected = selectedLogFilters.containsAll(logFilterKeys), onClick = { toggleLogFilter("ALL") }, label = { Text("전체", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
+                                    FilterChip(selected = "CYCLE" in selectedLogFilters, onClick = { toggleLogFilter("CYCLE") }, label = { Text("탐색", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PastelNavy, selectedLabelColor = Color.White))
+                                    FilterChip(selected = "BLOCK" in selectedLogFilters, onClick = { toggleLogFilter("BLOCK") }, label = { Text("처리 내역", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White))
+                                    FilterChip(selected = "DEBUG" in selectedLogFilters, onClick = { toggleLogFilter("DEBUG") }, label = { Text("디버그", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFFFB300), selectedLabelColor = Color.White))
+                                    FilterChip(selected = "AI" in selectedLogFilters, onClick = { toggleLogFilter("AI") }, label = { Text("AI", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF00897B), selectedLabelColor = Color.White))
+                                    FilterChip(selected = "HEALTH" in selectedLogFilters, onClick = { toggleLogFilter("HEALTH") }, label = { Text("헬스", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF546E7A), selectedLabelColor = Color.White))
+                                    FilterChip(selected = "SESSION" in selectedLogFilters, onClick = { toggleLogFilter("SESSION") }, label = { Text("세션/복구", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF6A1B9A), selectedLabelColor = Color.White))
+                                    FilterChip(selected = "ERROR" in selectedLogFilters, onClick = { toggleLogFilter("ERROR") }, label = { Text("오류", color = textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFD32F2F), selectedLabelColor = Color.White))
                                 }
 
                                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp).background(DarkTerminal, RoundedCornerShape(12.dp)).padding(12.dp)) {

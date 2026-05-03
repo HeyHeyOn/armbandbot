@@ -61,6 +61,7 @@ class BotService : Service() {
         val blockReason: String,
         val deletePostOnBlock: Boolean,
         val deleteOnlyMode: Boolean,
+        val blockProcessMode: String,
         val blockExemptPostNumbers: Set<String>,
 
         val isNotiMaster: Boolean,
@@ -285,7 +286,8 @@ class BotService : Service() {
 
     private enum class ModerationActionMode {
         BLOCK,
-        DELETE_ONLY
+        DELETE_ONLY,
+        HOLD
     }
 
     private data class ModerationActionConfig(
@@ -296,7 +298,7 @@ class BotService : Service() {
         val sourceLabel: String = "default"
     ) {
         val blockDurationValue: String get() = blockDurationHours.toString()
-        val deleteFlagValue: String get() = if (deletePostOnBlock) "1" else "0"
+        val deleteFlagValue: String get() = if (mode != ModerationActionMode.HOLD && deletePostOnBlock) "1" else "0"
     }
 
     private data class ModerationActionOverride(
@@ -304,7 +306,8 @@ class BotService : Service() {
         val blockDurationHours: Int?,
         val blockReasonText: String?,
         val deletePostOnBlock: Boolean?,
-        val deleteOnlyMode: Boolean?
+        val deleteOnlyMode: Boolean?,
+        val processMode: String?
     )
 
     companion object {
@@ -3478,13 +3481,29 @@ img.written_dccon{max-width:80px;max-height:80px}
             ?: ""
         return normalizeCreationDate(raw)
     }
+    private fun botPrefCompatProcessMode(config: BotConfig): String {
+        return when {
+            config.blockProcessMode == "HOLD" -> "HOLD"
+            config.blockProcessMode == "DELETE" || config.deleteOnlyMode -> "DELETE"
+            else -> "BLOCK"
+        }
+    }
+
     private fun resolveDefaultModerationActionConfig(config: BotConfig): ModerationActionConfig {
         return ModerationActionConfig(
-            mode = if (config.deleteOnlyMode) ModerationActionMode.DELETE_ONLY else ModerationActionMode.BLOCK,
+            mode = when (botPrefCompatProcessMode(config)) {
+                "HOLD" -> ModerationActionMode.HOLD
+                "DELETE" -> ModerationActionMode.DELETE_ONLY
+                else -> ModerationActionMode.BLOCK
+            },
             blockDurationHours = config.blockDurationHours,
             blockReasonText = config.blockReason,
             deletePostOnBlock = config.deletePostOnBlock,
-            sourceLabel = if (config.deleteOnlyMode) "default_delete_only" else "default"
+            sourceLabel = when (botPrefCompatProcessMode(config)) {
+                "HOLD" -> "default_hold"
+                "DELETE" -> "default_delete_only"
+                else -> "default"
+            }
         )
     }
 
@@ -3497,7 +3516,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             blockDurationHours = if (botPref.contains("${prefix}_block_duration_hours")) botPref.getInt("${prefix}_block_duration_hours", 6) else null,
             blockReasonText = botPref.getString("${prefix}_block_reason_text", null),
             deletePostOnBlock = if (botPref.contains("${prefix}_delete_post_on_block")) botPref.getBoolean("${prefix}_delete_post_on_block", true) else null,
-            deleteOnlyMode = if (botPref.contains("${prefix}_delete_only_mode")) botPref.getBoolean("${prefix}_delete_only_mode", false) else null
+            deleteOnlyMode = if (botPref.contains("${prefix}_delete_only_mode")) botPref.getBoolean("${prefix}_delete_only_mode", false) else null,
+            processMode = botPref.getString("${prefix}_block_process_mode", null)
         )
     }
 
@@ -3508,9 +3528,15 @@ img.written_dccon{max-width:80px;max-height:80px}
     ): ModerationActionConfig {
         if (!override.enabled) return baseConfig
 
-        val isDeleteOnly = override.deleteOnlyMode ?: (baseConfig.mode == ModerationActionMode.DELETE_ONLY)
+        val resolvedMode = when (override.processMode) {
+            "HOLD" -> ModerationActionMode.HOLD
+            "DELETE" -> ModerationActionMode.DELETE_ONLY
+            "BLOCK" -> ModerationActionMode.BLOCK
+            else -> override.deleteOnlyMode?.let { if (it) ModerationActionMode.DELETE_ONLY else ModerationActionMode.BLOCK }
+                ?: baseConfig.mode
+        }
         return ModerationActionConfig(
-            mode = if (isDeleteOnly) ModerationActionMode.DELETE_ONLY else ModerationActionMode.BLOCK,
+            mode = resolvedMode,
             blockDurationHours = override.blockDurationHours ?: baseConfig.blockDurationHours,
             blockReasonText = override.blockReasonText?.takeIf { it.isNotBlank() } ?: baseConfig.blockReasonText,
             deletePostOnBlock = override.deletePostOnBlock ?: baseConfig.deletePostOnBlock,
@@ -3525,7 +3551,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         resolvedConfig: ModerationActionConfig
     ) {
         sendLog(
-            "[디버그][처리정책] $label / enabled=${override.enabled} / deleteOnly=${override.deleteOnlyMode} / duration=${override.blockDurationHours} / deletePostOnBlock=${override.deletePostOnBlock} / reason=${override.blockReasonText ?: ""} / resolved=${resolvedConfig.sourceLabel}:${resolvedConfig.mode.name}:${resolvedConfig.blockDurationHours}:${resolvedConfig.deletePostOnBlock}:${resolvedConfig.blockReasonText}",
+            "[디버그][처리정책] $label / enabled=${override.enabled} / processMode=${override.processMode} / deleteOnly=${override.deleteOnlyMode} / duration=${override.blockDurationHours} / deletePostOnBlock=${override.deletePostOnBlock} / reason=${override.blockReasonText ?: ""} / resolved=${resolvedConfig.sourceLabel}:${resolvedConfig.mode.name}:${resolvedConfig.blockDurationHours}:${resolvedConfig.deletePostOnBlock}:${resolvedConfig.blockReasonText}",
             botId
         )
     }
@@ -3675,6 +3701,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         gallType: String
     ): String {
         return when (actionConfig.mode) {
+            ModerationActionMode.HOLD -> "{\"result\":\"success\",\"mode\":\"hold\"}"
+
             ModerationActionMode.BLOCK -> executeBlockRequest(
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
@@ -3917,6 +3945,8 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             blockDurationHours = botPref.getInt("block_duration_hours", 6),
             blockReason = botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반",
+            blockProcessMode = botPref.getString("block_process_mode", null)
+                ?: if (botPref.getBoolean("delete_only_mode", false)) "DELETE" else "BLOCK",
             deletePostOnBlock = botPref.getBoolean("delete_post_on_block", true),
             deleteOnlyMode = botPref.getBoolean("delete_only_mode", false),
             blockExemptPostNumbers = botPref.getStringSet("block_exempt_post_numbers", setOf())
@@ -4691,6 +4721,17 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
+        if (actionConfig.mode == ModerationActionMode.HOLD && GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr)) {
+            if (config.isDebugMode) sendLog("[디버그][보류중복] 게시글 보류 기록이 이미 있어 건너뜀 → 번호: $postNumStr", botId)
+            return BlockExecutionResult(
+                blockReason = dbBlockReason,
+                snapshotPath = null,
+                success = true,
+                response = "{\"result\":\"skipped\",\"reason\":\"duplicate_hold\"}",
+                deletesTarget = false
+            )
+        }
+
         if (config.isDebugMode) {
             sendLog("[디버그][차단요청] 게시글 차단 요청 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
@@ -4706,31 +4747,51 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
         val actionSucceeded = isModerationActionSuccess(actionResponse)
         if (config.isDebugMode) {
-            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제요청" else "차단요청"
+            val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
             sendLog("[디버그][$modeLabel] 게시글 처리 ${if (actionSucceeded) "성공" else "실패"} → 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
         }
 
         if (actionSucceeded) {
-            logBlock(botId, presentation.logCategory, presentation.logMessage)
+            val actionLabel = when (actionConfig.mode) {
+                ModerationActionMode.HOLD -> "보류"
+                ModerationActionMode.DELETE_ONLY -> "삭제"
+                else -> "차단"
+            }
+            logBlock(botId, presentation.logCategory.replace("차단", actionLabel), presentation.logMessage)
             notifyIfEnabled(
                 presentation.notificationType,
-                presentation.notificationTitle,
-                presentation.notificationMessage
+                presentation.notificationTitle.replace("차단됨", "${actionLabel} 처리됨"),
+                presentation.notificationMessage.replace("차단되었습니다", "${actionLabel} 처리되었습니다")
             )
 
-            GlobalBotState.saveBlockHistory(
-                gallType = gallType,
-                gallId = gallId,
-                postNum = postNumStr,
-                targetType = "POST",
-                targetAuthor = postDisplayAuthor,
-                targetContent = postTitle,
-                blockReason = dbBlockReason,
-                snapshotPath = blockHistorySnapshotPath,
-                creationDate = postDate
-            )
+            if (actionConfig.mode == ModerationActionMode.HOLD) {
+                GlobalBotState.saveHoldHistory(
+                    gallType = gallType,
+                    gallId = gallId,
+                    postNum = postNumStr,
+                    targetType = "POST",
+                    targetNo = postNumStr,
+                    targetAuthor = postDisplayAuthor,
+                    targetContent = postTitle,
+                    holdReason = dbBlockReason,
+                    snapshotPath = blockHistorySnapshotPath,
+                    creationDate = postDate
+                )
+            } else {
+                GlobalBotState.saveBlockHistory(
+                    gallType = gallType,
+                    gallId = gallId,
+                    postNum = postNumStr,
+                    targetType = "POST",
+                    targetAuthor = postDisplayAuthor,
+                    targetContent = postTitle,
+                    blockReason = "[$actionLabel] $dbBlockReason",
+                    snapshotPath = blockHistorySnapshotPath,
+                    creationDate = postDate
+                )
+            }
         } else {
-            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제" else "차단"
+            val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.HOLD -> "보류"; else -> "차단" }
             sendLog("[$modeLabel 실패] 게시글 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
         }
 
@@ -4739,7 +4800,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
             success = actionSucceeded,
             response = actionResponse,
-            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || actionConfig.deletePostOnBlock
+            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || (actionConfig.mode != ModerationActionMode.HOLD && actionConfig.deletePostOnBlock)
         )
     }
 
@@ -4878,6 +4939,17 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
+        if (actionConfig.mode == ModerationActionMode.HOLD && GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "COMMENT", commentNo)) {
+            if (config.isDebugMode) sendLog("[디버그][보류중복] 댓글 보류 기록이 이미 있어 건너뜀 → 번호: $commentNo (게시글: $postNumStr)", botId)
+            return BlockExecutionResult(
+                blockReason = dbBlockReason,
+                snapshotPath = null,
+                success = true,
+                response = "{\"result\":\"skipped\",\"reason\":\"duplicate_hold\"}",
+                deletesTarget = false
+            )
+        }
+
         if (config.isDebugMode) {
             sendLog("[디버그][차단요청] 댓글 차단 요청 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
@@ -4893,31 +4965,51 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
         val actionSucceeded = isModerationActionSuccess(actionResponse)
         if (config.isDebugMode) {
-            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제요청" else "차단요청"
+            val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
             sendLog("[디버그][$modeLabel] 댓글 처리 ${if (actionSucceeded) "성공" else "실패"} → 번호: $commentNo / 응답: ${actionResponse.take(300)}", botId)
         }
 
         if (actionSucceeded) {
-            logBlock(botId, presentation.logCategory, presentation.logMessage)
+            val actionLabel = when (actionConfig.mode) {
+                ModerationActionMode.HOLD -> "보류"
+                ModerationActionMode.DELETE_ONLY -> "삭제"
+                else -> "차단"
+            }
+            logBlock(botId, presentation.logCategory.replace("차단", actionLabel), presentation.logMessage)
             notifyIfEnabled(
                 presentation.notificationType,
-                presentation.notificationTitle,
-                presentation.notificationMessage
+                presentation.notificationTitle.replace("차단됨", "${actionLabel} 처리됨"),
+                presentation.notificationMessage.replace("차단되었습니다", "${actionLabel} 처리되었습니다")
             )
 
-            GlobalBotState.saveBlockHistory(
-                gallType = gallType,
-                gallId = gallId,
-                postNum = postNumStr,
-                targetType = "COMMENT",
-                targetAuthor = cmtDisplayAuthor,
-                targetContent = commentMemo,
-                blockReason = dbBlockReason,
-                snapshotPath = blockHistorySnapshotPath,
-                creationDate = commentDate
-            )
+            if (actionConfig.mode == ModerationActionMode.HOLD) {
+                GlobalBotState.saveHoldHistory(
+                    gallType = gallType,
+                    gallId = gallId,
+                    postNum = postNumStr,
+                    targetType = "COMMENT",
+                    targetNo = commentNo,
+                    targetAuthor = cmtDisplayAuthor,
+                    targetContent = commentMemo,
+                    holdReason = dbBlockReason,
+                    snapshotPath = blockHistorySnapshotPath,
+                    creationDate = commentDate
+                )
+            } else {
+                GlobalBotState.saveBlockHistory(
+                    gallType = gallType,
+                    gallId = gallId,
+                    postNum = postNumStr,
+                    targetType = "COMMENT",
+                    targetAuthor = cmtDisplayAuthor,
+                    targetContent = commentMemo,
+                    blockReason = "[$actionLabel] $dbBlockReason",
+                    snapshotPath = blockHistorySnapshotPath,
+                    creationDate = commentDate
+                )
+            }
         } else {
-            val modeLabel = if (actionConfig.mode == ModerationActionMode.DELETE_ONLY) "삭제" else "차단"
+            val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.HOLD -> "보류"; else -> "차단" }
             sendLog("[$modeLabel 실패] 댓글 번호: $commentNo (게시글: $postNumStr) / 응답: ${actionResponse.take(300)}", botId)
         }
 
@@ -4926,7 +5018,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             snapshotPath = if (actionSucceeded) dbSnapshotPath else null,
             success = actionSucceeded,
             response = actionResponse,
-            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || actionConfig.deletePostOnBlock
+            deletesTarget = actionConfig.mode == ModerationActionMode.DELETE_ONLY || (actionConfig.mode != ModerationActionMode.HOLD && actionConfig.deletePostOnBlock)
         )
     }
 

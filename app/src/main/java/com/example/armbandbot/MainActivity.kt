@@ -236,6 +236,47 @@ object GlobalBotState {
         }
     }
 
+    fun saveHoldHistory(
+        gallType: String,
+        gallId: String,
+        postNum: String,
+        targetType: String,
+        targetNo: String,
+        targetAuthor: String,
+        targetContent: String,
+        holdReason: String,
+        snapshotPath: String? = null,
+        creationDate: String? = null
+    ): Boolean {
+        return try {
+            val rowId = db?.postDao()?.insertHoldHistory(
+                HoldHistory(
+                    gallType = gallType,
+                    gallId = gallId,
+                    postNum = postNum,
+                    targetType = targetType,
+                    targetNo = targetNo,
+                    targetAuthor = targetAuthor,
+                    targetContent = targetContent,
+                    holdReason = holdReason,
+                    snapshotPath = snapshotPath,
+                    creationDate = creationDate
+                )
+            ) ?: -1L
+            rowId != -1L
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun hasHoldHistory(gallType: String, gallId: String, postNum: String, targetType: String, targetNo: String): Boolean {
+        return try {
+            db?.postDao()?.hasHoldHistory(gallType, gallId, postNum, targetType, targetNo) ?: false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     @Synchronized
     fun saveDb(context: Context) {}
 
@@ -250,6 +291,7 @@ object GlobalBotState {
                     ?.forEach { it.deleteRecursively() }
                 dao?.clearAllPosts()
                 dao?.clearAllBlockHistory()
+                dao?.clearAllHoldHistory()
             } catch (_: Exception) {
             }
         }.start()

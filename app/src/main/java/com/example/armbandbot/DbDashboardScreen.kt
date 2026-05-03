@@ -60,6 +60,8 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     val topBarColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
     val cardBgColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
     val blockCardBgColor = if (isDarkMode) Color(0xFF3E2723) else Color(0xFFFFF0F0)
+    val holdCardBgColor = if (isDarkMode) Color(0xFF3A2A12) else Color(0xFFFFF4E0)
+    val holdOrange = if (isDarkMode) Color(0xFFFFB74D) else Color(0xFFF57C00)
     val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
     val subTextColor = if (isDarkMode) Color(0xFFAAAEB3) else Color.Gray
     val dividerColor = if (isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE)
@@ -83,20 +85,25 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
     var generalLimit by remember { mutableStateOf(100) }
     var blockLimit by remember { mutableStateOf(100) }
+    var holdLimit by remember { mutableStateOf(100) }
 
     var generalPosts by remember { mutableStateOf<List<CheckedPost>>(emptyList()) }
     var blockPosts by remember { mutableStateOf<List<BlockHistory>>(emptyList()) }
+    var holdPosts by remember { mutableStateOf<List<HoldHistory>>(emptyList()) }
     val generalListState = rememberLazyListState()
     val blockListState = rememberLazyListState()
+    val holdListState = rememberLazyListState()
 
     var isGeneralRefreshing by remember { mutableStateOf(false) }
     var isBlockRefreshing by remember { mutableStateOf(false) }
+    var isHoldRefreshing by remember { mutableStateOf(false) }
 
     var snapshotViewerPath by remember { mutableStateOf<String?>(null) }
     var showClearDbConfirm by remember { mutableStateOf(false) }
     var recordedPostCount by remember { mutableStateOf(0) }
     var pendingDeletePost by remember { mutableStateOf<CheckedPost?>(null) }
     var pendingDeleteBlock by remember { mutableStateOf<BlockHistory?>(null) }
+    var pendingDeleteHold by remember { mutableStateOf<HoldHistory?>(null) }
     var openSwipeKey by remember { mutableStateOf<String?>(null) }
 
     val postDao = GlobalBotState.getDb()?.postDao()
@@ -129,13 +136,31 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         recordedPostCount = withContext(Dispatchers.IO) { postDao?.getPostCount() ?: 0 }
     }
 
-    LaunchedEffect(botId) {
-        withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
-        loadGeneralData(); loadBlockData()
+    suspend fun loadHoldData() {
+        val data = withContext(Dispatchers.IO) {
+            when {
+                sortField == "CHECK" && !isAscending -> postDao?.getHoldHistoryCheckDesc(selectedBlockType, searchQuery, holdLimit, 0)
+                sortField == "CHECK" && isAscending -> postDao?.getHoldHistoryCheckAsc(selectedBlockType, searchQuery, holdLimit, 0)
+                sortField == "CREATE" && !isAscending -> postDao?.getHoldHistoryCreateDesc(selectedBlockType, searchQuery, holdLimit, 0)
+                sortField == "CREATE" && isAscending -> postDao?.getHoldHistoryCreateAsc(selectedBlockType, searchQuery, holdLimit, 0)
+                else -> emptyList()
+            }
+        }
+        holdPosts = data ?: emptyList()
+        recordedPostCount = withContext(Dispatchers.IO) { postDao?.getPostCount() ?: 0 }
     }
 
-    LaunchedEffect(tabIndex, selectedGall, selectedBlockType, sortField, isAscending, searchQuery, generalLimit, blockLimit) {
-        if (tabIndex == 0) loadGeneralData() else loadBlockData()
+    LaunchedEffect(botId) {
+        withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
+        loadGeneralData(); loadBlockData(); loadHoldData()
+    }
+
+    LaunchedEffect(tabIndex, selectedGall, selectedBlockType, sortField, isAscending, searchQuery, generalLimit, blockLimit, holdLimit) {
+        when (tabIndex) {
+            0 -> loadGeneralData()
+            1 -> loadBlockData()
+            else -> loadHoldData()
+        }
     }
 
     val generalPullRefreshState = rememberPullRefreshState(
@@ -155,6 +180,16 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 isBlockRefreshing = true
                 loadBlockData()
                 isBlockRefreshing = false
+            }
+        }
+    )
+    val holdPullRefreshState = rememberPullRefreshState(
+        refreshing = isHoldRefreshing,
+        onRefresh = {
+            coroutineScope.launch {
+                isHoldRefreshing = true
+                loadHoldData()
+                isHoldRefreshing = false
             }
         }
     )
@@ -180,14 +215,17 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                     ?.forEach { it.deleteRecursively() }
                                 postDao?.clearAllPosts()
                                 postDao?.clearAllBlockHistory()
+                                postDao?.clearAllHoldHistory()
                             }
                             GlobalBotState.lastCheckedNumbers.clear()
                             generalPosts = emptyList()
                             blockPosts = emptyList()
+                            holdPosts = emptyList()
                             galleries = emptyList()
                             recordedPostCount = 0
                             generalLimit = 100
                             blockLimit = 100
+                            holdLimit = 100
                             showClearDbConfirm = false
                             Toast.makeText(context, "DB를 초기화했습니다.", Toast.LENGTH_SHORT).show()
                         }
@@ -200,19 +238,25 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         )
     }
 
-    if (pendingDeletePost != null || pendingDeleteBlock != null) {
-        val deleteTitle = if (pendingDeletePost != null) "게시글 기록 삭제" else "차단 기록 삭제"
+    if (pendingDeletePost != null || pendingDeleteBlock != null || pendingDeleteHold != null) {
+        val deleteTitle = when {
+            pendingDeletePost != null -> "게시글 기록 삭제"
+            pendingDeleteBlock != null -> "차단 기록 삭제"
+            else -> "보류 기록 삭제"
+        }
         val deleteMessage = pendingDeletePost?.let { "[${it.gallId}] ${it.postNum}번 글의 DB 정보와 스냅샷을 삭제할까요?" }
             ?: pendingDeleteBlock?.let { "[${it.gallId}] ${it.postNum}번 차단 기록과 스냅샷을 삭제할까요?" }
+            ?: pendingDeleteHold?.let { "[${it.gallId}] ${it.postNum}번 보류 기록과 스냅샷을 삭제할까요?" }
             ?: "삭제할까요?"
         AlertDialog(
-            onDismissRequest = { pendingDeletePost = null; pendingDeleteBlock = null },
+            onDismissRequest = { pendingDeletePost = null; pendingDeleteBlock = null; pendingDeleteHold = null },
             title = { Text(deleteTitle, fontWeight = FontWeight.Bold) },
             text = { Text(deleteMessage) },
             confirmButton = {
                 TextButton(onClick = {
                     val targetPost = pendingDeletePost
                     val targetBlock = pendingDeleteBlock
+                    val targetHold = pendingDeleteHold
                     coroutineScope.launch {
                         withContext(Dispatchers.IO) {
                             if (targetPost != null) {
@@ -221,19 +265,24 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                             } else if (targetBlock != null) {
                                 deleteSnapshotFiles(targetBlock.snapshotPath)
                                 postDao?.deleteBlockHistoryById(targetBlock.id)
+                            } else if (targetHold != null) {
+                                deleteSnapshotFiles(targetHold.snapshotPath)
+                                postDao?.deleteHoldHistoryById(targetHold.id)
                             }
                         }
                         pendingDeletePost = null
                         pendingDeleteBlock = null
+                        pendingDeleteHold = null
                         openSwipeKey = null
                         withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
                         loadGeneralData()
                         loadBlockData()
+                        loadHoldData()
                         Toast.makeText(context, "삭제했습니다.", Toast.LENGTH_SHORT).show()
                     }
                 }) { Text("삭제", color = warningRed, fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { pendingDeletePost = null; pendingDeleteBlock = null }) { Text("취소") } }
+            dismissButton = { TextButton(onClick = { pendingDeletePost = null; pendingDeleteBlock = null; pendingDeleteHold = null }) { Text("취소") } }
         )
     }
 
@@ -297,6 +346,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 }
             )
             Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text("차단 상세 기록", fontWeight = FontWeight.Bold, color = if(tabIndex==1) warningRed else subTextColor) })
+            Tab(selected = tabIndex == 2, onClick = { tabIndex = 2 }, text = { Text("보류 기록", fontWeight = FontWeight.Bold, color = if(tabIndex==2) holdOrange else subTextColor) })
         }
 
         Row(
@@ -309,7 +359,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 onValueChange = { searchQuery = it },
                 placeholder = { Text("글 번호, 제목, 작성자, 내용 검색...", fontSize = 14.sp) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "검색", tint = Color.Gray) },
-                trailingIcon = { if (searchQuery.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "지우기", modifier = Modifier.clickable { searchQuery = ""; generalLimit=100; blockLimit=100 }, tint = Color.Gray) },
+                trailingIcon = { if (searchQuery.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "지우기", modifier = Modifier.clickable { searchQuery = ""; generalLimit=100; blockLimit=100; holdLimit=100 }, tint = Color.Gray) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
@@ -336,9 +386,10 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 item { FilterChip(selected = selectedGall == "ALL", onClick = { selectedGall = "ALL"; generalLimit = 100 }, label = { Text("전체 갤러리", color=if(selectedGall == "ALL") Color.White else textColor) }) }
                 items(galleries) { gId -> FilterChip(selected = selectedGall == gId, onClick = { selectedGall = gId; generalLimit = 100 }, label = { Text(gId, color=if(selectedGall == gId) Color.White else textColor) }) }
             } else {
-                item { FilterChip(selected = selectedBlockType == "ALL", onClick = { selectedBlockType = "ALL"; blockLimit = 100 }, label = { Text("전체 내역", color=if(selectedBlockType == "ALL") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White)) }
-                item { FilterChip(selected = selectedBlockType == "POST", onClick = { selectedBlockType = "POST"; blockLimit = 100 }, label = { Text("게시글 차단", color=if(selectedBlockType == "POST") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White)) }
-                item { FilterChip(selected = selectedBlockType == "COMMENT", onClick = { selectedBlockType = "COMMENT"; blockLimit = 100 }, label = { Text("댓글 차단", color=if(selectedBlockType == "COMMENT") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = warningRed, selectedLabelColor = Color.White)) }
+                val chipColor = if (tabIndex == 2) holdOrange else warningRed
+                item { FilterChip(selected = selectedBlockType == "ALL", onClick = { selectedBlockType = "ALL"; blockLimit = 100; holdLimit = 100 }, label = { Text("전체 내역", color=if(selectedBlockType == "ALL") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = chipColor, selectedLabelColor = Color.White)) }
+                item { FilterChip(selected = selectedBlockType == "POST", onClick = { selectedBlockType = "POST"; blockLimit = 100; holdLimit = 100 }, label = { Text(if (tabIndex == 2) "게시글 보류" else "게시글 차단", color=if(selectedBlockType == "POST") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = chipColor, selectedLabelColor = Color.White)) }
+                item { FilterChip(selected = selectedBlockType == "COMMENT", onClick = { selectedBlockType = "COMMENT"; blockLimit = 100; holdLimit = 100 }, label = { Text(if (tabIndex == 2) "댓글 보류" else "댓글 차단", color=if(selectedBlockType == "COMMENT") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = chipColor, selectedLabelColor = Color.White)) }
             }
         }
 
@@ -395,7 +446,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     contentColor = PastelNavy
                 )
                 } // end generalPullRefreshBox
-            } else {
+            } else if (tabIndex == 1) {
                 Box(modifier = Modifier.fillMaxSize().pullRefresh(blockPullRefreshState)) {
                 if (blockPosts.isEmpty()) {
                     Text(
@@ -455,6 +506,45 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     contentColor = PastelNavy
                 )
                 } // end blockPullRefreshBox
+            } else {
+                Box(modifier = Modifier.fillMaxSize().pullRefresh(holdPullRefreshState)) {
+                    if (holdPosts.isEmpty()) {
+                        Text("조건에 맞는 보류 기록이 없습니다.", modifier = Modifier.align(Alignment.Center), color = subTextColor)
+                    } else {
+                        LazyColumn(state = holdListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
+                            items(holdPosts, key = { "hold_${it.id}" }) { history ->
+                                val holdTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(history.holdTime))
+                                val rowKey = "hold_${history.id}"
+                                SwipeDeleteDbRow(rowKey = rowKey, isOpen = openSwipeKey == rowKey, onOpenChange = { isOpen -> openSwipeKey = if (isOpen) rowKey else null }, onDeleteClick = { pendingDeleteHold = history }) {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) snapshotViewerPath = history.snapshotPath!! else Toast.makeText(context, "보류 스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
+                                        colors = CardDefaults.cardColors(containerColor = holdCardBgColor)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(if (history.targetType == "POST") "[게시글]" else "[댓글]", fontWeight = FontWeight.Bold, color = holdOrange)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("[${history.gallId}] 원본글: ${history.postNum}", fontSize = 12.sp, color = subTextColor)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("작성자: ${history.targetAuthor}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = subTextColor)
+                                            Text(history.targetContent, fontSize = 13.sp, color = textColor, modifier = Modifier.padding(vertical = 4.dp).background(if(isDarkMode) Color(0xFF4A3420) else Color.White, RoundedCornerShape(4.dp)).padding(8.dp).fillMaxWidth())
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(history.holdReason, fontSize = 12.sp, color = holdOrange, fontWeight = FontWeight.Bold)
+                                            Divider(color = if(isDarkMode) Color(0xFF6D4C20) else Color(0xFFFFD8A8), modifier = Modifier.padding(vertical = 6.dp))
+                                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                Text("작성: ${history.creationDate ?: "정보 없음"}", fontSize = 11.sp, color = subTextColor)
+                                                Text("보류: $holdTimeStr", fontSize = 11.sp, color = subTextColor)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            item { Button(onClick = { holdLimit += 100 }, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF6D4C20) else Color(0xFFFFE0B2), contentColor = if(isDarkMode) Color.White else holdOrange)) { Text("더 보기 (현재 $holdLimit 개)") } }
+                        }
+                    }
+                    PullRefreshIndicator(refreshing = isHoldRefreshing, state = holdPullRefreshState, modifier = Modifier.align(Alignment.TopCenter), contentColor = holdOrange)
+                } // end holdPullRefreshBox
             }
         }
     }

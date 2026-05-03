@@ -36,6 +36,25 @@ data class BlockHistory(
     val creationDate: String? = null
 )
 
+@Entity(
+    tableName = "hold_history",
+    indices = [Index(value = ["gallType", "gallId", "postNum", "targetType", "targetNo"], unique = true)]
+)
+data class HoldHistory(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val gallType: String,
+    val gallId: String,
+    val postNum: String,
+    val targetType: String,
+    val targetNo: String,
+    val targetAuthor: String,
+    val targetContent: String,
+    val holdReason: String,
+    val holdTime: Long = System.currentTimeMillis(),
+    val snapshotPath: String? = null,
+    val creationDate: String? = null
+)
+
 @Dao
 interface PostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -47,7 +66,7 @@ interface PostDao {
     @Query("SELECT COUNT(*) FROM checked_posts")
     fun getPostCount(): Int
 
-    @Query("SELECT snapshotPath FROM checked_posts WHERE snapshotPath IS NOT NULL UNION SELECT snapshotPath FROM block_history WHERE snapshotPath IS NOT NULL")
+    @Query("SELECT snapshotPath FROM checked_posts WHERE snapshotPath IS NOT NULL UNION SELECT snapshotPath FROM block_history WHERE snapshotPath IS NOT NULL UNION SELECT snapshotPath FROM hold_history WHERE snapshotPath IS NOT NULL")
     fun getAllSnapshotPaths(): List<String>
 
     @Query("DELETE FROM checked_posts")
@@ -115,6 +134,60 @@ interface PostDao {
 
     @Query("DELETE FROM block_history")
     fun clearAllBlockHistory()
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insertHoldHistory(history: HoldHistory): Long
+
+    @Query("DELETE FROM hold_history")
+    fun clearAllHoldHistory()
+
+    @Query("SELECT EXISTS(SELECT 1 FROM hold_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum AND targetType = :targetType AND targetNo = :targetNo LIMIT 1)")
+    fun hasHoldHistory(gallType: String, gallId: String, postNum: String, targetType: String, targetNo: String): Boolean
+
+    @Query("SELECT snapshotPath FROM hold_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum AND snapshotPath IS NOT NULL")
+    fun getHoldSnapshotPathsForPost(gallType: String, gallId: String, postNum: String): List<String>
+
+    @Query("DELETE FROM hold_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
+    fun deleteHoldHistoryForPost(gallType: String, gallId: String, postNum: String)
+
+    @Query("DELETE FROM hold_history WHERE id = :id")
+    fun deleteHoldHistoryById(id: Int)
+
+    @Query("""
+        SELECT * FROM hold_history
+        WHERE (:type = 'ALL' OR targetType = :type)
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+        ORDER BY holdTime DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    fun getHoldHistoryCheckDesc(type: String, query: String, limit: Int, offset: Int): List<HoldHistory>
+
+    @Query("""
+        SELECT * FROM hold_history
+        WHERE (:type = 'ALL' OR targetType = :type)
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+        ORDER BY holdTime ASC
+        LIMIT :limit OFFSET :offset
+    """)
+    fun getHoldHistoryCheckAsc(type: String, query: String, limit: Int, offset: Int): List<HoldHistory>
+
+    @Query("""
+        SELECT * FROM hold_history
+        WHERE (:type = 'ALL' OR targetType = :type)
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+        ORDER BY creationDate DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    fun getHoldHistoryCreateDesc(type: String, query: String, limit: Int, offset: Int): List<HoldHistory>
+
+    @Query("""
+        SELECT * FROM hold_history
+        WHERE (:type = 'ALL' OR targetType = :type)
+          AND (:query = '' OR postNum LIKE '%' || :query || '%' OR targetContent LIKE '%' || :query || '%' OR targetAuthor LIKE '%' || :query || '%')
+        ORDER BY creationDate ASC
+        LIMIT :limit OFFSET :offset
+    """)
+    fun getHoldHistoryCreateAsc(type: String, query: String, limit: Int, offset: Int): List<HoldHistory>
 
     @Query("SELECT snapshotPath FROM block_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum AND snapshotPath IS NOT NULL")
     fun getBlockSnapshotPathsForPost(gallType: String, gallId: String, postNum: String): List<String>
@@ -194,7 +267,7 @@ interface PostDao {
     fun getBlockHistoryAsc(type: String, limit: Int, offset: Int): List<BlockHistory>
 }
 
-@Database(entities = [CheckedPost::class, BlockHistory::class], version = 6, exportSchema = false)
+@Database(entities = [CheckedPost::class, BlockHistory::class, HoldHistory::class], version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
 
