@@ -22,13 +22,24 @@ data class BotLogEntry(
 )
 
 fun classifyBotLog(message: String): BotLogCategory {
+    val isProcessingLog =
+        message.contains("보류") ||
+        message.contains("차단") ||
+        message.contains("삭제") ||
+        message.contains("처리 성공") ||
+        message.contains("처리 실패") ||
+        message.contains("처리됨") ||
+        message.contains("완료") ||
+        message.startsWith("[AI 배치 차단!") ||
+        message.startsWith("[AI 댓글 차단!") ||
+        message.startsWith("[AI 필터 차단!")
+
     return when {
-        message.startsWith("[AI 배치 차단!") || message.startsWith("[AI 댓글 차단!") || message.startsWith("[AI 필터 차단!") -> BotLogCategory.BLOCK
+        isProcessingLog -> BotLogCategory.BLOCK
         message.contains("[AI ") || message.contains("[AI배치") || message.contains("[AI 배치") || message.contains("[AI 결과") || message.contains("AI HTTP") || message.contains("AI 파싱") || message.contains("AI raw") -> BotLogCategory.AI
         message.contains("[헬스]") || message.contains("[HEALTH]") -> BotLogCategory.HEALTH
         message.contains("[디버그]") -> BotLogCategory.DEBUG
         message.contains("[자동 로그인") || message.contains("[세션 ") || message.contains("[시작 ") || message.contains("[복구 ") || message.contains("로그인") -> BotLogCategory.SESSION
-        message.contains("[차단", ignoreCase = false) || message.contains("차단 요청") || message.contains("삭제 요청") || message.contains("보류") || message.contains("차단!") -> BotLogCategory.BLOCK
         message.contains("[치명적 오류]") || message.contains("오류") || message.contains("실패") || message.contains("Exception") -> BotLogCategory.ERROR
         message.contains("사이클") || message.contains("탐색") || message.contains("페이지") || message.contains("대기") || message.contains("검색") -> BotLogCategory.CYCLE
         message.contains("SYSTEM") || message.contains("시스템") -> BotLogCategory.SYSTEM
@@ -60,7 +71,7 @@ fun botLogEntryFromLine(line: String): BotLogEntry {
         BotLogEntry(
             raw = json.optString("raw"),
             message = json.optString("message"),
-            category = runCatching { BotLogCategory.valueOf(json.optString("category")) }.getOrDefault(classifyBotLog(json.optString("message"))),
+            category = classifyBotLog(json.optString("message")),
             timestamp = json.optString("timestamp").ifBlank { null }
         )
     }.getOrElse {
