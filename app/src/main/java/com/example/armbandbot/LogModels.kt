@@ -26,10 +26,6 @@ fun classifyBotLog(message: String): BotLogCategory {
         message.contains("보류") ||
         message.contains("차단") ||
         message.contains("삭제") ||
-        message.contains("처리 성공") ||
-        message.contains("처리 실패") ||
-        message.contains("처리됨") ||
-        message.contains("완료") ||
         message.startsWith("[AI 배치 차단!") ||
         message.startsWith("[AI 댓글 차단!") ||
         message.startsWith("[AI 필터 차단!")

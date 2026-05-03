@@ -815,3 +815,19 @@
 - APK: 완장봇_v1.3.7-beta5.apk
 - SHA256: A68A2F75F81D25A24B44D36D9F48E213F461BBC51F52F7113975A6B4F215EB38
 - Beta Drive file ID: 1q2WW8rBZrCD6NFqPU5JK4haOppxYACYv
+
+## 1.3.7-beta6 구현 완료
+
+### 주요 변화
+- beta5에서 과하게 넓힌 활동 로그 처리 내역 분류 조건을 축소
+  - `완료`, `처리 성공`, `처리 실패`, `처리됨` 같은 일반 조건은 제거
+  - `삭제` / `차단` / `보류`가 명시된 로그만 처리 내역으로 분류
+- AI 처리 로그도 실제 삭제/차단/보류가 명시된 경우에만 처리 내역으로 분류
+- 기존 저장 로그는 계속 현재 분류 규칙으로 재분류되므로, beta5에서 잘못 처리 내역으로 보이던 일반 완료 로그는 다시 원래 탭으로 돌아감
+
+### 빌드 정보
+- versionCode = 89
+- versionName = 1.3.7-beta6
+- APK: 완장봇_v1.3.7-beta6.apk
+- SHA256: A3DD07CD3C96EF7337A99121A7E325EA409FD0312928A53FC0959ED93B545B8F
+- Beta Drive file ID: 1-gHRziAs0sPMDTpejoHOIpPv0kyd_NP6
