@@ -4796,11 +4796,28 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ModerationActionMode.DELETE_ONLY -> "삭제"
                 else -> "차단"
             }
-            logBlock(botId, presentation.logCategory.replace("차단", actionLabel), presentation.logMessage)
+            val processingLogCategory = if (presentation.notificationType == "ai") {
+                "AI 필터 $actionLabel 처리"
+            } else {
+                presentation.logCategory.replace("차단", actionLabel)
+            }
+            val processingNotificationTitle = if (presentation.notificationType == "ai") {
+                "AI 필터 $actionLabel 처리됨"
+            } else {
+                presentation.notificationTitle.replace("차단됨", "${actionLabel} 처리됨")
+            }
+            val processingNotificationMessage = if (presentation.notificationType == "ai") {
+                "AI 필터로 게시글을 ${actionLabel} 처리했습니다."
+            } else {
+                presentation.notificationMessage
+                    .replace("차단되었습니다", "${actionLabel} 처리되었습니다")
+                    .replace("차단했습니다", "${actionLabel} 처리했습니다")
+            }
+            logBlock(botId, processingLogCategory, presentation.logMessage)
             notifyIfEnabled(
                 presentation.notificationType,
-                presentation.notificationTitle.replace("차단됨", "${actionLabel} 처리됨"),
-                presentation.notificationMessage.replace("차단되었습니다", "${actionLabel} 처리되었습니다")
+                processingNotificationTitle,
+                processingNotificationMessage
             )
 
             if (actionConfig.mode == ModerationActionMode.HOLD) {
@@ -5042,11 +5059,28 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ModerationActionMode.DELETE_ONLY -> "삭제"
                 else -> "차단"
             }
-            logBlock(botId, presentation.logCategory.replace("차단", actionLabel), presentation.logMessage)
+            val processingLogCategory = if (presentation.notificationType == "ai") {
+                "AI 필터 $actionLabel 처리"
+            } else {
+                presentation.logCategory.replace("차단", actionLabel)
+            }
+            val processingNotificationTitle = if (presentation.notificationType == "ai") {
+                "AI 필터 $actionLabel 처리됨"
+            } else {
+                presentation.notificationTitle.replace("차단됨", "${actionLabel} 처리됨")
+            }
+            val processingNotificationMessage = if (presentation.notificationType == "ai") {
+                "AI 필터로 댓글을 ${actionLabel} 처리했습니다."
+            } else {
+                presentation.notificationMessage
+                    .replace("차단되었습니다", "${actionLabel} 처리되었습니다")
+                    .replace("차단했습니다", "${actionLabel} 처리했습니다")
+            }
+            logBlock(botId, processingLogCategory, presentation.logMessage)
             notifyIfEnabled(
                 presentation.notificationType,
-                presentation.notificationTitle.replace("차단됨", "${actionLabel} 처리됨"),
-                presentation.notificationMessage.replace("차단되었습니다", "${actionLabel} 처리되었습니다")
+                processingNotificationTitle,
+                processingNotificationMessage
             )
 
             if (actionConfig.mode == ModerationActionMode.HOLD) {

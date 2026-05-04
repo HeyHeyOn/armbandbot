@@ -905,3 +905,20 @@
 - SHA256: C47FA55DD785ED461076E161F76AA499EC91AC31118223843A58A160A02977C8
 - Beta Drive file ID: 19Zcz-dz2qx9vnI45AcRI4Kd66X08iQdd
 
+## 1.3.8-beta3 배포 완료
+
+### 주요 변화
+- AI 필터 처리 알림을 실제 처리 방식에 맞춰 표시
+  - 차단: `AI 필터 차단 처리됨` / `AI 필터로 게시글 또는 댓글을 차단 처리했습니다.`
+  - 삭제: `AI 필터 삭제 처리됨` / `AI 필터로 게시글 또는 댓글을 삭제 처리했습니다.`
+  - 보류: `AI 필터 보류 처리됨` / `AI 필터로 게시글 또는 댓글을 보류 처리했습니다.`
+- AI 필터로 실제 삭제/차단/보류 처리된 활동 로그가 AI 탭이 아니라 처리 내역 탭으로 분류되도록 로그 카테고리 문구를 처리 방식 포함 형태로 변경
+- 기존 댓글돌이 전역 제외, 댓글 번호 0 안전망, 실패 응답 한글 표시, 동일 실패 재시도 억제는 유지
+
+### 배포 정보
+- versionCode = 93
+- versionName = 1.3.8-beta3
+- APK: 완장봇_v1.3.8-beta3.apk
+- SHA256: B52D0F617063AA1C34E0C769CC53C394A1956249D7AEAECE6ACF093A686A4566
+- Beta Drive file ID: 1eXx9CoFAZULI9gtPgMCOZzV8B8QcwNGR
+
