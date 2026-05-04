@@ -878,3 +878,30 @@
 - SHA256: 76FCF809FFD1569A2F1C6F30923AAA6AA8AE60102455FAF8E5C414AC10682411
 - Beta Drive file ID: 1PMCVeTaDfshyWLOUUCEuhcnGnKIo5Kxw
 
+## 1.3.8-beta2 배포 완료
+
+### 주요 변화
+- 디시 자체 광고/시스템 댓글인 댓글돌이를 전역 검사 대상에서 제외
+  - `nicktype=COMMENT_BOY`, `no=0`, `gallog_icon`의 `cmtboy`, 작성자/시간 정보가 비어 있는 `reply_w=N` 시스템 댓글을 제외
+  - 닉네임 `댓글돌이` 단독 조건은 사용하지 않음
+- 댓글 API 응답을 받은 직후 시스템 댓글을 필터링해 이후 경로가 정상 댓글만 사용하도록 정리
+  - AI 필터 입력
+  - URL/금지어/유저/닉네임 등 일반 댓글 필터
+  - 보류/삭제/차단 처리 후보
+- 스냅샷 저장 댓글 목록에서도 댓글돌이를 제외
+  - 전체 스냅샷
+  - 댓글 삭제 반영 재저장 스냅샷
+  - 댓글 차단 증거 스냅샷 재조회 경로
+- 디버그 모드에서는 제외된 시스템 댓글 수와 실제 검사 대상 댓글 수를 표시
+- beta1의 안전망 유지
+  - 유효하지 않은 댓글 번호 API 호출 방지
+  - 실패 응답 한글 표시
+  - 동일 실패 대상 10분 재시도 억제
+
+### 배포 정보
+- versionCode = 92
+- versionName = 1.3.8-beta2
+- APK: 완장봇_v1.3.8-beta2.apk
+- SHA256: C47FA55DD785ED461076E161F76AA499EC91AC31118223843A58A160A02977C8
+- Beta Drive file ID: 19Zcz-dz2qx9vnI45AcRI4Kd66X08iQdd
+

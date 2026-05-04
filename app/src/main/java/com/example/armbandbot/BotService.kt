@@ -1654,7 +1654,12 @@ class BotService : Service() {
                 .method(org.jsoup.Connection.Method.POST)
                 .execute()
 
-            val commentsJson = JSONObject(commentResponse.body()).optJSONArray("comments") ?: JSONArray()
+            val commentsJson = filterDcUserComments(
+                JSONObject(commentResponse.body()).optJSONArray("comments"),
+                botId = botId,
+                debugMode = config.isDebugMode,
+                contextLabel = "댓글 스냅샷 재조회"
+            ) ?: JSONArray()
             if (commentsJson.length() == 0 && comments.isNotEmpty()) {
                 comments.forEach { cmt ->
                     commentsJson.put(JSONObject().apply {
@@ -2174,9 +2179,15 @@ img.written_dccon{max-width:80px;max-height:80px}
             .ignoreContentType(true)
             .method(org.jsoup.Connection.Method.POST)
             .execute()
-        val commentsArray = org.json.JSONObject(commentResponse.body()).optJSONArray("comments")
+        val rawCommentsArray = org.json.JSONObject(commentResponse.body()).optJSONArray("comments")
+        val commentsArray = filterDcUserComments(
+            rawCommentsArray,
+            botId = botId,
+            debugMode = config.isDebugMode,
+            contextLabel = "게시글 $postNumStr"
+        )
         if (config.isDebugMode) {
-            sendLog("[디버그][게시글] 번호: $postNumStr / 댓글 수 (API): ${commentsArray?.length() ?: 0}", botId)
+            sendLog("[디버그][게시글] 번호: $postNumStr / 댓글 수 (API): ${rawCommentsArray?.length() ?: 0} / 검사 대상: ${commentsArray?.length() ?: 0}", botId)
             sendLog("[디버그][성능] 댓글 fetch / 글번호: $postNumStr / ${System.currentTimeMillis() - commentFetchStartedAt}ms", botId)
         }
         val postText = "$text $contentText"
@@ -2873,7 +2884,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                     .ignoreContentType(true)
                     .method(org.jsoup.Connection.Method.POST)
                     .execute()
-                org.json.JSONObject(latestResponse.body()).optJSONArray("comments")
+                filterDcUserComments(
+                    org.json.JSONObject(latestResponse.body()).optJSONArray("comments"),
+                    botId = botId,
+                    debugMode = config.isDebugMode,
+                    contextLabel = "최신 댓글 스냅샷 재조회"
+                )
             }.onFailure {
                 sendLog("[스냅샷][전체] 최신 댓글 재조회 실패: ${it.javaClass.simpleName} / ${it.message ?: "원인 불명"}", botId)
             }.getOrNull()
@@ -5078,6 +5094,43 @@ img.written_dccon{max-width:80px;max-height:80px}
         return runCatching {
             JSONObject(response).optString("result", "").equals("success", ignoreCase = true)
         }.getOrDefault(false)
+    }
+
+    private fun filterDcUserComments(
+        comments: JSONArray?,
+        botId: String,
+        debugMode: Boolean,
+        contextLabel: String
+    ): JSONArray? {
+        if (comments == null) return null
+        val filtered = JSONArray()
+        var excludedCount = 0
+        for (i in 0 until comments.length()) {
+            val comment = comments.optJSONObject(i) ?: continue
+            if (isDcSystemComment(comment)) {
+                excludedCount++
+                continue
+            }
+            filtered.put(comment)
+        }
+        if (excludedCount > 0 && debugMode) {
+            sendLog("[디버그][댓글 제외] $contextLabel / 디시 시스템 댓글 ${excludedCount}개 제외 / 검사 대상 ${filtered.length()}개", botId)
+        }
+        return filtered
+    }
+
+    private fun isDcSystemComment(comment: JSONObject): Boolean {
+        val no = comment.optString("no", "").trim()
+        val nickType = comment.optString("nicktype", "").trim()
+        val gallogIcon = comment.optString("gallog_icon", "")
+        val replyWrite = comment.optString("reply_w", "").trim()
+        val userId = comment.optString("user_id", "").trim()
+        val ip = comment.optString("ip", "").trim()
+        val regDate = comment.optString("reg_date", "").trim()
+        return nickType.equals("COMMENT_BOY", ignoreCase = true) ||
+            no == "0" ||
+            gallogIcon.contains("cmtboy", ignoreCase = true) ||
+            (replyWrite.equals("N", ignoreCase = true) && userId.isBlank() && ip.isBlank() && regDate.isBlank())
     }
 
     private fun isValidDcCommentNo(commentNo: String): Boolean {
