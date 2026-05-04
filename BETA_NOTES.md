@@ -922,3 +922,28 @@
 - SHA256: B52D0F617063AA1C34E0C769CC53C394A1956249D7AEAECE6ACF093A686A4566
 - Beta Drive file ID: 1eXx9CoFAZULI9gtPgMCOZzV8B8QcwNGR
 
+## 1.3.8 정식 릴리즈 완료
+
+### 주요 변화
+- 디시 자체 광고/시스템 댓글인 댓글돌이를 전역 제외
+  - AI, URL, 금지어, 유저, 닉네임 등 댓글 검사 대상에서 제외
+  - 삭제/차단/보류 처리 후보에서 제외
+  - 전체 스냅샷과 댓글 처리 스냅샷에서도 제외
+  - 판정 기준은 닉네임이 아니라 `COMMENT_BOY`, `no=0`, `cmtboy` 등 시스템 메타데이터
+- AI 필터 처리 결과 표시 개선
+  - AI 알림 문구가 실제 처리 방식(삭제/차단/보류)에 맞게 표시
+  - AI로 실제 처리된 활동 로그는 처리 내역 탭에서 확인 가능
+- 처리 실패 안정성 개선
+  - 유효하지 않은 댓글 번호는 삭제/차단 API 호출 전에 차단
+  - 실패 응답 JSON은 한글 메시지 중심으로 로그 표시
+  - 같은 대상의 반복 실패는 일정 시간 재시도 억제
+- 매뉴얼/패치노트/처음 사용 가이드에 1.3.8 내용 반영
+
+### 릴리즈 정보
+- versionCode = 94
+- versionName = 1.3.8
+- APK: 완장봇_v1.3.8.apk
+- SHA256: 14B5197D527661866115FC92F10F54E1726F4F0DC125DBE936E08C293AE22567
+- Release Drive file ID: 1Ugv0cdaWpdLzNJQ5x7E-dJ0Fe0tbL806
+- Release Drive folder ID: 1zyy7Yl8nmAge83JOaFBONm438432rxA3
+
