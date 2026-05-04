@@ -37,6 +37,7 @@ class BotService : Service() {
     private val pendingAiPostPlans = ConcurrentHashMap<String, MutableList<AiPostExecutionPlan>>()
     private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
     private val spamBurstRecentEvents = ConcurrentHashMap<String, MutableList<SpamBurstEvent>>()
+    private val recentModerationFailures = ConcurrentHashMap<String, Long>()
     private val spamBurstStates = ConcurrentHashMap<String, SpamBurstState>()
     private val lastHealthLogAt = ConcurrentHashMap<String, Long>()
     private val runtimeProtectionLastGcAt = ConcurrentHashMap<String, Long>()
@@ -49,6 +50,7 @@ class BotService : Service() {
     private val maxAiBatchResultEntriesPerBot = 120
     private val maxPendingAiPlansPerBot = 200
     private val maxSpamBurstEventsPerKey = 300
+    private val moderationFailureRetrySuppressMs = 10 * 60 * 1000L
 
     private data class BotConfig(
         val isDebugMode: Boolean,
@@ -498,6 +500,7 @@ class BotService : Service() {
                 pendingAiPostPlans.remove(botId)
                 pendingAiCommentPlans.remove(botId)
                 spamBurstRecentEvents.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstRecentEvents.remove(it) }
+                recentModerationFailures.keys.filter { it.startsWith("$botId:") }.forEach { recentModerationFailures.remove(it) }
                 spamBurstStates.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstStates.remove(it) }
                 lastHealthLogAt.remove(botId)
                 runtimeProtectionLastGcAt.remove(botId)
@@ -4742,6 +4745,18 @@ img.written_dccon{max-width:80px;max-height:80px}
             val requestLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
             sendLog("[디버그][$requestLabel] 게시글 처리 시작 → 번호: $postNumStr / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
+        val failureKey = moderationFailureKey(botId, gallType, gallId, postNumStr, "POST", postNumStr, actionConfig)
+        if (shouldSuppressModerationRetry(failureKey)) {
+            if (config.isDebugMode) sendLog("[디버그][처리 재시도 보류] 최근 실패한 게시글 처리 재시도를 잠시 건너뜀 → 번호: $postNumStr / 정책: ${actionConfig.sourceLabel}", botId)
+            return BlockExecutionResult(
+                blockReason = null,
+                snapshotPath = null,
+                success = true,
+                response = "{\"result\":\"skipped\",\"reason\":\"recent_failure_throttle\"}",
+                deletesTarget = false,
+                mode = actionConfig.mode
+            )
+        }
         val actionResponse = executeModerationAction(
             actionConfig = actionConfig,
             cookie = cookie,
@@ -4753,6 +4768,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             gallType = gallType
         )
         val actionSucceeded = isModerationActionSuccess(actionResponse)
+        if (!actionSucceeded) rememberModerationFailure(failureKey)
         if (config.isDebugMode) {
             val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
             sendLog("[디버그][$modeLabel] 게시글 처리 ${if (actionSucceeded) "성공" else "실패"} → 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
@@ -4799,7 +4815,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         } else {
             val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.HOLD -> "보류"; else -> "차단" }
-            sendLog("[$modeLabel 실패] 게시글 번호: $postNumStr / 응답: ${actionResponse.take(300)}", botId)
+            sendLog("[$modeLabel 실패] 게시글 번호: $postNumStr / 정책: ${actionConfig.sourceLabel} / 응답: ${moderationResponseForLog(actionResponse)}", botId)
         }
 
         return BlockExecutionResult(
@@ -4947,6 +4963,18 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
+        if (!isValidDcCommentNo(commentNo)) {
+            sendLog("[댓글 처리 건너뜀] 유효하지 않은 댓글 번호: $commentNo (게시글: $postNumStr) / 정책: ${actionConfig.sourceLabel}", botId)
+            return BlockExecutionResult(
+                blockReason = null,
+                snapshotPath = null,
+                success = true,
+                response = "{\"result\":\"skipped\",\"reason\":\"invalid_comment_no\"}",
+                deletesTarget = false,
+                mode = actionConfig.mode
+            )
+        }
+
         if (actionConfig.mode == ModerationActionMode.HOLD && GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "COMMENT", commentNo)) {
             if (config.isDebugMode) sendLog("[디버그][보류중복] 댓글 보류 기록이 이미 있어 건너뜀 → 번호: $commentNo (게시글: $postNumStr)", botId)
             return BlockExecutionResult(
@@ -4963,6 +4991,18 @@ img.written_dccon{max-width:80px;max-height:80px}
             val requestLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
             sendLog("[디버그][$requestLabel] 댓글 처리 시작 → 번호: $commentNo (게시글: $postNumStr) / 사유: ${dbBlockReason ?: actionConfig.blockReasonText} / 정책: ${actionConfig.sourceLabel}", botId)
         }
+        val failureKey = moderationFailureKey(botId, gallType, gallId, postNumStr, "COMMENT", commentNo, actionConfig)
+        if (shouldSuppressModerationRetry(failureKey)) {
+            if (config.isDebugMode) sendLog("[디버그][처리 재시도 보류] 최근 실패한 댓글 처리 재시도를 잠시 건너뜀 → 번호: $commentNo (게시글: $postNumStr) / 정책: ${actionConfig.sourceLabel}", botId)
+            return BlockExecutionResult(
+                blockReason = null,
+                snapshotPath = null,
+                success = true,
+                response = "{\"result\":\"skipped\",\"reason\":\"recent_failure_throttle\"}",
+                deletesTarget = false,
+                mode = actionConfig.mode
+            )
+        }
         val actionResponse = executeModerationAction(
             actionConfig = actionConfig,
             cookie = cookie,
@@ -4974,6 +5014,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             gallType = gallType
         )
         val actionSucceeded = isModerationActionSuccess(actionResponse)
+        if (!actionSucceeded) rememberModerationFailure(failureKey)
         if (config.isDebugMode) {
             val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제요청"; ModerationActionMode.HOLD -> "보류처리"; else -> "차단요청" }
             sendLog("[디버그][$modeLabel] 댓글 처리 ${if (actionSucceeded) "성공" else "실패"} → 번호: $commentNo / 응답: ${actionResponse.take(300)}", botId)
@@ -5020,7 +5061,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         } else {
             val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.HOLD -> "보류"; else -> "차단" }
-            sendLog("[$modeLabel 실패] 댓글 번호: $commentNo (게시글: $postNumStr) / 응답: ${actionResponse.take(300)}", botId)
+            sendLog("[$modeLabel 실패] 댓글 번호: $commentNo (게시글: $postNumStr) / 정책: ${actionConfig.sourceLabel} / 응답: ${moderationResponseForLog(actionResponse)}", botId)
         }
 
         return BlockExecutionResult(
@@ -5037,6 +5078,52 @@ img.written_dccon{max-width:80px;max-height:80px}
         return runCatching {
             JSONObject(response).optString("result", "").equals("success", ignoreCase = true)
         }.getOrDefault(false)
+    }
+
+    private fun isValidDcCommentNo(commentNo: String): Boolean {
+        val normalized = commentNo.trim()
+        return normalized.isNotBlank() && normalized != "0" && normalized.all { it.isDigit() }
+    }
+
+    private fun moderationFailureKey(
+        botId: String,
+        gallType: String,
+        gallId: String,
+        postNo: String,
+        targetType: String,
+        targetNo: String,
+        actionConfig: ModerationActionConfig
+    ): String = listOf(botId, gallType, gallId, postNo, targetType, targetNo, actionConfig.mode.name, actionConfig.sourceLabel).joinToString(":")
+
+    private fun shouldSuppressModerationRetry(key: String): Boolean {
+        val now = System.currentTimeMillis()
+        val lastFailedAt = recentModerationFailures[key] ?: return false
+        if (now - lastFailedAt <= moderationFailureRetrySuppressMs) return true
+        recentModerationFailures.remove(key)
+        return false
+    }
+
+    private fun rememberModerationFailure(key: String) {
+        recentModerationFailures[key] = System.currentTimeMillis()
+        if (recentModerationFailures.size > 500) {
+            val cutoff = System.currentTimeMillis() - moderationFailureRetrySuppressMs
+            recentModerationFailures.entries.removeIf { it.value < cutoff }
+        }
+    }
+
+    private fun moderationResponseForLog(response: String): String {
+        val trimmed = response.trim()
+        return runCatching {
+            val json = JSONObject(trimmed)
+            val result = json.optString("result", "").ifBlank { "unknown" }
+            val msg = json.optString("msg", json.optString("message", ""))
+            buildString {
+                append("result=").append(result)
+                if (msg.isNotBlank()) append(" / msg=").append(msg)
+                val code = json.optString("code", "")
+                if (code.isNotBlank()) append(" / code=").append(code)
+            }.ifBlank { trimmed.take(300) }
+        }.getOrElse { trimmed.take(300) }
     }
 
     private fun executeBlockRequest(

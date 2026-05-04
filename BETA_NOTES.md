@@ -856,3 +856,25 @@
 - Release Drive file ID: 1P7Qm-mUDwGQANN47-deo4C32bNIWhc5K
 - Release Drive folder ID: 1zyy7Yl8nmAge83JOaFBONm438432rxA3
 - Google Docs 매뉴얼/패치노트 및 처음 사용자 가이드에 1.3.7 내용 반영
+
+## 1.3.8-beta1 배포 완료
+
+### 주요 변화
+- 처리 실패 로그의 DC 응답 JSON을 사람이 읽을 수 있게 정리
+  - `msg`/`message` 값을 파싱해 `\uc2dc...` 형태 대신 실제 한글 메시지로 표시
+  - 실패 로그에 적용 정책(`ai_override`, `url_override` 등)을 함께 표시해 AI/URL/키워드 경로를 구분 가능
+- 유효하지 않은 댓글 번호 방어 추가
+  - 댓글 번호가 비어 있거나 `0`이면 차단/삭제 API 호출을 하지 않고 건너뜀
+  - `댓글 번호: 0` 대상이 매 사이클 DC 서버 오류를 반복시키는 문제를 차단
+- 반복 실패 재시도 억제 추가
+  - 같은 봇/갤러리/게시글/대상/처리모드/정책 조합이 실패하면 10분간 동일 요청을 건너뜀
+  - 일시적인 DC 서버 오류나 잘못된 대상 번호가 활동 로그를 계속 도배하지 않도록 완화
+- 봇 정지 시 최근 처리 실패 억제 상태도 함께 정리
+
+### 배포 정보
+- versionCode = 91
+- versionName = 1.3.8-beta1
+- APK: 완장봇_v1.3.8-beta1.apk
+- SHA256: 76FCF809FFD1569A2F1C6F30923AAA6AA8AE60102455FAF8E5C414AC10682411
+- Beta Drive file ID: 1PMCVeTaDfshyWLOUUCEuhcnGnKIo5Kxw
+
