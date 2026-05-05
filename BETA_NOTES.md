@@ -1,3 +1,20 @@
+﻿## 1.4.0 beta12 (최신 업로드본)
+
+### 주요 변화
+- beta11 AI 필터 설정 진입 크래시 수정
+  - 로그캣 원인: `IllegalStateException: Vertically scrollable component was measured with an infinity maximum height constraints`
+  - `AiFilterSettingsPanel`이 이미 스크롤되는 봇 상세 화면 안에서 다시 `verticalScroll()`을 사용해 발생
+  - 패널 내부 `verticalScroll(rememberScrollState())` 제거, 상위 상세 화면 스크롤만 사용하도록 변경
+- beta11의 AI 필터 전체 분리 구조는 유지
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta12.apk`
+- SHA256: `FADA2C9E6C3CFDC0171DBCC04A263F4B0C16632B3DC20E350ACA23789D1D6434`
+- Google Drive file ID: `1_nCUNCE8BsXUVQ2KqMAfvSqxhRi9lP4B`
+
+### 다음 작업 메모
+- beta12에서 확인할 것: 봇 상세 진입 → AI 필터 설정 진입 → 화면 스크롤/저장 동작.
 ## 1.4.0 beta11 (최신 업로드본)
 
 ### 주요 변화
@@ -1164,4 +1181,5 @@
 - SHA256: 14B5197D527661866115FC92F10F54E1726F4F0DC125DBE936E08C293AE22567
 - Release Drive file ID: 1Ugv0cdaWpdLzNJQ5x7E-dJ0Fe0tbL806
 - Release Drive folder ID: 1zyy7Yl8nmAge83JOaFBONm438432rxA3
+
 
