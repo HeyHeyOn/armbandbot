@@ -1,3 +1,21 @@
+## 1.4.0 beta9 (최신 업로드본)
+
+### 주요 변화
+- AI 필터 타임아웃 조절 UI 재추가
+  - `배치 기준` 카드에 `호출 타임아웃(초)` 버튼 추가
+  - 저장 key: `ai_filter_timeout_sec`
+  - 기본값: 20초, 최소 저장값: 5초
+  - LM Studio/로컬 LLM처럼 응답이 느린 환경에서는 60~180초 입력 권장
+- beta5~beta7의 상세 페이지 `VerifyError` 재발 방지
+  - timeout 버튼을 `BotDetailScreen` 본문에 직접 늘리지 않고 `AiBatchSettingsCard` 별도 Composable로 분리
+  - 기존 배치 기준 버튼 3개도 함께 분리해 `BotDetailScreen` 메서드 크기 증가를 완화
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta9.apk`
+- SHA256: `0DF3FE404B6C8989399E0CA9ACDC4DEE53EC6A9173F0DF1D2552568EFD2F2F07`
+- Google Drive file ID: `1lse4weSnxTmXEHxVftT5a5UasoaQl7Ky`
+
 ## 1.4.0 beta8 (최신 업로드본)
 
 ### 주요 변화

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,6 +59,44 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private fun SharedPreferences.safeInt(key: String, defaultValue: Int): Int = when (val value = all[key]) {
+    is Int -> value
+    is String -> value.toIntOrNull() ?: defaultValue
+    is Long -> value.toInt()
+    is Float -> value.toInt()
+    else -> defaultValue
+}
+
+@Composable
+private fun AiBatchSettingsCard(
+    isDarkMode: Boolean,
+    cardColor: Color,
+    textColor: Color,
+    subTextColor: Color,
+    maxPostsText: String,
+    maxWaitSecText: String,
+    maxWeightText: String,
+    timeoutSecText: String,
+    onEdit: (type: String, value: String) -> Unit,
+) {
+    val buttonContainerColor = if (isDarkMode) Color(0xFF37474F) else PastelNavyLight
+    val buttonContentColor = if (isDarkMode) Color.White else PastelNavy
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.padding(bottom = 12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("배치 기준", fontWeight = FontWeight.Bold, color = textColor)
+            Text("용량 중심 + 글 수/시간 보조 기준으로 배치를 발사합니다.", fontSize = 12.sp, color = subTextColor)
+            Button(onClick = { onEdit("ai_filter_batch_max_posts", maxPostsText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("최대 글 수: $maxPostsText") }
+            Button(onClick = { onEdit("ai_filter_batch_max_wait_sec", maxWaitSecText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("최대 대기 시간(초): $maxWaitSecText") }
+            Button(onClick = { onEdit("ai_filter_batch_max_weight", maxWeightText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("최대 누적 용량: $maxWeightText") }
+            Button(onClick = { onEdit("ai_filter_timeout_sec", timeoutSecText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("호출 타임아웃(초): $timeoutSecText") }
+        }
+    }
+}
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -509,6 +548,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var aiFilterBatchMaxPostsText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_posts", 5).toString()) }
         var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_wait_sec", 5).toString()) }
         var aiFilterBatchMaxWeightText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_weight", 20000).toString()) }
+        var aiFilterTimeoutSecText by remember { mutableStateOf(botPref.safeInt("ai_filter_timeout_sec", 20).toString()) }
         var notiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
         var aiUseCustomAction by remember { mutableStateOf(botPref.getBoolean("ai_use_custom_action_config", false)) }
         var aiActionMode by remember { mutableStateOf(if (botPref.getBoolean("ai_delete_only_mode", false)) "delete" else "block") }
@@ -1410,14 +1450,18 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             }
                                         }
 
-                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                Text("배치 기준", fontWeight = FontWeight.Bold, color = textColor)
-                                                Text("용량 중심 + 글 수/시간 보조 기준으로 배치를 발사합니다.", fontSize = 12.sp, color = subTextColor)
-                                                Button(onClick = { tempEditText = aiFilterBatchMaxPostsText; editDialogType = "ai_filter_batch_max_posts" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 글 수: ${aiFilterBatchMaxPostsText}") }
-                                                Button(onClick = { tempEditText = aiFilterBatchMaxWaitSecText; editDialogType = "ai_filter_batch_max_wait_sec" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 대기 시간(초): ${aiFilterBatchMaxWaitSecText}") }
-                                                Button(onClick = { tempEditText = aiFilterBatchMaxWeightText; editDialogType = "ai_filter_batch_max_weight" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 누적 용량: ${aiFilterBatchMaxWeightText}") }
-                                            }
+                                        AiBatchSettingsCard(
+                                            isDarkMode = isDarkMode,
+                                            cardColor = cardColor,
+                                            textColor = textColor,
+                                            subTextColor = subTextColor,
+                                            maxPostsText = aiFilterBatchMaxPostsText,
+                                            maxWaitSecText = aiFilterBatchMaxWaitSecText,
+                                            maxWeightText = aiFilterBatchMaxWeightText,
+                                            timeoutSecText = aiFilterTimeoutSecText,
+                                        ) { type, value ->
+                                            tempEditText = value
+                                            editDialogType = type
                                         }
 
                                         Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
@@ -2121,6 +2165,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "ai_filter_batch_max_posts" -> { aiFilterBatchMaxPostsText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_posts", tempEditText.trim().toIntOrNull() ?: 5).apply() }
                         "ai_filter_batch_max_wait_sec" -> { aiFilterBatchMaxWaitSecText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_wait_sec", tempEditText.trim().toIntOrNull() ?: 5).apply() }
                         "ai_filter_batch_max_weight" -> { aiFilterBatchMaxWeightText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_weight", tempEditText.trim().toIntOrNull() ?: 20000).apply() }
+                        "ai_filter_timeout_sec" -> { val saved = (tempEditText.trim().toIntOrNull() ?: 20).coerceAtLeast(5); aiFilterTimeoutSecText = saved.toString(); botPref.edit().putInt("ai_filter_timeout_sec", saved).apply() }
                     }
                     editDialogType = null; Toast.makeText(context, "저장되었습니다.", Toast.LENGTH_SHORT).show()
                 }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("저장", color = Color.White) } },
