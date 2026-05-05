@@ -63,6 +63,7 @@ internal data class AiFilterDecision(
     val category: String,
     val confidence: Int,
     val rawJson: String,
+    val evidence: String = "",
 )
 
 internal data class AiFilterCommentDecision(
@@ -101,19 +102,22 @@ internal class AiFilterClient(
         기존 1차 룰 기반 필터를 통과한 게시글 묶음을 입력으로 받습니다.
         입력은 항상 원문 전체이며, 게시글과 댓글을 반드시 분리해서 판단해야 합니다.
         출력은 아래 압축 줄 형식만 허용됩니다. JSON, 마크다운, 설명, 코드블록 금지.
-        형식: TYPE|ID|DECISION|REASON
+        형식: TYPE|POST_ID|COMMENT_ID|DECISION|REASON|EVIDENCE
         TYPE: 게시글은 P, 댓글은 C
-        ID: 게시글 번호 또는 댓글 번호
+        POST_ID: 게시글 번호
+        COMMENT_ID: 댓글은 댓글 번호, 게시글은 -
         DECISION: 0=허용, 1=보류, 2=차단
         REASON: 판단 이유. 반드시 10글자 이내의 짧은 한국어.
-        게시글 번호는 반드시 P 줄에만 출력하세요. C 줄에는 댓글 번호만 출력하세요.
-        댓글 번호는 반드시 C 줄에만 출력하세요. P 줄에는 게시글 번호만 출력하세요.
-        게시글 번호를 C 줄에 쓰거나 댓글 번호를 P 줄에 쓰는 것은 금지입니다.
+        EVIDENCE: 2=차단일 때만 현재 항목 원문에 실제로 포함된 짧은 근거 조각. 허용/보류는 -.
+        근거 조각에는 | 문자를 쓰지 마세요.
+        게시글 번호는 반드시 POST_ID 칸에만 출력하세요.
+        댓글 번호는 반드시 COMMENT_ID 칸에만 출력하세요.
+        댓글은 POST_ID와 COMMENT_ID가 모두 입력과 정확히 일치해야 합니다.
         게시글과 댓글은 각각 한 줄씩 출력하세요.
         예시:
-        P|123123|0|문제없음
-        C|126|2|광고성
-        C|127|0|단순호응
+        P|123123|-|0|문제없음|-
+        C|123123|126|2|욕설포함|씨발
+        C|123123|127|0|단순호응|-
         게시글 판단과 댓글 판단은 별개입니다.
         게시글이 정상이고 댓글만 문제인 경우 게시글은 0, 댓글만 2로 출력하세요.
         애매하거나 판단 근거가 부족하면 1을 선택하세요.
@@ -130,6 +134,9 @@ internal class AiFilterClient(
         이전 줄에서 차단 대상이 나왔더라도 다음 줄의 차단 근거로 전염시키지 마세요.
         특정 글/댓글에서 발견한 금지 주제나 분위기를 다른 글/댓글에 일반화하지 마세요.
         현재 항목 텍스트 안에 user_prompt 위반 근거가 직접 없으면 0을 출력하세요.
+        2를 출력하려면 EVIDENCE가 현재 항목 텍스트 안에 실제로 포함되어 있어야 합니다.
+        댓글 판단의 EVIDENCE는 해당 댓글 본문에서만 가져오고, 게시글 제목/본문이나 다른 댓글에서 가져오면 안 됩니다.
+        게시글 판단의 EVIDENCE는 해당 게시글 제목/본문에서만 가져오고, 댓글에서 가져오면 안 됩니다.
         현재 항목 텍스트에 직접 나타난 근거만 사용하세요.
         유사 표현, 연상, 비슷한 어감, 느슨한 의미 확장만으로 차단하지 마세요.
         한 항목이 차단 대상이어도 다른 항목은 처음부터 별도로 다시 판단해야 합니다.
@@ -509,7 +516,7 @@ internal class AiFilterClient(
     private fun parseCompactBatchResponse(content: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation? {
         val requestPostMap = request.posts.associateBy { it.postNo }
         val requestCommentMap = request.posts
-            .flatMap { post -> post.comments.map { comment -> comment.commentId to post.postNo } }
+            .flatMap { post -> post.comments.map { comment -> "${post.postNo}:${comment.commentId}" to comment } }
             .toMap()
         val postDecisionMap = linkedMapOf<String, AiFilterDecision>()
         val commentDecisionMap = linkedMapOf<String, MutableList<AiFilterCommentDecision>>()
@@ -520,36 +527,58 @@ internal class AiFilterClient(
             .filter { it.isNotBlank() }
             .forEach { line ->
                 val cleanLine = line.removePrefix("`").removeSuffix("`").trim()
-                val parts = cleanLine.split("|", limit = 4)
-                if (parts.size < 4) return@forEach
+                val parts = cleanLine.split("|", limit = 6)
+                if (parts.size < 6) {
+                    logger("AI compact 파싱 무시: beta16 6필드 형식 아님 / line=${cleanLine.take(120)}")
+                    return@forEach
+                }
                 val type = parts[0].trim().uppercase()
-                val id = parts[1].trim()
-                val action = parts[2].trim()
-                val reason = parts[3].trim()
-                val decision = parseDecision(
-                    actionRaw = action,
-                    reason = reason,
-                    reviewMode = config.reviewMode,
-                    rawText = cleanLine
-                ) ?: return@forEach
+                val postId = parts[1].trim()
+                val commentId = parts[2].trim()
+                val action = parts[3].trim()
+                val reason = parts[4].trim()
+                val evidence = parts[5].trim().removeSurrounding("\"")
 
                 when (type) {
                     "P" -> {
-                        if (requestPostMap.containsKey(id)) {
-                            postDecisionMap[id] = decision
-                            parsedLineCount++
-                        } else {
-                            logger("AI compact 파싱 무시: 요청에 없는 post_no=$id")
+                        val post = requestPostMap[postId]
+                        if (post == null) {
+                            logger("AI compact 파싱 무시: 요청에 없는 post_no=$postId")
+                            return@forEach
                         }
+                        if (commentId != "-" && commentId.isNotBlank()) {
+                            logger("AI compact 파싱 무시: 게시글 줄 COMMENT_ID 오류 / post_no=$postId / comment_id=$commentId")
+                            return@forEach
+                        }
+                        val sourceText = listOf(post.title, post.body).joinToString("\n")
+                        val decision = parseDecision(
+                            actionRaw = action,
+                            reason = reason,
+                            evidence = evidence,
+                            sourceText = sourceText,
+                            reviewMode = config.reviewMode,
+                            rawText = cleanLine
+                        ) ?: return@forEach
+                        postDecisionMap[postId] = decision
+                        parsedLineCount++
                     }
                     "C" -> {
-                        val postNo = requestCommentMap[id]
-                        if (postNo != null) {
-                            commentDecisionMap.getOrPut(postNo) { mutableListOf() } += AiFilterCommentDecision(id, decision)
-                            parsedLineCount++
-                        } else {
-                            logger("AI compact 파싱 무시: 요청에 없는 comment_id=$id")
+                        val key = "$postId:$commentId"
+                        val comment = requestCommentMap[key]
+                        if (comment == null) {
+                            logger("AI compact 파싱 무시: 요청에 없는 comment_key=$key")
+                            return@forEach
                         }
+                        val decision = parseDecision(
+                            actionRaw = action,
+                            reason = reason,
+                            evidence = evidence,
+                            sourceText = comment.body,
+                            reviewMode = config.reviewMode,
+                            rawText = cleanLine
+                        ) ?: return@forEach
+                        commentDecisionMap.getOrPut(postId) { mutableListOf() } += AiFilterCommentDecision(commentId, decision)
+                        parsedLineCount++
                     }
                 }
             }
@@ -557,11 +586,22 @@ internal class AiFilterClient(
         if (parsedLineCount == 0) return null
 
         val postDecisions = request.posts.mapNotNull { post ->
-            val postDecision = postDecisionMap[post.postNo] ?: return@mapNotNull null
+            val commentDecisions = commentDecisionMap[post.postNo].orEmpty()
+            val postDecision = postDecisionMap[post.postNo] ?: if (commentDecisions.isNotEmpty()) {
+                AiFilterDecision(
+                    type = AiFilterDecisionType.ALLOW,
+                    reason = "댓글만판단",
+                    category = "other",
+                    confidence = 0,
+                    rawJson = "implicit-post-allow"
+                )
+            } else {
+                return@mapNotNull null
+            }
             AiFilterPostDecision(
                 postNo = post.postNo,
                 decision = postDecision,
-                commentDecisions = commentDecisionMap[post.postNo].orEmpty()
+                commentDecisions = commentDecisions
             )
         }
         logger("AI compact 파싱 완료: lines=$parsedLineCount / postDecisions=${postDecisions.size}")
@@ -571,13 +611,28 @@ internal class AiFilterClient(
     private fun parseDecision(
         actionRaw: String,
         reason: String,
+        evidence: String = "",
+        sourceText: String = "",
         reviewMode: Boolean,
         rawText: String,
     ): AiFilterDecision? {
-        val type = when (actionRaw.trim().uppercase()) {
+        val rawAction = actionRaw.trim().uppercase()
+        val normalizedEvidence = evidence.trim().take(40)
+        val hasEvidence = normalizedEvidence.isNotBlank() && normalizedEvidence != "-"
+        val evidenceMatches = hasEvidence && containsEvidence(sourceText, normalizedEvidence)
+        val type = when (rawAction) {
             "0", "ALLOW", "PASS" -> AiFilterDecisionType.ALLOW
             "1", "REVIEW" -> AiFilterDecisionType.REVIEW
-            "2", "BLOCK" -> if (reviewMode) AiFilterDecisionType.REVIEW else AiFilterDecisionType.BLOCK
+            "2", "BLOCK" -> {
+                if (!evidenceMatches) {
+                    logger("AI 차단 무효화: 근거 불일치 / evidence=${normalizedEvidence.take(20)} / raw=${rawText.take(120)}")
+                    AiFilterDecisionType.ALLOW
+                } else if (reviewMode) {
+                    AiFilterDecisionType.REVIEW
+                } else {
+                    AiFilterDecisionType.BLOCK
+                }
+            }
             else -> return null
         }
         return AiFilterDecision(
@@ -586,6 +641,27 @@ internal class AiFilterClient(
             category = "other",
             confidence = 0,
             rawJson = rawText,
+            evidence = if (evidenceMatches) normalizedEvidence else "",
         )
     }
+
+    private fun containsEvidence(sourceText: String, evidence: String): Boolean {
+        val normalizedSource = normalizeEvidenceText(sourceText)
+        val normalizedEvidence = normalizeEvidenceText(evidence)
+        return normalizedEvidence.isNotBlank() && normalizedSource.contains(normalizedEvidence)
+    }
+
+    private fun normalizeEvidenceText(value: String): String {
+        return value
+            .replace(Regex("<[^>]+>"), "")
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace(Regex("\\s+"), "")
+            .lowercase()
+    }
+
 }

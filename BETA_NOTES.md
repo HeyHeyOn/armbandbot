@@ -1,4 +1,31 @@
-﻿## 1.4.0 beta15 (최신 업로드본)
+﻿## 1.4.0 beta16 (최신 업로드본)
+
+### 주요 변화
+- AI compact 응답 형식을 composite key + evidence 방식으로 변경
+  - 새 형식: `TYPE|POST_ID|COMMENT_ID|DECISION|REASON|EVIDENCE`
+  - 게시글 예: `P|123123|-|0|문제없음|-`
+  - 댓글 예: `C|123123|456|2|욕설포함|씨발`
+- 댓글 차단 신호의 글/댓글 매칭 안전성 강화
+  - 댓글 판정은 `postNo + commentNo`가 모두 요청 입력과 일치해야만 반영
+  - 동일 댓글 번호가 다른 글에 있어도 잘못된 글의 댓글로 연결되지 않도록 변경
+- AI 차단 evidence 검증 추가
+  - `2=차단` 응답은 EVIDENCE가 해당 항목 원문에 실제 포함되어야만 유효
+  - 댓글 evidence는 해당 댓글 본문에서만 인정
+  - 게시글 evidence는 해당 게시글 제목/본문에서만 인정
+  - 근거가 없거나 다른 항목에서 가져온 근거면 차단을 허용으로 무효화
+- 댓글만 판정되고 게시글 P 줄이 빠진 경우에도 댓글 판정을 보존하도록 보강
+  - 부모 게시글 판정은 내부적으로 허용 처리하고 댓글 판정만 적용
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta16.apk`
+- SHA256: `71A96D5DDA662CA332CAE9AC3D2D7166727FDAD57DCEDE4EB1FA94D51D7FA249`
+- Google Drive file ID: `1Ztl4N2AmnJy8SINRfnKuYtFGZowVsdBq`
+
+### 다음 작업 메모
+- beta16에서 확인할 것: AI 응답이 새 6필드 형식을 따르는지, `AI 차단 무효화: 근거 불일치` 로그가 과도하게 나오지 않는지, 같은 사유가 여러 댓글에 복붙되어도 evidence가 없는 댓글은 보류/삭제되지 않는지.
+
+## 1.4.0 beta15 (최신 업로드본)
 
 ### 주요 변화
 - AI compact 응답의 P/C 타입 혼동 방지 프롬프트 강화
