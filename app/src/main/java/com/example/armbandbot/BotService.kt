@@ -2150,9 +2150,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         val contentText = postDoc.select(".write_div").text()
         val postRawHtml = postDoc.select(".write_div").outerHtml()
-        val postImageAlts = postDoc.select(".write_div img")
-            .mapNotNull { it.attr("alt") }
-            .filter { it.isNotBlank() }
+        val postImageAlts = extractNonDcconImageAltsFromPost(postDoc)
 
         val freshCiToken = postDoc.select("input[name=ci_t]").attr("value")
         val esnoToken = postDoc.select("input[id=e_s_n_o]").attr("value")
@@ -3387,6 +3385,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         if (cleanedKeyword.isEmpty()) return Regex("$^")
 
         val hasKorean = cleanedKeyword.any { it in '가'..'힣' }
+        val hasUpperLatin = cleanedKeyword.any { it in 'A'..'Z' }
 
         // 한글이 포함된 금지어:
         // 글자 사이에 "한글이 아닌 것"만 끼어들면 우회로 간주해서 잡음
@@ -3405,7 +3404,31 @@ img.written_dccon{max-width:80px;max-height:80px}
             .toCharArray()
             .joinToString(separator) { Regex.escape(it.toString()) }
 
-        return Regex(pattern, RegexOption.IGNORE_CASE)
+        // 영문 대문자를 포함한 우회 금지어는 사용자가 대소문자까지 의도한 것으로 본다.
+        // 예: "AV"가 댓글 멘션 HTML의 javascript:... 안에 있는 "av"와 매칭되는 오탐 방지.
+        val options = if (hasUpperLatin) emptySet() else setOf(RegexOption.IGNORE_CASE)
+
+        return Regex(pattern, options)
+    }
+
+    private fun isDcconElement(element: org.jsoup.nodes.Element): Boolean {
+        val src = element.attr("src")
+        return element.hasClass("written_dccon") ||
+                src.contains("dccon.php", ignoreCase = true) ||
+                element.hasAttr("conalt") ||
+                element.hasAttr("data-dcconoverstatus")
+    }
+
+    private fun extractNonDcconImageAltsFromPost(postDoc: org.jsoup.nodes.Document): List<String> {
+        return postDoc.select(".write_div img")
+            .filterNot { isDcconElement(it) }
+            .mapNotNull { it.attr("alt") }
+            .filter { it.isNotBlank() }
+    }
+
+    private fun extractVisibleTextFromHtmlFragment(rawHtml: String): String {
+        if (rawHtml.isBlank()) return ""
+        return Jsoup.parseBodyFragment(rawHtml).body().text()
     }
 
     private fun getGallogStats(
@@ -4465,6 +4488,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         val spamCodeRegex = if (toggles.spamEnabled) buildSpamCodeRegex(config) else null
+        val commentVisibleText = extractVisibleTextFromHtmlFragment(commentMemo)
 
         if (isWhitelistedUser && config.isDebugMode && botId.isNotEmpty()) {
             sendLog("[디버그][필터/화이트] 화이트리스트 댓글 작성자 → 이후 모든 필터 통과", botId)
@@ -4536,15 +4560,15 @@ img.written_dccon{max-width:80px;max-height:80px}
                 isBadComment = true
             } else {
                 val matchedNormalWord =
-                    if (toggles.keywordEnabled) config.normalWords.firstOrNull { commentMemo.contains(it, ignoreCase = true) } else null
+                    if (toggles.keywordEnabled) config.normalWords.firstOrNull { commentVisibleText.contains(it, ignoreCase = true) } else null
 
                 val matchedBypassWord =
-                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(commentMemo) } else null
+                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(commentVisibleText) } else null
 
                 suspiciousUrlInComment =
-                    if (toggles.urlEnabled) getSuspiciousUrl(commentMemo, config.urlWhitelistList) else null
+                    if (toggles.urlEnabled) getSuspiciousUrl(commentVisibleText, config.urlWhitelistList) else null
 
-                spamCodeMatchComment = spamCodeRegex?.find(commentMemo)?.value
+                spamCodeMatchComment = spamCodeRegex?.find(commentVisibleText)?.value
 
                 if (config.isDebugMode && botId.isNotEmpty()) {
                     if (toggles.keywordEnabled) {

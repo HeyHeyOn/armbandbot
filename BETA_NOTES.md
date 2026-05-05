@@ -1,3 +1,24 @@
+## 1.4.0 beta1 (최신 업로드본)
+
+### 주요 변화
+- 금지어 필터 오탐 수정 1차 반영
+  - 댓글 금지어/URL/스팸코드 검사는 API `memo` HTML 원문이 아니라 Jsoup 표시 텍스트 기준으로 수행
+  - 멘션 HTML의 `href="javascript:focusComment(...)"` 내부 문자열이 우회 금지어로 잡히는 문제 방지
+  - 영문 대문자를 포함한 우회 금지어는 대소문자 구분 매칭으로 변경해 `AV`가 `javascript`의 `av`에 매칭되지 않도록 수정
+- 디시콘 이미지 첨부 오탐 수정
+  - 게시글 이미지 첨부 판정에서 `img.written_dccon`, `dccon.php`, `conalt`, `data-dcconoverstatus` 디시콘 요소 제외
+  - 유동/깡계 이미지 첨부 금지에서 디시콘만 포함된 글이 이미지 첨부로 처리되지 않도록 수정
+- 테스트 게시글 `armbandbot/201` 구조 분석 반영
+  - 본문 디시콘은 `.write_div img.written_dccon` 형태
+  - 댓글 디시콘은 API `memo`에 `<img class="written_dccon" src="...dccon.php...">` 형태
+  - 대댓글 멘션은 API `memo`에 `<a href="javascript:focusComment(...)" class="mention">...</a>` 형태
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta1.apk`
+- SHA256: `911A7E003F62E0913F98896B457B44F55BC918196BD051B4C59AE1F5AC77D706`
+- Google Drive file ID: `1AuiOzXycFWJfxnJdiIHZ_xsWaSkiYEdr`
+
 
 ## 1.3.0 beta1 (최신 업로드본)
 
