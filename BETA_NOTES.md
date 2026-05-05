@@ -1,3 +1,25 @@
+## 1.4.0 beta11 (최신 업로드본)
+
+### 주요 변화
+- 봇 상세 페이지 `VerifyError` 추가 대응
+  - beta10 로그에서도 동일한 `Verifier rejected class ... BotDetailScreenKt.BotDetailScreen ... invalid arg count` 확인
+  - 작은 카드 분리로는 부족해, AI 필터 설정 UI 전체를 `AiFilterSettingsPanel.kt` 별도 Composable/file로 분리
+  - `BotDetailScreen.kt` 내부 AI 설정 본문 약 300줄 제거, 상세 화면에는 `AiFilterSettingsPanel(botId)` 호출만 남김
+- AI timeout UI 유지
+  - `호출 타임아웃(초)` 설정 포함
+  - key `ai_filter_timeout_sec`, 기본값 20초, 최소 5초
+- AI 설정 UI는 독립 패널에서 SharedPreferences를 직접 읽고 저장하도록 변경
+  - provider / endpoint / API key / model / prompt / batch / timeout / AI 개별 차단 설정 포함
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta11.apk`
+- SHA256: `B73FC990E739206DCE2239CE68CC3D1951215B20D3B2E8E0729F150A29B9E6DD`
+- Google Drive file ID: `1XlcvvdsUnrnbxmx7jbv-wjlnN6PKCFI3`
+
+### 다음 작업 메모
+- beta11에서도 VerifyError가 남으면 AI 외 섹션도 추가 분리해야 함. 하지만 이번에는 상세 본문에서 AI 섹션 전체를 제거했으므로 가장 유력한 한계 초과 원인을 크게 줄인 상태.
+
 ## 1.4.0 beta10 (최신 업로드본)
 
 ### 주요 변화
