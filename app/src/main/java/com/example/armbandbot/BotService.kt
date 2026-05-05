@@ -494,6 +494,21 @@ class BotService : Service() {
         }
     }
 
+    private fun isDeletedCommentMemo(memo: String): Boolean {
+        val visible = extractVisibleTextFromHtmlFragment(memo).trim()
+        if (visible.isBlank()) return true
+        val compact = visible.replace(" ", "")
+        return compact == "해당댓글은삭제되었습니다." ||
+            compact == "삭제된댓글입니다." ||
+            compact == "삭제되었습니다." ||
+            compact.contains("해당댓글은삭제되었습니다")
+    }
+
+    private fun formatAiBlockReason(reason: String?): String {
+        val normalized = reason.orEmpty().removePrefix("[AI]").trim()
+        return if (normalized.isBlank()) "[AI] AI 필터 작동" else "[AI] $normalized"
+    }
+
     private fun cleanupRuntimeState(botId: String, aggressive: Boolean = false) {
         runCatching {
             if (aggressive) {
@@ -2434,6 +2449,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             val cmtNick = commentObj.optString("name", "")
                             val cmtAuthor = cmtUid.ifEmpty { cmtIp }
                             val commentMemo = commentObj.optString("memo", "")
+                            if (isDeletedCommentMemo(commentMemo)) continue
                             add(
                                 AiFilterCommentInput(
                                     commentId = commentNo,
@@ -2759,7 +2775,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         suspiciousUrlInComment = null,
                                         spamCodeMatchComment = null,
                                         notifyIfEnabled = notifyIfEnabled,
-                                        debugDetail = "AI 댓글 배치 즉시집행",
+                                        debugDetail = commentDecision.decision.reason,
                                         saveSnapshotFn = {
                                             if (config.isDebugMode && botId.isNotEmpty()) {
                                                 sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 스냅샷 시도 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId}", botId)
@@ -3058,7 +3074,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 }
             }
         } else if (postAnalysis.action == PostModerationAction.REVIEW_ONLY || aiDecision?.type == AiFilterDecisionType.REVIEW) {
-            val reviewReason = aiReviewReason ?: postAnalysis.reviewReason ?: postAnalysis.aiReviewReason ?: "AI 검토 필요"
+            val reviewReason = formatAiBlockReason(aiReviewReason ?: postAnalysis.reviewReason ?: postAnalysis.aiReviewReason ?: "AI 검토 필요")
             sendLog("[AI 검토] 번호: $postNumStr / $reviewReason", botId)
             if (config.isNotiMaster) {
                 sendBlockNotification(botId, botName = botId, title = "AI 검토 필요", message = "글 번호 $postNumStr / $reviewReason")
@@ -5424,7 +5440,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             aiDecision != null || aiReviewReason != null -> BlockPresentation(
                 blockReason = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 작동" else "AI 필터 검토 필요",
-                detailedBlockReason = debugDetail ?: aiReviewReason ?: aiDecision?.reason ?: "AI 필터 검토 필요",
+                detailedBlockReason = formatAiBlockReason(debugDetail ?: aiReviewReason ?: aiDecision?.reason ?: "AI 필터 검토 필요"),
                 logCategory = if (aiDecision?.type == AiFilterDecisionType.BLOCK) "AI 필터 작동" else "AI 필터 검토",
                 logMessage = "번호: $postNumStr",
                 notificationType = "ai",
@@ -5533,7 +5549,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             notiTypeCmt == "ai" -> BlockPresentation(
                 blockReason = "AI 필터 작동",
-                detailedBlockReason = debugDetail ?: blockReasonPrefixCmt ?: "AI 필터 작동",
+                detailedBlockReason = formatAiBlockReason(debugDetail ?: blockReasonPrefixCmt ?: "AI 필터 작동"),
                 logCategory = "AI 필터 작동",
                 logMessage = "작성자: $cmtDisplayAuthor",
                 notificationType = "ai",
