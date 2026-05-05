@@ -3977,38 +3977,48 @@ img.written_dccon{max-width:80px;max-height:80px}
     }
 
     private fun loadBotConfig(botPref: android.content.SharedPreferences): BotConfig {
-        val rawUrlsText = botPref.getString("target_urls", "") ?: ""
-        val targetUrls = rawUrlsText
-            .split("\n")
-            .map { it.removeCommentAndTrim() }
-            .filter { it.isNotEmpty() }
-            .map { convertToPcUrl(it) }
-
-        val postMinMs = (botPref.getFloat("delay_post_min_sec", 1.0f) * 1000).toLong()
-        val postMaxMs = maxOf((botPref.getFloat("delay_post_max_sec", 2.5f) * 1000).toLong(), postMinMs + 1L)
-
-        val pageMinMs = (botPref.getFloat("delay_page_min_sec", 2.0f) * 1000).toLong()
-        val pageMaxMs = maxOf((botPref.getFloat("delay_page_max_sec", 4.0f) * 1000).toLong(), pageMinMs + 1L)
-
-        val cycleMinMs = (botPref.getFloat("delay_cycle_min_sec", 45.0f) * 1000).toLong()
-        val cycleMaxMs = maxOf((botPref.getFloat("delay_cycle_max_sec", 90.0f) * 1000).toLong(), cycleMinMs + 1L)
         fun safePrefString(key: String, defaultValue: String): String = (botPref.all[key] as? String) ?: defaultValue
         fun safePrefInt(key: String, defaultValue: Int): Int = when (val value = botPref.all[key]) {
             is Int -> value
             is String -> value.toIntOrNull() ?: defaultValue
             is Long -> value.toInt()
             is Float -> value.toInt()
+            is Double -> value.toInt()
             else -> defaultValue
         }
+        fun safePrefFloat(key: String, defaultValue: Float): Float = when (val value = botPref.all[key]) {
+            is Float -> value
+            is Int -> value.toFloat()
+            is Long -> value.toFloat()
+            is Double -> value.toFloat()
+            is String -> value.toFloatOrNull() ?: defaultValue
+            else -> defaultValue
+        }
+
+        val rawUrlsText = safePrefString("target_urls", "")
+        val targetUrls = rawUrlsText
+            .split("\n")
+            .map { it.removeCommentAndTrim() }
+            .filter { it.isNotEmpty() }
+            .map { convertToPcUrl(it) }
+
+        val postMinMs = (safePrefFloat("delay_post_min_sec", 1.0f) * 1000).toLong()
+        val postMaxMs = maxOf((safePrefFloat("delay_post_max_sec", 2.5f) * 1000).toLong(), postMinMs + 1L)
+
+        val pageMinMs = (safePrefFloat("delay_page_min_sec", 2.0f) * 1000).toLong()
+        val pageMaxMs = maxOf((safePrefFloat("delay_page_max_sec", 4.0f) * 1000).toLong(), pageMinMs + 1L)
+
+        val cycleMinMs = (safePrefFloat("delay_cycle_min_sec", 45.0f) * 1000).toLong()
+        val cycleMaxMs = maxOf((safePrefFloat("delay_cycle_max_sec", 90.0f) * 1000).toLong(), cycleMinMs + 1L)
 
         return BotConfig(
             isDebugMode = botPref.getBoolean("is_debug_mode", false),
             isExpertMode = botPref.getBoolean("is_expert_mode", false),
-            snapshotKeepDays = botPref.getInt("snapshot_keep_days", 7),
+            snapshotKeepDays = safePrefInt("snapshot_keep_days", 7),
             isSnapshotBlocked = botPref.getBoolean("is_snapshot_blocked", true),
             isSnapshotAll = botPref.getBoolean("is_snapshot_all", false),
 
-            blockDurationHours = botPref.getInt("block_duration_hours", 6),
+            blockDurationHours = safePrefInt("block_duration_hours", 6),
             blockReason = botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반",
             blockProcessMode = botPref.getString("block_process_mode", null)
                 ?: if (botPref.getBoolean("delete_only_mode", false)) "DELETE" else "BLOCK",
@@ -4081,24 +4091,24 @@ img.written_dccon{max-width:80px;max-height:80px}
             isOverseasIpCommentBlock = botPref.getBoolean("is_overseas_ip_comment_block", true),
 
             isGallerySettingRefreshEnabled = botPref.getBoolean("gallery_setting_refresh_enabled", false),
-            gallerySettingRefreshIntervalMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_refresh_interval_minutes", 30), listOf(5, 10, 30, 60, 180, 360), 30),
+            gallerySettingRefreshIntervalMinutes = sanitizeAllowedInt(safePrefInt("gallery_setting_refresh_interval_minutes", 30), listOf(5, 10, 30, 60, 180, 360), 30),
             gallerySettingProxyUse = botPref.getBoolean("gallery_setting_proxy_use", false),
-            gallerySettingProxyTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_proxy_time_minutes", 2880), listOf(60, 360, 1440, 2880), 2880),
+            gallerySettingProxyTimeMinutes = sanitizeAllowedInt(safePrefInt("gallery_setting_proxy_time_minutes", 2880), listOf(60, 360, 1440, 2880), 2880),
             gallerySettingMobileUse = botPref.getBoolean("gallery_setting_mobile_use", false),
-            gallerySettingMobileTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_mobile_time_minutes", 720), listOf(10, 30, 60, 180, 720), 720),
+            gallerySettingMobileTimeMinutes = sanitizeAllowedInt(safePrefInt("gallery_setting_mobile_time_minutes", 720), listOf(10, 30, 60, 180, 720), 720),
             gallerySettingMobileIpsUse = botPref.getBoolean("gallery_setting_mobile_ips_use", false),
-            gallerySettingMobileIpsTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_mobile_ips_time_minutes", 1440), listOf(180, 360, 720, 1440), 1440),
+            gallerySettingMobileIpsTimeMinutes = sanitizeAllowedInt(safePrefInt("gallery_setting_mobile_ips_time_minutes", 1440), listOf(180, 360, 720, 1440), 1440),
             gallerySettingImageBlockUse = botPref.getBoolean("gallery_setting_image_block_use", false),
-            gallerySettingImageBlockTimeMinutes = sanitizeAllowedInt(botPref.getInt("gallery_setting_image_block_time_minutes", 2880), listOf(60, 360, 1440, 2880), 2880),
+            gallerySettingImageBlockTimeMinutes = sanitizeAllowedInt(safePrefInt("gallery_setting_image_block_time_minutes", 2880), listOf(60, 360, 1440, 2880), 2880),
             gallerySettingImageBlockProxy = botPref.getBoolean("gallery_setting_image_block_proxy", true),
             gallerySettingImageBlockMobile = botPref.getBoolean("gallery_setting_image_block_mobile", false),
             gallerySettingImageBlockAll = botPref.getBoolean("gallery_setting_image_block_all", false),
 
             isSpamBurstProtectionEnabled = botPref.getBoolean("is_spam_burst_protection_enabled", false),
-            spamBurstWindowMinutes = botPref.getInt("spam_burst_window_minutes", 3),
-            spamBurstYudongThreshold = botPref.getInt("spam_burst_yudong_threshold", 10),
-            spamBurstKkangThreshold = botPref.getInt("spam_burst_kkang_threshold", 10),
-            spamBurstDurationMinutes = botPref.getInt("spam_burst_duration_minutes", 10),
+            spamBurstWindowMinutes = safePrefInt("spam_burst_window_minutes", 3),
+            spamBurstYudongThreshold = safePrefInt("spam_burst_yudong_threshold", 10),
+            spamBurstKkangThreshold = safePrefInt("spam_burst_kkang_threshold", 10),
+            spamBurstDurationMinutes = safePrefInt("spam_burst_duration_minutes", 10),
             spamBurstTargetYudong = botPref.getBoolean("spam_burst_target_yudong", true),
             spamBurstTargetKkang = botPref.getBoolean("spam_burst_target_kkang", true),
 
@@ -4109,10 +4119,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?: emptyList(),
 
             isSpamCodeFilterMode = botPref.getBoolean("is_spam_code_filter_mode", false),
-            spamCodeLength = botPref.getInt("spam_code_length", 6),
+            spamCodeLength = safePrefInt("spam_code_length", 6),
 
             isImageFilterMode = botPref.getBoolean("is_image_filter_mode", false),
-            imageFilterThreshold = botPref.getInt("image_filter_threshold", 80),
+            imageFilterThreshold = safePrefInt("image_filter_threshold", 80),
             imageAltBlacklist = botPref.getStringSet("image_alt_blacklist", setOf())
                 ?.map { it.removeCommentAndTrim() }
                 ?.filter { it.isNotEmpty() }
@@ -4139,7 +4149,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             aiFilterBatchMaxWeight = safePrefInt("ai_filter_batch_max_weight", 20000),
             aiFilterTimeoutSec = safePrefInt("ai_filter_timeout_sec", 20),
 
-            scanPageCount = botPref.getInt("scan_page_count", 1),
+            scanPageCount = safePrefInt("scan_page_count", 1),
             postMinMs = postMinMs,
             postMaxMs = postMaxMs,
             pageMinMs = pageMinMs,

@@ -1,3 +1,21 @@
+## 1.4.0 beta7 (최신 업로드본)
+
+### 주요 변화
+- beta6 이후에도 남은 봇 상세 진입 크래시 추가 대응
+  - 상세 화면 진입 시 읽는 SharedPreferences 값을 전반적으로 안전 읽기 처리
+  - `getInt/getFloat/getBoolean/getString/getStringSet` 직접 호출로 인한 타입 불일치 크래시 방지
+  - 숫자/소수/불리언/문자열/문자열 목록 값이 예상 타입과 달라도 기본값 또는 안전 변환으로 복구
+  - BotService 설정 로드의 숫자/소수 값도 안전 처리 보강
+
+### 예상 원인
+- 특정 신규 AI 설정 하나가 아니라, 기존 저장값 중 하나가 예상 타입과 다르게 저장되어 상세 화면 초기화 중 `ClassCastException`이 발생했을 가능성이 큼
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta7.apk`
+- SHA256: `6B78B2333D377BF28496D7BF8AFA0749EBD894B0BF43ED5D52A117DCBFBC88F4`
+- Google Drive file ID: `1MY9UXBR4Wp3mG7YMzB2ybPFsPftwD0ht`
+
 ## 1.4.0 beta6 (최신 업로드본)
 
 ### 주요 변화

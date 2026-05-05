@@ -84,6 +84,32 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         is String -> value.toIntOrNull() ?: defaultValue
         is Long -> value.toInt()
         is Float -> value.toInt()
+        is Double -> value.toInt()
+        else -> defaultValue
+    }
+    fun safePrefFloat(key: String, defaultValue: Float): Float = when (val value = botPref.all[key]) {
+        is Float -> value
+        is Int -> value.toFloat()
+        is Long -> value.toFloat()
+        is Double -> value.toFloat()
+        is String -> value.toFloatOrNull() ?: defaultValue
+        else -> defaultValue
+    }
+    fun safePrefString(key: String, defaultValue: String? = null): String? = when (val value = botPref.all[key]) {
+        is String -> value
+        null -> defaultValue
+        else -> value.toString()
+    }
+    fun safePrefBoolean(key: String, defaultValue: Boolean): Boolean = when (val value = botPref.all[key]) {
+        is Boolean -> value
+        is String -> value.equals("true", ignoreCase = true) || value == "1" || value.equals("yes", ignoreCase = true)
+        is Int -> value != 0
+        is Long -> value != 0L
+        else -> defaultValue
+    }
+    fun safePrefStringSet(key: String, defaultValue: Set<String> = emptySet()): Set<String> = when (val value = botPref.all[key]) {
+        is Set<*> -> value.mapNotNull { it as? String }.toSet()
+        is String -> value.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         else -> defaultValue
     }
     fun safeKkangCriteriaInt(key: String, defaultValue: Int): Int = safePrefInt(key, defaultValue)
@@ -99,29 +125,29 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     }
     fun kkangCriteriaGuideText(): String = "깡계 필터 설정의 판정 기준을 따릅니다. (현재 기준: ${currentKkangCriteriaDescription()})"
 
-    var isNotiKkang by remember { mutableStateOf(botPref.getBoolean("noti_kkang", true)) }
-    var isKkangFilterMode by remember { mutableStateOf(botPref.getBoolean("is_kkang_filter_mode", false)) }
-    var kkangPostMinText by remember { mutableStateOf(botPref.getInt("kkang_post_min", 5).toString()) }
-    var kkangCmtMinText by remember { mutableStateOf(botPref.getInt("kkang_comment_min", 10).toString()) }
-    var isKkangPostBlock by remember { mutableStateOf(botPref.getBoolean("is_kkang_post_block", false)) }
-    var isKkangCommentBlock by remember { mutableStateOf(botPref.getBoolean("is_kkang_comment_block", false)) }
-    var isKkangImageBlock by remember { mutableStateOf(botPref.getBoolean("is_kkang_image_block", false)) }
-    var isKkangVoiceBlock by remember { mutableStateOf(botPref.getBoolean("is_kkang_voice_block", false)) }
+    var isNotiKkang by remember { mutableStateOf(safePrefBoolean("noti_kkang", true)) }
+    var isKkangFilterMode by remember { mutableStateOf(safePrefBoolean("is_kkang_filter_mode", false)) }
+    var kkangPostMinText by remember { mutableStateOf(safePrefInt("kkang_post_min", 5).toString()) }
+    var kkangCmtMinText by remember { mutableStateOf(safePrefInt("kkang_comment_min", 10).toString()) }
+    var isKkangPostBlock by remember { mutableStateOf(safePrefBoolean("is_kkang_post_block", false)) }
+    var isKkangCommentBlock by remember { mutableStateOf(safePrefBoolean("is_kkang_comment_block", false)) }
+    var isKkangImageBlock by remember { mutableStateOf(safePrefBoolean("is_kkang_image_block", false)) }
+    var isKkangVoiceBlock by remember { mutableStateOf(safePrefBoolean("is_kkang_voice_block", false)) }
 
-    var isExpertMode by remember { mutableStateOf(botPref.getBoolean("is_expert_mode", false)) }
-    var snapshotKeepDaysText by remember { mutableStateOf(botPref.getInt("snapshot_keep_days", 7).toString()) }
-    var isSnapshotBlocked by remember { mutableStateOf(botPref.getBoolean("is_snapshot_blocked", true)) }
-    var isSnapshotAll by remember { mutableStateOf(botPref.getBoolean("is_snapshot_all", false)) }
+    var isExpertMode by remember { mutableStateOf(safePrefBoolean("is_expert_mode", false)) }
+    var snapshotKeepDaysText by remember { mutableStateOf(safePrefInt("snapshot_keep_days", 7).toString()) }
+    var isSnapshotBlocked by remember { mutableStateOf(safePrefBoolean("is_snapshot_blocked", true)) }
+    var isSnapshotAll by remember { mutableStateOf(safePrefBoolean("is_snapshot_all", false)) }
     var htmlSnapshotPathToView by remember { mutableStateOf<String?>(null) }
 
     var devModeClickCount by remember { mutableStateOf(0) }
     var lastDevModeClickTime by remember { mutableStateOf(0L) }
     var isDevModeUnlocked by remember { mutableStateOf(masterPref.getBoolean("dev_mode_unlocked", false)) }
-    var botName by remember { mutableStateOf(botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇") }
-    var myCookie by remember { mutableStateOf(botPref.getString("saved_cookie", null)) }
+    var botName by remember { mutableStateOf(safePrefString("bot_name", "이름 없는 봇") ?: "이름 없는 봇") }
+    var myCookie by remember { mutableStateOf(safePrefString("saved_cookie", null)) }
     var isAutoLoginInProgress by remember { mutableStateOf(false) }
-    var shouldOpenWebViewFallback by remember { mutableStateOf(botPref.getBoolean("session_webview_fallback_pending", false)) }
-    var sessionRecoveryReason by remember { mutableStateOf(botPref.getString("session_recovery_reason", null)) }
+    var shouldOpenWebViewFallback by remember { mutableStateOf(safePrefBoolean("session_webview_fallback_pending", false)) }
+    var sessionRecoveryReason by remember { mutableStateOf(safePrefString("session_recovery_reason", null)) }
 
     var editDialogType by remember { mutableStateOf<String?>(null) }
     var tempEditText by remember { mutableStateOf("") }
@@ -177,7 +203,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val coroutineScope = rememberCoroutineScope()
         var selectedTabIndex by remember { mutableStateOf(0) }
         val logFilterKeys = listOf("CYCLE", "BLOCK", "DEBUG", "AI", "HEALTH", "SESSION", "ERROR")
-        val savedLogFilters = botPref.getStringSet("activity_log_selected_filters", logFilterKeys.toSet())
+        val savedLogFilters = safePrefStringSet("activity_log_selected_filters", logFilterKeys.toSet())
             ?.filter { it in logFilterKeys }
             ?: logFilterKeys
         val selectedLogFilters = remember(botId) { mutableStateListOf<String>().apply { addAll(savedLogFilters) } }
@@ -201,7 +227,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         val tabs = listOf("기본 설정", "활동 로그")
         val logMessages = GlobalBotState.logs.getOrPut(botId) { mutableStateListOf() }
-        var isRunning by remember { mutableStateOf(botPref.getBoolean("is_running", false)) }
+        var isRunning by remember { mutableStateOf(safePrefBoolean("is_running", false)) }
         var showEditNameDialog by remember { mutableStateOf(false) }
         var newBotNameInput by remember { mutableStateOf(botName) }
         val settingsScrollState = rememberScrollState()
@@ -226,11 +252,11 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         fun readActionMode(prefix: String? = null, fallbackDeleteOnly: Boolean = false): String {
             val processKey = prefix?.let { "${it}_block_process_mode" } ?: "block_process_mode"
             val deleteKey = prefix?.let { "${it}_delete_only_mode" } ?: "delete_only_mode"
-            return when (botPref.getString(processKey, null)) {
+            return when (safePrefString(processKey, null)) {
                 "HOLD" -> "hold"
                 "DELETE" -> "delete"
                 "BLOCK" -> "block"
-                else -> if (botPref.getBoolean(deleteKey, fallbackDeleteOnly)) "delete" else "block"
+                else -> if (safePrefBoolean(deleteKey, fallbackDeleteOnly)) "delete" else "block"
             }
         }
         fun saveActionMode(prefix: String? = null, mode: String) {
@@ -248,19 +274,19 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val galleryMobileIpsTimeOptions = linkedMapOf(180 to "3시간", 360 to "6시간", 720 to "12시간", 1440 to "24시간")
         val galleryImageBlockTimeOptions = linkedMapOf(60 to "1시간", 360 to "6시간", 1440 to "24시간", 2880 to "48시간")
 
-        var isGallerySettingRefreshEnabled by remember { mutableStateOf(botPref.getBoolean("gallery_setting_refresh_enabled", false)) }
-        var gallerySettingRefreshIntervalMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_refresh_interval_minutes", 30).takeIf { it in galleryRefreshIntervalOptions.keys } ?: 30) }
-        var gallerySettingProxyUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_proxy_use", false)) }
-        var gallerySettingProxyTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_proxy_time_minutes", 2880).takeIf { it in galleryProxyTimeOptions.keys } ?: 2880) }
-        var gallerySettingMobileUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_mobile_use", false)) }
-        var gallerySettingMobileTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_mobile_time_minutes", 720).takeIf { it in galleryMobileTimeOptions.keys } ?: 720) }
-        var gallerySettingMobileIpsUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_mobile_ips_use", false)) }
-        var gallerySettingMobileIpsTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_mobile_ips_time_minutes", 1440).takeIf { it in galleryMobileIpsTimeOptions.keys } ?: 1440) }
-        var gallerySettingImageBlockUse by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_use", false)) }
-        var gallerySettingImageBlockTimeMinutes by remember { mutableStateOf(botPref.getInt("gallery_setting_image_block_time_minutes", 2880).takeIf { it in galleryImageBlockTimeOptions.keys } ?: 2880) }
-        var gallerySettingImageBlockProxy by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_proxy", true)) }
-        var gallerySettingImageBlockMobile by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_mobile", false)) }
-        var gallerySettingImageBlockAll by remember { mutableStateOf(botPref.getBoolean("gallery_setting_image_block_all", false)) }
+        var isGallerySettingRefreshEnabled by remember { mutableStateOf(safePrefBoolean("gallery_setting_refresh_enabled", false)) }
+        var gallerySettingRefreshIntervalMinutes by remember { mutableStateOf(safePrefInt("gallery_setting_refresh_interval_minutes", 30).takeIf { it in galleryRefreshIntervalOptions.keys } ?: 30) }
+        var gallerySettingProxyUse by remember { mutableStateOf(safePrefBoolean("gallery_setting_proxy_use", false)) }
+        var gallerySettingProxyTimeMinutes by remember { mutableStateOf(safePrefInt("gallery_setting_proxy_time_minutes", 2880).takeIf { it in galleryProxyTimeOptions.keys } ?: 2880) }
+        var gallerySettingMobileUse by remember { mutableStateOf(safePrefBoolean("gallery_setting_mobile_use", false)) }
+        var gallerySettingMobileTimeMinutes by remember { mutableStateOf(safePrefInt("gallery_setting_mobile_time_minutes", 720).takeIf { it in galleryMobileTimeOptions.keys } ?: 720) }
+        var gallerySettingMobileIpsUse by remember { mutableStateOf(safePrefBoolean("gallery_setting_mobile_ips_use", false)) }
+        var gallerySettingMobileIpsTimeMinutes by remember { mutableStateOf(safePrefInt("gallery_setting_mobile_ips_time_minutes", 1440).takeIf { it in galleryMobileIpsTimeOptions.keys } ?: 1440) }
+        var gallerySettingImageBlockUse by remember { mutableStateOf(safePrefBoolean("gallery_setting_image_block_use", false)) }
+        var gallerySettingImageBlockTimeMinutes by remember { mutableStateOf(safePrefInt("gallery_setting_image_block_time_minutes", 2880).takeIf { it in galleryImageBlockTimeOptions.keys } ?: 2880) }
+        var gallerySettingImageBlockProxy by remember { mutableStateOf(safePrefBoolean("gallery_setting_image_block_proxy", true)) }
+        var gallerySettingImageBlockMobile by remember { mutableStateOf(safePrefBoolean("gallery_setting_image_block_mobile", false)) }
+        var gallerySettingImageBlockAll by remember { mutableStateOf(safePrefBoolean("gallery_setting_image_block_all", false)) }
         var gallerySettingDropdownKey by remember { mutableStateOf<String?>(null) }
 
         @Composable
@@ -294,121 +320,121 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         // 기본 차단 설정
         var blockActionMode by remember { mutableStateOf(readActionMode()) }
-        var blockDurationHours by remember { mutableStateOf(botPref.getInt("block_duration_hours", 6)) }
+        var blockDurationHours by remember { mutableStateOf(safePrefInt("block_duration_hours", 6)) }
         var isBlockActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var blockReasonText by remember { mutableStateOf(botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반") }
-        var isDeletePostOnBlock by remember { mutableStateOf(botPref.getBoolean("delete_post_on_block", true)) }
-        var isDeleteOnlyMode by remember { mutableStateOf(botPref.getBoolean("delete_only_mode", false)) }
-        var blockExemptPostNumbersText by remember { mutableStateOf(botPref.getStringSet("block_exempt_post_numbers", setOf())?.joinToString("\n") ?: "") }
+        var blockReasonText by remember { mutableStateOf(safePrefString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반") }
+        var isDeletePostOnBlock by remember { mutableStateOf(safePrefBoolean("delete_post_on_block", true)) }
+        var isDeleteOnlyMode by remember { mutableStateOf(safePrefBoolean("delete_only_mode", false)) }
+        var blockExemptPostNumbersText by remember { mutableStateOf(safePrefStringSet("block_exempt_post_numbers", setOf())?.joinToString("\n") ?: "") }
 
         // 금지어 필터 개별 차단 설정
-        var keywordUseCustomAction by remember { mutableStateOf(botPref.getBoolean("keyword_use_custom_action_config", false)) }
+        var keywordUseCustomAction by remember { mutableStateOf(safePrefBoolean("keyword_use_custom_action_config", false)) }
         var keywordActionMode by remember { mutableStateOf(readActionMode("keyword", isDeleteOnlyMode)) }
-        var keywordBlockDurationHours by remember { mutableStateOf(botPref.getInt("keyword_block_duration_hours", blockDurationHours)) }
+        var keywordBlockDurationHours by remember { mutableStateOf(safePrefInt("keyword_block_duration_hours", blockDurationHours)) }
         var isKeywordActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isKeywordBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var keywordBlockReasonText by remember { mutableStateOf(botPref.getString("keyword_block_reason_text", null) ?: blockReasonText) }
-        var keywordDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("keyword_delete_post_on_block")) botPref.getBoolean("keyword_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var keywordDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("keyword_delete_only_mode")) botPref.getBoolean("keyword_delete_only_mode", false) else isDeleteOnlyMode) }
-        var keywordApplyYudongOnly by remember { mutableStateOf(botPref.getBoolean("keyword_apply_yudong_only", false)) }
-        var keywordApplyKkangOnly by remember { mutableStateOf(botPref.getBoolean("keyword_apply_kkang_only", false)) }
+        var keywordBlockReasonText by remember { mutableStateOf(safePrefString("keyword_block_reason_text", null) ?: blockReasonText) }
+        var keywordDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("keyword_delete_post_on_block")) safePrefBoolean("keyword_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var keywordDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("keyword_delete_only_mode")) safePrefBoolean("keyword_delete_only_mode", false) else isDeleteOnlyMode) }
+        var keywordApplyYudongOnly by remember { mutableStateOf(safePrefBoolean("keyword_apply_yudong_only", false)) }
+        var keywordApplyKkangOnly by remember { mutableStateOf(safePrefBoolean("keyword_apply_kkang_only", false)) }
 
-        var userUseCustomAction by remember { mutableStateOf(botPref.getBoolean("user_use_custom_action_config", false)) }
+        var userUseCustomAction by remember { mutableStateOf(safePrefBoolean("user_use_custom_action_config", false)) }
         var userActionMode by remember { mutableStateOf(readActionMode("user", isDeleteOnlyMode)) }
-        var userBlockDurationHours by remember { mutableStateOf(botPref.getInt("user_block_duration_hours", blockDurationHours)) }
+        var userBlockDurationHours by remember { mutableStateOf(safePrefInt("user_block_duration_hours", blockDurationHours)) }
         var isUserActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isUserBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var userBlockReasonText by remember { mutableStateOf(botPref.getString("user_block_reason_text", null) ?: blockReasonText) }
-        var userDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("user_delete_post_on_block")) botPref.getBoolean("user_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var userDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("user_delete_only_mode")) botPref.getBoolean("user_delete_only_mode", false) else isDeleteOnlyMode) }
+        var userBlockReasonText by remember { mutableStateOf(safePrefString("user_block_reason_text", null) ?: blockReasonText) }
+        var userDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("user_delete_post_on_block")) safePrefBoolean("user_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var userDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("user_delete_only_mode")) safePrefBoolean("user_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var nicknameUseCustomAction by remember { mutableStateOf(botPref.getBoolean("nickname_use_custom_action_config", false)) }
+        var nicknameUseCustomAction by remember { mutableStateOf(safePrefBoolean("nickname_use_custom_action_config", false)) }
         var nicknameActionMode by remember { mutableStateOf(readActionMode("nickname", isDeleteOnlyMode)) }
-        var nicknameBlockDurationHours by remember { mutableStateOf(botPref.getInt("nickname_block_duration_hours", blockDurationHours)) }
+        var nicknameBlockDurationHours by remember { mutableStateOf(safePrefInt("nickname_block_duration_hours", blockDurationHours)) }
         var isNicknameActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isNicknameBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var nicknameBlockReasonText by remember { mutableStateOf(botPref.getString("nickname_block_reason_text", null) ?: blockReasonText) }
-        var nicknameDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("nickname_delete_post_on_block")) botPref.getBoolean("nickname_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var nicknameDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("nickname_delete_only_mode")) botPref.getBoolean("nickname_delete_only_mode", false) else isDeleteOnlyMode) }
+        var nicknameBlockReasonText by remember { mutableStateOf(safePrefString("nickname_block_reason_text", null) ?: blockReasonText) }
+        var nicknameDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("nickname_delete_post_on_block")) safePrefBoolean("nickname_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var nicknameDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("nickname_delete_only_mode")) safePrefBoolean("nickname_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var urlUseCustomAction by remember { mutableStateOf(botPref.getBoolean("url_use_custom_action_config", false)) }
+        var urlUseCustomAction by remember { mutableStateOf(safePrefBoolean("url_use_custom_action_config", false)) }
         var urlActionMode by remember { mutableStateOf(readActionMode("url", isDeleteOnlyMode)) }
-        var urlBlockDurationHours by remember { mutableStateOf(botPref.getInt("url_block_duration_hours", blockDurationHours)) }
+        var urlBlockDurationHours by remember { mutableStateOf(safePrefInt("url_block_duration_hours", blockDurationHours)) }
         var isUrlActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isUrlBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var urlBlockReasonText by remember { mutableStateOf(botPref.getString("url_block_reason_text", null) ?: blockReasonText) }
-        var urlDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("url_delete_post_on_block")) botPref.getBoolean("url_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var urlDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("url_delete_only_mode")) botPref.getBoolean("url_delete_only_mode", false) else isDeleteOnlyMode) }
+        var urlBlockReasonText by remember { mutableStateOf(safePrefString("url_block_reason_text", null) ?: blockReasonText) }
+        var urlDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("url_delete_post_on_block")) safePrefBoolean("url_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var urlDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("url_delete_only_mode")) safePrefBoolean("url_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var voiceUseCustomAction by remember { mutableStateOf(botPref.getBoolean("voice_use_custom_action_config", false)) }
+        var voiceUseCustomAction by remember { mutableStateOf(safePrefBoolean("voice_use_custom_action_config", false)) }
         var voiceActionMode by remember { mutableStateOf(readActionMode("voice", isDeleteOnlyMode)) }
-        var voiceBlockDurationHours by remember { mutableStateOf(botPref.getInt("voice_block_duration_hours", blockDurationHours)) }
+        var voiceBlockDurationHours by remember { mutableStateOf(safePrefInt("voice_block_duration_hours", blockDurationHours)) }
         var isVoiceActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isVoiceBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var voiceBlockReasonText by remember { mutableStateOf(botPref.getString("voice_block_reason_text", null) ?: blockReasonText) }
-        var voiceDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("voice_delete_post_on_block")) botPref.getBoolean("voice_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var voiceDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("voice_delete_only_mode")) botPref.getBoolean("voice_delete_only_mode", false) else isDeleteOnlyMode) }
+        var voiceBlockReasonText by remember { mutableStateOf(safePrefString("voice_block_reason_text", null) ?: blockReasonText) }
+        var voiceDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("voice_delete_post_on_block")) safePrefBoolean("voice_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var voiceDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("voice_delete_only_mode")) safePrefBoolean("voice_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var imageUseCustomAction by remember { mutableStateOf(botPref.getBoolean("image_use_custom_action_config", false)) }
+        var imageUseCustomAction by remember { mutableStateOf(safePrefBoolean("image_use_custom_action_config", false)) }
         var imageActionMode by remember { mutableStateOf(readActionMode("image", isDeleteOnlyMode)) }
-        var imageBlockDurationHours by remember { mutableStateOf(botPref.getInt("image_block_duration_hours", blockDurationHours)) }
+        var imageBlockDurationHours by remember { mutableStateOf(safePrefInt("image_block_duration_hours", blockDurationHours)) }
         var isImageActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isImageBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var imageBlockReasonText by remember { mutableStateOf(botPref.getString("image_block_reason_text", null) ?: blockReasonText) }
-        var imageDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("image_delete_post_on_block")) botPref.getBoolean("image_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var imageDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("image_delete_only_mode")) botPref.getBoolean("image_delete_only_mode", false) else isDeleteOnlyMode) }
+        var imageBlockReasonText by remember { mutableStateOf(safePrefString("image_block_reason_text", null) ?: blockReasonText) }
+        var imageDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("image_delete_post_on_block")) safePrefBoolean("image_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var imageDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("image_delete_only_mode")) safePrefBoolean("image_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var spamUseCustomAction by remember { mutableStateOf(botPref.getBoolean("spam_use_custom_action_config", false)) }
+        var spamUseCustomAction by remember { mutableStateOf(safePrefBoolean("spam_use_custom_action_config", false)) }
         var spamActionMode by remember { mutableStateOf(readActionMode("spam", isDeleteOnlyMode)) }
-        var spamBlockDurationHours by remember { mutableStateOf(botPref.getInt("spam_block_duration_hours", blockDurationHours)) }
+        var spamBlockDurationHours by remember { mutableStateOf(safePrefInt("spam_block_duration_hours", blockDurationHours)) }
         var isSpamActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isSpamBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var spamBlockReasonText by remember { mutableStateOf(botPref.getString("spam_block_reason_text", null) ?: blockReasonText) }
-        var spamDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("spam_delete_post_on_block")) botPref.getBoolean("spam_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var spamDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("spam_delete_only_mode")) botPref.getBoolean("spam_delete_only_mode", false) else isDeleteOnlyMode) }
+        var spamBlockReasonText by remember { mutableStateOf(safePrefString("spam_block_reason_text", null) ?: blockReasonText) }
+        var spamDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("spam_delete_post_on_block")) safePrefBoolean("spam_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var spamDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("spam_delete_only_mode")) safePrefBoolean("spam_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var yudongUseCustomAction by remember { mutableStateOf(botPref.getBoolean("yudong_use_custom_action_config", false)) }
+        var yudongUseCustomAction by remember { mutableStateOf(safePrefBoolean("yudong_use_custom_action_config", false)) }
         var yudongActionMode by remember { mutableStateOf(readActionMode("yudong", isDeleteOnlyMode)) }
-        var yudongBlockDurationHours by remember { mutableStateOf(botPref.getInt("yudong_block_duration_hours", blockDurationHours)) }
+        var yudongBlockDurationHours by remember { mutableStateOf(safePrefInt("yudong_block_duration_hours", blockDurationHours)) }
         var isYudongActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isYudongBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var yudongBlockReasonText by remember { mutableStateOf(botPref.getString("yudong_block_reason_text", null) ?: blockReasonText) }
-        var yudongDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("yudong_delete_post_on_block")) botPref.getBoolean("yudong_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var yudongDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("yudong_delete_only_mode")) botPref.getBoolean("yudong_delete_only_mode", false) else isDeleteOnlyMode) }
+        var yudongBlockReasonText by remember { mutableStateOf(safePrefString("yudong_block_reason_text", null) ?: blockReasonText) }
+        var yudongDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("yudong_delete_post_on_block")) safePrefBoolean("yudong_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var yudongDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("yudong_delete_only_mode")) safePrefBoolean("yudong_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var overseasIpUseCustomAction by remember { mutableStateOf(botPref.getBoolean("overseas_ip_use_custom_action_config", false)) }
+        var overseasIpUseCustomAction by remember { mutableStateOf(safePrefBoolean("overseas_ip_use_custom_action_config", false)) }
         var overseasIpActionMode by remember { mutableStateOf(readActionMode("overseas_ip", isDeleteOnlyMode)) }
-        var overseasIpBlockDurationHours by remember { mutableStateOf(botPref.getInt("overseas_ip_block_duration_hours", blockDurationHours)) }
+        var overseasIpBlockDurationHours by remember { mutableStateOf(safePrefInt("overseas_ip_block_duration_hours", blockDurationHours)) }
         var isOverseasIpActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isOverseasIpBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var overseasIpBlockReasonText by remember { mutableStateOf(botPref.getString("overseas_ip_block_reason_text", null) ?: blockReasonText) }
-        var overseasIpDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("overseas_ip_delete_post_on_block")) botPref.getBoolean("overseas_ip_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var overseasIpDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("overseas_ip_delete_only_mode")) botPref.getBoolean("overseas_ip_delete_only_mode", false) else isDeleteOnlyMode) }
+        var overseasIpBlockReasonText by remember { mutableStateOf(safePrefString("overseas_ip_block_reason_text", null) ?: blockReasonText) }
+        var overseasIpDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("overseas_ip_delete_post_on_block")) safePrefBoolean("overseas_ip_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var overseasIpDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("overseas_ip_delete_only_mode")) safePrefBoolean("overseas_ip_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var kkangUseCustomAction by remember { mutableStateOf(botPref.getBoolean("kkang_use_custom_action_config", false)) }
+        var kkangUseCustomAction by remember { mutableStateOf(safePrefBoolean("kkang_use_custom_action_config", false)) }
         var kkangActionMode by remember { mutableStateOf(readActionMode("kkang", isDeleteOnlyMode)) }
-        var kkangBlockDurationHours by remember { mutableStateOf(botPref.getInt("kkang_block_duration_hours", blockDurationHours)) }
+        var kkangBlockDurationHours by remember { mutableStateOf(safePrefInt("kkang_block_duration_hours", blockDurationHours)) }
         var isKkangActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isKkangBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var kkangBlockReasonText by remember { mutableStateOf(botPref.getString("kkang_block_reason_text", null) ?: blockReasonText) }
-        var kkangDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("kkang_delete_post_on_block")) botPref.getBoolean("kkang_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var kkangDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("kkang_delete_only_mode")) botPref.getBoolean("kkang_delete_only_mode", false) else isDeleteOnlyMode) }
+        var kkangBlockReasonText by remember { mutableStateOf(safePrefString("kkang_block_reason_text", null) ?: blockReasonText) }
+        var kkangDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("kkang_delete_post_on_block")) safePrefBoolean("kkang_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var kkangDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("kkang_delete_only_mode")) safePrefBoolean("kkang_delete_only_mode", false) else isDeleteOnlyMode) }
 
-        var isNotiMaster by remember { mutableStateOf(botPref.getBoolean("noti_master", true)) }
-        var isNotiKeyword by remember { mutableStateOf(botPref.getBoolean("noti_keyword", true)) }
-        var isNotiUser by remember { mutableStateOf(botPref.getBoolean("noti_user", true)) }
-        var isNotiNickname by remember { mutableStateOf(botPref.getBoolean("noti_nickname", true)) }
-        var isNotiYudong by remember { mutableStateOf(botPref.getBoolean("noti_yudong", true)) }
-        var isNotiUrl by remember { mutableStateOf(botPref.getBoolean("noti_url", true)) }
-        var isNotiImage by remember { mutableStateOf(botPref.getBoolean("noti_image", true)) }
-        var isNotiVoice by remember { mutableStateOf(botPref.getBoolean("noti_voice", true)) }
-        var isNotiSpam by remember { mutableStateOf(botPref.getBoolean("noti_spam", true)) }
-        var isNotiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
+        var isNotiMaster by remember { mutableStateOf(safePrefBoolean("noti_master", true)) }
+        var isNotiKeyword by remember { mutableStateOf(safePrefBoolean("noti_keyword", true)) }
+        var isNotiUser by remember { mutableStateOf(safePrefBoolean("noti_user", true)) }
+        var isNotiNickname by remember { mutableStateOf(safePrefBoolean("noti_nickname", true)) }
+        var isNotiYudong by remember { mutableStateOf(safePrefBoolean("noti_yudong", true)) }
+        var isNotiUrl by remember { mutableStateOf(safePrefBoolean("noti_url", true)) }
+        var isNotiImage by remember { mutableStateOf(safePrefBoolean("noti_image", true)) }
+        var isNotiVoice by remember { mutableStateOf(safePrefBoolean("noti_voice", true)) }
+        var isNotiSpam by remember { mutableStateOf(safePrefBoolean("noti_spam", true)) }
+        var isNotiAi by remember { mutableStateOf(safePrefBoolean("noti_ai", true)) }
 
         fun loadMultilineText(key: String): String {
-            return botPref.getString("${key}_text", null)
-                ?: botPref.getStringSet(key, emptySet())?.joinToString("\n")
+            return safePrefString("${key}_text", null)
+                ?: safePrefStringSet(key, emptySet())?.joinToString("\n")
                 ?: ""
         }
 
@@ -426,42 +452,42 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 .commit()
         }
 
-        var targetUrlsText by remember { mutableStateOf(botPref.getString("target_urls", "") ?: "") }
-        var isSearchMode by remember { mutableStateOf(botPref.getBoolean("is_search_mode", false)) }
-        var searchType by remember { mutableStateOf(botPref.getString("search_type", "search_subject_memo") ?: "search_subject_memo") }
+        var targetUrlsText by remember { mutableStateOf(safePrefString("target_urls", "") ?: "") }
+        var isSearchMode by remember { mutableStateOf(safePrefBoolean("is_search_mode", false)) }
+        var searchType by remember { mutableStateOf(safePrefString("search_type", "search_subject_memo") ?: "search_subject_memo") }
         var isSearchTypeDropdownExpanded by remember { mutableStateOf(false) }
         val searchTypeMap = mapOf("search_subject_memo" to "제목+내용", "search_subject" to "제목", "search_memo" to "내용", "search_name" to "글쓴이", "search_comment" to "댓글")
         var searchWordsText by remember { mutableStateOf(loadMultilineText("search_keywords")) }
 
-        var isUserFilterMode by remember { mutableStateOf(botPref.getBoolean("is_user_filter_mode", false)) }
-        var userBlacklistText by remember { mutableStateOf(botPref.getStringSet("user_blacklist", setOf())?.joinToString("\n") ?: "") }
-        var userWhitelistText by remember { mutableStateOf(botPref.getStringSet("user_whitelist", setOf())?.joinToString("\n") ?: "") }
+        var isUserFilterMode by remember { mutableStateOf(safePrefBoolean("is_user_filter_mode", false)) }
+        var userBlacklistText by remember { mutableStateOf(safePrefStringSet("user_blacklist", setOf())?.joinToString("\n") ?: "") }
+        var userWhitelistText by remember { mutableStateOf(safePrefStringSet("user_whitelist", setOf())?.joinToString("\n") ?: "") }
 
-        var isNicknameFilterMode by remember { mutableStateOf(botPref.getBoolean("is_nickname_filter_mode", false)) }
-        var nicknameBlacklistText by remember { mutableStateOf(botPref.getStringSet("nickname_blacklist", setOf())?.joinToString("\n") ?: "") }
-        var nicknameWhitelistText by remember { mutableStateOf(botPref.getStringSet("nickname_whitelist", setOf())?.joinToString("\n") ?: "") }
+        var isNicknameFilterMode by remember { mutableStateOf(safePrefBoolean("is_nickname_filter_mode", false)) }
+        var nicknameBlacklistText by remember { mutableStateOf(safePrefStringSet("nickname_blacklist", setOf())?.joinToString("\n") ?: "") }
+        var nicknameWhitelistText by remember { mutableStateOf(safePrefStringSet("nickname_whitelist", setOf())?.joinToString("\n") ?: "") }
 
-        var isYudongPostBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_post_block", false)) }
-        var isYudongCommentBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_comment_block", false)) }
-        var isYudongImageBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_image_block", false)) }
-        var isYudongVoiceBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_voice_block", false)) }
+        var isYudongPostBlock by remember { mutableStateOf(safePrefBoolean("is_yudong_post_block", false)) }
+        var isYudongCommentBlock by remember { mutableStateOf(safePrefBoolean("is_yudong_comment_block", false)) }
+        var isYudongImageBlock by remember { mutableStateOf(safePrefBoolean("is_yudong_image_block", false)) }
+        var isYudongVoiceBlock by remember { mutableStateOf(safePrefBoolean("is_yudong_voice_block", false)) }
 
-        var isOverseasIpFilterMode by remember { mutableStateOf(botPref.getBoolean("is_overseas_ip_filter_mode", false)) }
-        var isOverseasIpPostBlock by remember { mutableStateOf(botPref.getBoolean("is_overseas_ip_post_block", true)) }
-        var isOverseasIpCommentBlock by remember { mutableStateOf(botPref.getBoolean("is_overseas_ip_comment_block", true)) }
+        var isOverseasIpFilterMode by remember { mutableStateOf(safePrefBoolean("is_overseas_ip_filter_mode", false)) }
+        var isOverseasIpPostBlock by remember { mutableStateOf(safePrefBoolean("is_overseas_ip_post_block", true)) }
+        var isOverseasIpCommentBlock by remember { mutableStateOf(safePrefBoolean("is_overseas_ip_comment_block", true)) }
 
-        var isUrlFilterMode by remember { mutableStateOf(botPref.getBoolean("is_url_filter_mode", false)) }
-        var urlWhitelistText by remember { mutableStateOf(botPref.getStringSet("url_whitelist", setOf())?.joinToString("\n") ?: "") }
+        var isUrlFilterMode by remember { mutableStateOf(safePrefBoolean("is_url_filter_mode", false)) }
+        var urlWhitelistText by remember { mutableStateOf(safePrefStringSet("url_whitelist", setOf())?.joinToString("\n") ?: "") }
 
-        var isImageFilterMode by remember { mutableStateOf(botPref.getBoolean("is_image_filter_mode", false)) }
-        var imageFilterThresholdText by remember { mutableStateOf(botPref.getInt("image_filter_threshold", 80).toString()) }
-        var imageAltBlacklistText by remember { mutableStateOf(botPref.getStringSet("image_alt_blacklist", setOf())?.joinToString("\n") ?: "") }
+        var isImageFilterMode by remember { mutableStateOf(safePrefBoolean("is_image_filter_mode", false)) }
+        var imageFilterThresholdText by remember { mutableStateOf(safePrefInt("image_filter_threshold", 80).toString()) }
+        var imageAltBlacklistText by remember { mutableStateOf(safePrefStringSet("image_alt_blacklist", setOf())?.joinToString("\n") ?: "") }
 
-        var isVoiceFilterMode by remember { mutableStateOf(botPref.getBoolean("is_voice_filter_mode", false)) }
-        var voiceBlacklistText by remember { mutableStateOf(botPref.getStringSet("voice_blacklist", setOf())?.joinToString("\n") ?: "") }
+        var isVoiceFilterMode by remember { mutableStateOf(safePrefBoolean("is_voice_filter_mode", false)) }
+        var voiceBlacklistText by remember { mutableStateOf(safePrefStringSet("voice_blacklist", setOf())?.joinToString("\n") ?: "") }
 
         val isAiFilterVisible = true
-        var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
+        var isAiFilterMode by remember { mutableStateOf(safePrefBoolean("is_ai_filter_mode", false)) }
         val aiProviderOptions = linkedMapOf(
             "gemini_direct" to "Gemini direct",
             "groq" to "Groq",
@@ -472,14 +498,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isAiProviderDropdownExpanded by remember { mutableStateOf(false) }
         var isAiModelDropdownExpanded by remember { mutableStateOf(false) }
         var isAiEndpointDropdownExpanded by remember { mutableStateOf(false) }
-        var aiFilterProvider by remember { mutableStateOf(botPref.getString("ai_filter_provider", "gemini_direct") ?: "gemini_direct") }
-        var aiFilterCustomProviderLabel by remember { mutableStateOf(botPref.getString("ai_filter_provider_custom_label", "") ?: "") }
-        var aiFilterEndpointText by remember { mutableStateOf(botPref.getString("ai_filter_endpoint", "") ?: "") }
-        var aiFilterApiKeyText by remember { mutableStateOf(botPref.getString("ai_filter_api_key", "") ?: "") }
-        var aiFilterModelText by remember { mutableStateOf(botPref.getString("ai_filter_model", "gemini-2.5-flash") ?: "gemini-2.5-flash") }
-        var aiFilterUseCustomEndpoint by remember { mutableStateOf(botPref.getBoolean("ai_filter_use_custom_endpoint", false)) }
-        var aiFilterUseCustomModel by remember { mutableStateOf(botPref.getBoolean("ai_filter_use_custom_model", false)) }
-        var aiFilterUserPromptText by remember { mutableStateOf(botPref.getString("ai_filter_user_prompt", "") ?: "") }
+        var aiFilterProvider by remember { mutableStateOf(safePrefString("ai_filter_provider", "gemini_direct") ?: "gemini_direct") }
+        var aiFilterCustomProviderLabel by remember { mutableStateOf(safePrefString("ai_filter_provider_custom_label", "") ?: "") }
+        var aiFilterEndpointText by remember { mutableStateOf(safePrefString("ai_filter_endpoint", "") ?: "") }
+        var aiFilterApiKeyText by remember { mutableStateOf(safePrefString("ai_filter_api_key", "") ?: "") }
+        var aiFilterModelText by remember { mutableStateOf(safePrefString("ai_filter_model", "gemini-2.5-flash") ?: "gemini-2.5-flash") }
+        var aiFilterUseCustomEndpoint by remember { mutableStateOf(safePrefBoolean("ai_filter_use_custom_endpoint", false)) }
+        var aiFilterUseCustomModel by remember { mutableStateOf(safePrefBoolean("ai_filter_use_custom_model", false)) }
+        var aiFilterUserPromptText by remember { mutableStateOf(safePrefString("ai_filter_user_prompt", "") ?: "") }
         val aiModelPresetOptions = remember(aiFilterProvider) {
             when (aiFilterProvider) {
                 "gemini_direct" -> listOf("gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "직접 입력")
@@ -512,38 +538,38 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(safePrefInt("ai_filter_batch_max_wait_sec", 5).toString()) }
         var aiFilterBatchMaxWeightText by remember { mutableStateOf(safePrefInt("ai_filter_batch_max_weight", 20000).toString()) }
         var aiFilterTimeoutSecText by remember { mutableStateOf(safePrefInt("ai_filter_timeout_sec", 20).toString()) }
-        var notiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
-        var aiUseCustomAction by remember { mutableStateOf(botPref.getBoolean("ai_use_custom_action_config", false)) }
-        var aiActionMode by remember { mutableStateOf(if (botPref.getBoolean("ai_delete_only_mode", false)) "delete" else "block") }
-        var aiBlockDurationHours by remember { mutableStateOf(botPref.getInt("ai_block_duration_hours", blockDurationHours)) }
+        var notiAi by remember { mutableStateOf(safePrefBoolean("noti_ai", true)) }
+        var aiUseCustomAction by remember { mutableStateOf(safePrefBoolean("ai_use_custom_action_config", false)) }
+        var aiActionMode by remember { mutableStateOf(if (safePrefBoolean("ai_delete_only_mode", false)) "delete" else "block") }
+        var aiBlockDurationHours by remember { mutableStateOf(safePrefInt("ai_block_duration_hours", blockDurationHours)) }
         var isAiActionModeDropdownExpanded by remember { mutableStateOf(false) }
         var isAiBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
-        var aiBlockReasonText by remember { mutableStateOf(botPref.getString("ai_block_reason_text", blockReasonText) ?: blockReasonText) }
-        var aiDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("ai_delete_post_on_block")) botPref.getBoolean("ai_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var aiDeleteOnlyMode by remember { mutableStateOf(botPref.getBoolean("ai_delete_only_mode", false)) }
+        var aiBlockReasonText by remember { mutableStateOf(safePrefString("ai_block_reason_text", blockReasonText) ?: blockReasonText) }
+        var aiDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("ai_delete_post_on_block")) safePrefBoolean("ai_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var aiDeleteOnlyMode by remember { mutableStateOf(safePrefBoolean("ai_delete_only_mode", false)) }
 
-        var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
-        var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
+        var isSpamCodeFilterMode by remember { mutableStateOf(safePrefBoolean("is_spam_code_filter_mode", false)) }
+        var spamCodeLengthText by remember { mutableStateOf(safePrefInt("spam_code_length", 6).toString()) }
 
         var normalWordsText by remember { mutableStateOf(loadMultilineText("normal")) }
         var bypassWordsText by remember { mutableStateOf(loadMultilineText("bypass")) }
 
-        var scanPageText by remember { mutableStateOf(botPref.getInt("scan_page_count", 1).toString()) }
-        var postMinText by remember { mutableStateOf(botPref.getFloat("delay_post_min_sec", 1.0f).toString()) }
-        var postMaxText by remember { mutableStateOf(botPref.getFloat("delay_post_max_sec", 2.5f).toString()) }
-        var pageMinText by remember { mutableStateOf(botPref.getFloat("delay_page_min_sec", 2.0f).toString()) }
-        var pageMaxText by remember { mutableStateOf(botPref.getFloat("delay_page_max_sec", 4.0f).toString()) }
-        var cycleMinText by remember { mutableStateOf(botPref.getFloat("delay_cycle_min_sec", 45.0f).toString()) }
-        var cycleMaxText by remember { mutableStateOf(botPref.getFloat("delay_cycle_max_sec", 90.0f).toString()) }
+        var scanPageText by remember { mutableStateOf(safePrefInt("scan_page_count", 1).toString()) }
+        var postMinText by remember { mutableStateOf(safePrefFloat("delay_post_min_sec", 1.0f).toString()) }
+        var postMaxText by remember { mutableStateOf(safePrefFloat("delay_post_max_sec", 2.5f).toString()) }
+        var pageMinText by remember { mutableStateOf(safePrefFloat("delay_page_min_sec", 2.0f).toString()) }
+        var pageMaxText by remember { mutableStateOf(safePrefFloat("delay_page_max_sec", 4.0f).toString()) }
+        var cycleMinText by remember { mutableStateOf(safePrefFloat("delay_cycle_min_sec", 45.0f).toString()) }
+        var cycleMaxText by remember { mutableStateOf(safePrefFloat("delay_cycle_max_sec", 90.0f).toString()) }
 
         var rememberedPostCount by remember { mutableStateOf(0) }
-        var isDebugMode by remember { mutableStateOf(botPref.getBoolean("is_debug_mode", false)) }
-        var isSpamBurstProtectionEnabled by remember { mutableStateOf(botPref.getBoolean("is_spam_burst_protection_enabled", false)) }
-        var spamBurstWindowMinutesText by remember { mutableStateOf(botPref.getInt("spam_burst_window_minutes", 3).toString()) }
-        var spamBurstYudongThresholdText by remember { mutableStateOf(botPref.getInt("spam_burst_yudong_threshold", 10).toString()) }
-                var spamBurstDurationMinutesText by remember { mutableStateOf(botPref.getInt("spam_burst_duration_minutes", 10).toString()) }
-        var spamBurstTargetYudong by remember { mutableStateOf(botPref.getBoolean("spam_burst_target_yudong", true)) }
-        var spamBurstTargetKkang by remember { mutableStateOf(botPref.getBoolean("spam_burst_target_kkang", true)) }
+        var isDebugMode by remember { mutableStateOf(safePrefBoolean("is_debug_mode", false)) }
+        var isSpamBurstProtectionEnabled by remember { mutableStateOf(safePrefBoolean("is_spam_burst_protection_enabled", false)) }
+        var spamBurstWindowMinutesText by remember { mutableStateOf(safePrefInt("spam_burst_window_minutes", 3).toString()) }
+        var spamBurstYudongThresholdText by remember { mutableStateOf(safePrefInt("spam_burst_yudong_threshold", 10).toString()) }
+                var spamBurstDurationMinutesText by remember { mutableStateOf(safePrefInt("spam_burst_duration_minutes", 10).toString()) }
+        var spamBurstTargetYudong by remember { mutableStateOf(safePrefBoolean("spam_burst_target_yudong", true)) }
+        var spamBurstTargetKkang by remember { mutableStateOf(safePrefBoolean("spam_burst_target_kkang", true)) }
         var lastCheckedNumber by remember { mutableStateOf(GlobalBotState.lastCheckedNumbers[botId] ?: 0) }
         val logListState = rememberLazyListState()
 
@@ -576,10 +602,10 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         isAutoLoginInProgress = true
                         shouldOpenWebViewFallback = intent.getBooleanExtra(
                             "REQUIRE_WEBVIEW_FALLBACK",
-                            botPref.getBoolean("session_webview_fallback_pending", false)
+                            safePrefBoolean("session_webview_fallback_pending", false)
                         )
                         sessionRecoveryReason = intent.getStringExtra("RECOVERY_REASON")
-                            ?: botPref.getString("session_recovery_reason", null)
+                            ?: safePrefString("session_recovery_reason", null)
                     }
                 }
             }
@@ -1706,7 +1732,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             checked = isRunning,
                             onCheckedChange = {
                                 isRunning = it; botPref.edit().putBoolean("is_running", it).apply()
-                                val serviceIntent = Intent(context, BotService::class.java).apply { putExtra("BOT_ID", botId); putExtra("COOKIE", botPref.getString("saved_cookie", "")); action = if (isRunning) "START" else "STOP" }
+                                val serviceIntent = Intent(context, BotService::class.java).apply { putExtra("BOT_ID", botId); putExtra("COOKIE", safePrefString("saved_cookie", "")); action = if (isRunning) "START" else "STOP" }
                                 if (isRunning && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(serviceIntent) else context.startService(serviceIntent)
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray, uncheckedBorderColor = Color.Transparent),
