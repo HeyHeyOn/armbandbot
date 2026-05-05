@@ -1,3 +1,23 @@
+## 1.4.0 beta10 (최신 업로드본)
+
+### 주요 변화
+- beta9 상세 페이지 진입 크래시 추가 대응
+  - 로그캣상 beta9도 동일한 `VerifyError: Verifier rejected class ... BotDetailScreenKt ... invalid arg count` 확인
+  - `AiBatchSettingsCard`와 `SharedPreferences.safeInt`를 `BotDetailScreen.kt` 밖의 별도 파일 `AiBatchSettingsCard.kt`로 분리
+  - `BotDetailScreen.kt`에서 beta9에 추가했던 top-level Composable/helper 코드를 제거해 `BotDetailScreenKt`/상세 화면 쪽 바이트코드 부담 축소
+- AI timeout UI 자체는 유지
+  - 위치: AI 필터 `배치 기준` 카드
+  - key: `ai_filter_timeout_sec`, 기본값 20초, 최소 5초
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta10.apk`
+- SHA256: `45FA5E76CB3FBFB78B84BBEB19FF2E05C70C56847CBCA99F16EF11E765E8EC90`
+- Google Drive file ID: `1TirliDvwC9K-Q_rGdtuF71uQWus2Vobg`
+
+### 다음 작업 메모
+- beta10에서도 VerifyError가 남으면 `BotDetailScreen` 내부의 AI 필터 섹션 전체를 별도 Composable/file로 분리해야 함
+
 ## 1.4.0 beta9 (최신 업로드본)
 
 ### 주요 변화

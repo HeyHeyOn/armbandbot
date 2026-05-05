@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -60,43 +59,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private fun SharedPreferences.safeInt(key: String, defaultValue: Int): Int = when (val value = all[key]) {
-    is Int -> value
-    is String -> value.toIntOrNull() ?: defaultValue
-    is Long -> value.toInt()
-    is Float -> value.toInt()
-    else -> defaultValue
-}
-
-@Composable
-private fun AiBatchSettingsCard(
-    isDarkMode: Boolean,
-    cardColor: Color,
-    textColor: Color,
-    subTextColor: Color,
-    maxPostsText: String,
-    maxWaitSecText: String,
-    maxWeightText: String,
-    timeoutSecText: String,
-    onEdit: (type: String, value: String) -> Unit,
-) {
-    val buttonContainerColor = if (isDarkMode) Color(0xFF37474F) else PastelNavyLight
-    val buttonContentColor = if (isDarkMode) Color.White else PastelNavy
-    Card(
-        colors = CardDefaults.cardColors(containerColor = cardColor),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.padding(bottom = 12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("배치 기준", fontWeight = FontWeight.Bold, color = textColor)
-            Text("용량 중심 + 글 수/시간 보조 기준으로 배치를 발사합니다.", fontSize = 12.sp, color = subTextColor)
-            Button(onClick = { onEdit("ai_filter_batch_max_posts", maxPostsText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("최대 글 수: $maxPostsText") }
-            Button(onClick = { onEdit("ai_filter_batch_max_wait_sec", maxWaitSecText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("최대 대기 시간(초): $maxWaitSecText") }
-            Button(onClick = { onEdit("ai_filter_batch_max_weight", maxWeightText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("최대 누적 용량: $maxWeightText") }
-            Button(onClick = { onEdit("ai_filter_timeout_sec", timeoutSecText) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonContainerColor, contentColor = buttonContentColor)) { Text("호출 타임아웃(초): $timeoutSecText") }
-        }
-    }
-}
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
