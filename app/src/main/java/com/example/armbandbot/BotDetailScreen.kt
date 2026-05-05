@@ -509,6 +509,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var aiFilterBatchMaxPostsText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_posts", 5).toString()) }
         var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_wait_sec", 5).toString()) }
         var aiFilterBatchMaxWeightText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_weight", 20000).toString()) }
+        var aiFilterTimeoutSecText by remember { mutableStateOf(botPref.getInt("ai_filter_timeout_sec", 20).toString()) }
         var notiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
         var aiUseCustomAction by remember { mutableStateOf(botPref.getBoolean("ai_use_custom_action_config", false)) }
         var aiActionMode by remember { mutableStateOf(if (botPref.getBoolean("ai_delete_only_mode", false)) "delete" else "block") }
@@ -1417,6 +1418,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 Button(onClick = { tempEditText = aiFilterBatchMaxPostsText; editDialogType = "ai_filter_batch_max_posts" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 글 수: ${aiFilterBatchMaxPostsText}") }
                                                 Button(onClick = { tempEditText = aiFilterBatchMaxWaitSecText; editDialogType = "ai_filter_batch_max_wait_sec" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 대기 시간(초): ${aiFilterBatchMaxWaitSecText}") }
                                                 Button(onClick = { tempEditText = aiFilterBatchMaxWeightText; editDialogType = "ai_filter_batch_max_weight" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("최대 누적 용량: ${aiFilterBatchMaxWeightText}") }
+                                                Button(onClick = { tempEditText = aiFilterTimeoutSecText; editDialogType = "ai_filter_timeout_sec" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("호출 타임아웃(초): ${aiFilterTimeoutSecText}") }
                                             }
                                         }
 
@@ -2121,6 +2123,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "ai_filter_batch_max_posts" -> { aiFilterBatchMaxPostsText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_posts", tempEditText.trim().toIntOrNull() ?: 5).apply() }
                         "ai_filter_batch_max_wait_sec" -> { aiFilterBatchMaxWaitSecText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_wait_sec", tempEditText.trim().toIntOrNull() ?: 5).apply() }
                         "ai_filter_batch_max_weight" -> { aiFilterBatchMaxWeightText = tempEditText.trim(); botPref.edit().putInt("ai_filter_batch_max_weight", tempEditText.trim().toIntOrNull() ?: 20000).apply() }
+                        "ai_filter_timeout_sec" -> { aiFilterTimeoutSecText = tempEditText.trim(); botPref.edit().putInt("ai_filter_timeout_sec", tempEditText.trim().toIntOrNull() ?: 20).apply() }
                     }
                     editDialogType = null; Toast.makeText(context, "저장되었습니다.", Toast.LENGTH_SHORT).show()
                 }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("저장", color = Color.White) } },

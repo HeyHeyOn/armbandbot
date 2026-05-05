@@ -156,6 +156,7 @@ class BotService : Service() {
         val aiFilterBatchMaxPosts: Int,
         val aiFilterBatchMaxWaitSec: Int,
         val aiFilterBatchMaxWeight: Int,
+        val aiFilterTimeoutSec: Int,
 
         val scanPageCount: Int,
         val postMinMs: Long,
@@ -2515,6 +2516,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             model = config.aiFilterModel,
                             userPrompt = config.aiFilterUserPrompt,
                             reviewMode = false,
+                            timeoutMs = config.aiFilterTimeoutSec.coerceAtLeast(5) * 1000,
                             debugLoggingEnabled = config.isDebugMode,
                         ),
                         logger = { if (botId.isNotEmpty()) sendLog("[AI 배치] $it", botId) }
@@ -4134,6 +4136,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             aiFilterBatchMaxPosts = botPref.getInt("ai_filter_batch_max_posts", 5),
             aiFilterBatchMaxWaitSec = botPref.getInt("ai_filter_batch_max_wait_sec", 5),
             aiFilterBatchMaxWeight = botPref.getInt("ai_filter_batch_max_weight", 20000),
+            aiFilterTimeoutSec = botPref.getInt("ai_filter_timeout_sec", 20),
 
             scanPageCount = botPref.getInt("scan_page_count", 1),
             postMinMs = postMinMs,

@@ -1,3 +1,20 @@
+## 1.4.0 beta5 (최신 업로드본)
+
+### 주요 변화
+- AI 호출 타임아웃 직접 설정 추가
+  - AI 설정의 배치 기준 카드에 `호출 타임아웃(초)` 항목 추가
+  - 저장 키: `ai_filter_timeout_sec`
+  - 기본값: 20초
+  - 최소 적용값: 5초
+  - LM Studio/로컬 LLM이 느릴 때 60~180초 등으로 직접 늘릴 수 있음
+- AI 필터 호출부가 설정된 timeout 값을 실제 HTTP connect/read timeout에 반영하도록 수정
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta5.apk`
+- SHA256: `DA437BC5661F692CE63D68D517415253C226C1DCD6DDFB9762363F45BA9ECC02`
+- Google Drive file ID: `15XYquwhT9yOwojfjxX_b-iae_dsPxm4D`
+
 ## 1.4.0 beta4 (최신 업로드본)
 
 ### 주요 변화
