@@ -100,38 +100,26 @@ internal class AiFilterClient(
         당신은 커뮤니티 게시글/댓글 전용 2차 AI 필터입니다.
         기존 1차 룰 기반 필터를 통과한 게시글 묶음을 입력으로 받습니다.
         입력은 항상 원문 전체이며, 게시글과 댓글을 반드시 분리해서 판단해야 합니다.
-        출력은 JSON 객체 하나만 허용됩니다. 마크다운, 설명, 코드블록 금지.
-        허용 가능한 decision 값: ALLOW, REVIEW, BLOCK
-        게시글 decision 과 댓글 decision 은 별개입니다.
-        게시글이 정상이고 댓글만 문제인 경우, 게시글은 ALLOW/PASS 성격으로 두고 댓글만 BLOCK 하세요.
-        애매하거나 판단 근거가 부족하면 REVIEW 를 선택하세요.
-        reviewMode 가 활성화되어 있으면 BLOCK 은 앱 쪽에서 REVIEW 로 완화될 수 있습니다.
+        출력은 아래 압축 줄 형식만 허용됩니다. JSON, 마크다운, 설명, 코드블록 금지.
+        형식: TYPE|ID|DECISION|REASON
+        TYPE: 게시글은 P, 댓글은 C
+        ID: 게시글 번호 또는 댓글 번호
+        DECISION: 0=허용, 1=보류, 2=차단
+        REASON: 판단 이유. 반드시 10글자 이내의 짧은 한국어.
+        게시글과 댓글은 각각 한 줄씩 출력하세요.
+        예시:
+        P|123123|0|문제없음
+        C|126|2|광고성
+        C|127|0|단순호응
+        게시글 판단과 댓글 판단은 별개입니다.
+        게시글이 정상이고 댓글만 문제인 경우 게시글은 0, 댓글만 2로 출력하세요.
+        애매하거나 판단 근거가 부족하면 1을 선택하세요.
+        reviewMode 가 활성화되어 있으면 2는 앱 쪽에서 1로 완화될 수 있습니다.
         각 게시글과 댓글은 서로 완전히 독립적으로 판단해야 합니다.
         같은 배치에 포함된 다른 게시글/댓글의 키워드, 맥락, 결론, 추정 의도를 현재 항목 판단에 절대 적용하지 마세요.
         현재 항목 텍스트에 직접 나타난 근거만 사용하세요.
         유사 표현, 연상, 비슷한 어감, 느슨한 의미 확장만으로 차단하지 마세요.
         한 항목이 차단 대상이어도 다른 항목은 처음부터 별도로 다시 판단해야 합니다.
-        JSON 스키마:
-        {
-          "results": [
-            {
-              "post_no": "문자열",
-              "post_decision": "ALLOW|REVIEW|BLOCK",
-              "post_reason": "한 줄 요약",
-              "post_category": "spam|sexual|abuse|scam|other",
-              "post_confidence": 0,
-              "comments": [
-                {
-                  "comment_id": "문자열",
-                  "decision": "ALLOW|REVIEW|BLOCK",
-                  "reason": "한 줄 요약",
-                  "category": "spam|sexual|abuse|scam|other",
-                  "confidence": 0
-                }
-              ]
-            }
-          ]
-        }
     """.trimIndent()
 
     fun evaluateBatch(request: AiFilterBatchRequest): AiFilterBatchEvaluation {
@@ -249,10 +237,6 @@ internal class AiFilterClient(
         val composedUserPrompt = buildComposedUserPrompt(request)
         return JSONObject().apply {
             put("model", config.model)
-            // LM Studio currently accepts response_format.type=text/json_schema, not json_object.
-            // Keep JSON-only behavior in the prompt and parse JSON from the returned text.
-            val responseFormatType = if (config.provider == AiFilterProvider.LM_STUDIO) "text" else "json_object"
-            put("response_format", JSONObject().put("type", responseFormatType))
             put("messages", JSONArray().apply {
                 put(JSONObject().put("role", "system").put("content", fixedPrompt))
                 put(JSONObject().put("role", "user").put("content", composedUserPrompt))
@@ -277,7 +261,6 @@ internal class AiFilterClient(
                 "generationConfig",
                 JSONObject()
                     .put("temperature", 0.1)
-                    .put("responseMimeType", "application/json")
             )
         }
     }
@@ -435,9 +418,14 @@ internal class AiFilterClient(
             logger("AI raw content 미리보기=${content.take(500)}")
         }
 
+        parseCompactBatchResponse(content, request)?.let { parsed ->
+            return parsed.copy(rawResponseText = responseText, parsedContentText = content)
+        }
+
+        // Backward-compatible fallback for older JSON-style responses.
         val parsed = runCatching { JSONObject(content) }.getOrElse {
-            logger("AI 배치 JSON 파싱 실패: ${it.message}")
-            return AiFilterBatchEvaluation(failureReason = "AI JSON 파싱 실패", rawResponseText = responseText, parsedContentText = content)
+            logger("AI compact/JSON 파싱 실패: ${it.message}")
+            return AiFilterBatchEvaluation(failureReason = "AI 응답 파싱 실패", rawResponseText = responseText, parsedContentText = content)
         }
 
         val resultsArray = parsed.optJSONArray("results") ?: run {
@@ -462,11 +450,9 @@ internal class AiFilterClient(
 
             val postDecision = parseDecision(
                 actionRaw = item.optString("post_decision", "REVIEW"),
-                reason = item.optString("post_reason", "AI 판단 사유 없음"),
-                category = item.optString("post_category", "other"),
-                confidence = item.optInt("post_confidence", 0),
+                reason = item.optString("post_reason", "AI판단"),
                 reviewMode = config.reviewMode,
-                rawJson = item.toString()
+                rawText = item.toString()
             )
             if (postDecision == null) {
                 logger("AI 파싱 무시: 게시글 decision 해석 실패 / post_no=$postNo / raw=${item.toString().take(300)}")
@@ -485,11 +471,9 @@ internal class AiFilterClient(
                 }
                 val commentDecision = parseDecision(
                     actionRaw = commentItem.optString("decision", "REVIEW"),
-                    reason = commentItem.optString("reason", "AI 판단 사유 없음"),
-                    category = commentItem.optString("category", "other"),
-                    confidence = commentItem.optInt("confidence", 0),
+                    reason = commentItem.optString("reason", "AI판단"),
                     reviewMode = config.reviewMode,
-                    rawJson = commentItem.toString()
+                    rawText = commentItem.toString()
                 )
                 if (commentDecision == null) {
                     logger("AI 파싱 무시: 댓글 decision 해석 실패 / post_no=$postNo / comment_id=$commentId")
@@ -509,26 +493,86 @@ internal class AiFilterClient(
         return AiFilterBatchEvaluation(postDecisions = postDecisions, rawResponseText = responseText, parsedContentText = content)
     }
 
+    private fun parseCompactBatchResponse(content: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation? {
+        val requestPostMap = request.posts.associateBy { it.postNo }
+        val requestCommentMap = request.posts
+            .flatMap { post -> post.comments.map { comment -> comment.commentId to post.postNo } }
+            .toMap()
+        val postDecisionMap = linkedMapOf<String, AiFilterDecision>()
+        val commentDecisionMap = linkedMapOf<String, MutableList<AiFilterCommentDecision>>()
+        var parsedLineCount = 0
+
+        content.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { line ->
+                val cleanLine = line.removePrefix("`").removeSuffix("`").trim()
+                val parts = cleanLine.split("|", limit = 4)
+                if (parts.size < 4) return@forEach
+                val type = parts[0].trim().uppercase()
+                val id = parts[1].trim()
+                val action = parts[2].trim()
+                val reason = parts[3].trim()
+                val decision = parseDecision(
+                    actionRaw = action,
+                    reason = reason,
+                    reviewMode = config.reviewMode,
+                    rawText = cleanLine
+                ) ?: return@forEach
+
+                when (type) {
+                    "P" -> {
+                        if (requestPostMap.containsKey(id)) {
+                            postDecisionMap[id] = decision
+                            parsedLineCount++
+                        } else {
+                            logger("AI compact 파싱 무시: 요청에 없는 post_no=$id")
+                        }
+                    }
+                    "C" -> {
+                        val postNo = requestCommentMap[id]
+                        if (postNo != null) {
+                            commentDecisionMap.getOrPut(postNo) { mutableListOf() } += AiFilterCommentDecision(id, decision)
+                            parsedLineCount++
+                        } else {
+                            logger("AI compact 파싱 무시: 요청에 없는 comment_id=$id")
+                        }
+                    }
+                }
+            }
+
+        if (parsedLineCount == 0) return null
+
+        val postDecisions = request.posts.mapNotNull { post ->
+            val postDecision = postDecisionMap[post.postNo] ?: return@mapNotNull null
+            AiFilterPostDecision(
+                postNo = post.postNo,
+                decision = postDecision,
+                commentDecisions = commentDecisionMap[post.postNo].orEmpty()
+            )
+        }
+        logger("AI compact 파싱 완료: lines=$parsedLineCount / postDecisions=${postDecisions.size}")
+        return AiFilterBatchEvaluation(postDecisions = postDecisions)
+    }
+
     private fun parseDecision(
         actionRaw: String,
         reason: String,
-        category: String,
-        confidence: Int,
         reviewMode: Boolean,
-        rawJson: String,
+        rawText: String,
     ): AiFilterDecision? {
-        val type = when (actionRaw.uppercase()) {
-            "ALLOW", "PASS" -> AiFilterDecisionType.ALLOW
-            "REVIEW" -> AiFilterDecisionType.REVIEW
-            "BLOCK" -> if (reviewMode) AiFilterDecisionType.REVIEW else AiFilterDecisionType.BLOCK
+        val type = when (actionRaw.trim().uppercase()) {
+            "0", "ALLOW", "PASS" -> AiFilterDecisionType.ALLOW
+            "1", "REVIEW" -> AiFilterDecisionType.REVIEW
+            "2", "BLOCK" -> if (reviewMode) AiFilterDecisionType.REVIEW else AiFilterDecisionType.BLOCK
             else -> return null
         }
         return AiFilterDecision(
             type = type,
-            reason = reason.ifBlank { "AI 판단 사유 없음" },
-            category = category.ifBlank { "other" },
-            confidence = confidence.coerceIn(0, 100),
-            rawJson = rawJson,
+            reason = reason.ifBlank { "AI판단" }.take(10),
+            category = "other",
+            confidence = 0,
+            rawJson = rawText,
         )
     }
 }

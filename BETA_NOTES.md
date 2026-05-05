@@ -1,4 +1,30 @@
-﻿## 1.4.0 beta12 (최신 업로드본)
+﻿## 1.4.0 beta13 (최신 업로드본)
+
+### 주요 변화
+- AI 필터 응답 표준을 JSON에서 압축 줄 형식으로 변경
+  - 출력 형식: `TYPE|ID|DECISION|REASON`
+  - `TYPE`: `P` 게시글, `C` 댓글
+  - `DECISION`: `0` 허용, `1` 보류, `2` 차단
+  - 예: `P|123123|0|문제없음`, `C|126|2|광고성`
+- AI 시스템 프롬프트에서 category/confidence 요구 제거
+- 판단 이유는 10글자 이내로 생성하도록 제한
+  - 파서에서도 reason을 최대 10자로 보정
+- OpenAI/Groq/LM Studio/Gemini 요청에서 JSON 전용 응답 강제 제거
+  - 외부 API와 로컬 LLM 모두 압축 형식 사용
+  - 기존 JSON 응답은 fallback 파서로 임시 호환 유지
+- 댓글 AI 차단 기록 개선
+  - 댓글 차단 시에도 AI가 반환한 개별 판단 이유를 DB/차단 기록에 반영
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta13.apk`
+- SHA256: `8AC806CF3F0F4168684640E9F9D01DD2AD7B7811480C8ED64BD61844D1592B21`
+- Google Drive file ID: `1L-5mlx4se46o-NSiJyklSD-CD_76-kOK`
+
+### 다음 작업 메모
+- 실제 AI 호출에서 compact 응답 예: `P|글번호|0|문제없음`, `C|댓글번호|2|광고성` 형태로 나오는지 확인.
+- 댓글 차단 기록에서 AI 개별 reason이 저장되는지 확인.
+## 1.4.0 beta12 (최신 업로드본)
 
 ### 주요 변화
 - beta11 AI 필터 설정 진입 크래시 수정
@@ -1181,5 +1207,6 @@
 - SHA256: 14B5197D527661866115FC92F10F54E1726F4F0DC125DBE936E08C293AE22567
 - Release Drive file ID: 1Ugv0cdaWpdLzNJQ5x7E-dJ0Fe0tbL806
 - Release Drive folder ID: 1zyy7Yl8nmAge83JOaFBONm438432rxA3
+
 
 

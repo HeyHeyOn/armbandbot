@@ -3239,7 +3239,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             suspiciousUrlInComment = suspiciousUrlInComment,
                             spamCodeMatchComment = spamCodeMatchComment,
                             notifyIfEnabled = notifyIfEnabled,
-                            debugDetail = commentAnalysis.debugDetail,
+                            debugDetail = aiCommentPlan?.reason ?: commentAnalysis.debugDetail,
                             saveSnapshotFn = {
                                 val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                                 saveSnapshotFromDoc(postDoc, commentsArray, blockedCommentNo = commentNo, blockedTs = ts)
