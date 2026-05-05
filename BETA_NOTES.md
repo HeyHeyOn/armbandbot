@@ -1,3 +1,23 @@
+## 1.4.0 beta3 (최신 업로드본)
+
+### 주요 변화
+- LM Studio HTTP 연결 실패 수정
+  - Android cleartext HTTP 차단으로 `http://...:1234` 호출이 실패하던 문제 대응
+  - 앱 manifest에 `usesCleartextTraffic=true` 적용
+- LM Studio endpoint 안내 보강
+  - 실제 폰에서 `127.0.0.1`은 PC가 아니라 휴대폰 자신이므로 사용 불가 안내
+  - 같은 Wi-Fi: `http://PC_LAN_IP:1234/v1/chat/completions`
+  - 셀룰러/Tailscale: `http://PC_TAILSCALE_IP:1234/v1/chat/completions`
+- AI 배치 실패 재시도 완화
+  - AI 호출 실패 시 묶음은 재큐하되 60초 백오프 후 재시도
+  - 연결 실패 상황에서 5건→6건→7건처럼 즉시 반복 호출/로그가 쌓이는 문제 완화
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta3.apk`
+- SHA256: `6BD4E3E23070BDAED041EF54E6A6CF22733283FE16394BCA5B806D6DD64FE7DF`
+- Google Drive file ID: `19LCWa-dWNUxSYK0UrBTpwssY-1-sbiDk`
+
 ## 1.4.0 beta2 (최신 업로드본)
 
 ### 주요 변화

@@ -489,7 +489,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val aiEndpointGuideText = when (aiFilterProvider) {
             "gemini_direct" -> "Gemini direct는 기본 경로를 권장합니다. 필요할 때만 직접 입력하세요."
             "groq" -> "Groq는 기본 endpoint를 권장합니다. 필요할 때만 직접 입력하세요."
-            "lm_studio" -> "LM Studio는 OpenAI 호환 서버를 켠 뒤 연결합니다. 에뮬레이터 기본값은 http://10.0.2.2:1234/v1/chat/completions 입니다. 실제 기기는 PC와 같은 Wi-Fi에서 http://PC_IP:1234/v1/chat/completions 를 직접 입력하세요."
+            "lm_studio" -> "LM Studio는 OpenAI 호환 서버를 켠 뒤 연결합니다. 에뮬레이터 기본값은 http://10.0.2.2:1234/v1/chat/completions 입니다. 실제 폰에서 127.0.0.1은 휴대폰 자신이므로 사용할 수 없습니다. 같은 Wi-Fi에서는 http://PC_LAN_IP:1234/v1/chat/completions, 셀룰러에서는 Tailscale 같은 VPN으로 http://PC_TAILSCALE_IP:1234/v1/chat/completions 를 입력하세요."
             "openai_compatible" -> "기본 OpenAI 호환 endpoint를 쓰거나 직접 입력할 수 있습니다."
             else -> "직접 선택한 제공자에 맞는 endpoint를 입력하세요."
         }
@@ -2072,8 +2072,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "image_alt_blacklist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n759b8005c4... #광고1"
                 "voice_blacklist" -> "39a4c023b... #어그로보플"
                 "ai_filter_provider_custom" -> "사용할 AI 제공자 표시 이름을 입력하세요.\n예: 회사 내부 OpenAI 호환 / 기타 API"
-                "ai_filter_endpoint" -> "선택한 AI 서비스의 endpoint를 입력하세요.\n예: Groq는 https://api.groq.com/openai/v1/chat/completions\nGemini direct는 비워두면 기본 경로를 사용합니다."
-                "ai_filter_api_key" -> "선택한 AI 서비스의 API 키를 입력하세요.\n예: Gemini key 또는 Groq API key"
+                "ai_filter_endpoint" -> "선택한 AI 서비스의 endpoint를 입력하세요.\n예: LM Studio 에뮬레이터: http://10.0.2.2:1234/v1/chat/completions\n예: 실제 폰 같은 Wi-Fi: http://PC_LAN_IP:1234/v1/chat/completions\n예: 셀룰러/Tailscale: http://PC_TAILSCALE_IP:1234/v1/chat/completions\n주의: 실제 폰에서 127.0.0.1은 PC가 아니라 휴대폰 자신입니다.\n예: Groq는 https://api.groq.com/openai/v1/chat/completions\nGemini direct는 비워두면 기본 경로를 사용합니다."
+                "ai_filter_api_key" -> "선택한 AI 서비스의 API 키를 입력하세요.\nLM Studio는 보통 비워둬도 됩니다.\n예: Gemini key 또는 Groq API key"
                 "ai_filter_model" -> "사용할 모델명을 입력하세요.\n예: gemini-2.5-flash / llama-3.3-70b-versatile"
                 "ai_filter_user_prompt" -> "AI가 어떤 글/댓글을 차단해야 하는지 구체적으로 설명하세요.\n예: 두바이 쫀득 쿠키와 관련 있는 글이나 댓글만 차단해줘. 그 외에는 절대로 차단하지 마."
                 "ai_filter_batch_max_posts" -> "한 번의 AI 배치 요청에 포함할 최대 게시글 수를 숫자로 입력하세요.\n예: 3"

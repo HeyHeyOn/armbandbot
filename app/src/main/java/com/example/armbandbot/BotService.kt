@@ -34,6 +34,7 @@ class BotService : Service() {
     private val activeBots = ConcurrentHashMap<String, Job>()
     private val aiBatchQueues = ConcurrentHashMap<String, AiBatchQueue>()
     private val aiBatchResults = ConcurrentHashMap<String, ConcurrentHashMap<String, AiFilterPostDecision>>()
+    private val aiBatchFailureBackoffUntil = ConcurrentHashMap<String, Long>()
     private val pendingAiPostPlans = ConcurrentHashMap<String, MutableList<AiPostExecutionPlan>>()
     private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
     private val spamBurstRecentEvents = ConcurrentHashMap<String, MutableList<SpamBurstEvent>>()
@@ -2472,11 +2473,19 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                 val isOversizeSingle = queueItem.estimatedWeight >= config.aiFilterBatchMaxWeight.coerceAtLeast(1000)
                 val shouldFlushNow = queue.shouldFlush()
+                val aiBackoffUntil = aiBatchFailureBackoffUntil[botId] ?: 0L
+                val nowForAiBackoff = System.currentTimeMillis()
+                val aiBackoffActive = nowForAiBackoff < aiBackoffUntil
                 if (config.isDebugMode && botId.isNotEmpty()) {
-                    sendLog("[AI 배치] flush 판정 / 글 번호: $postNumStr / oversize=$isOversizeSingle / shouldFlush=$shouldFlushNow", botId)
+                    sendLog("[AI 배치] flush 판정 / 글 번호: $postNumStr / oversize=$isOversizeSingle / shouldFlush=$shouldFlushNow / backoff=$aiBackoffActive", botId)
                 }
 
-                if (isOversizeSingle || shouldFlushNow) {
+                if ((isOversizeSingle || shouldFlushNow) && aiBackoffActive) {
+                    val remainSec = ((aiBackoffUntil - nowForAiBackoff).coerceAtLeast(0L) / 1000L)
+                    if (botId.isNotEmpty() && config.isDebugMode) {
+                        sendLog("[AI 배치] 이전 호출 실패로 ${remainSec}초 뒤 재시도합니다.", botId)
+                    }
+                } else if (isOversizeSingle || shouldFlushNow) {
                     val flushItems = if (isOversizeSingle) listOf(queueItem) else queue.drainFlushable()
                     val aiProviderName = when {
                         config.aiFilterProvider.equals("gemini_direct", ignoreCase = true) -> "GEMINI_DIRECT"
@@ -2515,14 +2524,18 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                     if (aiBatchEvaluation.failureReason != null) {
                         flushItems.forEach { queue.addOrReplace(it) }
+                        val backoffMs = 60_000L
+                        aiBatchFailureBackoffUntil[botId] = System.currentTimeMillis() + backoffMs
                         if (botId.isNotEmpty()) {
                             if (config.isDebugMode) {
                                 sendLog("AIFAILSTAMP:b8103ef [AI 배치] AI 배치 호출 실패: ${aiBatchEvaluation.failureReason.take(500)} / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
                             } else {
                                 sendLog("[AI 배치] AI 배치 호출 실패: ${aiBatchEvaluation.failureReason.take(500)}", botId)
                             }
-                            sendLog("[AI 배치] 검사 실패로 묶음 ${flushItems.size}건 재큐", botId)
+                            sendLog("[AI 배치] 검사 실패로 묶음 ${flushItems.size}건 재큐, ${backoffMs / 1000}초 뒤 재시도", botId)
                         }
+                    } else {
+                        aiBatchFailureBackoffUntil.remove(botId)
                     }
 
                     val resultCache = aiBatchResults.getOrPut(botId) { ConcurrentHashMap() }
