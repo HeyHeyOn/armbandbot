@@ -3997,6 +3997,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             is Int -> value
             is String -> value.toIntOrNull() ?: defaultValue
             is Long -> value.toInt()
+            is Float -> value.toInt()
             else -> defaultValue
         }
 
@@ -4133,10 +4134,10 @@ img.written_dccon{max-width:80px;max-height:80px}
             aiFilterApiKey = botPref.getString("ai_filter_api_key", "")?.trim().orEmpty(),
             aiFilterModel = botPref.getString("ai_filter_model", "gpt-4o-mini")?.trim().orEmpty(),
             aiFilterUserPrompt = botPref.getString("ai_filter_user_prompt", "")?.trim().orEmpty(),
-            aiFilterBatchMaxPosts = botPref.getInt("ai_filter_batch_max_posts", 5),
-            aiFilterBatchMaxWaitSec = botPref.getInt("ai_filter_batch_max_wait_sec", 5),
-            aiFilterBatchMaxWeight = botPref.getInt("ai_filter_batch_max_weight", 20000),
-            aiFilterTimeoutSec = botPref.getInt("ai_filter_timeout_sec", 20),
+            aiFilterBatchMaxPosts = safePrefInt("ai_filter_batch_max_posts", 5),
+            aiFilterBatchMaxWaitSec = safePrefInt("ai_filter_batch_max_wait_sec", 5),
+            aiFilterBatchMaxWeight = safePrefInt("ai_filter_batch_max_weight", 20000),
+            aiFilterTimeoutSec = safePrefInt("ai_filter_timeout_sec", 20),
 
             scanPageCount = botPref.getInt("scan_page_count", 1),
             postMinMs = postMinMs,

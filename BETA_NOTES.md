@@ -1,3 +1,17 @@
+## 1.4.0 beta6 (최신 업로드본)
+
+### 주요 변화
+- beta5 봇 상세 진입 크래시 대응
+  - 새로 추가된 `ai_filter_timeout_sec` 및 AI 배치 숫자 설정을 안전 읽기 방식으로 변경
+  - SharedPreferences에 숫자 설정이 문자열/Long/Float 등 예상과 다른 타입으로 저장되어도 기본값으로 복구
+  - BotDetailScreen 초기 진입과 BotService 설정 로드 양쪽 모두 안전 처리
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta6.apk`
+- SHA256: `4D08A9F012DB8257C24E53763CD4D0DDDDB8BE309D0A2C945F36946C32C650B4`
+- Google Drive file ID: `1nYTWCaCUFz9YVBqLw8kU8Vc8CRwFWadM`
+
 ## 1.4.0 beta5 (최신 업로드본)
 
 ### 주요 변화

@@ -79,12 +79,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     val warningRed = if (isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F)
     val colors = botColors(isDarkMode)
 
-    fun safeKkangCriteriaInt(key: String, defaultValue: Int): Int = when (val value = botPref.all[key]) {
+    fun safePrefInt(key: String, defaultValue: Int): Int = when (val value = botPref.all[key]) {
         is Int -> value
         is String -> value.toIntOrNull() ?: defaultValue
         is Long -> value.toInt()
+        is Float -> value.toInt()
         else -> defaultValue
     }
+    fun safeKkangCriteriaInt(key: String, defaultValue: Int): Int = safePrefInt(key, defaultValue)
     fun currentKkangCriteriaDescription(): String {
         val mode = (botPref.all["kkang_detection_mode"] as? String)
             ?.takeIf { it in setOf("total", "separate", "dc_mark") }
@@ -506,10 +508,10 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             "lm_studio" -> "LM Studio의 Developer 탭에 표시되는 모델 ID를 직접 입력하세요. 모델을 하나만 로드한 경우 local-model로도 동작할 수 있습니다."
             else -> "자주 쓰는 모델을 선택하거나 직접 입력할 수 있습니다."
         }
-        var aiFilterBatchMaxPostsText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_posts", 5).toString()) }
-        var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_wait_sec", 5).toString()) }
-        var aiFilterBatchMaxWeightText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_weight", 20000).toString()) }
-        var aiFilterTimeoutSecText by remember { mutableStateOf(botPref.getInt("ai_filter_timeout_sec", 20).toString()) }
+        var aiFilterBatchMaxPostsText by remember { mutableStateOf(safePrefInt("ai_filter_batch_max_posts", 5).toString()) }
+        var aiFilterBatchMaxWaitSecText by remember { mutableStateOf(safePrefInt("ai_filter_batch_max_wait_sec", 5).toString()) }
+        var aiFilterBatchMaxWeightText by remember { mutableStateOf(safePrefInt("ai_filter_batch_max_weight", 20000).toString()) }
+        var aiFilterTimeoutSecText by remember { mutableStateOf(safePrefInt("ai_filter_timeout_sec", 20).toString()) }
         var notiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
         var aiUseCustomAction by remember { mutableStateOf(botPref.getBoolean("ai_use_custom_action_config", false)) }
         var aiActionMode by remember { mutableStateOf(if (botPref.getBoolean("ai_delete_only_mode", false)) "delete" else "block") }
