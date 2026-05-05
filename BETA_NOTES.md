@@ -1,3 +1,24 @@
+## 1.4.0 beta4 (최신 업로드본)
+
+### 주요 변화
+- LM Studio 요청 형식 호환성 수정
+  - LM Studio provider에서는 `response_format.type=json_object` 대신 `text` 사용
+  - 프롬프트의 JSON-only 지시와 기존 응답 파싱은 유지
+  - LM Studio 오류 `response_format.type must be json_schema or text` 대응
+- LM Studio endpoint 입력 간소화
+  - 전체 endpoint 대신 PC IP만 입력해도 자동으로 `http://IP:1234/v1/chat/completions` 구성
+  - 포트가 다르면 `IP:PORT` 입력 가능
+  - 전체 URL을 직접 입력하는 기존 방식도 유지
+- AI 설정 안내 문구 수정
+  - 실제 폰에서 `127.0.0.1`은 PC가 아니라 휴대폰 자신임을 안내
+  - 같은 Wi-Fi는 `192.168.x.x`, 셀룰러/Tailscale은 `100.x.x.x` 형태의 PC IP 입력 안내
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta4.apk`
+- SHA256: `4AA0BB16A28CD9544F1E11BD291A719E1F8FBE27214B8487D2E0E918FAD2CEE9`
+- Google Drive file ID: `1tSxhB6F_7DqPnto4gPsdpRWQRD6lfHNx`
+
 ## 1.4.0 beta3 (최신 업로드본)
 
 ### 주요 변화

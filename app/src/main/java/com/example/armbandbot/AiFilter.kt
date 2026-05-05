@@ -249,7 +249,10 @@ internal class AiFilterClient(
         val composedUserPrompt = buildComposedUserPrompt(request)
         return JSONObject().apply {
             put("model", config.model)
-            put("response_format", JSONObject().put("type", "json_object"))
+            // LM Studio currently accepts response_format.type=text/json_schema, not json_object.
+            // Keep JSON-only behavior in the prompt and parse JSON from the returned text.
+            val responseFormatType = if (config.provider == AiFilterProvider.LM_STUDIO) "text" else "json_object"
+            put("response_format", JSONObject().put("type", responseFormatType))
             put("messages", JSONArray().apply {
                 put(JSONObject().put("role", "system").put("content", fixedPrompt))
                 put(JSONObject().put("role", "user").put("content", composedUserPrompt))
@@ -291,8 +294,18 @@ internal class AiFilterClient(
                 if (config.endpoint.isNotBlank()) config.endpoint else "https://api.groq.com/openai/v1/chat/completions"
             }
             AiFilterProvider.OPENAI_COMPATIBLE -> config.endpoint
-            AiFilterProvider.LM_STUDIO -> if (config.endpoint.isNotBlank()) config.endpoint else "http://10.0.2.2:1234/v1/chat/completions"
+            AiFilterProvider.LM_STUDIO -> buildLmStudioRequestUrl()
         }
+    }
+
+    private fun buildLmStudioRequestUrl(): String {
+        val raw = config.endpoint.trim()
+        if (raw.isBlank()) return "http://10.0.2.2:1234/v1/chat/completions"
+        if (raw.startsWith("http://", ignoreCase = true) || raw.startsWith("https://", ignoreCase = true)) {
+            return raw
+        }
+        val hostAndPort = if (raw.contains(":")) raw else "$raw:1234"
+        return "http://$hostAndPort/v1/chat/completions"
     }
 
     private fun callApi(request: AiFilterBatchRequest): String {

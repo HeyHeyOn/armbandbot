@@ -489,7 +489,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val aiEndpointGuideText = when (aiFilterProvider) {
             "gemini_direct" -> "Gemini direct는 기본 경로를 권장합니다. 필요할 때만 직접 입력하세요."
             "groq" -> "Groq는 기본 endpoint를 권장합니다. 필요할 때만 직접 입력하세요."
-            "lm_studio" -> "LM Studio는 OpenAI 호환 서버를 켠 뒤 연결합니다. 에뮬레이터 기본값은 http://10.0.2.2:1234/v1/chat/completions 입니다. 실제 폰에서 127.0.0.1은 휴대폰 자신이므로 사용할 수 없습니다. 같은 Wi-Fi에서는 http://PC_LAN_IP:1234/v1/chat/completions, 셀룰러에서는 Tailscale 같은 VPN으로 http://PC_TAILSCALE_IP:1234/v1/chat/completions 를 입력하세요."
+            "lm_studio" -> "LM Studio는 PC IP만 입력해도 자동으로 http://IP:1234/v1/chat/completions 로 연결합니다. 에뮬레이터는 기본 endpoint를 쓰고, 실제 폰에서 127.0.0.1은 사용할 수 없습니다. 같은 Wi-Fi는 PC_LAN_IP, 셀룰러는 Tailscale의 PC_TAILSCALE_IP를 입력하세요."
             "openai_compatible" -> "기본 OpenAI 호환 endpoint를 쓰거나 직접 입력할 수 있습니다."
             else -> "직접 선택한 제공자에 맞는 endpoint를 입력하세요."
         }
@@ -1362,7 +1362,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     }
                                                 }
                                                 if (aiFilterUseCustomEndpoint) {
-                                                    Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterEndpointText.isBlank()) "Endpoint 직접 입력" else "Endpoint 직접 수정") }
+                                                    Button(onClick = { tempEditText = aiFilterEndpointText; editDialogType = "ai_filter_endpoint" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterEndpointText.isBlank()) { if (aiFilterProvider == "lm_studio") "PC IP 직접 입력" else "Endpoint 직접 입력" } else { if (aiFilterProvider == "lm_studio") "PC IP/Endpoint 직접 수정" else "Endpoint 직접 수정" }) }
                                                 }
 
                                                 Text("API Key", fontWeight = FontWeight.Bold, color = textColor)
