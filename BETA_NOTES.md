@@ -1,3 +1,21 @@
+## 1.4.0 beta8 (최신 업로드본)
+
+### 주요 변화
+- 봇 상세 페이지 진입 강제 종료 원인 확정 및 긴급 회피
+  - 로그캣상 원인: `java.lang.VerifyError: Verifier rejected class ... BotDetailScreenKt ... invalid arg count`
+  - 설정값 타입 문제가 아니라 `BotDetailScreen` Compose 함수가 너무 커져 Dex verifier가 메서드 검증을 거부한 문제
+  - beta5~beta7에서 상세 화면에 추가한 timeout UI/광범위 preference 안전 읽기 변경을 상세 화면에서 제거해 beta4 수준으로 축소
+  - AI timeout은 서비스 설정 로드/실행 경로에는 유지하되, 상세 화면 진입 안정성을 우선해 UI 노출은 임시 보류
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta8.apk`
+- SHA256: `879FC16FEE8E5072998D955BC62539E135F7E5EC5A2E5DF84AC8D3ADD484A57F`
+- Google Drive file ID: `1jsiDQlfasG9R8h9xxYBPYgwUvJ5lJJaf`
+
+### 다음 작업 메모
+- timeout UI를 다시 넣으려면 `BotDetailScreen` 내부에 더 추가하지 말고, AI 설정 섹션을 별도 Composable/file로 분리한 뒤 넣어야 함
+
 ## 1.4.0 beta7 (최신 업로드본)
 
 ### 주요 변화
