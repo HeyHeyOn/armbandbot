@@ -2481,6 +2481,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     val aiProviderName = when {
                         config.aiFilterProvider.equals("gemini_direct", ignoreCase = true) -> "GEMINI_DIRECT"
                         config.aiFilterProvider.equals("groq", ignoreCase = true) -> "GROQ"
+                        config.aiFilterProvider.equals("lm_studio", ignoreCase = true) -> "LM_STUDIO"
                         else -> "OPENAI_COMPATIBLE"
                     }
                     val aiEndpointHost = runCatching {
@@ -2497,6 +2498,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             provider = when {
                                 config.aiFilterProvider.equals("gemini_direct", ignoreCase = true) -> AiFilterProvider.GEMINI_DIRECT
                                 config.aiFilterProvider.equals("groq", ignoreCase = true) -> AiFilterProvider.GROQ
+                                config.aiFilterProvider.equals("lm_studio", ignoreCase = true) -> AiFilterProvider.LM_STUDIO
                                 else -> AiFilterProvider.OPENAI_COMPATIBLE
                             },
                             endpoint = config.aiFilterEndpoint,

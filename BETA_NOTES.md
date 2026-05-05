@@ -1,3 +1,32 @@
+## 1.4.0 beta2 (최신 업로드본)
+
+### 주요 변화
+- AI 필터에 `LM Studio (로컬 LLM)` 제공자 추가
+  - LM Studio의 OpenAI 호환 `/v1/chat/completions` API를 사용
+  - API Key 없이 호출 가능하도록 지원
+  - API Key가 입력된 경우에만 Bearer 헤더 전송
+  - 기본 endpoint: `http://10.0.2.2:1234/v1/chat/completions`
+- AI 설정 UI 안내 보강
+  - 에뮬레이터: 기본 endpoint 사용
+  - 실제 기기: PC와 같은 Wi-Fi에서 LM Studio 서버를 켠 뒤 `http://PC_IP:1234/v1/chat/completions` 직접 입력
+  - 모델명은 LM Studio Developer 탭의 모델 ID를 직접 입력하도록 안내
+  - LM Studio는 API Key를 보통 비워도 된다는 안내 추가
+
+### LM Studio 연결 방법
+1. PC에서 LM Studio 실행
+2. 사용할 모델 다운로드 후 로드
+3. Developer / Local Server에서 서버 시작
+4. 앱 AI 필터 제공자를 `LM Studio (로컬 LLM)`으로 선택
+5. Android 에뮬레이터는 기본 endpoint 사용
+6. 실제 휴대폰은 LM Studio의 Local Network 접근을 허용하고 endpoint를 `http://PC_IP:1234/v1/chat/completions`로 직접 입력
+7. 모델명은 LM Studio에 표시되는 모델 ID와 맞춤
+
+### 검증
+- `./gradlew.bat assembleRelease` 성공
+- APK: `완장봇_v1.4.0-beta2.apk`
+- SHA256: `BA227DFA98E18900A4959593C629E49C76ABAD22F0F9531AC4A0601D1207F874`
+- Google Drive file ID: `132pRWR-0HYbozs6zRW1cS_RnOrUj8cP2`
+
 ## 1.4.0 beta1 (최신 업로드본)
 
 ### 주요 변화

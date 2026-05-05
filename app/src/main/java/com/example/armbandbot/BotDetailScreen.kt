@@ -463,6 +463,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val aiProviderOptions = linkedMapOf(
             "gemini_direct" to "Gemini direct",
             "groq" to "Groq",
+            "lm_studio" to "LM Studio (로컬 LLM)",
             "openai_compatible" to "OpenAI-compatible",
             "custom_openai" to "기타(OpenAI 호환 직접 입력)"
         )
@@ -481,24 +482,28 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             when (aiFilterProvider) {
                 "gemini_direct" -> listOf("gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "직접 입력")
                 "groq" -> listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-20b", "직접 입력")
+                "lm_studio" -> listOf("local-model", "직접 입력")
                 else -> listOf("gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "직접 입력")
             }
         }
         val aiEndpointGuideText = when (aiFilterProvider) {
             "gemini_direct" -> "Gemini direct는 기본 경로를 권장합니다. 필요할 때만 직접 입력하세요."
             "groq" -> "Groq는 기본 endpoint를 권장합니다. 필요할 때만 직접 입력하세요."
+            "lm_studio" -> "LM Studio는 OpenAI 호환 서버를 켠 뒤 연결합니다. 에뮬레이터 기본값은 http://10.0.2.2:1234/v1/chat/completions 입니다. 실제 기기는 PC와 같은 Wi-Fi에서 http://PC_IP:1234/v1/chat/completions 를 직접 입력하세요."
             "openai_compatible" -> "기본 OpenAI 호환 endpoint를 쓰거나 직접 입력할 수 있습니다."
             else -> "직접 선택한 제공자에 맞는 endpoint를 입력하세요."
         }
         val aiEndpointPresetOptions = when (aiFilterProvider) {
             "gemini_direct" -> listOf("기본 endpoint 사용", "직접 입력")
             "groq" -> listOf("기본 endpoint 사용", "직접 입력")
+            "lm_studio" -> listOf("기본 endpoint 사용", "직접 입력")
             "openai_compatible" -> listOf("기본 endpoint 사용", "직접 입력")
             else -> listOf("직접 입력")
         }
         val aiModelGuideText = when (aiFilterProvider) {
             "gemini_direct" -> "자주 쓰는 Gemini 모델을 선택하거나 직접 입력할 수 있습니다."
             "groq" -> "자주 쓰는 Groq 모델을 선택하거나 직접 입력할 수 있습니다."
+            "lm_studio" -> "LM Studio의 Developer 탭에 표시되는 모델 ID를 직접 입력하세요. 모델을 하나만 로드한 경우 local-model로도 동작할 수 있습니다."
             else -> "자주 쓰는 모델을 선택하거나 직접 입력할 수 있습니다."
         }
         var aiFilterBatchMaxPostsText by remember { mutableStateOf(botPref.getInt("ai_filter_batch_max_posts", 5).toString()) }
@@ -1310,6 +1315,17 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                                             botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
                                                                         }
                                                                     }
+                                                                    if (key == "lm_studio") {
+                                                                        aiFilterUseCustomEndpoint = false
+                                                                        botPref.edit()
+                                                                            .putBoolean("ai_filter_use_custom_endpoint", false)
+                                                                            .putString("ai_filter_endpoint", "")
+                                                                            .apply()
+                                                                        if (!aiFilterUseCustomModel) {
+                                                                            aiFilterModelText = "local-model"
+                                                                            botPref.edit().putString("ai_filter_model", aiFilterModelText).apply()
+                                                                        }
+                                                                    }
                                                                 }
                                                             )
                                                         }
@@ -1350,7 +1366,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 }
 
                                                 Text("API Key", fontWeight = FontWeight.Bold, color = textColor)
-                                                Text("선택한 AI 서비스의 API 키를 입력하세요.", fontSize = 12.sp, color = subTextColor)
+                                                Text(if (aiFilterProvider == "lm_studio") "LM Studio는 보통 API Key 없이 사용합니다. 서버에서 키를 요구하도록 설정한 경우에만 입력하세요." else "선택한 AI 서비스의 API 키를 입력하세요.", fontSize = 12.sp, color = subTextColor)
                                                 Button(onClick = { tempEditText = aiFilterApiKeyText; editDialogType = "ai_filter_api_key" }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text(if (aiFilterApiKeyText.isBlank()) "API Key 입력" else "API Key 수정") }
 
                                                 Text("모델", fontWeight = FontWeight.Bold, color = textColor)

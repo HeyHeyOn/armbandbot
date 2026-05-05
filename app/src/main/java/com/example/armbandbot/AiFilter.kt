@@ -15,6 +15,7 @@ internal enum class AiFilterProvider {
     OPENAI_COMPATIBLE,
     GEMINI_DIRECT,
     GROQ,
+    LM_STUDIO,
 }
 
 internal data class AiFilterConfig(
@@ -136,8 +137,11 @@ internal class AiFilterClient(
     fun evaluateBatch(request: AiFilterBatchRequest): AiFilterBatchEvaluation {
         if (!config.enabled) return AiFilterBatchEvaluation()
         if (request.posts.isEmpty()) return AiFilterBatchEvaluation()
-        if (config.apiKey.isBlank() || config.model.isBlank()) {
-            return AiFilterBatchEvaluation(failureReason = "AI 설정이 비어 있습니다")
+        if (config.model.isBlank()) {
+            return AiFilterBatchEvaluation(failureReason = "AI 모델 설정이 비어 있습니다")
+        }
+        if (config.provider != AiFilterProvider.LM_STUDIO && config.apiKey.isBlank()) {
+            return AiFilterBatchEvaluation(failureReason = "AI API Key 설정이 비어 있습니다")
         }
         if (config.provider == AiFilterProvider.OPENAI_COMPATIBLE && config.endpoint.isBlank()) {
             return AiFilterBatchEvaluation(failureReason = "AI endpoint 가 비어 있습니다")
@@ -287,13 +291,14 @@ internal class AiFilterClient(
                 if (config.endpoint.isNotBlank()) config.endpoint else "https://api.groq.com/openai/v1/chat/completions"
             }
             AiFilterProvider.OPENAI_COMPATIBLE -> config.endpoint
+            AiFilterProvider.LM_STUDIO -> if (config.endpoint.isNotBlank()) config.endpoint else "http://10.0.2.2:1234/v1/chat/completions"
         }
     }
 
     private fun callApi(request: AiFilterBatchRequest): String {
         val requestUrl = buildRequestUrl()
         val payload = when (config.provider) {
-            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> buildOpenAiPayload(request)
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ, AiFilterProvider.LM_STUDIO -> buildOpenAiPayload(request)
             AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
         }
         val requestUri = runCatching { URI(requestUrl) }.getOrNull()
@@ -319,6 +324,7 @@ internal class AiFilterClient(
         val payloadPreview = payload.toString().replace("\n", " ").replace("\r", " ").take(400)
         val authModePreview = when (config.provider) {
             AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> "bearer"
+            AiFilterProvider.LM_STUDIO -> if (config.apiKey.isBlank()) "none" else "bearer"
             AiFilterProvider.GEMINI_DIRECT -> if (requestUrl.contains("key=")) "url-key" else "x-goog-api-key"
         }
         if (config.debugLoggingEnabled) {
@@ -342,6 +348,11 @@ internal class AiFilterClient(
                     AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> {
                         setRequestProperty("Authorization", "Bearer ${config.apiKey}")
                     }
+                    AiFilterProvider.LM_STUDIO -> {
+                        if (config.apiKey.isNotBlank()) {
+                            setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+                        }
+                    }
                     AiFilterProvider.GEMINI_DIRECT -> {
                         val useHeaderKey = !requestUrl.contains("key=")
                         if (useHeaderKey) {
@@ -363,6 +374,7 @@ internal class AiFilterClient(
             val trimmedError = text.replace("\n", " ").replace("\r", " ").take(300)
             val authModePreview = when (config.provider) {
                 AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> "bearer"
+                AiFilterProvider.LM_STUDIO -> if (config.apiKey.isBlank()) "none" else "bearer"
                 AiFilterProvider.GEMINI_DIRECT -> if (requestUrl.contains("key=")) "url-key" else "x-goog-api-key"
             }
             logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / key=$keyPreview / customEndpoint=${config.endpoint.isNotBlank()} / body=$trimmedError")
@@ -384,7 +396,7 @@ internal class AiFilterClient(
     private fun parseBatchResponse(responseText: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation {
         val root = JSONObject(responseText)
         val content = when (config.provider) {
-            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> root.optJSONArray("choices")
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ, AiFilterProvider.LM_STUDIO -> root.optJSONArray("choices")
                 ?.optJSONObject(0)
                 ?.optJSONObject("message")
                 ?.optString("content", "")
