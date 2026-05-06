@@ -1302,3 +1302,23 @@
 - APK: 완장봇_v1.4.0-beta17.apk
 - SHA256: FA1955E3CE9815DF838804DB5C3DE8D1078B869682E837B501AE4A6F8F869B5C
 - Beta Drive file ID: 1oLsUokcSr-dCL2fMJMmzEOrIURlZuMuH
+
+
+## 1.4.0-beta18 배포 완료
+
+### 주요 변화
+- AI compact 응답 포맷 시스템 프롬프트를 강화
+  - 모든 출력 줄은 `|` 기준 정확히 5칸이어야 한다고 명시
+  - 허용/보류(`0`/`1`)도 `REASON`과 `EVIDENCE` 칸을 반드시 출력하도록 명시
+  - `P|123123|0|-`, `C|123123:126|0|-` 같은 4칸 출력 금지 예시 추가
+  - 최종 제출 전 각 줄의 `|` 문자가 정확히 4개인지 확인하라는 지시 추가
+- LM Studio/local model이 REASON을 누락한 4칸 응답을 반환해도 배치 전체가 실패하지 않도록 4필드 보정 파서 추가
+  - 보정된 항목의 reason은 `형식보정`으로 기록
+  - 기존 beta17 5필드 형식과 beta16 6필드 임시 호환은 유지
+
+### 빌드 정보
+- versionCode = 112
+- versionName = 1.4.0-beta18
+- APK: 완장봇_v1.4.0-beta18.apk
+- SHA256: 26872E80CA8A6C93B38A4EBE17BBD4F8D08113003F70228397955205A86C9553
+- Beta Drive file ID: 1rb1R9ks0yRZ-RYj6QqGxZ5GGKnec6FLN

@@ -102,19 +102,23 @@ internal class AiFilterClient(
         기존 1차 룰 기반 필터를 통과한 게시글 묶음을 입력으로 받습니다.
         입력은 항상 원문 전체이며, 게시글과 댓글을 반드시 분리해서 판단해야 합니다.
         출력은 아래 압축 줄 형식만 허용됩니다. JSON, 마크다운, 설명, 코드블록 금지.
+        모든 출력 줄은 반드시 | 로 구분된 정확히 5칸이어야 합니다.
         게시글 형식: P|POST_ID|DECISION|REASON|EVIDENCE
         댓글 형식: C|COMMENT_KEY|DECISION|REASON|EVIDENCE
         TYPE: 게시글은 P, 댓글은 C
         POST_ID: 게시글 번호
         COMMENT_KEY: 입력 comments의 comment_key 값을 그대로 복사한 값. 형식은 POST_ID:COMMENT_ID.
         DECISION: 0=허용, 1=보류, 2=차단
-        REASON: 판단 이유. 반드시 10글자 이내의 짧은 한국어.
+        REASON: 판단 이유. 반드시 10글자 이내의 짧은 한국어. 허용도 반드시 REASON 칸을 채우세요. 예: 문제없음, 단순호응.
         EVIDENCE: 2=차단일 때만 현재 항목 원문에 실제로 포함된 짧은 근거 조각. 허용/보류는 -.
         근거 조각에는 | 문자를 쓰지 마세요.
         게시글 번호는 반드시 POST_ID 칸에만 출력하세요.
         댓글은 POST_ID와 COMMENT_ID를 따로 조합하지 말고 입력의 comment_key를 그대로 복사하세요.
         댓글은 COMMENT_KEY가 입력과 정확히 일치해야 합니다.
         게시글과 댓글은 각각 한 줄씩 출력하세요.
+        아래 같은 4칸 출력은 절대 금지입니다: P|123123|0|- 또는 C|123123:126|0|-
+        허용/보류여도 REASON 칸과 EVIDENCE 칸을 모두 출력해야 합니다.
+        정답 예시는 반드시 5칸입니다.
         예시:
         P|123123|0|문제없음|-
         C|123123:126|2|욕설포함|씨발
@@ -129,6 +133,7 @@ internal class AiFilterClient(
         선의의 확장 해석, 자체 커뮤니티 규칙 추가, 넓은 도덕 판단을 금지합니다.
         삭제된 댓글 안내문(예: 해당 댓글은 삭제되었습니다)은 판단 대상이 아니며 항상 0입니다.
         입력에 없는 ID를 새로 만들거나 출력하지 마세요.
+        최종 제출 전에 각 줄의 | 개수를 확인하세요. 각 줄마다 | 문자는 정확히 4개여야 합니다.
         각 게시글과 댓글은 서로 완전히 독립적으로 판단해야 합니다.
         배치는 처리 효율을 위한 포장일 뿐이며 여러 글을 한 사건, 한 대화, 한 흐름으로 묶어 해석하지 마세요.
         같은 배치에 포함된 다른 게시글/댓글의 키워드, 맥락, 결론, 추정 의도를 현재 항목 판단에 절대 적용하지 마세요.
@@ -668,6 +673,38 @@ internal class AiFilterClient(
                     reason = oldParts[4].trim(),
                     evidence = oldParts[5].trim().removeSurrounding("\"")
                 )
+            }
+        }
+
+        val shortParts = line.split("|", limit = 4)
+        if (shortParts.size == 4) {
+            val type = shortParts[0].trim().uppercase()
+            val action = shortParts[2].trim()
+            val fallbackEvidence = shortParts[3].trim().removeSurrounding("\"")
+            when (type) {
+                "P" -> if (isCompactActionToken(action)) {
+                    return ParsedCompactLine(
+                        type = type,
+                        postId = shortParts[1].trim(),
+                        commentId = "-",
+                        action = action,
+                        reason = "형식보정",
+                        evidence = fallbackEvidence
+                    )
+                }
+                "C" -> {
+                    val keyParts = shortParts[1].trim().split(":", limit = 2)
+                    if (keyParts.size == 2 && isCompactActionToken(action)) {
+                        return ParsedCompactLine(
+                            type = type,
+                            postId = keyParts[0].trim(),
+                            commentId = keyParts[1].trim(),
+                            action = action,
+                            reason = "형식보정",
+                            evidence = fallbackEvidence
+                        )
+                    }
+                }
             }
         }
         return null
