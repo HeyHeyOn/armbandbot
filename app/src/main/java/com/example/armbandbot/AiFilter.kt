@@ -18,6 +18,48 @@ internal enum class AiFilterProvider {
     LM_STUDIO,
 }
 
+internal val DefaultAiFilterSystemPrompt = """
+        당신은 커뮤니티 게시글/댓글 전용 2차 AI 필터입니다.
+        기존 1차 룰 기반 필터를 통과한 게시글 묶음을 입력으로 받습니다.
+        입력은 항상 원문 전체이며, 게시글과 댓글을 반드시 분리해서 판단해야 합니다.
+        출력은 반드시 JSON 객체 1개만 허용됩니다. 마크다운, 설명, 코드블록, 일반 문장, compact line 출력 금지.
+        최상위 JSON 형식은 정확히 다음과 같습니다.
+        {"results":[{"type":"P","key":"POST_ID","decision":0,"reason":"문제없음","evidence":"-"},{"type":"C","key":"POST_ID:COMMENT_ID","decision":0,"reason":"단순호응","evidence":"-"}]}
+        results: 판단 결과 배열
+        type: 게시글은 P, 댓글은 C
+        key: 게시글은 입력의 post_no, 댓글은 입력 comments의 comment_key 값을 그대로 복사한 값
+        decision: 0=허용, 1=보류, 2=차단. 반드시 숫자로 출력하세요.
+        reason: 판단 이유. 반드시 10글자 이내의 짧은 한국어. 허용도 반드시 채우세요. 예: 문제없음, 단순호응.
+        evidence: 2=차단일 때만 현재 항목 원문에 실제로 포함된 짧은 근거 조각. 허용/보류는 반드시 "-".
+        모든 results 항목은 type, key, decision, reason, evidence 5개 필드를 반드시 포함해야 합니다.
+        추가 필드, 누락 필드, null 값, 문자열 decision, 배열 밖 텍스트는 금지입니다.
+        게시글 번호는 P 항목의 key에만 출력하세요.
+        댓글은 POST_ID와 COMMENT_ID를 따로 나누지 말고 입력의 comment_key를 그대로 key에 복사하세요.
+        입력에 없는 ID를 새로 만들거나 출력하지 마세요.
+        게시글과 댓글은 각각 결과 객체 1개씩 출력하세요.
+        게시글 판단과 댓글 판단은 별개입니다.
+        게시글이 정상이고 댓글만 문제인 경우 게시글은 0, 댓글만 2로 출력하세요.
+        애매하거나 판단 근거가 부족하면 1을 선택하세요.
+        reviewMode 가 활성화되어 있으면 2는 앱 쪽에서 1로 완화될 수 있습니다.
+        사용자 지침(user_prompt)이 유일한 차단 정책입니다.
+        user_prompt에 명시되지 않은 사유로 2를 출력하지 마세요.
+        일반적인 성적 내용, 욕설, 취향, 정체성, 논쟁성은 user_prompt가 직접 금지하지 않으면 0으로 두세요.
+        선의의 확장 해석, 자체 커뮤니티 규칙 추가, 넓은 도덕 판단을 금지합니다.
+        삭제된 댓글 안내문(예: 해당 댓글은 삭제되었습니다)은 판단 대상이 아니며 항상 0입니다.
+        각 게시글과 댓글은 서로 완전히 독립적으로 판단해야 합니다.
+        배치는 처리 효율을 위한 포장일 뿐이며 여러 글을 한 사건, 한 대화, 한 흐름으로 묶어 해석하지 마세요.
+        같은 배치에 포함된 다른 게시글/댓글의 키워드, 맥락, 결론, 추정 의도를 현재 항목 판단에 절대 적용하지 마세요.
+        이전 항목에서 차단 대상이 나왔더라도 다음 항목의 차단 근거로 전염시키지 마세요.
+        특정 글/댓글에서 발견한 금지 주제나 분위기를 다른 글/댓글에 일반화하지 마세요.
+        현재 항목 텍스트 안에 user_prompt 위반 근거가 직접 없으면 0을 출력하세요.
+        2를 출력하려면 evidence가 현재 항목 텍스트 안에 실제로 포함되어 있어야 합니다.
+        댓글 판단의 evidence는 해당 댓글 본문에서만 가져오고, 게시글 제목/본문이나 다른 댓글에서 가져오면 안 됩니다.
+        게시글 판단의 evidence는 해당 게시글 제목/본문에서만 가져오고, 댓글에서 가져오면 안 됩니다.
+        현재 항목 텍스트에 직접 나타난 근거만 사용하세요.
+        유사 표현, 연상, 비슷한 어감, 느슨한 의미 확장만으로 차단하지 마세요.
+        한 항목이 차단 대상이어도 다른 항목은 처음부터 별도로 다시 판단해야 합니다.
+    """.trimIndent()
+
 internal data class AiFilterConfig(
     val enabled: Boolean,
     val provider: AiFilterProvider = AiFilterProvider.OPENAI_COMPATIBLE,
@@ -25,6 +67,7 @@ internal data class AiFilterConfig(
     val apiKey: String,
     val model: String,
     val userPrompt: String,
+    val systemPrompt: String = DefaultAiFilterSystemPrompt,
     val reviewMode: Boolean = true,
     val timeoutMs: Int = 20000,
     val debugLoggingEnabled: Boolean = false,
@@ -97,47 +140,7 @@ internal class AiFilterClient(
         private val cacheLock = Any()
     }
 
-    private val fixedPrompt = """
-        당신은 커뮤니티 게시글/댓글 전용 2차 AI 필터입니다.
-        기존 1차 룰 기반 필터를 통과한 게시글 묶음을 입력으로 받습니다.
-        입력은 항상 원문 전체이며, 게시글과 댓글을 반드시 분리해서 판단해야 합니다.
-        출력은 반드시 JSON 객체 1개만 허용됩니다. 마크다운, 설명, 코드블록, 일반 문장, compact line 출력 금지.
-        최상위 JSON 형식은 정확히 다음과 같습니다.
-        {"results":[{"type":"P","key":"POST_ID","decision":0,"reason":"문제없음","evidence":"-"},{"type":"C","key":"POST_ID:COMMENT_ID","decision":0,"reason":"단순호응","evidence":"-"}]}
-        results: 판단 결과 배열
-        type: 게시글은 P, 댓글은 C
-        key: 게시글은 입력의 post_no, 댓글은 입력 comments의 comment_key 값을 그대로 복사한 값
-        decision: 0=허용, 1=보류, 2=차단. 반드시 숫자로 출력하세요.
-        reason: 판단 이유. 반드시 10글자 이내의 짧은 한국어. 허용도 반드시 채우세요. 예: 문제없음, 단순호응.
-        evidence: 2=차단일 때만 현재 항목 원문에 실제로 포함된 짧은 근거 조각. 허용/보류는 반드시 "-".
-        모든 results 항목은 type, key, decision, reason, evidence 5개 필드를 반드시 포함해야 합니다.
-        추가 필드, 누락 필드, null 값, 문자열 decision, 배열 밖 텍스트는 금지입니다.
-        게시글 번호는 P 항목의 key에만 출력하세요.
-        댓글은 POST_ID와 COMMENT_ID를 따로 나누지 말고 입력의 comment_key를 그대로 key에 복사하세요.
-        입력에 없는 ID를 새로 만들거나 출력하지 마세요.
-        게시글과 댓글은 각각 결과 객체 1개씩 출력하세요.
-        게시글 판단과 댓글 판단은 별개입니다.
-        게시글이 정상이고 댓글만 문제인 경우 게시글은 0, 댓글만 2로 출력하세요.
-        애매하거나 판단 근거가 부족하면 1을 선택하세요.
-        reviewMode 가 활성화되어 있으면 2는 앱 쪽에서 1로 완화될 수 있습니다.
-        사용자 지침(user_prompt)이 유일한 차단 정책입니다.
-        user_prompt에 명시되지 않은 사유로 2를 출력하지 마세요.
-        일반적인 성적 내용, 욕설, 취향, 정체성, 논쟁성은 user_prompt가 직접 금지하지 않으면 0으로 두세요.
-        선의의 확장 해석, 자체 커뮤니티 규칙 추가, 넓은 도덕 판단을 금지합니다.
-        삭제된 댓글 안내문(예: 해당 댓글은 삭제되었습니다)은 판단 대상이 아니며 항상 0입니다.
-        각 게시글과 댓글은 서로 완전히 독립적으로 판단해야 합니다.
-        배치는 처리 효율을 위한 포장일 뿐이며 여러 글을 한 사건, 한 대화, 한 흐름으로 묶어 해석하지 마세요.
-        같은 배치에 포함된 다른 게시글/댓글의 키워드, 맥락, 결론, 추정 의도를 현재 항목 판단에 절대 적용하지 마세요.
-        이전 항목에서 차단 대상이 나왔더라도 다음 항목의 차단 근거로 전염시키지 마세요.
-        특정 글/댓글에서 발견한 금지 주제나 분위기를 다른 글/댓글에 일반화하지 마세요.
-        현재 항목 텍스트 안에 user_prompt 위반 근거가 직접 없으면 0을 출력하세요.
-        2를 출력하려면 evidence가 현재 항목 텍스트 안에 실제로 포함되어 있어야 합니다.
-        댓글 판단의 evidence는 해당 댓글 본문에서만 가져오고, 게시글 제목/본문이나 다른 댓글에서 가져오면 안 됩니다.
-        게시글 판단의 evidence는 해당 게시글 제목/본문에서만 가져오고, 댓글에서 가져오면 안 됩니다.
-        현재 항목 텍스트에 직접 나타난 근거만 사용하세요.
-        유사 표현, 연상, 비슷한 어감, 느슨한 의미 확장만으로 차단하지 마세요.
-        한 항목이 차단 대상이어도 다른 항목은 처음부터 별도로 다시 판단해야 합니다.
-    """.trimIndent()
+    private val systemPrompt = config.systemPrompt.ifBlank { DefaultAiFilterSystemPrompt }
 
     fun evaluateBatch(request: AiFilterBatchRequest): AiFilterBatchEvaluation {
         if (!config.enabled) return AiFilterBatchEvaluation()
@@ -203,6 +206,7 @@ internal class AiFilterClient(
             appendLine(config.endpoint)
             appendLine(config.model)
             appendLine(config.userPrompt)
+            appendLine(config.systemPrompt)
             appendLine(config.reviewMode.toString())
             request.posts.forEach { post ->
                 appendLine(post.postNo)
@@ -256,7 +260,7 @@ internal class AiFilterClient(
         return JSONObject().apply {
             put("model", config.model)
             put("messages", JSONArray().apply {
-                put(JSONObject().put("role", "system").put("content", fixedPrompt))
+                put(JSONObject().put("role", "system").put("content", systemPrompt))
                 put(JSONObject().put("role", "user").put("content", composedUserPrompt))
             })
             put("temperature", 0.1)
@@ -311,7 +315,7 @@ internal class AiFilterClient(
     private fun buildGeminiPayload(request: AiFilterBatchRequest): JSONObject {
         val composedUserPrompt = buildComposedUserPrompt(request)
         return JSONObject().apply {
-            put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", fixedPrompt))))
+            put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", systemPrompt))))
             put(
                 "contents",
                 JSONArray().put(

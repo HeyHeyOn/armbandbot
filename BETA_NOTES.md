@@ -1344,3 +1344,23 @@
 - APK: 완장봇_v1.4.0-beta19.apk
 - SHA256: 48957F566E6AD4BDCD002D77DE904C32CAB1396AB2F865D60C713DD055C43460
 - Beta Drive file ID: 12PJRHPv9uLKx0DxUe2YJp1s3Y4FsZ4gg
+
+
+## 1.4.0-beta20 배포 완료
+
+### 주요 변화
+- AI 필터 시스템 프롬프트를 봇별 설정에서 직접 수정할 수 있도록 추가
+  - 새 봇/미설정 봇은 beta19의 기본 JSON structured 시스템 프롬프트를 자동 사용
+  - AI 설정 화면에 `시스템 프롬프트` 입력란과 `기본값 복원` 버튼 추가
+  - 저장 키: `ai_filter_system_prompt`
+- AI 캐시 키에 시스템 프롬프트를 포함해 프롬프트 변경 후 이전 캐시가 재사용되지 않도록 보강
+- 기존 사용자 프롬프트는 그대로 별도 유지
+  - 시스템 프롬프트: 출력 형식/판단 방식/안전장치
+  - 사용자 프롬프트: 실제 차단 정책
+
+### 빌드 정보
+- versionCode = 114
+- versionName = 1.4.0-beta20
+- APK: 완장봇_v1.4.0-beta20.apk
+- SHA256: CB5924A386E296FE8A0FBF8851DF4E42E8D75345AD0CCC6A55AC6A4775E15130
+- Beta Drive file ID: 13lsbcb-b6Cd_smvROGSQOAlE0bg_6Bbr

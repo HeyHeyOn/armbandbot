@@ -25,6 +25,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
@@ -80,6 +81,7 @@ fun AiFilterSettingsPanel(botId: String) {
     var useCustomEndpoint by remember { mutableStateOf(botPref.getBoolean("ai_filter_use_custom_endpoint", false)) }
     var useCustomModel by remember { mutableStateOf(botPref.getBoolean("ai_filter_use_custom_model", false)) }
     var prompt by remember { mutableStateOf(botPref.getString("ai_filter_user_prompt", "") ?: "") }
+    var systemPrompt by remember { mutableStateOf(botPref.getString("ai_filter_system_prompt", DefaultAiFilterSystemPrompt) ?: DefaultAiFilterSystemPrompt) }
     var maxPosts by remember { mutableStateOf(botPref.safeInt("ai_filter_batch_max_posts", 5).toString()) }
     var maxWaitSec by remember { mutableStateOf(botPref.safeInt("ai_filter_batch_max_wait_sec", 5).toString()) }
     var maxWeight by remember { mutableStateOf(botPref.safeInt("ai_filter_batch_max_weight", 20000).toString()) }
@@ -167,6 +169,25 @@ fun AiFilterSettingsPanel(botId: String) {
                 OutlinedTextField(value = model, onValueChange = { model = it; saveString("ai_filter_model", it.trim()) }, label = { Text("모델") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
 
                 OutlinedTextField(value = prompt, onValueChange = { prompt = it; saveString("ai_filter_user_prompt", it.trim()) }, label = { Text("사용자 프롬프트") }, minLines = 5, modifier = Modifier.fillMaxWidth().height(180.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                Divider(color = dividerColor)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("시스템 프롬프트", fontWeight = FontWeight.Bold, color = textColor)
+                        Text("새 봇은 기본 프롬프트로 시작하며, 필요할 때 봇별로 수정할 수 있습니다.", fontSize = 12.sp, color = subTextColor)
+                    }
+                    TextButton(onClick = {
+                        systemPrompt = DefaultAiFilterSystemPrompt
+                        saveString("ai_filter_system_prompt", DefaultAiFilterSystemPrompt)
+                    }) { Text("기본값 복원", color = buttonContentColor) }
+                }
+                OutlinedTextField(
+                    value = systemPrompt,
+                    onValueChange = { systemPrompt = it; saveString("ai_filter_system_prompt", it.trim()) },
+                    label = { Text("시스템 프롬프트") },
+                    minLines = 8,
+                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+                )
             }
         }
 
