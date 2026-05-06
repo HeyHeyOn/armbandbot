@@ -1322,3 +1322,25 @@
 - APK: 완장봇_v1.4.0-beta18.apk
 - SHA256: 26872E80CA8A6C93B38A4EBE17BBD4F8D08113003F70228397955205A86C9553
 - Beta Drive file ID: 1rb1R9ks0yRZ-RYj6QqGxZ5GGKnec6FLN
+
+
+## 1.4.0-beta19 배포 완료
+
+### 주요 변화
+- AI 필터 기본 응답 포맷을 compact line에서 JSON structured 방식으로 변경
+  - 기본 형식: `{ "results": [{ "type": "P|C", "key": "POST_ID 또는 POST_ID:COMMENT_ID", "decision": 0|1|2, "reason": "짧은 이유", "evidence": "근거 또는 -" }] }`
+  - 게시글은 `type=P`, `key=post_no`
+  - 댓글은 `type=C`, `key=comment_key(POST_ID:COMMENT_ID)`
+- LM Studio provider 요청에는 OpenAI-compatible `response_format=json_schema`를 함께 전송하도록 추가
+  - LM Studio Structured Output 설정과 같은 schema 구조를 사용
+  - `type`, `key`, `decision`, `reason`, `evidence` 필수 / additionalProperties=false / decision은 숫자 enum 0,1,2
+- Gemini direct 요청에는 `responseMimeType=application/json` 추가
+- 파서는 JSON structured 응답을 1순위로 처리하고, 기존 legacy JSON 및 compact line 응답은 fallback으로 유지
+- JSON 응답에서도 차단 근거는 현재 게시글/댓글 원문에 실제 포함될 때만 인정
+
+### 빌드 정보
+- versionCode = 113
+- versionName = 1.4.0-beta19
+- APK: 완장봇_v1.4.0-beta19.apk
+- SHA256: 48957F566E6AD4BDCD002D77DE904C32CAB1396AB2F865D60C713DD055C43460
+- Beta Drive file ID: 12PJRHPv9uLKx0DxUe2YJp1s3Y4FsZ4gg
