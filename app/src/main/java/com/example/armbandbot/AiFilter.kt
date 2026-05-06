@@ -102,22 +102,23 @@ internal class AiFilterClient(
         기존 1차 룰 기반 필터를 통과한 게시글 묶음을 입력으로 받습니다.
         입력은 항상 원문 전체이며, 게시글과 댓글을 반드시 분리해서 판단해야 합니다.
         출력은 아래 압축 줄 형식만 허용됩니다. JSON, 마크다운, 설명, 코드블록 금지.
-        형식: TYPE|POST_ID|COMMENT_ID|DECISION|REASON|EVIDENCE
+        게시글 형식: P|POST_ID|DECISION|REASON|EVIDENCE
+        댓글 형식: C|COMMENT_KEY|DECISION|REASON|EVIDENCE
         TYPE: 게시글은 P, 댓글은 C
         POST_ID: 게시글 번호
-        COMMENT_ID: 댓글은 댓글 번호, 게시글은 -
+        COMMENT_KEY: 입력 comments의 comment_key 값을 그대로 복사한 값. 형식은 POST_ID:COMMENT_ID.
         DECISION: 0=허용, 1=보류, 2=차단
         REASON: 판단 이유. 반드시 10글자 이내의 짧은 한국어.
         EVIDENCE: 2=차단일 때만 현재 항목 원문에 실제로 포함된 짧은 근거 조각. 허용/보류는 -.
         근거 조각에는 | 문자를 쓰지 마세요.
         게시글 번호는 반드시 POST_ID 칸에만 출력하세요.
-        댓글 번호는 반드시 COMMENT_ID 칸에만 출력하세요.
-        댓글은 POST_ID와 COMMENT_ID가 모두 입력과 정확히 일치해야 합니다.
+        댓글은 POST_ID와 COMMENT_ID를 따로 조합하지 말고 입력의 comment_key를 그대로 복사하세요.
+        댓글은 COMMENT_KEY가 입력과 정확히 일치해야 합니다.
         게시글과 댓글은 각각 한 줄씩 출력하세요.
         예시:
-        P|123123|-|0|문제없음|-
-        C|123123|126|2|욕설포함|씨발
-        C|123123|127|0|단순호응|-
+        P|123123|0|문제없음|-
+        C|123123:126|2|욕설포함|씨발
+        C|123123:127|0|단순호응|-
         게시글 판단과 댓글 판단은 별개입니다.
         게시글이 정상이고 댓글만 문제인 경우 게시글은 0, 댓글만 2로 출력하세요.
         애매하거나 판단 근거가 부족하면 1을 선택하세요.
@@ -239,6 +240,7 @@ internal class AiFilterClient(
                         put("comments", JSONArray().apply {
                             post.comments.forEach { comment ->
                                 put(JSONObject().apply {
+                                    put("comment_key", "${post.postNo}:${comment.commentId}")
                                     put("comment_id", comment.commentId)
                                     put("author_id_or_ip", comment.authorIdOrIp)
                                     put("nickname", comment.nickname)
@@ -527,17 +529,17 @@ internal class AiFilterClient(
             .filter { it.isNotBlank() }
             .forEach { line ->
                 val cleanLine = line.removePrefix("`").removeSuffix("`").trim()
-                val parts = cleanLine.split("|", limit = 6)
-                if (parts.size < 6) {
-                    logger("AI compact 파싱 무시: beta16 6필드 형식 아님 / line=${cleanLine.take(120)}")
+                val parsedLine = parseCompactLine(cleanLine)
+                if (parsedLine == null) {
+                    logger("AI compact 파싱 무시: beta17 5필드/comment_key 형식 아님 / line=${cleanLine.take(120)}")
                     return@forEach
                 }
-                val type = parts[0].trim().uppercase()
-                val postId = parts[1].trim()
-                val commentId = parts[2].trim()
-                val action = parts[3].trim()
-                val reason = parts[4].trim()
-                val evidence = parts[5].trim().removeSurrounding("\"")
+                val type = parsedLine.type
+                val postId = parsedLine.postId
+                val commentId = parsedLine.commentId
+                val action = parsedLine.action
+                val reason = parsedLine.reason
+                val evidence = parsedLine.evidence
 
                 when (type) {
                     "P" -> {
@@ -566,7 +568,7 @@ internal class AiFilterClient(
                         val key = "$postId:$commentId"
                         val comment = requestCommentMap[key]
                         if (comment == null) {
-                            logger("AI compact 파싱 무시: 요청에 없는 comment_key=$key")
+                            logger("AI compact 파싱 무시: 요청에 없는 comment_key=$key / raw=${cleanLine.take(120)}")
                             return@forEach
                         }
                         val decision = parseDecision(
@@ -608,6 +610,76 @@ internal class AiFilterClient(
         return AiFilterBatchEvaluation(postDecisions = postDecisions)
     }
 
+    private data class ParsedCompactLine(
+        val type: String,
+        val postId: String,
+        val commentId: String,
+        val action: String,
+        val reason: String,
+        val evidence: String,
+    )
+
+    private fun parseCompactLine(line: String): ParsedCompactLine? {
+        val newParts = line.split("|", limit = 5)
+        if (newParts.size == 5) {
+            val type = newParts[0].trim().uppercase()
+            when (type) {
+                "P" -> {
+                    val action = newParts[2].trim()
+                    if (isCompactActionToken(action)) {
+                        return ParsedCompactLine(
+                            type = type,
+                            postId = newParts[1].trim(),
+                            commentId = "-",
+                            action = action,
+                            reason = newParts[3].trim(),
+                            evidence = newParts[4].trim().removeSurrounding("\"")
+                        )
+                    }
+                }
+                "C" -> {
+                    val commentKey = newParts[1].trim()
+                    val action = newParts[2].trim()
+                    val keyParts = commentKey.split(":", limit = 2)
+                    if (keyParts.size == 2 && isCompactActionToken(action)) {
+                        return ParsedCompactLine(
+                            type = type,
+                            postId = keyParts[0].trim(),
+                            commentId = keyParts[1].trim(),
+                            action = action,
+                            reason = newParts[3].trim(),
+                            evidence = newParts[4].trim().removeSurrounding("\"")
+                        )
+                    }
+                }
+            }
+        }
+
+        val oldParts = line.split("|", limit = 6)
+        if (oldParts.size >= 6) {
+            val type = oldParts[0].trim().uppercase()
+            val action = oldParts[3].trim()
+            if ((type == "P" || type == "C") && isCompactActionToken(action)) {
+                return ParsedCompactLine(
+                    type = type,
+                    postId = oldParts[1].trim(),
+                    commentId = oldParts[2].trim(),
+                    action = action,
+                    reason = oldParts[4].trim(),
+                    evidence = oldParts[5].trim().removeSurrounding("\"")
+                )
+            }
+        }
+        return null
+    }
+
+    private fun isCompactActionToken(value: String): Boolean {
+        return when (value.trim().uppercase()) {
+            "0", "1", "2", "ALLOW", "PASS", "REVIEW", "BLOCK" -> true
+            else -> false
+        }
+    }
+
     private fun parseDecision(
         actionRaw: String,
         reason: String,
@@ -617,15 +689,14 @@ internal class AiFilterClient(
         rawText: String,
     ): AiFilterDecision? {
         val rawAction = actionRaw.trim().uppercase()
-        val normalizedEvidence = evidence.trim().take(40)
-        val hasEvidence = normalizedEvidence.isNotBlank() && normalizedEvidence != "-"
-        val evidenceMatches = hasEvidence && containsEvidence(sourceText, normalizedEvidence)
+        val normalizedEvidence = selectMatchingEvidence(sourceText, evidence)
+        val evidenceMatches = normalizedEvidence != null
         val type = when (rawAction) {
             "0", "ALLOW", "PASS" -> AiFilterDecisionType.ALLOW
             "1", "REVIEW" -> AiFilterDecisionType.REVIEW
             "2", "BLOCK" -> {
                 if (!evidenceMatches) {
-                    logger("AI 차단 무효화: 근거 불일치 / evidence=${normalizedEvidence.take(20)} / raw=${rawText.take(120)}")
+                    logger("AI 차단 무효화: 근거 불일치 / evidence=${evidence.trim().take(20)} / raw=${rawText.take(120)}")
                     AiFilterDecisionType.ALLOW
                 } else if (reviewMode) {
                     AiFilterDecisionType.REVIEW
@@ -641,8 +712,21 @@ internal class AiFilterClient(
             category = "other",
             confidence = 0,
             rawJson = rawText,
-            evidence = if (evidenceMatches) normalizedEvidence else "",
+            evidence = normalizedEvidence ?: "",
         )
+    }
+
+    private fun selectMatchingEvidence(sourceText: String, evidence: String): String? {
+        val raw = evidence.trim().removeSurrounding("\"")
+        if (raw.isBlank() || raw == "-") return null
+        val candidates = buildList {
+            add(raw.take(40))
+            raw.split("|")
+                .map { it.trim().take(40) }
+                .filter { it.isNotBlank() && it != "-" }
+                .forEach { add(it) }
+        }.distinct()
+        return candidates.firstOrNull { containsEvidence(sourceText, it) }
     }
 
     private fun containsEvidence(sourceText: String, evidence: String): Boolean {

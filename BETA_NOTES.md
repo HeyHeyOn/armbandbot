@@ -1283,3 +1283,22 @@
 
 
 
+
+
+## 1.4.0-beta17 배포 완료
+
+### 주요 변화
+- AI 필터 compact 응답을 2+3 방식으로 변경
+  - 게시글: `P|POST_ID|DECISION|REASON|EVIDENCE`
+  - 댓글: `C|COMMENT_KEY|DECISION|REASON|EVIDENCE`
+  - 댓글은 `POST_ID`/`COMMENT_ID`를 분리 출력하지 않고 입력의 `comment_key`(`POST_ID:COMMENT_ID`)를 그대로 복사하도록 변경
+- AI 입력 댓글 JSON에 `comment_key`를 추가해 모델의 댓글 식별자 혼동을 줄임
+- 파서는 beta17 5필드 형식을 우선 지원하고, 기존 beta16 6필드 형식도 임시 호환 유지
+- 차단 근거 검증을 보강해 근거 문자열이 현재 게시글/댓글 원문에 실제 포함될 때만 차단/보류 판단을 인정
+
+### 빌드 정보
+- versionCode = 111
+- versionName = 1.4.0-beta17
+- APK: 완장봇_v1.4.0-beta17.apk
+- SHA256: FA1955E3CE9815DF838804DB5C3DE8D1078B869682E837B501AE4A6F8F869B5C
+- Beta Drive file ID: 1oLsUokcSr-dCL2fMJMmzEOrIURlZuMuH
