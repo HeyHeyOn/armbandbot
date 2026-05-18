@@ -1386,3 +1386,19 @@
 - SHA256: `F7EF06131618C8397CA95CB01345F55A9E0F9C8C36D6938AD0176DD9F99F1990`
 - Google Drive file ID: `1J-VOTeTJIwv16eTxO5N6BnR8kvtLKtwL`
 
+
+## 1.4.0 정식 릴리즈
+
+### 주요 변화
+- AI 필터에 Gemini direct와 LM Studio 로컬 LLM 지원을 포함했습니다.
+- OpenAI 호환 endpoint 입력, AI 응답 파싱, evidence 검증, 캐시/배치 처리를 안정화했습니다.
+- REVIEW/BLOCK 처리 분리와 AI별 처리 설정을 정리했습니다.
+- 댓글돌이/시스템 댓글과 삭제된 댓글 흔적을 검사 대상에서 제외해 오탐과 반복 처리를 줄였습니다.
+- 초심자 가이드, 상세 매뉴얼, 패치노트를 1.4.0 기준으로 갱신했습니다.
+
+### 빌드 정보
+- versionCode = 116
+- versionName = 1.4.0
+- APK: `완장봇_v1.4.0.apk`
+- SHA256: `FC0168401B5ED5A9D5E55056A1FB6839A16872A9FD7A5E90A4C1BC0D09B723CB`
+- Google Drive file ID: `1KHzEqaaTGcXsskG0rmLQ_t4ZPAIdbjR_`
