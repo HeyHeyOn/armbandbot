@@ -5210,19 +5210,32 @@ img.written_dccon{max-width:80px;max-height:80px}
     ): JSONArray? {
         if (comments == null) return null
         val filtered = JSONArray()
-        var excludedCount = 0
+        var systemExcludedCount = 0
+        var deletedExcludedCount = 0
         for (i in 0 until comments.length()) {
             val comment = comments.optJSONObject(i) ?: continue
             if (isDcSystemComment(comment)) {
-                excludedCount++
+                systemExcludedCount++
+                continue
+            }
+            if (isDcDeletedComment(comment)) {
+                deletedExcludedCount++
                 continue
             }
             filtered.put(comment)
         }
+        val excludedCount = systemExcludedCount + deletedExcludedCount
         if (excludedCount > 0 && debugMode) {
-            sendLog("[디버그][댓글 제외] $contextLabel / 디시 시스템 댓글 ${excludedCount}개 제외 / 검사 대상 ${filtered.length()}개", botId)
+            sendLog("[디버그][댓글 제외] $contextLabel / 시스템 ${systemExcludedCount}개, 삭제 흔적 ${deletedExcludedCount}개 제외 / 검사 대상 ${filtered.length()}개", botId)
         }
         return filtered
+    }
+
+    private fun isDcDeletedComment(comment: JSONObject): Boolean {
+        val deletedYn = comment.optString("del_yn", "").trim()
+        val deleteType = comment.optString("is_delete", "0").trim()
+        return deletedYn.equals("Y", ignoreCase = true) ||
+            (deleteType.isNotBlank() && deleteType != "0")
     }
 
     private fun isDcSystemComment(comment: JSONObject): Boolean {

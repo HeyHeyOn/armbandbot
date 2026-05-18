@@ -1364,3 +1364,25 @@
 - APK: 완장봇_v1.4.0-beta20.apk
 - SHA256: CB5924A386E296FE8A0FBF8851DF4E42E8D75345AD0CCC6A55AC6A4775E15130
 - Beta Drive file ID: 13lsbcb-b6Cd_smvROGSQOAlE0bg_6Bbr
+
+## 1.4.0-beta21 작업
+
+### 주요 변화
+- 디시 댓글 API에 남는 삭제 흔적 댓글을 검사 대상에서 제외했습니다.
+  - `del_yn=Y` 또는 `is_delete != 0`인 댓글은 tombstone으로 판정합니다.
+  - 작성자/운영진 삭제 흔적과 게시물 작성자 삭제 흔적을 모두 제외합니다.
+- 삭제된 댓글 하나만 개별 스킵하고, 같은 글의 나머지 정상 댓글/답글 검사는 계속 진행되도록 중앙 댓글 필터에서 처리했습니다.
+- 삭제 흔적 댓글은 ID/IP 블랙리스트, 닉네임 블랙리스트, 금지어/URL/스팸코드/AI 입력, 삭제·차단 후보, 스냅샷 댓글 목록에서 제외됩니다.
+- 디버그 모드에서 시스템 댓글 제외 수와 삭제 흔적 댓글 제외 수를 분리해 확인할 수 있게 했습니다.
+
+### 검증
+- 예시 댓글 구조 기준 필터 검증: 삭제 흔적 2개와 시스템 댓글 1개만 제외, 정상 답글 2개 유지 확인.
+- `./gradlew.bat assembleRelease` 성공.
+
+### 빌드 정보
+- versionCode = 115
+- versionName = 1.4.0-beta21
+- APK: `완장봇_v1.4.0-beta21.apk`
+- SHA256: `F7EF06131618C8397CA95CB01345F55A9E0F9C8C36D6938AD0176DD9F99F1990`
+- Google Drive file ID: `1J-VOTeTJIwv16eTxO5N6BnR8kvtLKtwL`
+
