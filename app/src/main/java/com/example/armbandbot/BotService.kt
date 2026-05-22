@@ -953,7 +953,13 @@ class BotService : Service() {
                 .header("Cookie", cookie)
                 .get()
 
-            sessionCheckDoc.text().contains("로그아웃")
+            val bodyText = sessionCheckDoc.text()
+            when {
+                bodyText.contains("로그아웃") -> true
+                isConfirmedLoginPage(sessionCheckDoc, "https://m.dcinside.com/") -> false
+                cookie.contains("ci_c=") || cookie.contains("dc_sess=") || cookie.contains("user_id=") -> true
+                else -> false
+            }
         } catch (e: Exception) {
             true
         }
@@ -1085,7 +1091,7 @@ class BotService : Service() {
         cookie: String,
         currentCookie: String = ""
     ): String {
-        val mergedCookie = mergeCookieStrings(currentCookie, cookie)
+        val mergedCookie = mergeCookieStrings(cookie)
         botPref.edit()
             .putString("saved_cookie", mergedCookie)
             .putBoolean("session_login_required", false)
@@ -1262,23 +1268,23 @@ class BotService : Service() {
                 )
                 if (recoveredCookie != null) {
                     currentCookie = recoveredCookie
-                    continue
+                    sendLog("[세션 진단] 세션 복구 성공. 같은 사이클에서 검사를 계속합니다.", botId)
+                } else {
+                    sendLog("[세션 진단] 시작 직후 세션 복구 실패. 즉시 종료 대신 WebView 로그인 대기 상태로 전환합니다.", botId)
+                    botPref.edit()
+                        .putBoolean("should_restore_after_restart", false)
+                        .putBoolean("is_running", false)
+                        .apply()
+                    sendLog("🚨 로그인 세션이 만료되었고 자동 복구에 실패했습니다. WebView 로그인 대기로 전환합니다.", botId)
+                    notifySessionRecoveryRequired(
+                        botId = botId,
+                        botPref = botPref,
+                        reason = "세션 만료 감지",
+                        requireWebViewFallback = true
+                    )
+                    delay(500)
+                    break
                 }
-
-                sendLog("[세션 진단] 시작 직후 세션 복구 실패. 즉시 종료 대신 WebView 로그인 대기 상태로 전환합니다.", botId)
-                botPref.edit()
-                    .putBoolean("should_restore_after_restart", false)
-                    .putBoolean("is_running", false)
-                    .apply()
-                sendLog("🚨 로그인 세션이 만료되었고 자동 복구에 실패했습니다. WebView 로그인 대기로 전환합니다.", botId)
-                notifySessionRecoveryRequired(
-                    botId = botId,
-                    botPref = botPref,
-                    reason = "세션 만료 감지",
-                    requireWebViewFallback = true
-                )
-                delay(500)
-                break
             }
 
             maybeRefreshGallerySettings(
