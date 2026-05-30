@@ -9,7 +9,7 @@ import java.io.InputStreamReader
 import java.util.UUID
 
 private const val BOT_SETTINGS_EXPORT_VERSION = 1
-private const val BOT_SETTINGS_APP_VERSION = "1.4.0"
+private const val BOT_SETTINGS_APP_VERSION = ARMBANDBOT_APP_VERSION
 private const val BOT_SETTINGS_FILE_TYPE = "armbandbot_bot_settings"
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 
@@ -61,6 +61,7 @@ fun defaultBotUrlWhitelist(): Set<String> = DEFAULT_URL_WHITELIST
 
 fun exportBotSettings(context: Context, botId: String): BotSettingsExport {
     val botPref = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+    migrateBotSettingsToCurrentVersion(botPref)
     return BotSettingsExport(
         botName = botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇",
         strings = EXPORTABLE_STRING_KEYS.associateWithNotNull { key -> botPref.getString(key, null) },
@@ -130,6 +131,8 @@ private fun applyImportedSettings(botPref: SharedPreferences, imported: BotSetti
 
     editor.putBoolean("is_running", false)
     editor.putBoolean("should_restore_after_restart", false)
+    editor.putInt(BOT_PREF_SCHEMA_VERSION_KEY, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
+    editor.putString(BOT_PREF_APP_VERSION_KEY, ARMBANDBOT_APP_VERSION)
     editor.apply()
 }
 
@@ -192,13 +195,13 @@ private inline fun <T> Iterable<String>.associateWithNotNull(valueSelector: (Str
         }
     }
 
-private fun defaultBooleanValue(key: String): Boolean = when (key) {
+internal fun defaultBooleanValue(key: String): Boolean = when (key) {
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block", "is_snapshot_blocked" -> true
     else -> false
 }
 
-private fun defaultIntValue(key: String): Int = when (key) {
+internal fun defaultIntValue(key: String): Int = when (key) {
     "block_duration_hours" -> 6
     "kkang_post_min" -> 5
     "kkang_comment_min" -> 10
@@ -210,7 +213,7 @@ private fun defaultIntValue(key: String): Int = when (key) {
     else -> 0
 }
 
-private fun defaultFloatValue(key: String): Float = when (key) {
+internal fun defaultFloatValue(key: String): Float = when (key) {
     "delay_post_min_sec" -> 1.0f
     "delay_post_max_sec" -> 2.5f
     "delay_page_min_sec" -> 2.0f

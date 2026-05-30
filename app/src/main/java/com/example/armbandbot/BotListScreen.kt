@@ -77,6 +77,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
         }
         botIds.clear()
         botIds.addAll(botIdsStr.split(",").filter { it.isNotBlank() })
+        migrateAllBotSettingsToCurrentVersion(context)
     }
 
     val savedIdsStr = masterPref.getString("bot_ids_list", "") ?: ""
@@ -196,7 +197,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: 1.4.0", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                        Text("버전: $ARMBANDBOT_APP_VERSION", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                     IconButton(onClick = { showHelpDialog = true }) {
                         Icon(Icons.Filled.HelpOutline, contentDescription = "도움말", tint = Color.White, modifier = Modifier.size(28.dp))
@@ -247,7 +248,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                                     ?.trim()
                                     ?.ifBlank { "bot" }
                                     ?: "bot"
-                                exportLauncher.launch("${botName}_settings_1.1.1-beta4.json")
+                                exportLauncher.launch("${botName}_settings_$ARMBANDBOT_APP_VERSION.json")
                             },
                             onDuplicateRequest = { swipedBotId = null; botToDuplicate = botId },
                             onDeleteRequest = { swipedBotId = null; botToDelete = botId }
@@ -266,7 +267,12 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     if (newBotName.isNotBlank()) {
                         val newBotId = "bot_${UUID.randomUUID()}"
                         val botPref = context.getSharedPreferences("bot_prefs_$newBotId", Context.MODE_PRIVATE)
-                        botPref.edit().putString("bot_name", newBotName).putStringSet("url_whitelist", defaultBotUrlWhitelist()).apply()
+                        botPref.edit()
+                            .putString("bot_name", newBotName)
+                            .putStringSet("url_whitelist", defaultBotUrlWhitelist())
+                            .putInt(BOT_PREF_SCHEMA_VERSION_KEY, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
+                            .putString(BOT_PREF_APP_VERSION_KEY, ARMBANDBOT_APP_VERSION)
+                            .apply()
                         botIds.add(newBotId)
                         masterPref.edit().putString("bot_ids_list", botIds.joinToString(",")).apply()
                         newBotName = ""; showAddDialog = false

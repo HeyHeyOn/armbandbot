@@ -371,7 +371,11 @@ fun duplicateBotPref(context: Context, oldBotId: String, newBotId: String, newNa
     }
     editor.putString("bot_name", newName)
     editor.putBoolean("is_running", false)
+    editor.putBoolean("should_restore_after_restart", false)
+    editor.putInt(BOT_PREF_SCHEMA_VERSION_KEY, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
+    editor.putString(BOT_PREF_APP_VERSION_KEY, ARMBANDBOT_APP_VERSION)
     editor.apply()
+    migrateBotSettingsToCurrentVersion(newPref)
 }
 
 fun copyToClipboard(context: Context, text: String, label: String = "복사된 텍스트") {
@@ -471,6 +475,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val masterPref = getSharedPreferences("bot_master", Context.MODE_PRIVATE)
+        migrateAllBotSettingsToCurrentVersion(this)
         val pendingRestoreAfterBoot = masterPref.getBoolean("pending_restore_after_boot", false)
 
         if (pendingRestoreAfterBoot) {
