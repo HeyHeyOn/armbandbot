@@ -7,6 +7,11 @@ import org.junit.Test
 
 class BotSettingsRuntimeMigrationTest {
     @Test
+    fun appVersionComesFromGradleVersionName() {
+        assertEquals(BuildConfig.VERSION_NAME, ARMBANDBOT_APP_VERSION)
+    }
+
+    @Test
     fun oldBotPreferencesAreCoercedAndStampedWithCurrentVersion() {
         val migrated = migrateBotSettingsSnapshot(
             mapOf(

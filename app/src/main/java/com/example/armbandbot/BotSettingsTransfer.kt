@@ -9,7 +9,8 @@ import java.io.InputStreamReader
 import java.util.UUID
 
 private const val BOT_SETTINGS_EXPORT_VERSION = 1
-private const val BOT_SETTINGS_APP_VERSION = ARMBANDBOT_APP_VERSION
+private val BOT_SETTINGS_APP_VERSION: String
+    get() = ARMBANDBOT_APP_VERSION
 private const val BOT_SETTINGS_FILE_TYPE = "armbandbot_bot_settings"
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 

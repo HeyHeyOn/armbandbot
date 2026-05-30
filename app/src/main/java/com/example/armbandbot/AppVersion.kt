@@ -1,3 +1,3 @@
 package com.heyheyon.armbandbot
 
-internal const val ARMBANDBOT_APP_VERSION = "1.4.1-beta4"
+internal val ARMBANDBOT_APP_VERSION: String = BuildConfig.VERSION_NAME
