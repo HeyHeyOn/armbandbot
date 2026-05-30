@@ -4543,7 +4543,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         val spamCodeRegex = if (toggles.spamEnabled) buildSpamCodeRegex(config) else null
-        val commentVisibleText = extractVisibleTextFromHtmlFragment(commentMemo)
+        val commentVisibleText = CommentModerationText.extract(commentMemo)
 
         if (isWhitelistedUser && config.isDebugMode && botId.isNotEmpty()) {
             sendLog("[디버그][필터/화이트] 화이트리스트 댓글 작성자 → 이후 모든 필터 통과", botId)
