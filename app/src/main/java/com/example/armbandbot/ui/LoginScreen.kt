@@ -6,6 +6,7 @@ import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.heyheyon.armbandbot.DcLoginHeuristics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -83,22 +84,28 @@ fun BotLoginScreen(
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
 
-                            val leftMsign = url?.contains("dcinside.com") == true &&
-                                    url.contains("msign.dcinside.com") == false
-                            val cookies = CookieManager.getInstance().getCookie("https://dcinside.com")
-                            val hasCiC = cookies?.contains("ci_c=") == true
-
-                            if (leftMsign || hasCiC) {
-                                if (cookies != null) onLoginSuccess(cookies)
-                                return
-                            }
-
                             view?.evaluateJavascript(
-                                "(function() { var t = document.body.innerText; return t.includes('로그아웃') || t.includes('비밀번호 변경') || t.includes('30일 후') || t.includes('나중에 변경') || t.includes('비밀번호를 변경'); })();"
-                            ) { result ->
-                                if (result == "true") {
-                                    val c = CookieManager.getInstance().getCookie("https://dcinside.com")
-                                    if (c != null) onLoginSuccess(c)
+                                "(function() { return document.body ? document.body.innerText : ''; })();"
+                            ) { rawText ->
+                                val pageText = rawText
+                                    ?.removeSurrounding("\"")
+                                    ?.replace("\\n", "\n")
+                                    ?.replace("\\\"", "\"")
+                                    .orEmpty()
+                                val cookies = collectDcCookies()
+
+                                if (DcLoginHeuristics.isPasswordChangeCampaign(pageText)) {
+                                    view.evaluateJavascript(DcLoginHeuristics.passwordChangeDeferClickScript(pageText), null)
+                                    return@evaluateJavascript
+                                }
+
+                                val leftMsign = url?.contains("dcinside.com") == true &&
+                                        url.contains("msign.dcinside.com") == false
+                                if ((leftMsign || url?.contains("m.dcinside.com") == true) &&
+                                    DcLoginHeuristics.isFinalLoggedInPage(pageText, cookies)
+                                ) {
+                                    CookieManager.getInstance().flush()
+                                    if (cookies.isNotBlank()) onLoginSuccess(cookies)
                                 }
                             }
                         }
@@ -303,31 +310,32 @@ fun BotLoginScreen(
                                     view?.evaluateJavascript(js, null)
                                 }
 
-                                val leftMsign = url?.contains("dcinside.com") == true &&
-                                        url.contains("msign.dcinside.com") == false
-                                val cookies = CookieManager.getInstance().getCookie("https://dcinside.com")
-                                val hasCiC = cookies?.contains("ci_c=") == true
-
-                                if (leftMsign || hasCiC) {
-                                    handler.removeCallbacks(timeoutRunnable)
-                                    if (cookies != null) {
-                                        isLoadingState.value = false
-                                        triggerLoginState.value = false
-                                        onLoginSuccess(cookies)
-                                    }
-                                    return
-                                }
-
                                 view?.evaluateJavascript(
-                                    "(function() { var t = document.body.innerText; return t.includes('로그아웃') || t.includes('비밀번호 변경') || t.includes('30일 후') || t.includes('나중에 변경') || t.includes('비밀번호를 변경'); })();"
-                                ) { result ->
-                                    if (result == "true") {
+                                    "(function() { return document.body ? document.body.innerText : ''; })();"
+                                ) { rawText ->
+                                    val pageText = rawText
+                                        ?.removeSurrounding("\"")
+                                        ?.replace("\\n", "\n")
+                                        ?.replace("\\\"", "\"")
+                                        .orEmpty()
+                                    val cookies = collectDcCookies()
+
+                                    if (DcLoginHeuristics.isPasswordChangeCampaign(pageText)) {
+                                        view.evaluateJavascript(DcLoginHeuristics.passwordChangeDeferClickScript(pageText), null)
+                                        return@evaluateJavascript
+                                    }
+
+                                    val leftMsign = url?.contains("dcinside.com") == true &&
+                                            url.contains("msign.dcinside.com") == false
+                                    if ((leftMsign || url?.contains("m.dcinside.com") == true) &&
+                                        DcLoginHeuristics.isFinalLoggedInPage(pageText, cookies)
+                                    ) {
                                         handler.removeCallbacks(timeoutRunnable)
-                                        val c = CookieManager.getInstance().getCookie("https://dcinside.com")
-                                        if (c != null) {
+                                        CookieManager.getInstance().flush()
+                                        if (cookies.isNotBlank()) {
                                             isLoadingState.value = false
                                             triggerLoginState.value = false
-                                            onLoginSuccess(c)
+                                            onLoginSuccess(cookies)
                                         }
                                     }
                                 }
@@ -339,4 +347,30 @@ fun BotLoginScreen(
             )
         }
     }
+}
+
+private fun collectDcCookies(): String {
+    val manager = CookieManager.getInstance()
+    val ordered = linkedMapOf<String, String>()
+    listOf(
+        "https://dcinside.com",
+        "https://www.dcinside.com",
+        "https://m.dcinside.com",
+        "https://sign.dcinside.com",
+        "https://msign.dcinside.com"
+    ).forEach { url ->
+        manager.getCookie(url)
+            ?.split(';')
+            ?.map { it.trim() }
+            ?.filter { it.contains('=') }
+            ?.forEach { part ->
+                val index = part.indexOf('=')
+                if (index > 0) {
+                    val key = part.substring(0, index).trim()
+                    val value = part.substring(index + 1).trim()
+                    if (key.isNotBlank() && value.isNotBlank()) ordered[key] = value
+                }
+            }
+    }
+    return ordered.entries.joinToString("; ") { "${it.key}=${it.value}" }
 }

@@ -865,6 +865,7 @@ class BotService : Service() {
             "회원 로그인",
             "디시인사이드 로그인"
         )
+        if (DcLoginHeuristics.isPasswordChangeCampaign(bodyText)) return false
         val explicitLoginText = explicitLoginPhrases.any { bodyText.contains(it, ignoreCase = true) }
         val isLoginUrl = location.contains("/login") || location.contains("msign.dcinside.com/login")
         val requestedSearchPage = isSearchPageUrl(requested)
@@ -955,9 +956,9 @@ class BotService : Service() {
 
             val bodyText = sessionCheckDoc.text()
             when {
-                bodyText.contains("로그아웃") -> true
+                DcLoginHeuristics.isPasswordChangeCampaign(bodyText) -> false
+                DcLoginHeuristics.isFinalLoggedInPage(bodyText, cookie) -> true
                 isConfirmedLoginPage(sessionCheckDoc, "https://m.dcinside.com/") -> false
-                cookie.contains("ci_c=") || cookie.contains("dc_sess=") || cookie.contains("user_id=") -> true
                 else -> false
             }
         } catch (e: Exception) {

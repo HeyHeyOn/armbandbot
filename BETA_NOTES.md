@@ -1,3 +1,33 @@
+## 1.4.1-beta2 배포 준비 완료
+
+### 주요 변화
+- 디시 비밀번호 변경/보안 캠페인 중간 화면 대응
+  - WebView 로그인 중 `비밀번호 규칙이 변경되었습니다`, `30일 후 변경`, `다음에 변경` 화면을 최종 로그인 성공으로 오판하지 않도록 분리했습니다.
+  - 해당 화면이 감지되면 `30일 후 변경`/`다음에 변경`/`나중에 변경` 버튼을 자동 클릭해 메인 화면 진입을 재시도합니다.
+- 로그인 성공 판정 강화
+  - `ci_c` 쿠키 단독 존재만으로 로그인 성공 처리하지 않도록 변경했습니다.
+  - 최종 성공은 `로그아웃`, `MY갤로그`, `고정닉정보` 등 강한 로그인 증거가 확인될 때만 인정합니다.
+- WebView 쿠키 수집 안정화
+  - `dcinside.com`, `www.dcinside.com`, `m.dcinside.com`, `sign.dcinside.com`, `msign.dcinside.com` 쿠키를 병합해 저장합니다.
+- 세션 유효성 검증 강화
+  - 비밀번호 변경 캠페인 화면은 유효 세션으로 인정하지 않습니다.
+  - 로그인 전에도 생길 수 있는 `ci_c` 쿠키에 의존하지 않도록 조정했습니다.
+- 회귀 테스트 추가
+  - 비밀번호 변경 캠페인을 최종 로그인 성공으로 보지 않는지 검증
+  - `ci_c` 단독 쿠키를 로그인 증거로 보지 않는지 검증
+  - `로그아웃` 문구는 강한 로그인 증거로 인정하는지 검증
+  - 비밀번호 변경 유예 클릭 스크립트 생성 검증
+
+### 검증
+- `./gradlew.bat testReleaseUnitTest --tests 'com.heyheyon.armbandbot.DcLoginHeuristicsTest'` 성공.
+- `./gradlew.bat testReleaseUnitTest assembleRelease` 성공.
+
+### 빌드 정보
+- versionCode = 118
+- versionName = 1.4.1-beta2
+- APK: `완장봇_v1.4.1-beta2.apk`
+- SHA256: `C8E80AFB9B2C994A92BE5B401B85F54BCFBAC92C67BF55BBE3E181B1D50B97C0`
+
 ## 1.4.1-beta1 배포 완료
 
 ### 주요 변화
