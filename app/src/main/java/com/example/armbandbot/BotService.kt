@@ -1453,7 +1453,25 @@ class BotService : Service() {
             try {
                 processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, notifyIfEnabled)
             } catch (e: Exception) {
-                sendLog("[처리 오류] 번호: $postNumStr", botId)
+                if (DeletedPostHandling.isDeletedOrUnavailablePost(e)) {
+                    GlobalBotState.savePost(
+                        gallType = gallType,
+                        gallId = gallId,
+                        postNum = postNumStr,
+                        commentCount = currentCommentCount,
+                        title = text,
+                        author = postDisplayAuthor,
+                        isBlocked = false,
+                        blockReason = null,
+                        snapshotPath = null,
+                        creationDate = postDate
+                    )
+                    if (config.isDebugMode) {
+                        sendLog("[디버그][삭제/접근불가 글] 번호: $postNumStr / 상세 404 → 댓글 수 기준 저장 후 재처리 억제", botId)
+                    }
+                } else {
+                    sendLog("[처리 오류] 번호: $postNumStr / ${e.javaClass.simpleName}: ${e.message ?: "원인 불명"}", botId)
+                }
             }
             delay(randomDelay(config.postMinMs, config.postMaxMs))
         }
