@@ -16,7 +16,7 @@ class SnapshotViewerTest {
                 <span class="gall_count">조회 1</span>
                 <div class="write_div">
                     <p>본문 앞</p>
-                    <p><img class="written_dccon" src="https://dcimg5.dcinside.com/dccon.php?no=BODYTOKEN" alt="본문콘"></p>
+                    <p><img class="written_dccon" src="https://dcimg5.dcinside.com/dccon.php?no=BODYTOKEN" alt="본문콘"><img class="written_dccon" src="https://dcimg5.dcinside.com/dccon.php?no=BODYTOKEN" alt="본문콘"></p>
                     <p>본문 뒤</p>
                 </div>
                 <ul class="cmt_list">
@@ -35,7 +35,9 @@ class SnapshotViewerTest {
 
         val parsed = parseSnapshot(file.absolutePath)
 
-        assertTrue(parsed.bodyElements.any { it is BodyElement.ImageElement && it.isDccon && it.url.contains("BODYTOKEN") })
+        val bodyDcconRow = parsed.bodyElements.filterIsInstance<BodyElement.DcconRowElement>().single()
+        assertEquals(2, bodyDcconRow.urls.size)
+        assertTrue(bodyDcconRow.urls.all { it == "https://dcimg5.dcinside.com/dccon.php?no=BODYTOKEN" })
         assertEquals(listOf("https://dcimg5.dcinside.com/dccon.php?no=COMMENTTOKEN"), parsed.comments.single().dcconUrls)
     }
 }

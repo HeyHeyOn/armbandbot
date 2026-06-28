@@ -67,7 +67,9 @@ object DcconFilter {
         if (html.isBlank()) return emptyList()
         val doc = Jsoup.parseBodyFragment(html)
         val refs = linkedMapOf<String, ImageAltRef>()
-        doc.select(".write_div img, img")
+        val roots = doc.select(".write_div")
+        val imageElements = if (roots.isNotEmpty()) roots.select("img") else doc.select("img")
+        imageElements
             .filterNot { isDcconElement(it) }
             .forEach { img ->
                 val alt = img.attr("alt").trim().takeIf { it.isNotBlank() } ?: return@forEach
@@ -281,6 +283,7 @@ object DcconFilter {
         doc.select("*").forEach { element ->
             val label = firstNonBlank(element.attr("conalt"), element.attr("alt"), element.attr("title"))
             element.attributes().forEach { attribute ->
+                if (attribute.key == "src" || attribute.key == "data-src") return@forEach
                 val value = attribute.value
                 if (value.contains("dccon.php", ignoreCase = true)) {
                     dcconUrlPattern.findAll(value).forEach { match ->
@@ -300,6 +303,48 @@ object DcconFilter {
             }
         }
         return refs.values.toList()
+    }
+
+    fun extractDcconRefsForDisplay(html: String): List<DcconRef> {
+        if (html.isBlank() || !html.contains("dccon.php", ignoreCase = true)) return emptyList()
+        val doc = Jsoup.parseBodyFragment(html)
+        val refs = mutableListOf<DcconRef>()
+
+        fun addFrom(value: String, label: String?, source: String) {
+            extractTokenFromText(value)?.let { token ->
+                val url = extractUrlFromText(value) ?: value
+                refs.add(DcconRef(token, decodeHtmlAndUrl(url), label, source))
+            }
+        }
+
+        doc.select("*[src], *[data-src]").forEach { element ->
+            val label = firstNonBlank(element.attr("conalt"), element.attr("alt"), element.attr("title"))
+            listOf("src", "data-src").forEach { attr -> addFrom(element.attr(attr), label, attr) }
+        }
+
+        doc.select("*").forEach { element ->
+            val label = firstNonBlank(element.attr("conalt"), element.attr("alt"), element.attr("title"))
+            element.attributes().forEach { attribute ->
+                if (attribute.key == "src" || attribute.key == "data-src") return@forEach
+                val value = attribute.value
+                if (value.contains("dccon.php", ignoreCase = true)) {
+                    dcconUrlPattern.findAll(value).forEach { match ->
+                        val token = decodeHtmlAndUrl(match.groupValues[1].ifBlank { match.groupValues[3] })
+                        val url = extractUrlFromText(match.value) ?: match.value.trim()
+                        refs.add(DcconRef(token, decodeHtmlAndUrl(url), label, attribute.key))
+                    }
+                }
+            }
+        }
+
+        if (refs.isEmpty()) {
+            dcconUrlPattern.findAll(html).forEach { match ->
+                val token = decodeHtmlAndUrl(match.groupValues[1].ifBlank { match.groupValues[3] })
+                val url = extractUrlFromText(match.value) ?: match.value.trim()
+                refs.add(DcconRef(token, decodeHtmlAndUrl(url), null, "raw"))
+            }
+        }
+        return refs
     }
 
     fun findBlockedDccon(html: String, blacklist: List<String>): DcconMatch? {

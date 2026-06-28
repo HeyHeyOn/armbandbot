@@ -150,6 +150,7 @@ private fun imageAltRefsFromBlacklistText(text: String): List<ImageAltRef> = Dcc
 
 @Composable
 private fun ImageAltPreviewImage(imageUrl: String?, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
@@ -159,7 +160,11 @@ private fun ImageAltPreviewImage(imageUrl: String?, modifier: Modifier = Modifie
     ) {
         if (imageUrl != null) {
             AsyncImage(
-                model = imageUrl,
+                model = ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .setHeader("Referer", "https://gall.dcinside.com/")
+                    .setHeader("User-Agent", "Mozilla/5.0")
+                    .build(),
                 contentDescription = "이미지 미리보기",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -691,6 +696,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     "OVERSEAS_IP" -> "해외 IP 필터"
                                     "URL" -> "URL 필터"
                                     "IMAGE" -> "이미지 필터"
+                                    "DCCON" -> "디시콘 필터"
                                     "VOICE" -> "보이스 필터"
                                     "SPAM" -> "스팸코드 필터"
                                     "WORD" -> "금지어 필터"
@@ -1234,6 +1240,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             .clickable {
                                                 imageAltBlacklistDraftText = DcconFilter.normalizeImageAltBlacklistText(imageAltBlacklistText)
                                                 imageAltBlacklistAddText = ""
+                                                imageAltExtractUrlText = ""
                                                 isImageAltAddInputVisible = false
                                                 selectedImageAlts = emptySet()
                                                 imageAltDeleteConfirmAlts = null
@@ -1248,8 +1255,25 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = PastelNavy)
                                         }
                                     }
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = imageUseCustomAction, onCheckedChange = { imageUseCustomAction = it; botPref.edit().putBoolean("image_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
+                                    Column(modifier = if (!imageUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageActionModeDropdownExpanded = true }) { Text(actionModeOptions[imageActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageActionModeDropdownExpanded, onDismissRequest = { isImageActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageActionMode = mode; imageDeleteOnlyMode = mode == "delete"; saveActionMode("image", mode); isImageActionModeDropdownExpanded = false }) } } } }
+                                            if (imageActionMode == "block") {
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[imageBlockDurationHours] ?: "${imageBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageBlockDurationDropdownExpanded, onDismissRequest = { isImageBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageBlockDurationHours = hours; botPref.edit().putInt("image_block_duration_hours", hours).apply(); isImageBlockDurationDropdownExpanded = false }) } } } }
+                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = imageDeletePostOnBlock, onCheckedChange = { imageDeletePostOnBlock = it; botPref.edit().putBoolean("image_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
+                                            }
+                                        } }
+                                        if (imageActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", imageBlockReasonText, colors) { tempEditText = imageBlockReasonText; editDialogType = "image_block_reason" } }
+                                    }
+                                    }
+                                }
+                                "DCCON" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text("디시콘 필터", fontWeight = FontWeight.Bold, color = textColor)
@@ -1258,6 +1282,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             Switch(checked = isDcconFilterMode, onCheckedChange = { isDcconFilterMode = it; botPref.edit().putBoolean("is_dccon_filter_mode", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
                                         }
                                     }
+                                    Text("디시콘 차단 목록", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
                                     Column(modifier = if (!isDcconFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                         Card(
                                             colors = CardDefaults.cardColors(containerColor = cardColor),
@@ -1280,58 +1305,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text("차단된 디시콘 목록", fontWeight = FontWeight.Bold, color = textColor)
-                                                    Text("${dcconTokensFromBlacklistText(dcconBlacklistText).size}개 등록됨 · 이미지 목록으로 관리", fontSize = 12.sp, color = subTextColor)
+                                                    Text("${dcconTokensFromBlacklistText(dcconBlacklistText).size}개 등록됨 · 추출/직접 추가 통합 관리", fontSize = 12.sp, color = subTextColor)
                                                 }
                                                 Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = PastelNavy)
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = imageUseCustomAction, onCheckedChange = { imageUseCustomAction = it; botPref.edit().putBoolean("image_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
-                                    Column(modifier = if (!imageUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageActionModeDropdownExpanded = true }) { Text(actionModeOptions[imageActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageActionModeDropdownExpanded, onDismissRequest = { isImageActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageActionMode = mode; imageDeleteOnlyMode = mode == "delete"; saveActionMode("image", mode); isImageActionModeDropdownExpanded = false }) } } } }
-                                            if (imageActionMode == "block") {
-                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
-                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (imageUseCustomAction) isImageBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[imageBlockDurationHours] ?: "${imageBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isImageBlockDurationDropdownExpanded, onDismissRequest = { isImageBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { imageBlockDurationHours = hours; botPref.edit().putInt("image_block_duration_hours", hours).apply(); isImageBlockDurationDropdownExpanded = false }) } } } }
-                                                Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
-                                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = imageDeletePostOnBlock, onCheckedChange = { imageDeletePostOnBlock = it; botPref.edit().putBoolean("image_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
-                                            }
-                                        } }
-                                        if (imageActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", imageBlockReasonText, colors) { tempEditText = imageBlockReasonText; editDialogType = "image_block_reason" } }
-                                    }
-                                    } // end Column
-                                    Spacer(modifier = Modifier.height(24.dp))
-
-                                    Text("도구", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=8.dp))
-                                    Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Filled.ImageSearch, contentDescription = null, tint = PastelNavy, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text("이미지 alt값 추출기", fontWeight = FontWeight.Bold, color = textColor)
-                                            }
-                                            Text("게시글 주소에서 일반 이미지 alt값만 추출합니다. 디시콘 alt는 제외됩니다.", fontSize = 12.sp, color = subTextColor, modifier = Modifier.padding(top=4.dp, bottom=12.dp))
-                                            Row {
-                                                OutlinedTextField(value = imageAltExtractUrlText, onValueChange = { imageAltExtractUrlText = it }, placeholder = { Text("https://...", fontSize=12.sp) }, singleLine = true, modifier = Modifier.weight(1f).height(50.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Button(onClick = {
-                                                    if (imageAltExtractUrlText.isNotBlank()) {
-                                                        isExtractingImageAlts = true
-                                                        coroutineScope.launch(Dispatchers.IO) {
-                                                            try {
-                                                                val doc = fetchPostDocument(imageAltExtractUrlText)
-                                                                val alts = DcconFilter.extractImageAltImageRefs(doc.html())
-                                                                withContext(Dispatchers.Main) {
-                                                                    if (alts.isEmpty()) extractedAltsError = "이미지 alt값을 찾지 못했습니다." else extractedAltsList = alts
-                                                                    imageAltExtractUrlText = ""
-                                                                    isExtractingImageAlts = false
-                                                                }
-                                                            } catch (e: Exception) { withContext(Dispatchers.Main) { extractedAltsError = "이미지 alt 추출 오류: 주소를 확인해주세요. (${e.message})"; isExtractingImageAlts = false } }
-                                                        }
-                                                    }
-                                                }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy), modifier = Modifier.height(50.dp)) { Text(if(isExtractingImageAlts) "..." else "추출", color = Color.White) }
                                             }
                                         }
                                     }
@@ -1658,6 +1634,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 Text("고급 미디어 필터", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
                                 ModernSettingItem("URL 필터", "외부 링크 차단", Icons.Filled.Share, colors, isUrlFilterMode, { isUrlFilterMode = it; botPref.edit().putBoolean("is_url_filter_mode", it).apply() }) { currentSubScreen = "URL" }
                                 ModernSettingItem("이미지 필터", "alt값 기반 이미지 차단", Icons.Filled.Search, colors, isImageFilterMode, { isImageFilterMode = it; botPref.edit().putBoolean("is_image_filter_mode", it).apply() }) { currentSubScreen = "IMAGE" }
+                                ModernSettingItem("디시콘 필터", "디시콘 URL/토큰 기반 차단", Icons.Filled.Image, colors, isDcconFilterMode, { isDcconFilterMode = it; botPref.edit().putBoolean("is_dccon_filter_mode", it).apply() }) { currentSubScreen = "DCCON" }
                                 ModernSettingItem("보이스 필터", "보이스 리플 차단", Icons.Filled.Call, colors, isVoiceFilterMode, { isVoiceFilterMode = it; botPref.edit().putBoolean("is_voice_filter_mode", it).apply() }) { currentSubScreen = "VOICE" }
                                 if (isAiFilterVisible) {
                                     ModernSettingItem("AI 필터", "게시글 2차 AI 검토", Icons.Filled.AutoAwesome, colors, isAiFilterMode, { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }) { currentSubScreen = "AI" }
@@ -2082,6 +2059,52 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                         }
+
+                        Text("게시글 주소로 찾아 넣기", color = textColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("본문 이미지 alt만 추출해 현재 차단 목록 초안에 추가합니다.", color = subTextColor, fontSize = 11.sp, modifier = Modifier.padding(bottom = 6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(
+                                value = imageAltExtractUrlText,
+                                onValueChange = { imageAltExtractUrlText = it },
+                                placeholder = { Text("게시글 주소", fontSize = 12.sp) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (imageAltExtractUrlText.isNotBlank() && !isExtractingImageAlts) {
+                                        isExtractingImageAlts = true
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            try {
+                                                val doc = fetchPostDocument(imageAltExtractUrlText)
+                                                val refs = DcconFilter.extractImageAltImageRefs(doc.html())
+                                                val entries = refs.joinToString("\n") { ref -> if (ref.imageUrl != null) "${ref.alt} #${ref.imageUrl}" else ref.alt }
+                                                withContext(Dispatchers.Main) {
+                                                    if (refs.isEmpty()) {
+                                                        Toast.makeText(context, "본문 이미지 alt를 찾지 못했습니다.", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        imageAltBlacklistDraftText = DcconFilter.addImageAltBlacklistEntries(imageAltBlacklistDraftText, entries)
+                                                        Toast.makeText(context, "이미지 alt ${refs.size}개를 차단 목록 초안에 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                    imageAltExtractUrlText = ""
+                                                    isExtractingImageAlts = false
+                                                }
+                                            } catch (e: Exception) {
+                                                withContext(Dispatchers.Main) {
+                                                    Toast.makeText(context, "이미지 alt 추출 오류: ${e.message}", Toast.LENGTH_LONG).show()
+                                                    isExtractingImageAlts = false
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = PastelNavy),
+                                modifier = Modifier.height(50.dp)
+                            ) { Text(if (isExtractingImageAlts) "..." else "추출", color = Color.White, fontSize = 12.sp) }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         if (visibleAlts.isNotEmpty()) {
                             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -44,6 +44,7 @@ import java.io.File
 sealed class BodyElement {
     data class TextElement(val text: String) : BodyElement()
     data class ImageElement(val url: String, val isDccon: Boolean = false) : BodyElement()
+    data class DcconRowElement(val urls: List<String>) : BodyElement()
 }
 
 data class SnapshotComment(
@@ -138,11 +139,13 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
                 add(BodyElement.TextElement("[보이스리플]"))
                 return@forEach
             }
-            val dccons = DcconFilter.extractDcconRefs(child.outerHtml())
+            val dccons = DcconFilter.extractDcconRefsForDisplay(child.outerHtml())
             val allImgs = child.select("img")
             when {
-                dccons.isNotEmpty() -> dccons.forEach { ref ->
-                    add(BodyElement.ImageElement(DcconFilter.buildImageUrl(ref.token), isDccon = true))
+                dccons.isNotEmpty() -> {
+                    val urls = dccons.map { ref -> DcconFilter.buildImageUrl(ref.token) }
+                    if (urls.size == 1) add(BodyElement.ImageElement(urls.first(), isDccon = true))
+                    else add(BodyElement.DcconRowElement(urls))
                 }
                 allImgs.isNotEmpty() -> allImgs.forEach { img ->
                     val src = img.attr("src").ifEmpty { img.attr("data-original") }
@@ -209,9 +212,8 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
             mentionText.isNotEmpty() -> mentionText
             else -> rawText
         }
-        val dcconUrls = DcconFilter.extractDcconRefs(infoDiv.outerHtml())
+        val dcconUrls = DcconFilter.extractDcconRefsForDisplay(infoDiv.outerHtml())
             .map { DcconFilter.buildImageUrl(it.token) }
-            .distinct()
         val content = when {
             hasVr && textContent.isBlank() -> "[🔊 보이스리플]"
             hasVr -> "$textContent\n[🔊 보이스리플]"
@@ -450,6 +452,14 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
+                            is BodyElement.DcconRowElement -> Row(
+                                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            ) {
+                                element.urls.forEach { url ->
+                                    SnapshotDcconImage(url = url, modifier = Modifier.size(80.dp))
+                                }
+                            }
                         }
                     }
 
@@ -543,7 +553,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                         }
                                         if (comment.dcconUrls.isNotEmpty()) {
                                             Row(
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(0.dp),
                                                 modifier = Modifier.padding(top = 6.dp)
                                             ) {
                                                 comment.dcconUrls.forEach { dcconUrl ->

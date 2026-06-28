@@ -194,6 +194,37 @@ class DcconFilterTest {
     }
 
     @Test
+    fun extractsImageAltsOnlyFromPostBodyWhenFullPageContainsUiImages() {
+        val html = """
+            <html><body>
+                <div class="header"><img src="https://example.com/logo.png" alt="사이트로고"></div>
+                <div class="write_div">
+                    <p><img src="https://example.com/body.jpg" alt="본문이미지"></p>
+                </div>
+                <div class="footer"><img src="https://example.com/footer.png" alt="푸터아이콘"></div>
+            </body></html>
+        """.trimIndent()
+
+        assertEquals(
+            listOf(ImageAltRef("본문이미지", "https://example.com/body.jpg")),
+            DcconFilter.extractImageAltImageRefs(html)
+        )
+    }
+
+    @Test
+    fun extractsDcconRefsForDisplayPreservesDuplicateAdjacentDccons() {
+        val html = """
+            <p>
+                <img class="written_dccon" src="https://dcimg5.dcinside.com/dccon.php?no=SAME" alt="콘">
+                <img class="written_dccon" src="https://dcimg5.dcinside.com/dccon.php?no=SAME" alt="콘">
+            </p>
+        """.trimIndent()
+
+        assertEquals(listOf("SAME", "SAME"), DcconFilter.extractDcconRefsForDisplay(html).map { it.token })
+        assertEquals(listOf("SAME"), DcconFilter.extractDcconRefs(html).map { it.token })
+    }
+
+    @Test
     fun imageAltBlacklistEntriesKeepPreviewUrlButMatchOnlyAltText() {
         val existing = "광고이미지 #https://example.com/a.jpg\n텍스트만"
 

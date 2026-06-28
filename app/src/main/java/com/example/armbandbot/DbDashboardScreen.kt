@@ -4,6 +4,7 @@ import android.content.Context
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -299,6 +300,8 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         val commentParam = if (targetType == "COMMENT" && targetNo.isNotBlank()) "&fcno=$targetNo" else ""
         return "${basePath}?id=$gallId&no=$postNum$commentParam"
     }
+
+    BackHandler(enabled = webViewUrl != null) { webViewUrl = null }
 
     val activeWebViewUrl = webViewUrl
     if (activeWebViewUrl != null) {
@@ -601,7 +604,7 @@ private fun FullScreenPostWebView(
                 tint = PastelNavy
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text("원문 열기", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
+                Text("링크", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
                 Text(url, fontSize = 11.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -664,9 +667,9 @@ private fun SwipeDeleteDbRow(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.OpenInNew, contentDescription = "원문 열기", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.OpenInNew, contentDescription = "링크", tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("원문 열기", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("링크", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Box(
