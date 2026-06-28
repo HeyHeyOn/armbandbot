@@ -211,6 +211,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var dcconBlacklistDraftText by remember { mutableStateOf("") }
     var dcconBlacklistAddText by remember { mutableStateOf("") }
     var isDcconAddInputVisible by remember { mutableStateOf(false) }
+    var isDcconExtractInputVisible by remember { mutableStateOf(false) }
     var selectedDcconTokens by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedDcconGroupName by remember { mutableStateOf<String?>(null) }
     var dcconDeleteConfirmTokens by remember { mutableStateOf<Set<String>?>(null) }
@@ -261,6 +262,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         )
     } else {
         val coroutineScope = rememberCoroutineScope()
+        val dcconPackageCache = remember { mutableMapOf<String, DcconPackageDetail>() }
         var selectedTabIndex by remember { mutableStateOf(0) }
         val logFilterKeys = listOf("CYCLE", "BLOCK", "DEBUG", "AI", "HEALTH", "SESSION", "ERROR")
         val savedLogFilters = botPref.getStringSet("activity_log_selected_filters", logFilterKeys.toSet())
@@ -1205,6 +1207,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     dcconBlacklistDraftText = dcconBlacklistText
                                                     dcconBlacklistAddText = ""
                                                     isDcconAddInputVisible = false
+                                                    isDcconExtractInputVisible = false
+                                                    dcconExtractUrlText = ""
+                                                    extractedDcconsList = null
                                                     selectedDcconTokens = emptySet()
                                                     selectedDcconGroupName = null
                                                     dcconDeleteConfirmTokens = null
@@ -1266,39 +1271,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                         }
                                                     }
                                                 }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy), modifier = Modifier.height(50.dp)) { Text(if(isExtractingImageAlts) "..." else "추출", color = Color.White) }
-                                            }
-                                        }
-                                    }
-                                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Filled.Search, contentDescription = null, tint = PastelNavy, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text("디시콘 URL 추출기", fontWeight = FontWeight.Bold, color = textColor)
-                                            }
-                                            Text("게시글 본문과 댓글 API에서 디시콘 URL을 함께 추출합니다.", fontSize = 12.sp, color = subTextColor, modifier = Modifier.padding(top=4.dp, bottom=12.dp))
-                                            Row {
-                                                OutlinedTextField(value = dcconExtractUrlText, onValueChange = { dcconExtractUrlText = it }, placeholder = { Text("https://...", fontSize=12.sp) }, singleLine = true, modifier = Modifier.weight(1f).height(50.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Button(onClick = {
-                                                    if (dcconExtractUrlText.isNotBlank()) {
-                                                        isExtractingDccons = true
-                                                        coroutineScope.launch(Dispatchers.IO) {
-                                                            try {
-                                                                val doc = fetchPostDocument(dcconExtractUrlText)
-                                                                val bodyRefs = DcconFilter.extractDcconRefs(doc.select(".write_div").outerHtml())
-                                                                    .map { it.copy(source = "본문") }
-                                                                val commentRefs = fetchCommentDcconRefs(dcconExtractUrlText, doc.html())
-                                                                val dccons = (bodyRefs + commentRefs).distinctBy { "${it.source}:${it.token}" }
-                                                                withContext(Dispatchers.Main) {
-                                                                    if (dccons.isEmpty()) extractedAltsError = "본문/댓글에서 디시콘 URL을 찾지 못했습니다." else extractedDcconsList = dccons
-                                                                    dcconExtractUrlText = ""
-                                                                    isExtractingDccons = false
-                                                                }
-                                                            } catch (e: Exception) { withContext(Dispatchers.Main) { extractedAltsError = "디시콘 추출 오류: 주소를 확인해주세요. (${e.message})"; isExtractingDccons = false } }
-                                                        }
-                                                    }
-                                                }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy), modifier = Modifier.height(50.dp)) { Text(if(isExtractingDccons) "..." else "추출", color = Color.White) }
                                             }
                                         }
                                     }
@@ -2056,7 +2028,50 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        if (isDcconAddInputVisible && activeGroup == null) {
+                        if (isDcconExtractInputVisible && activeGroup == null) {
+                            Text("차단하고 싶은 디시콘이 있는 글 주소를 입력하세요.", color = subTextColor, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+                            Row {
+                                OutlinedTextField(
+                                    value = dcconExtractUrlText,
+                                    onValueChange = { dcconExtractUrlText = it },
+                                    placeholder = { Text("https://...", fontSize = 12.sp) },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f).height(50.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(onClick = {
+                                    if (dcconExtractUrlText.isNotBlank()) {
+                                        isExtractingDccons = true
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            try {
+                                                val doc = fetchPostDocument(dcconExtractUrlText)
+                                                val bodyRefs = DcconFilter.extractDcconRefs(doc.select(".write_div").outerHtml())
+                                                    .map { it.copy(source = "본문") }
+                                                val commentRefs = fetchCommentDcconRefs(dcconExtractUrlText, doc.html())
+                                                val dccons = (bodyRefs + commentRefs).distinctBy { "${it.source}:${it.token}" }
+                                                withContext(Dispatchers.Main) {
+                                                    if (dccons.isEmpty()) extractedAltsError = "본문/댓글에서 디시콘 URL을 찾지 못했습니다." else extractedDcconsList = dccons
+                                                    dcconExtractUrlText = ""
+                                                    isExtractingDccons = false
+                                                }
+                                            } catch (e: Exception) {
+                                                withContext(Dispatchers.Main) {
+                                                    extractedAltsError = "디시콘 추출 오류: 주소를 확인해주세요. (${e.message})"
+                                                    isExtractingDccons = false
+                                                }
+                                            }
+                                        }
+                                    }
+                                }, enabled = !isExtractingDccons, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy), modifier = Modifier.height(50.dp)) {
+                                    Text(if (isExtractingDccons) "..." else "추출", color = Color.White)
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { dcconExtractUrlText = ""; isDcconExtractInputVisible = false }) { Text("취소", color = subTextColor) }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        } else if (isDcconAddInputVisible && activeGroup == null) {
                             OutlinedTextField(
                                 value = dcconBlacklistAddText,
                                 onValueChange = { dcconBlacklistAddText = it },
@@ -2076,10 +2091,17 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                         } else if (activeGroup == null) {
-                            OutlinedButton(onClick = { isDcconAddInputVisible = true }, modifier = Modifier.fillMaxWidth()) {
-                                Icon(Icons.Filled.Add, contentDescription = null, tint = PastelNavy)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("디시콘 토큰 직접 추가", color = PastelNavy)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { isDcconExtractInputVisible = true; isDcconAddInputVisible = false }, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Filled.Search, contentDescription = null, tint = PastelNavy)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("글 주소로 추가", color = PastelNavy)
+                                }
+                                OutlinedButton(onClick = { isDcconAddInputVisible = true; isDcconExtractInputVisible = false }, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Filled.Add, contentDescription = null, tint = PastelNavy)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("직접 추가", color = PastelNavy)
+                                }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                         }
@@ -2186,65 +2208,93 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         if (dccons != null) {
             AlertDialog(
                 containerColor = dialogBgColor, titleContentColor = textColor, textContentColor = textColor,
-                onDismissRequest = { extractedDcconsList = null }, title = { Text("디시콘 추출 결과 (${dccons.size}개)", fontWeight = FontWeight.Bold) },
+                onDismissRequest = { extractedDcconsList = null },
+                title = { Text("디시콘 추출 결과 (${dccons.size}개)", fontWeight = FontWeight.Bold) },
                 text = {
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 390.dp)) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp)) {
                         items(dccons.size) { index ->
                             val ref = dccons[index]
                             val label = listOfNotNull(ref.source, ref.label).joinToString(" / ").ifBlank { "디시콘" }
+                            val blacklistForCheck = if (isDcconBlacklistDialogOpen) dcconBlacklistDraftText else dcconBlacklistText
+                            val isBlocked = DcconFilter.isTokenBlocked(blacklistForCheck, ref.token)
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 DcconPreviewImage(ref.token, modifier = Modifier.size(76.dp))
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(label, color = textColor, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("토큰 ${index + 1}", color = subTextColor, fontSize = 11.sp)
+                                    Text(if (isBlocked) "이미 차단 목록에 있음" else "토큰 ${index + 1}", color = subTextColor, fontSize = 11.sp)
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Button(onClick = { copyToClipboard(context, ref.token, "디시콘 토큰") }, contentPadding = PaddingValues(0.dp), modifier = Modifier.size(55.dp), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("복사", fontSize = 12.sp) }
+                                if (isBlocked) {
+                                    AssistChip(onClick = {}, label = { Text("차단됨", fontSize = 12.sp) }, enabled = false)
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            isAddingDcconPackage = true
+                                            coroutineScope.launch(Dispatchers.IO) {
+                                                try {
+                                                    val detail = dcconPackageCache[ref.token] ?: fetchDcconPackageDetail(ref.token)?.also { dcconPackageCache[ref.token] = it }
+                                                    val merged = DcconFilter.addSingleTokenWithPackageTitle(dcconBlacklistDraftText, ref.token, detail)
+                                                    withContext(Dispatchers.Main) {
+                                                        dcconBlacklistDraftText = merged
+                                                        isAddingDcconPackage = false
+                                                        Toast.makeText(context, "디시콘 1개를 차단 목록에 추가했습니다. 저장을 눌러 반영하세요.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    withContext(Dispatchers.Main) {
+                                                        dcconBlacklistDraftText = DcconFilter.addSingleTokenWithPackageTitle(dcconBlacklistDraftText, ref.token, null)
+                                                        isAddingDcconPackage = false
+                                                        Toast.makeText(context, "세트명 확인은 실패했지만 디시콘 1개를 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        enabled = !isAddingDcconPackage,
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                        modifier = Modifier.height(38.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)
+                                    ) { Text("차단", fontSize = 12.sp, color = Color.White) }
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Button(
+                                    onClick = {
+                                        isAddingDcconPackage = true
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            try {
+                                                val detail = dcconPackageCache[ref.token] ?: fetchDcconPackageDetail(ref.token)?.also { dcconPackageCache[ref.token] = it }
+                                                if (detail == null) {
+                                                    withContext(Dispatchers.Main) {
+                                                        isAddingDcconPackage = false
+                                                        extractedAltsError = "디시콘 세트 정보를 찾지 못했습니다."
+                                                    }
+                                                } else {
+                                                    val beforeCount = dcconBlacklistDraftText.lines().mapNotNull { DcconFilter.normalizeBlacklistEntry(it.substringBefore("#")) }.toSet().size
+                                                    val merged = DcconFilter.mergePackageTokensIntoBlacklist(dcconBlacklistDraftText, detail)
+                                                    val afterCount = merged.lines().mapNotNull { DcconFilter.normalizeBlacklistEntry(it.substringBefore("#")) }.toSet().size
+                                                    withContext(Dispatchers.Main) {
+                                                        dcconBlacklistDraftText = merged
+                                                        isAddingDcconPackage = false
+                                                        Toast.makeText(context, if (afterCount > beforeCount) "${detail.title} 세트 ${afterCount - beforeCount}개를 추가했습니다. 저장을 눌러 반영하세요." else "이미 차단된 세트입니다.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                withContext(Dispatchers.Main) {
+                                                    isAddingDcconPackage = false
+                                                    extractedAltsError = "디시콘 세트 추가 오류: ${e.message}"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    enabled = !isAddingDcconPackage,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(38.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)
+                                ) { Text("세트 차단", fontSize = 12.sp) }
                             }
                         }
                     }
                 },
-                confirmButton = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Button(onClick = { copyToClipboard(context, dccons.joinToString("\n") { it.token }, "전체 디시콘 토큰") }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("모두 복사", color = Color.White) }
-                        Button(onClick = {
-                            isAddingDcconPackage = true
-                            coroutineScope.launch(Dispatchers.IO) {
-                                try {
-                                    var merged = dcconBlacklistText
-                                    var addedPackages = 0
-                                    var addedTokens = 0
-                                    dccons.map { it.token }.distinct().forEach { token ->
-                                        val detail = fetchDcconPackageDetail(token)
-                                        if (detail != null) {
-                                            val beforeCount = merged.lines().map { it.substringBefore("#").trim() }.filter { it.isNotBlank() }.toSet().size
-                                            merged = DcconFilter.mergePackageTokensIntoBlacklist(merged, detail)
-                                            val afterCount = merged.lines().map { it.substringBefore("#").trim() }.filter { it.isNotBlank() }.toSet().size
-                                            if (afterCount > beforeCount) {
-                                                addedPackages += 1
-                                                addedTokens += afterCount - beforeCount
-                                            }
-                                        }
-                                    }
-                                    withContext(Dispatchers.Main) {
-                                        val normalized = DcconFilter.normalizeBlacklistText(merged)
-                                        dcconBlacklistText = normalized
-                                        botPref.edit().putStringSet("dccon_blacklist", normalized.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply()
-                                        isAddingDcconPackage = false
-                                        Toast.makeText(context, if (addedTokens > 0) "디시콘 세트 ${addedPackages}개 / 토큰 ${addedTokens}개 추가" else "추가할 새 디시콘 토큰이 없습니다.", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        isAddingDcconPackage = false
-                                        extractedAltsError = "디시콘 세트 추가 오류: ${e.message}"
-                                    }
-                                }
-                            }
-                        }, enabled = !isAddingDcconPackage, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text(if (isAddingDcconPackage) "추가중..." else "세트 전체 차단 추가", color = Color.White) }
-                    }
-                },
-                dismissButton = { TextButton(onClick = { extractedDcconsList = null }) { Text("닫기", color = subTextColor) } }
+                confirmButton = { TextButton(onClick = { extractedDcconsList = null }) { Text("닫기", color = PastelNavy) } }
             )
         }
 

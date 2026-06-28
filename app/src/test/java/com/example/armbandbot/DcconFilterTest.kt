@@ -132,6 +132,33 @@ class DcconFilterTest {
     }
 
     @Test
+    fun addsSingleDcconWithResolvedKoreanPackageTitle() {
+        val detail = DcconPackageDetail("27107", "핑구콘", listOf("TOKEN1", "TOKEN2"))
+
+        val merged = DcconFilter.addSingleTokenWithPackageTitle("TOKEN0 #기존", "TOKEN1", detail)
+
+        assertEquals("TOKEN0 #기존\nTOKEN1 #핑구콘", merged)
+    }
+
+    @Test
+    fun packageMergeUpdatesExistingUngroupedTokenWithoutCreatingDuplicates() {
+        val detail = DcconPackageDetail("27107", "핑구콘", listOf("TOKEN1", "TOKEN2", "TOKEN3"))
+
+        val merged = DcconFilter.mergePackageTokensIntoBlacklist("TOKEN1\nTOKEN2 #OLD27107", detail)
+
+        assertEquals("TOKEN1 #핑구콘\nTOKEN2 #핑구콘\nTOKEN3 #핑구콘", merged)
+    }
+
+    @Test
+    fun detectsBlockedDcconTokensForExtractionResultState() {
+        val existing = "TOKEN1 #핑구콘\nhttps://dcimg5.dcinside.com/dccon.php?no=TOKEN2 #뭐야콘"
+
+        assertTrue(DcconFilter.isTokenBlocked(existing, "TOKEN1"))
+        assertTrue(DcconFilter.isTokenBlocked(existing, "TOKEN2"))
+        assertFalse(DcconFilter.isTokenBlocked(existing, "TOKEN3"))
+    }
+
+    @Test
     fun extractsImageAltsWithoutDcconImagesSeparatelyFromDcconUrls() {
         val html = """
             <div class="write_div">

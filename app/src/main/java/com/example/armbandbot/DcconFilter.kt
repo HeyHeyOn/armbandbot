@@ -99,18 +99,27 @@ object DcconFilter {
     }
 
     fun mergePackageTokensIntoBlacklist(existingText: String, packageDetail: DcconPackageDetail): String {
-        val lines = normalizeBlacklistText(existingText)
-            .lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .toMutableList()
-        val existingTokens = lines.mapNotNull { normalizeBlacklistEntry(it.substringBefore("#")) }.toMutableSet()
-        packageDetail.tokens.forEach { token ->
-            if (existingTokens.add(token)) {
-                lines.add("$token #${packageDetail.title}")
-            }
+        val entries = normalizedEntryMap(existingText).toMutableMap()
+        packageDetail.tokens.forEach { rawToken ->
+            val token = normalizeBlacklistEntry(rawToken) ?: return@forEach
+            entries[token] = packageDetail.title
         }
-        return lines.joinToString("\n")
+        return entriesToText(entries)
+    }
+
+    fun addSingleTokenWithPackageTitle(existingText: String, tokenOrUrl: String, packageDetail: DcconPackageDetail?): String {
+        val token = normalizeBlacklistEntry(tokenOrUrl) ?: return normalizeBlacklistText(existingText)
+        val entries = normalizedEntryMap(existingText).toMutableMap()
+        val packageTitle = packageDetail?.title?.takeIf { it.isNotBlank() }
+        if (!entries.containsKey(token) || entries[token].isNullOrBlank() || packageTitle != null) {
+            entries[token] = packageTitle ?: entries[token].orEmpty()
+        }
+        return entriesToText(entries)
+    }
+
+    fun isTokenBlocked(existingText: String, tokenOrUrl: String): Boolean {
+        val token = normalizeBlacklistEntry(tokenOrUrl) ?: return false
+        return normalizedEntryMap(existingText).keys.any { blocked -> tokensMatch(blocked, token) }
     }
 
     fun buildImageUrl(tokenOrUrl: String): String {
@@ -238,6 +247,24 @@ object DcconFilter {
         if (blacklistToken.length < MIN_PREFIX_MATCH_LENGTH || detectedToken.length < MIN_PREFIX_MATCH_LENGTH) return false
         return detectedToken.startsWith(blacklistToken) || blacklistToken.startsWith(detectedToken)
     }
+
+    private fun normalizedEntryMap(text: String): LinkedHashMap<String, String> {
+        val entries = linkedMapOf<String, String>()
+        normalizeBlacklistText(text)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { line ->
+                val token = normalizeBlacklistEntry(line.substringBefore("#")) ?: return@forEach
+                val comment = line.substringAfter("#", "").trim()
+                entries.putIfAbsent(token, comment)
+            }
+        return entries
+    }
+
+    private fun entriesToText(entries: Map<String, String>): String = entries
+        .map { (token, comment) -> if (comment.isNotBlank()) "$token #$comment" else token }
+        .joinToString("\n")
 
     private fun extractTokenFromText(text: String): String? {
         if (!text.contains("dccon.php", ignoreCase = true)) return null
