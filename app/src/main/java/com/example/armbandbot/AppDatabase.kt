@@ -28,6 +28,7 @@ data class BlockHistory(
     val gallId: String,
     val postNum: String,
     val targetType: String,
+    val targetNo: String = "",
     val targetAuthor: String,
     val targetContent: String,
     val blockReason: String,
@@ -267,7 +268,7 @@ interface PostDao {
     fun getBlockHistoryAsc(type: String, limit: Int, offset: Int): List<BlockHistory>
 }
 
-@Database(entities = [CheckedPost::class, BlockHistory::class, HoldHistory::class], version = 7, exportSchema = false)
+@Database(entities = [CheckedPost::class, BlockHistory::class, HoldHistory::class], version = 8, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
 

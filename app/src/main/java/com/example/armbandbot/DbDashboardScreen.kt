@@ -1,6 +1,8 @@
 package com.heyheyon.armbandbot
 
 import android.content.Context
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
 import com.heyheyon.armbandbot.ui.PastelNavyLight
@@ -104,6 +107,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     var pendingDeletePost by remember { mutableStateOf<CheckedPost?>(null) }
     var pendingDeleteBlock by remember { mutableStateOf<BlockHistory?>(null) }
     var pendingDeleteHold by remember { mutableStateOf<HoldHistory?>(null) }
+    var webViewUrl by remember { mutableStateOf<String?>(null) }
     var openSwipeKey by remember { mutableStateOf<String?>(null) }
 
     val postDao = GlobalBotState.getDb()?.postDao()
@@ -286,6 +290,39 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         )
     }
 
+    fun buildDcinsidePostUrl(gallType: String, gallId: String, postNum: String, targetType: String = "POST", targetNo: String = ""): String {
+        val basePath = when (gallType) {
+            "M" -> "https://gall.dcinside.com/mgallery/board/view/"
+            "MI" -> "https://gall.dcinside.com/mini/board/view/"
+            else -> "https://gall.dcinside.com/board/view/"
+        }
+        val commentParam = if (targetType == "COMMENT" && targetNo.isNotBlank()) "&fcno=$targetNo" else ""
+        return "${basePath}?id=$gallId&no=$postNum$commentParam"
+    }
+
+    val activeWebViewUrl = webViewUrl
+    if (activeWebViewUrl != null) {
+        AlertDialog(
+            onDismissRequest = { webViewUrl = null },
+            title = { Text("원문 바로가기", fontWeight = FontWeight.Bold) },
+            text = {
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth().height(520.dp),
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            webViewClient = WebViewClient()
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            loadUrl(activeWebViewUrl)
+                        }
+                    },
+                    update = { it.loadUrl(activeWebViewUrl) }
+                )
+            },
+            confirmButton = { TextButton(onClick = { webViewUrl = null }) { Text("닫기") } }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
         Row(
             modifier = Modifier
@@ -412,6 +449,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                 rowKey = rowKey,
                                 isOpen = openSwipeKey == rowKey,
                                 onOpenChange = { isOpen -> openSwipeKey = if (isOpen) rowKey else null },
+                                onOpenLinkClick = { webViewUrl = buildDcinsidePostUrl(post.gallType, post.gallId, post.postNum) },
                                 onDeleteClick = { pendingDeletePost = post }
                             ) {
                                 Card(
@@ -465,6 +503,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                 rowKey = rowKey,
                                 isOpen = openSwipeKey == rowKey,
                                 onOpenChange = { isOpen -> openSwipeKey = if (isOpen) rowKey else null },
+                                onOpenLinkClick = { webViewUrl = buildDcinsidePostUrl(history.gallType, history.gallId, history.postNum, history.targetType, history.targetNo) },
                                 onDeleteClick = { pendingDeleteBlock = history }
                             ) {
                                 Card(
@@ -515,7 +554,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                             items(holdPosts, key = { "hold_${it.id}" }) { history ->
                                 val holdTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(history.holdTime))
                                 val rowKey = "hold_${history.id}"
-                                SwipeDeleteDbRow(rowKey = rowKey, isOpen = openSwipeKey == rowKey, onOpenChange = { isOpen -> openSwipeKey = if (isOpen) rowKey else null }, onDeleteClick = { pendingDeleteHold = history }) {
+                                SwipeDeleteDbRow(rowKey = rowKey, isOpen = openSwipeKey == rowKey, onOpenChange = { isOpen -> openSwipeKey = if (isOpen) rowKey else null }, onOpenLinkClick = { webViewUrl = buildDcinsidePostUrl(history.gallType, history.gallId, history.postNum, history.targetType, history.targetNo) }, onDeleteClick = { pendingDeleteHold = history }) {
                                     Card(
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).clickable { if (history.snapshotPath != null) snapshotViewerPath = history.snapshotPath!! else Toast.makeText(context, "보류 스냅샷이 없습니다.", Toast.LENGTH_SHORT).show() },
                                         colors = CardDefaults.cardColors(containerColor = holdCardBgColor)
@@ -555,6 +594,7 @@ private fun SwipeDeleteDbRow(
     rowKey: String,
     isOpen: Boolean,
     onOpenChange: (Boolean) -> Unit,
+    onOpenLinkClick: () -> Unit,
     onDeleteClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
@@ -562,7 +602,7 @@ private fun SwipeDeleteDbRow(
     val density = androidx.compose.ui.platform.LocalDensity.current
     val buttonSize = 58.dp
     val buttonGap = 8.dp
-    val maxSwipePx = with(density) { -(buttonSize + buttonGap * 2).toPx() }
+    val maxSwipePx = with(density) { -((buttonSize * 2) + buttonGap * 3).toPx() }
     val swipeOffset = remember(rowKey) { androidx.compose.animation.core.Animatable(0f) }
 
     LaunchedEffect(isOpen) {
@@ -571,20 +611,39 @@ private fun SwipeDeleteDbRow(
     }
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        Box(
+        Row(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = buttonGap, top = 4.dp, bottom = 4.dp)
-                .size(buttonSize)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFD32F2F))
-                .clickable { onDeleteClick() },
-            contentAlignment = Alignment.Center
+                .padding(end = buttonGap, top = 4.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(buttonGap)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = Color.White, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.height(2.dp))
-                Text("삭제", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Box(
+                modifier = Modifier
+                    .size(buttonSize)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(PastelNavy)
+                    .clickable { onOpenLinkClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.OpenInNew, contentDescription = "열기", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("열기", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(buttonSize)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFD32F2F))
+                    .clickable { onDeleteClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("삭제", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
         Box(

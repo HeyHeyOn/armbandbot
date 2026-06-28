@@ -27,7 +27,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_search_mode", "is_user_filter_mode", "is_nickname_filter_mode",
     "is_yudong_post_block", "is_yudong_comment_block", "is_yudong_image_block", "is_yudong_voice_block",
     "is_kkang_filter_mode", "is_kkang_post_block", "is_kkang_comment_block", "is_kkang_image_block", "is_kkang_voice_block",
-    "is_url_filter_mode", "is_image_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode",
+    "is_url_filter_mode", "is_image_filter_mode", "is_dccon_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode",
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
 
@@ -43,7 +43,7 @@ internal val EXPORTABLE_FLOAT_KEYS = listOf(
 
 internal val EXPORTABLE_STRING_SET_KEYS = listOf(
     "normal", "bypass", "search_keywords", "user_blacklist", "user_whitelist",
-    "nickname_blacklist", "nickname_whitelist", "url_whitelist", "block_exempt_post_numbers", "image_alt_blacklist", "voice_blacklist"
+    "nickname_blacklist", "nickname_whitelist", "url_whitelist", "block_exempt_post_numbers", "image_alt_blacklist", "dccon_blacklist", "voice_blacklist"
 )
 
 data class BotSettingsExport(

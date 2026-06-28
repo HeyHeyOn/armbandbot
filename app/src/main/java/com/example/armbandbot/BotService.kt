@@ -143,6 +143,8 @@ class BotService : Service() {
         val isImageFilterMode: Boolean,
         val imageFilterThreshold: Int,
         val imageAltBlacklist: List<String>,
+        val isDcconFilterMode: Boolean,
+        val dcconBlacklist: List<String>,
 
         val isVoiceFilterMode: Boolean,
         val voiceBlacklist: List<String>,
@@ -188,6 +190,7 @@ class BotService : Service() {
         URL,
         SPAM,
         IMAGE,
+        DCCON,
         VOICE,
         AI,
         UNKNOWN
@@ -201,6 +204,7 @@ class BotService : Service() {
         val suspiciousUrlInPost: String? = null,
         val spamCodeMatchPost: String? = null,
         val matchedImageAlt: String? = null,
+        val matchedDcconToken: String? = null,
         val matchedVoiceIdPost: String? = null,
         val aiDecision: AiFilterDecision? = null,
         val aiReviewReason: String? = null,
@@ -218,6 +222,7 @@ class BotService : Service() {
         val isBlacklistedUserNick: Boolean,
         val suspiciousUrlInComment: String? = null,
         val spamCodeMatchComment: String? = null,
+        val matchedDcconToken: String? = null,
         val matchedVoiceIdComment: String? = null,
         val blockReasonPrefix: String? = null,
         val notiType: String? = null,
@@ -254,6 +259,7 @@ class BotService : Service() {
         val urlEnabled: Boolean,
         val spamEnabled: Boolean,
         val imageEnabled: Boolean,
+        val dcconEnabled: Boolean,
         val voiceEnabled: Boolean,
         val yudongPostEnabled: Boolean,
         val yudongCommentEnabled: Boolean,
@@ -2675,6 +2681,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 notiType = "ai",
                                 matchedVoiceIdPost = null,
                                 matchedImageAlt = null,
+                                matchedDcconToken = null,
                                 aiDecision = decision.decision,
                                 aiReviewReason = null,
                                 suspiciousUrlInPost = null,
@@ -2798,6 +2805,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         isBlacklistedCmtUserNick = false,
                                         blockReasonPrefixCmt = "AI 댓글 차단",
                                         notiTypeCmt = "ai",
+                                        matchedDcconToken = null,
                                         matchedVoiceIdComment = null,
                                         suspiciousUrlInComment = null,
                                         spamCodeMatchComment = null,
@@ -3073,6 +3081,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 notiType = notiType,
                 matchedVoiceIdPost = matchedVoiceIdPost,
                 matchedImageAlt = matchedImageAlt,
+                matchedDcconToken = postAnalysis.matchedDcconToken,
                 aiDecision = aiDecision,
                 aiReviewReason = aiReviewReason,
                 suspiciousUrlInPost = suspiciousUrlInPost,
@@ -3251,6 +3260,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     override = getActionOverride("image"),
                                     sourceLabel = "image_override"
                                 )
+                                ModerationFilterSource.DCCON -> resolveModerationActionConfig(
+                                    baseConfig = resolveDefaultModerationActionConfig(config),
+                                    override = getActionOverride("image"),
+                                    sourceLabel = "dccon_override"
+                                )
                                 ModerationFilterSource.SPAM -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
                                     override = getActionOverride("spam"),
@@ -3278,6 +3292,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             isBlacklistedCmtUserNick = isBlacklistedCmtUserNick,
                             blockReasonPrefixCmt = blockReasonPrefixCmt,
                             notiTypeCmt = notiTypeCmt,
+                            matchedDcconToken = commentAnalysis.matchedDcconToken,
                             matchedVoiceIdComment = matchedVoiceIdComment,
                             suspiciousUrlInComment = suspiciousUrlInComment,
                             spamCodeMatchComment = spamCodeMatchComment,
@@ -4170,6 +4185,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?.map { it.removeCommentAndTrim() }
                 ?.filter { it.isNotEmpty() }
                 ?: emptyList(),
+            isDcconFilterMode = botPref.getBoolean("is_dccon_filter_mode", false),
+            dcconBlacklist = botPref.getStringSet("dccon_blacklist", setOf())
+                ?.map { it.removeCommentAndTrim() }
+                ?.filter { it.isNotEmpty() }
+                ?: emptyList(),
 
             isVoiceFilterMode = botPref.getBoolean("is_voice_filter_mode", false),
             voiceBlacklist = botPref.getStringSet("voice_blacklist", setOf())
@@ -4293,6 +4313,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         var suspiciousUrlInPost: String? = null
         var spamCodeMatchPost: String? = null
         var matchedImageAlt: String? = null
+        var matchedDcconToken: String? = null
         var matchedVoiceIdPost: String? = null
         var aiDecision: AiFilterDecision? = null
         var aiReviewReason: String? = null
@@ -4452,6 +4473,20 @@ img.written_dccon{max-width:80px;max-height:80px}
                     filterSource = ModerationFilterSource.SPAM
                 }
 
+                if (!shouldBlockExecute && toggles.dcconEnabled) {
+                    val matchedDccon = DcconFilter.findBlockedDccon(postRawHtml, config.dcconBlacklist)
+                    if (matchedDccon != null) {
+                        shouldBlockExecute = true
+                        matchedDcconToken = matchedDccon.ref.token
+                        val label = matchedDccon.ref.label?.takeIf { it.isNotBlank() }?.let { ", label='$it'" } ?: ""
+                        debugDetail = "금지 디시콘 감지 (token=${matchedDccon.ref.token.take(24)}$label)"
+                        filterSource = ModerationFilterSource.DCCON
+                    }
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[디버그][필터/dccon] 디시콘 필터: ${if (matchedDcconToken != null) "차단 (token=${matchedDcconToken!!.take(24)})" else "통과"}", botId)
+                    }
+                }
+
                 if (!shouldBlockExecute && toggles.imageEnabled) {
                     for (postAlt in postImageAlts) {
                         for (blackAlt in config.imageAltBlacklist) {
@@ -4503,6 +4538,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             suspiciousUrlInPost = suspiciousUrlInPost,
             spamCodeMatchPost = spamCodeMatchPost,
             matchedImageAlt = matchedImageAlt,
+            matchedDcconToken = matchedDcconToken,
             matchedVoiceIdPost = matchedVoiceIdPost,
             aiDecision = aiDecision,
             aiReviewReason = aiReviewReason,
@@ -4547,6 +4583,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         var isBadComment = isBlacklistedUserId || isBlacklistedUserNick
         var suspiciousUrlInComment: String? = null
         var spamCodeMatchComment: String? = null
+        var matchedDcconToken: String? = null
         var matchedVoiceIdComment: String? = null
         var blockReasonPrefix: String? = null
         var notiType: String? = null
@@ -4694,6 +4731,20 @@ img.written_dccon{max-width:80px;max-height:80px}
                     filterSource = ModerationFilterSource.SPAM
                 }
 
+                if (!isBadComment && toggles.dcconEnabled) {
+                    val matchedDccon = DcconFilter.findBlockedDccon(commentMemo, config.dcconBlacklist)
+                    if (matchedDccon != null) {
+                        isBadComment = true
+                        matchedDcconToken = matchedDccon.ref.token
+                        val label = matchedDccon.ref.label?.takeIf { it.isNotBlank() }?.let { ", label='$it'" } ?: ""
+                        debugDetail = "댓글 금지 디시콘 감지 (token=${matchedDccon.ref.token.take(24)}$label)"
+                        filterSource = ModerationFilterSource.DCCON
+                    }
+                    if (config.isDebugMode && botId.isNotEmpty()) {
+                        sendLog("[디버그][필터/dccon] 댓글 디시콘 필터: ${if (matchedDcconToken != null) "차단 (token=${matchedDcconToken!!.take(24)})" else "통과"}", botId)
+                    }
+                }
+
                 if (!isBadComment && toggles.voiceEnabled) {
                     for (vid in config.voiceBlacklist) {
                         if (commentMemo.contains(vid)) {
@@ -4718,6 +4769,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             isBlacklistedUserNick = isBlacklistedUserNick,
             suspiciousUrlInComment = suspiciousUrlInComment,
             spamCodeMatchComment = spamCodeMatchComment,
+            matchedDcconToken = matchedDcconToken,
             matchedVoiceIdComment = matchedVoiceIdComment,
             blockReasonPrefix = blockReasonPrefix,
             notiType = notiType,
@@ -4734,6 +4786,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         val urlEnabled = config.isUrlFilterMode
         val spamEnabled = config.isSpamCodeFilterMode
         val imageEnabled = config.isImageFilterMode
+        val dcconEnabled = config.isDcconFilterMode && config.dcconBlacklist.isNotEmpty()
         val voiceEnabled = config.isVoiceFilterMode
         val yudongPostEnabled = config.isYudongPostBlock
         val yudongCommentEnabled = config.isYudongCommentBlock
@@ -4758,6 +4811,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             urlEnabled = urlEnabled,
             spamEnabled = spamEnabled,
             imageEnabled = imageEnabled,
+            dcconEnabled = dcconEnabled,
             voiceEnabled = voiceEnabled,
             yudongPostEnabled = yudongPostEnabled,
             yudongCommentEnabled = yudongCommentEnabled,
@@ -4797,6 +4851,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         notiType: String?,
         matchedVoiceIdPost: String?,
         matchedImageAlt: String?,
+        matchedDcconToken: String?,
         aiDecision: AiFilterDecision?,
         aiReviewReason: String?,
         suspiciousUrlInPost: String?,
@@ -4819,6 +4874,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             notiType = notiType,
             matchedVoiceIdPost = matchedVoiceIdPost,
             matchedImageAlt = matchedImageAlt,
+            matchedDcconToken = matchedDcconToken,
             aiDecision = aiDecision,
             aiReviewReason = aiReviewReason,
             suspiciousUrlInPost = suspiciousUrlInPost,
@@ -5054,6 +5110,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         isBlacklistedCmtUserNick: Boolean,
         blockReasonPrefixCmt: String?,
         notiTypeCmt: String?,
+        matchedDcconToken: String?,
         matchedVoiceIdComment: String?,
         suspiciousUrlInComment: String?,
         spamCodeMatchComment: String?,
@@ -5071,6 +5128,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             isBlacklistedCmtUserNick = isBlacklistedCmtUserNick,
             blockReasonPrefixCmt = blockReasonPrefixCmt,
             notiTypeCmt = notiTypeCmt,
+            matchedDcconToken = matchedDcconToken,
             matchedVoiceIdComment = matchedVoiceIdComment,
             suspiciousUrlInComment = suspiciousUrlInComment,
             spamCodeMatchComment = spamCodeMatchComment,
@@ -5199,6 +5257,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     gallId = gallId,
                     postNum = postNumStr,
                     targetType = "COMMENT",
+                    targetNo = commentNo,
                     targetAuthor = cmtDisplayAuthor,
                     targetContent = commentMemo,
                     blockReason = "[$actionLabel] $dbBlockReason",
@@ -5452,6 +5511,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         notiType: String?,
         matchedVoiceIdPost: String?,
         matchedImageAlt: String?,
+        matchedDcconToken: String?,
         aiDecision: AiFilterDecision?,
         aiReviewReason: String?,
         suspiciousUrlInPost: String?,
@@ -5501,6 +5561,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                 notificationType = notiType ?: "keyword",
                 notificationTitle = "${notiType ?: "keyword"} 차단됨",
                 notificationMessage = "$blockReasonPrefix 사유로 게시글이 차단되었습니다."
+            )
+
+            matchedDcconToken != null -> BlockPresentation(
+                blockReason = "금지 디시콘 첨부",
+                detailedBlockReason = "금지 디시콘 감지 (${matchedDcconToken.take(48)})",
+                logCategory = "디시콘 필터 차단!",
+                logMessage = "번호: $postNumStr / token: ${matchedDcconToken.take(48)}",
+                notificationType = "image",
+                notificationTitle = "디시콘 차단됨",
+                notificationMessage = "금지된 디시콘이 포함된 게시글이 차단되었습니다."
             )
 
             matchedVoiceIdPost != null -> BlockPresentation(
@@ -5562,6 +5632,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         isBlacklistedCmtUserNick: Boolean,
         blockReasonPrefixCmt: String?,
         notiTypeCmt: String?,
+        matchedDcconToken: String?,
         matchedVoiceIdComment: String?,
         suspiciousUrlInComment: String?,
         spamCodeMatchComment: String?,
