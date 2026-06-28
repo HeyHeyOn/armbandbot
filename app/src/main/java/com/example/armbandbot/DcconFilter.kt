@@ -34,6 +34,12 @@ data class DcconBlacklistGroup(
     val isUngrouped: Boolean = false
 )
 
+data class DcconPreviewItem(
+    val token: String,
+    val packageName: String,
+    val imageUrl: String
+)
+
 object DcconFilter {
     private const val MIN_PREFIX_MATCH_LENGTH = 40
     private val dcconUrlPattern = Regex("""(?:https?:)?//[^\\\s'"<>]+/dccon\.php\?[^\\\s'"<>]*no=([^&\\\s'"<>]+)[^\\\s'"<>]*|(?:^|[^A-Za-z0-9_./-])(dccon\.php\?[^\\\s'"<>]*no=([^&\\\s'"<>]+)[^\\\s'"<>]*)""")
@@ -123,6 +129,14 @@ object DcconFilter {
             .map { it.trim() }
             .filter { line -> imageAltMatchValue(line) !in removeAlts }
             .joinToString("\n")
+    }
+
+    fun addSelectedImageAltRefs(existingText: String, refs: List<ImageAltRef>, selectedAlts: Set<String>): String {
+        if (selectedAlts.isEmpty()) return normalizeImageAltBlacklistText(existingText)
+        val selectedEntries = refs
+            .filter { it.alt in selectedAlts }
+            .joinToString("\n") { ref -> if (ref.imageUrl != null) "${ref.alt} #${ref.imageUrl}" else ref.alt }
+        return addImageAltBlacklistEntries(existingText, selectedEntries)
     }
 
     fun extractDcconRefsFromCommentApiJson(json: String): List<DcconRef> {
@@ -263,6 +277,18 @@ object DcconFilter {
         val normalizedVisible = visibleTokens.mapNotNull { normalizeBlacklistEntry(it) }.toSet()
         return if (selectAll) currentSelection + normalizedVisible else currentSelection - normalizedVisible
     }
+
+    fun previewItemsFromBlacklistText(text: String): List<DcconPreviewItem> = normalizeBlacklistText(text)
+        .lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .mapNotNull { line ->
+            val token = normalizeBlacklistEntry(line.substringBefore("#")) ?: return@mapNotNull null
+            val packageName = line.substringAfter("#", "").trim().ifBlank { "개별 디시콘" }
+            DcconPreviewItem(token, packageName, buildImageUrl(token))
+        }
+        .distinctBy { it.token }
+        .toList()
 
     fun extractDcconRefs(html: String): List<DcconRef> {
         if (html.isBlank() || !html.contains("dccon.php", ignoreCase = true)) return emptyList()

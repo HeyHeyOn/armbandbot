@@ -492,6 +492,15 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var imageDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("image_delete_post_on_block")) botPref.getBoolean("image_delete_post_on_block", true) else isDeletePostOnBlock) }
         var imageDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("image_delete_only_mode")) botPref.getBoolean("image_delete_only_mode", false) else isDeleteOnlyMode) }
 
+        var dcconUseCustomAction by remember { mutableStateOf(botPref.getBoolean("dccon_use_custom_action_config", false)) }
+        var dcconActionMode by remember { mutableStateOf(readActionMode("dccon", isDeleteOnlyMode)) }
+        var dcconBlockDurationHours by remember { mutableStateOf(botPref.getInt("dccon_block_duration_hours", blockDurationHours)) }
+        var isDcconActionModeDropdownExpanded by remember { mutableStateOf(false) }
+        var isDcconBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
+        var dcconBlockReasonText by remember { mutableStateOf(botPref.getString("dccon_block_reason_text", null) ?: blockReasonText) }
+        var dcconDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("dccon_delete_post_on_block")) botPref.getBoolean("dccon_delete_post_on_block", true) else isDeletePostOnBlock) }
+        var dcconDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("dccon_delete_only_mode")) botPref.getBoolean("dccon_delete_only_mode", false) else isDeleteOnlyMode) }
+
         var spamUseCustomAction by remember { mutableStateOf(botPref.getBoolean("spam_use_custom_action_config", false)) }
         var spamActionMode by remember { mutableStateOf(readActionMode("spam", isDeleteOnlyMode)) }
         var spamBlockDurationHours by remember { mutableStateOf(botPref.getInt("spam_block_duration_hours", blockDurationHours)) }
@@ -1303,15 +1312,39 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                 }
                                         ) {
                                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                val previewItems = DcconFilter.previewItemsFromBlacklistText(dcconBlacklistText)
+                                                Row(horizontalArrangement = Arrangement.spacedBy((-12).dp), modifier = Modifier.widthIn(max = 124.dp)) {
+                                                    previewItems.take(3).forEach { item ->
+                                                        DcconPreviewImage(item.token, modifier = Modifier.size(44.dp))
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(12.dp))
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text("차단된 디시콘 목록", fontWeight = FontWeight.Bold, color = textColor)
-                                                    Text("${dcconTokensFromBlacklistText(dcconBlacklistText).size}개 등록됨 · 추출/직접 추가 통합 관리", fontSize = 12.sp, color = subTextColor)
+                                                    Text("${previewItems.size}개 등록됨 · 목록에서 미리보기", fontSize = 12.sp, color = subTextColor)
+                                                    if (previewItems.isNotEmpty()) Text(previewItems.take(2).joinToString(" · ") { it.packageName }, fontSize = 11.sp, color = subTextColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                                 Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = PastelNavy)
                                             }
                                         }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor); Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor) }; Switch(checked = dcconUseCustomAction, onCheckedChange = { dcconUseCustomAction = it; botPref.edit().putBoolean("dccon_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) } } }
+                                        Column(modifier = if (!dcconUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                            Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) { Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (dcconUseCustomAction) isDcconActionModeDropdownExpanded = true }) { Text(actionModeOptions[dcconActionMode] ?: "차단", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isDcconActionModeDropdownExpanded, onDismissRequest = { isDcconActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { dcconActionMode = mode; dcconDeleteOnlyMode = mode == "delete"; saveActionMode("dccon", mode); isDcconActionModeDropdownExpanded = false }) } } } }
+                                                if (dcconActionMode == "block") {
+                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor); Box { OutlinedButton(onClick = { if (dcconUseCustomAction) isDcconBlockDurationDropdownExpanded = true }) { Text(blockDurationOptions[dcconBlockDurationHours] ?: "${dcconBlockDurationHours}시간", color = textColor); Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy) }; DropdownMenu(expanded = isDcconBlockDurationDropdownExpanded, onDismissRequest = { isDcconBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) { blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { dcconBlockDurationHours = hours; botPref.edit().putInt("dccon_block_duration_hours", hours).apply(); isDcconBlockDurationDropdownExpanded = false }) } } } }
+                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text("차단 시 글/댓글 함께 삭제", color = textColor); Switch(checked = dcconDeletePostOnBlock, onCheckedChange = { dcconDeletePostOnBlock = it; botPref.edit().putBoolean("dccon_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray)) }
+                                                }
+                                            } }
+                                            if (dcconActionMode == "block") { ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", dcconBlockReasonText, colors) { tempEditText = dcconBlockReasonText; editDialogType = "dccon_block_reason" } }
+                                        }
                                     }
                                 }
+
                                 "VOICE" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1940,9 +1973,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         if (editDialogType != null) {
-            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason" || editDialogType == "overseas_ip_block_reason"
+            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "dccon_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason" || editDialogType == "overseas_ip_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "block_exempt_post_numbers" -> "차단 예외 글 번호 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "dccon_blacklist" -> "차단할 디시콘 URL/토큰 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "dccon_block_reason" -> "디시콘 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "block_exempt_post_numbers" -> "차단 예외 글 번호 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "dccon_blacklist" -> "차단할 디시콘 URL/토큰 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
@@ -1954,6 +1987,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "url_block_reason" -> "예: URL 필터 위반"
                 "voice_block_reason" -> "예: 보이스 필터 위반"
                 "image_block_reason" -> "예: 이미지 필터 위반"
+                "dccon_block_reason" -> "예: 디시콘 필터 위반"
                 "spam_block_reason" -> "예: 스팸코드 필터 위반"
                 "yudong_block_reason" -> "예: 유동 필터 위반"
                 "kkang_block_reason" -> "예: 깡계 필터 위반"
@@ -1990,6 +2024,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "url_block_reason" -> { urlBlockReasonText = tempEditText; botPref.edit().putString("url_block_reason_text", tempEditText).apply() }
                         "voice_block_reason" -> { voiceBlockReasonText = tempEditText; botPref.edit().putString("voice_block_reason_text", tempEditText).apply() }
                         "image_block_reason" -> { imageBlockReasonText = tempEditText; botPref.edit().putString("image_block_reason_text", tempEditText).apply() }
+                        "dccon_block_reason" -> { dcconBlockReasonText = tempEditText; botPref.edit().putString("dccon_block_reason_text", tempEditText).apply() }
                         "spam_block_reason" -> { spamBlockReasonText = tempEditText; botPref.edit().putString("spam_block_reason_text", tempEditText).apply() }
                         "yudong_block_reason" -> { yudongBlockReasonText = tempEditText; botPref.edit().putString("yudong_block_reason_text", tempEditText).apply() }
                         "kkang_block_reason" -> { kkangBlockReasonText = tempEditText; botPref.edit().putString("kkang_block_reason_text", tempEditText).apply() }
@@ -2085,8 +2120,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                     if (refs.isEmpty()) {
                                                         Toast.makeText(context, "본문 이미지 alt를 찾지 못했습니다.", Toast.LENGTH_SHORT).show()
                                                     } else {
-                                                        imageAltBlacklistDraftText = DcconFilter.addImageAltBlacklistEntries(imageAltBlacklistDraftText, entries)
-                                                        Toast.makeText(context, "이미지 alt ${refs.size}개를 차단 목록 초안에 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                                        extractedAltsList = refs
+                                                        Toast.makeText(context, "이미지 alt ${refs.size}개를 찾았습니다. 필요한 항목만 추가하세요.", Toast.LENGTH_SHORT).show()
                                                     }
                                                     imageAltExtractUrlText = ""
                                                     isExtractingImageAlts = false
@@ -2184,7 +2219,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         items(alts.size) { index ->
                             val ref = alts[index]
                             val entry = if (ref.imageUrl != null) "${ref.alt} #${ref.imageUrl}" else ref.alt
-                            val isBlocked = DcconFilter.imageAltMatchValue(entry) in DcconFilter.imageAltBlacklistValues(imageAltBlacklistText)
+                            val activeImageAltText = if (isImageAltBlacklistDialogOpen) imageAltBlacklistDraftText else imageAltBlacklistText
+                            val isBlocked = DcconFilter.imageAltMatchValue(entry) in DcconFilter.imageAltBlacklistValues(activeImageAltText)
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 ImageAltPreviewImage(ref.imageUrl, modifier = Modifier.size(68.dp))
                                 Spacer(modifier = Modifier.width(10.dp))
@@ -2198,10 +2234,15 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 } else {
                                     Button(
                                         onClick = {
-                                            val merged = DcconFilter.addImageAltBlacklistEntries(imageAltBlacklistText, entry)
-                                            imageAltBlacklistText = merged
-                                            botPref.edit().putStringSet("image_alt_blacklist", merged.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()).apply()
-                                            Toast.makeText(context, "이미지 alt를 차단 목록에 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                            if (isImageAltBlacklistDialogOpen) {
+                                                imageAltBlacklistDraftText = DcconFilter.addImageAltBlacklistEntries(imageAltBlacklistDraftText, entry)
+                                                Toast.makeText(context, "이미지 alt를 차단 목록 초안에 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                val merged = DcconFilter.addImageAltBlacklistEntries(imageAltBlacklistText, entry)
+                                                imageAltBlacklistText = merged
+                                                botPref.edit().putStringSet("image_alt_blacklist", merged.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()).apply()
+                                                Toast.makeText(context, "이미지 alt를 차단 목록에 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                            }
                                         },
                                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                         modifier = Modifier.height(38.dp),
@@ -2214,7 +2255,23 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         }
                     }
                 },
-                confirmButton = { Button(onClick = { copyToClipboard(context, alts.joinToString("\n") { it.alt }, "전체 이미지 alt") }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("모두 복사", color = Color.White) } },
+                confirmButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { copyToClipboard(context, alts.joinToString("\n") { it.alt }, "전체 이미지 alt") }) { Text("모두 복사", color = PastelNavy) }
+                        Button(onClick = {
+                            val allAlts = alts.map { it.alt }.toSet()
+                            if (isImageAltBlacklistDialogOpen) {
+                                imageAltBlacklistDraftText = DcconFilter.addSelectedImageAltRefs(imageAltBlacklistDraftText, alts, allAlts)
+                            } else {
+                                val merged = DcconFilter.addSelectedImageAltRefs(imageAltBlacklistText, alts, allAlts)
+                                imageAltBlacklistText = merged
+                                botPref.edit().putStringSet("image_alt_blacklist", merged.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()).apply()
+                            }
+                            extractedAltsList = null
+                            Toast.makeText(context, "이미지 alt ${alts.size}개를 추가했습니다.", Toast.LENGTH_SHORT).show()
+                        }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("모두 추가", color = Color.White) }
+                    }
+                },
                 dismissButton = { TextButton(onClick = { extractedAltsList = null }) { Text("닫기", color = subTextColor) } }
             )
         }

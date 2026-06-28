@@ -3262,7 +3262,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 )
                                 ModerationFilterSource.DCCON -> resolveModerationActionConfig(
                                     baseConfig = resolveDefaultModerationActionConfig(config),
-                                    override = getActionOverride("image"),
+                                    override = getActionOverride("dccon"),
                                     sourceLabel = "dccon_override"
                                 )
                                 ModerationFilterSource.SPAM -> resolveModerationActionConfig(

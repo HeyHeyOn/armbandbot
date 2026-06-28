@@ -304,4 +304,53 @@ class DcconFilterTest {
             DcconFilter.toggleVisibleTokenSelection(currentSelection = setOf("OLD", "A", "B"), visibleTokens = visibleTokens, selectAll = false)
         )
     }
+
+    @Test
+    fun mergesOnlySelectedExtractedImageAltsIntoBlacklist() {
+        val refs = listOf(
+            ImageAltRef("광고1", "https://example.com/a.jpg"),
+            ImageAltRef("광고2", "https://example.com/b.jpg"),
+            ImageAltRef("기존", "https://example.com/old-new.jpg")
+        )
+
+        val merged = DcconFilter.addSelectedImageAltRefs(
+            existingText = "기존 #https://example.com/old.jpg",
+            refs = refs,
+            selectedAlts = setOf("광고2", "기존")
+        )
+
+        assertEquals("기존 #https://example.com/old.jpg\n광고2 #https://example.com/b.jpg", merged)
+    }
+
+    @Test
+    fun createsDcconPreviewItemsForDatabaseListFromBlacklistText() {
+        val text = """
+            TOKEN1 #핑구콘
+            https://dcimg5.dcinside.com/dccon.php?no=TOKEN2 #뭐야콘
+        """.trimIndent()
+
+        val items = DcconFilter.previewItemsFromBlacklistText(text)
+
+        assertEquals(listOf("TOKEN1", "TOKEN2"), items.map { it.token })
+        assertEquals(listOf("핑구콘", "뭐야콘"), items.map { it.packageName })
+        assertEquals(
+            listOf(
+                "https://dcimg5.dcinside.com/dccon.php?no=TOKEN1",
+                "https://dcimg5.dcinside.com/dccon.php?no=TOKEN2"
+            ),
+            items.map { it.imageUrl }
+        )
+    }
+
+    @Test
+    fun runtimeDcconFilterUsesDcconActionOverrideNotImageOverride() {
+        val source = java.io.File("src/main/java/com/example/armbandbot/BotService.kt").readText()
+        val dcconBlock = Regex(
+            "ModerationFilterSource\\.DCCON -> resolveModerationActionConfig\\([\\s\\S]*?sourceLabel = \\\"dccon_override\\\"",
+            setOf(RegexOption.MULTILINE)
+        ).find(source)?.value ?: error("DCCON action resolution block not found")
+
+        assertTrue(dcconBlock.contains("getActionOverride(\"dccon\")"))
+        assertFalse(dcconBlock.contains("getActionOverride(\"image\")"))
+    }
 }

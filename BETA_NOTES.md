@@ -1,3 +1,26 @@
+## 1.4.3-beta9 배포 완료
+
+### 주요 변화
+- 이미지 alt 추출 결과를 바로 차단 목록에 자동 저장하지 않고, 결과 팝업에서 필요한 항목만 골라 추가하도록 개선했습니다.
+- 이미지 alt 추출 결과 팝업에서 `모두 복사`와 `모두 추가`를 분리해 실수로 목록이 커지는 문제를 줄였습니다.
+- 디시콘 필터에 개별 차단 설정을 추가했습니다.
+  - 디시콘만 별도 처리 방식/차단 기간/차단 사유/글·댓글 함께 삭제 여부를 설정할 수 있습니다.
+  - 런타임에서도 디시콘이 이미지 필터 설정이 아니라 `dccon_*` 설정을 읽도록 수정했습니다.
+- 차단된 디시콘 목록 카드에서 등록된 디시콘을 썸네일로 미리 볼 수 있게 했습니다.
+- 디시콘 개별 차단 설정과 목록 프리뷰 회귀 테스트를 추가했습니다.
+
+### 검증
+- `./gradlew testDebugUnitTest --tests 'com.heyheyon.armbandbot.DcconFilterTest'` 성공.
+- `./gradlew testDebugUnitTest assembleRelease` 성공.
+
+### 빌드 정보
+- versionCode = 132
+- versionName = 1.4.3-beta9
+- APK: `완장봇_v1.4.3-beta9.apk`
+- SHA256: `52c7c9d43c0cc242e63c1410ed5b36aeb895af3ba2901f1ceec696ca97361f43`
+- Google Drive file ID: `1-x14nq8xoGYm3wygGk-l5TKUQOW3E__X`
+- Google Drive link: https://drive.google.com/file/d/1-x14nq8xoGYm3wygGk-l5TKUQOW3E__X/view?usp=drivesdk
+
 ## 1.4.3-beta8 배포 완료
 
 ### 주요 변화
