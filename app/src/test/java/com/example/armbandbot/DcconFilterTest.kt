@@ -180,13 +180,37 @@ class DcconFilterTest {
     fun extractsImageAltsWithoutDcconImagesSeparatelyFromDcconUrls() {
         val html = """
             <div class="write_div">
-                <img src="normal.jpg" alt="광고이미지">
+                <img src="https://example.com/normal.jpg" alt="광고이미지">
                 <img class="written_dccon" src="https://dcimg5.dcinside.com/dccon.php?no=DCON" alt="디시콘라벨" conalt="디시콘라벨">
             </div>
         """.trimIndent()
 
         assertEquals(listOf("광고이미지"), DcconFilter.extractImageAltRefs(html))
+        assertEquals(
+            listOf(ImageAltRef("광고이미지", "https://example.com/normal.jpg")),
+            DcconFilter.extractImageAltImageRefs(html)
+        )
         assertEquals(listOf("DCON"), DcconFilter.extractDcconRefs(html).map { it.token })
+    }
+
+    @Test
+    fun imageAltBlacklistEntriesKeepPreviewUrlButMatchOnlyAltText() {
+        val existing = "광고이미지 #https://example.com/a.jpg\n텍스트만"
+
+        val merged = DcconFilter.addImageAltBlacklistEntries(existing, "광고이미지 #https://example.com/new.jpg\n신규이미지 #https://example.com/b.jpg")
+
+        assertEquals("광고이미지 #https://example.com/a.jpg\n텍스트만\n신규이미지 #https://example.com/b.jpg", merged)
+        assertEquals(listOf("광고이미지", "텍스트만", "신규이미지"), DcconFilter.imageAltBlacklistValues(merged))
+        assertEquals("광고이미지", DcconFilter.imageAltMatchValue("광고이미지 #https://example.com/a.jpg"))
+    }
+
+    @Test
+    fun removesImageAltBlacklistEntriesByAltTextWithoutDependingOnPreviewUrl() {
+        val existing = "광고이미지 #https://example.com/a.jpg\n텍스트만\n신규이미지 #https://example.com/b.jpg"
+
+        val removed = DcconFilter.removeImageAltBlacklistEntries(existing, setOf("광고이미지", "신규이미지 #https://example.com/b.jpg"))
+
+        assertEquals("텍스트만", removed)
     }
 
     @Test

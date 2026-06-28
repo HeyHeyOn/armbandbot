@@ -136,6 +136,40 @@ private fun dcconTokensFromBlacklistText(text: String): List<String> = DcconFilt
     .distinct()
     .toList()
 
+private fun imageAltRefsFromBlacklistText(text: String): List<ImageAltRef> = DcconFilter.normalizeImageAltBlacklistText(text)
+    .lineSequence()
+    .map { it.trim() }
+    .filter { it.isNotBlank() }
+    .map { line ->
+        val alt = DcconFilter.imageAltMatchValue(line)
+        val previewUrl = line.substringAfter("#", "").trim().takeIf { it.startsWith("http") || it.startsWith("//") }
+            ?.let { if (it.startsWith("//")) "https:$it" else it }
+        ImageAltRef(alt, previewUrl)
+    }
+    .toList()
+
+@Composable
+private fun ImageAltPreviewImage(imageUrl: String?, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.White)
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (imageUrl != null) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "이미지 미리보기",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(Icons.Filled.Image, contentDescription = null, tint = Color(0xFF9E9E9E), modifier = Modifier.size(28.dp))
+        }
+    }
+}
+
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsumed: () -> Unit, onBack: () -> Unit) {
@@ -208,6 +242,12 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var isExtractingDccons by remember { mutableStateOf(false) }
     var isAddingDcconPackage by remember { mutableStateOf(false) }
     var isDcconBlacklistDialogOpen by remember { mutableStateOf(false) }
+    var isImageAltBlacklistDialogOpen by remember { mutableStateOf(false) }
+    var imageAltBlacklistDraftText by remember { mutableStateOf("") }
+    var imageAltBlacklistAddText by remember { mutableStateOf("") }
+    var isImageAltAddInputVisible by remember { mutableStateOf(false) }
+    var selectedImageAlts by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var imageAltDeleteConfirmAlts by remember { mutableStateOf<Set<String>?>(null) }
     var dcconBlacklistDraftText by remember { mutableStateOf("") }
     var dcconBlacklistAddText by remember { mutableStateOf("") }
     var isDcconAddInputVisible by remember { mutableStateOf(false) }
@@ -215,7 +255,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var selectedDcconTokens by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedDcconGroupName by remember { mutableStateOf<String?>(null) }
     var dcconDeleteConfirmTokens by remember { mutableStateOf<Set<String>?>(null) }
-    var extractedAltsList by remember { mutableStateOf<List<String>?>(null) }
+    var extractedAltsList by remember { mutableStateOf<List<ImageAltRef>?>(null) }
     var extractedDcconsList by remember { mutableStateOf<List<DcconRef>?>(null) }
     var extractedAltsError by remember { mutableStateOf<String?>(null) }
     var extractVoiceText by remember { mutableStateOf("") }
@@ -1186,7 +1226,28 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             OutlinedTextField(value = imageFilterThresholdText, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) { imageFilterThresholdText = it; botPref.edit().putInt("image_filter_threshold", it.toIntOrNull() ?: 80).apply() } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.width(80.dp), textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
                                         }
                                     }
-                                    ReadOnlyTextCard("차단할 이미지 alt값 (블랙리스트)", imageAltBlacklistText, colors) { tempEditText = imageAltBlacklistText; editDialogType = "image_alt_blacklist" }
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = cardColor),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                imageAltBlacklistDraftText = DcconFilter.normalizeImageAltBlacklistText(imageAltBlacklistText)
+                                                imageAltBlacklistAddText = ""
+                                                isImageAltAddInputVisible = false
+                                                selectedImageAlts = emptySet()
+                                                imageAltDeleteConfirmAlts = null
+                                                isImageAltBlacklistDialogOpen = true
+                                            }
+                                    ) {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text("차단할 이미지 alt값 목록", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("${imageAltRefsFromBlacklistText(imageAltBlacklistText).size}개 등록됨 · 이미지 미리보기로 관리", fontSize = 12.sp, color = subTextColor)
+                                            }
+                                            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = PastelNavy)
+                                        }
+                                    }
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
                                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1261,7 +1322,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                         coroutineScope.launch(Dispatchers.IO) {
                                                             try {
                                                                 val doc = fetchPostDocument(imageAltExtractUrlText)
-                                                                val alts = DcconFilter.extractImageAltRefs(doc.html())
+                                                                val alts = DcconFilter.extractImageAltImageRefs(doc.html())
                                                                 withContext(Dispatchers.Main) {
                                                                     if (alts.isEmpty()) extractedAltsError = "이미지 alt값을 찾지 못했습니다." else extractedAltsList = alts
                                                                     imageAltExtractUrlText = ""
@@ -1966,7 +2027,11 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "user_whitelist" -> { userWhitelistText = tempEditText; botPref.edit().putStringSet("user_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "nickname_blacklist" -> { nicknameBlacklistText = tempEditText; botPref.edit().putStringSet("nickname_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "nickname_whitelist" -> { nicknameWhitelistText = tempEditText; botPref.edit().putStringSet("nickname_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "image_alt_blacklist" -> { imageAltBlacklistText = tempEditText; botPref.edit().putStringSet("image_alt_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "image_alt_blacklist" -> {
+                            val normalized = DcconFilter.normalizeImageAltBlacklistText(tempEditText)
+                            imageAltBlacklistText = normalized
+                            botPref.edit().putStringSet("image_alt_blacklist", normalized.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply()
+                        }
                         "dccon_blacklist" -> {
                             val normalized = DcconFilter.normalizeBlacklistText(tempEditText)
                             dcconBlacklistText = normalized
@@ -1980,24 +2045,153 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             )
         }
 
+        if (isImageAltBlacklistDialogOpen) {
+            val draftRefs = imageAltRefsFromBlacklistText(imageAltBlacklistDraftText)
+            val visibleAlts = draftRefs.map { it.alt }
+            val allSelected = visibleAlts.isNotEmpty() && visibleAlts.all { it in selectedImageAlts }
+            AlertDialog(
+                containerColor = dialogBgColor, titleContentColor = textColor, textContentColor = textColor,
+                onDismissRequest = { isImageAltBlacklistDialogOpen = false },
+                title = { Text("차단할 이미지 alt값 (${draftRefs.size}개)", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (isImageAltAddInputVisible) {
+                            OutlinedTextField(
+                                value = imageAltBlacklistAddText,
+                                onValueChange = { imageAltBlacklistAddText = it },
+                                placeholder = { Text("alt값 또는 alt #이미지URL\n여러 개는 줄바꿈으로 입력", fontSize = 12.sp) },
+                                minLines = 3,
+                                maxLines = 5,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { imageAltBlacklistAddText = ""; isImageAltAddInputVisible = false }) { Text("취소", color = subTextColor) }
+                                Button(onClick = {
+                                    imageAltBlacklistDraftText = DcconFilter.addImageAltBlacklistEntries(imageAltBlacklistDraftText, imageAltBlacklistAddText)
+                                    imageAltBlacklistAddText = ""
+                                    isImageAltAddInputVisible = false
+                                }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("추가", color = Color.White) }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        } else {
+                            OutlinedButton(onClick = { isImageAltAddInputVisible = true }, modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Filled.Add, contentDescription = null, tint = PastelNavy)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("직접 추가", color = PastelNavy)
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        if (visibleAlts.isNotEmpty()) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = allSelected, onCheckedChange = { checked ->
+                                    selectedImageAlts = if (checked) selectedImageAlts + visibleAlts else selectedImageAlts - visibleAlts.toSet()
+                                })
+                                Text("전체 선택", color = textColor, modifier = Modifier.weight(1f))
+                                if (selectedImageAlts.isNotEmpty()) Text("${selectedImageAlts.size}개 선택", color = subTextColor, fontSize = 12.sp)
+                            }
+                        }
+
+                        if (draftRefs.isEmpty()) {
+                            Text("등록된 이미지 alt값이 없습니다.", color = subTextColor, modifier = Modifier.padding(vertical = 24.dp))
+                        } else {
+                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                                items(draftRefs.size) { index ->
+                                    val ref = draftRefs[index]
+                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = ref.alt in selectedImageAlts, onCheckedChange = { checked ->
+                                            selectedImageAlts = if (checked) selectedImageAlts + ref.alt else selectedImageAlts - ref.alt
+                                        })
+                                        ImageAltPreviewImage(ref.imageUrl, modifier = Modifier.size(64.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(ref.alt, color = textColor, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            Text(if (ref.imageUrl != null) "미리보기 있음" else "기존 텍스트 항목", color = subTextColor, fontSize = 11.sp)
+                                        }
+                                        IconButton(onClick = { imageAltDeleteConfirmAlts = setOf(ref.alt) }) {
+                                            Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = warningRed)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (selectedImageAlts.isNotEmpty()) {
+                            OutlinedButton(onClick = { imageAltDeleteConfirmAlts = selectedImageAlts }) { Text("선택 삭제", color = warningRed) }
+                        }
+                        Button(onClick = {
+                            val normalized = DcconFilter.normalizeImageAltBlacklistText(imageAltBlacklistDraftText)
+                            imageAltBlacklistText = normalized
+                            botPref.edit().putStringSet("image_alt_blacklist", normalized.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()).apply()
+                            isImageAltBlacklistDialogOpen = false
+                        }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("저장", color = Color.White) }
+                    }
+                },
+                dismissButton = { TextButton(onClick = { isImageAltBlacklistDialogOpen = false }) { Text("취소", color = subTextColor) } }
+            )
+        }
+
+        val pendingImageAltDeletes = imageAltDeleteConfirmAlts
+        if (pendingImageAltDeletes != null) {
+            AlertDialog(
+                containerColor = dialogBgColor, titleContentColor = textColor, textContentColor = textColor,
+                onDismissRequest = { imageAltDeleteConfirmAlts = null },
+                title = { Text(if (pendingImageAltDeletes.size == 1) "이미지 alt 삭제" else "이미지 alt 선택 삭제", fontWeight = FontWeight.Bold) },
+                text = { Text(if (pendingImageAltDeletes.size == 1) "이 이미지 alt값을 차단 목록에서 제거할까요?" else "선택한 이미지 alt값 ${pendingImageAltDeletes.size}개를 차단 목록에서 제거할까요?") },
+                confirmButton = { Button(onClick = {
+                    imageAltBlacklistDraftText = DcconFilter.removeImageAltBlacklistEntries(imageAltBlacklistDraftText, pendingImageAltDeletes)
+                    selectedImageAlts = selectedImageAlts - pendingImageAltDeletes
+                    imageAltDeleteConfirmAlts = null
+                }, colors = ButtonDefaults.buttonColors(containerColor = warningRed)) { Text("삭제", color = Color.White) } },
+                dismissButton = { TextButton(onClick = { imageAltDeleteConfirmAlts = null }) { Text("취소", color = subTextColor) } }
+            )
+        }
+
         val alts = extractedAltsList
         if (alts != null) {
             AlertDialog(
                 containerColor = dialogBgColor, titleContentColor = textColor, textContentColor = textColor,
                 onDismissRequest = { extractedAltsList = null }, title = { Text("이미지 alt 값 (${alts.size}개)", fontWeight = FontWeight.Bold) },
                 text = {
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 350.dp)) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 390.dp)) {
                         items(alts.size) { index ->
-                            val altVal = alts[index]
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                OutlinedTextField(value = altVal, onValueChange = {}, readOnly = true, singleLine = true, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
+                            val ref = alts[index]
+                            val entry = if (ref.imageUrl != null) "${ref.alt} #${ref.imageUrl}" else ref.alt
+                            val isBlocked = DcconFilter.imageAltMatchValue(entry) in DcconFilter.imageAltBlacklistValues(imageAltBlacklistText)
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                ImageAltPreviewImage(ref.imageUrl, modifier = Modifier.size(68.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(ref.alt, color = textColor, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(if (ref.imageUrl != null) "이미지 ${index + 1}" else "미리보기 없음", color = subTextColor, fontSize = 11.sp)
+                                }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Button(onClick = { copyToClipboard(context, altVal, "개별 이미지 alt") }, contentPadding = PaddingValues(0.dp), modifier = Modifier.size(55.dp), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("복사", fontSize = 12.sp) }
+                                if (isBlocked) {
+                                    AssistChip(onClick = {}, label = { Text("추가됨", fontSize = 12.sp) }, enabled = false)
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            val merged = DcconFilter.addImageAltBlacklistEntries(imageAltBlacklistText, entry)
+                                            imageAltBlacklistText = merged
+                                            botPref.edit().putStringSet("image_alt_blacklist", merged.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()).apply()
+                                            Toast.makeText(context, "이미지 alt를 차단 목록에 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                        modifier = Modifier.height(38.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)
+                                    ) { Text("추가", fontSize = 12.sp, color = Color.White) }
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Button(onClick = { copyToClipboard(context, ref.alt, "개별 이미지 alt") }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp), modifier = Modifier.height(38.dp), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = if(isDarkMode) Color(0xFF37474F) else PastelNavyLight, contentColor = if(isDarkMode) Color.White else PastelNavy)) { Text("복사", fontSize = 12.sp) }
                             }
                         }
                     }
                 },
-                confirmButton = { Button(onClick = { copyToClipboard(context, alts.joinToString("\n"), "전체 이미지 alt") }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("모두 복사", color = Color.White) } },
+                confirmButton = { Button(onClick = { copyToClipboard(context, alts.joinToString("\n") { it.alt }, "전체 이미지 alt") }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("모두 복사", color = Color.White) } },
                 dismissButton = { TextButton(onClick = { extractedAltsList = null }) { Text("닫기", color = subTextColor) } }
             )
         }

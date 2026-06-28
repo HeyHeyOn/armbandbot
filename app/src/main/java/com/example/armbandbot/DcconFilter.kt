@@ -22,6 +22,11 @@ data class DcconPackageDetail(
     val tokens: List<String>
 )
 
+data class ImageAltRef(
+    val alt: String,
+    val imageUrl: String? = null
+)
+
 data class DcconBlacklistGroup(
     val packageName: String,
     val tokens: List<String>,
@@ -55,12 +60,67 @@ object DcconFilter {
         .joinToString("\n")
 
     fun extractImageAltRefs(html: String): List<String> {
+        return extractImageAltImageRefs(html).map { it.alt }
+    }
+
+    fun extractImageAltImageRefs(html: String): List<ImageAltRef> {
         if (html.isBlank()) return emptyList()
         val doc = Jsoup.parseBodyFragment(html)
-        return doc.select(".write_div img, img")
+        val refs = linkedMapOf<String, ImageAltRef>()
+        doc.select(".write_div img, img")
             .filterNot { isDcconElement(it) }
-            .mapNotNull { it.attr("alt").takeIf { alt -> alt.isNotBlank() } }
-            .distinct()
+            .forEach { img ->
+                val alt = img.attr("alt").trim().takeIf { it.isNotBlank() } ?: return@forEach
+                refs.putIfAbsent(alt, ImageAltRef(alt, resolveImageUrl(img.attr("src").ifBlank { img.attr("data-original") }.ifBlank { img.attr("data-src") })))
+            }
+        return refs.values.toList()
+    }
+
+    fun imageAltMatchValue(entry: String): String = entry.substringBefore("#").trim()
+
+    fun normalizeImageAltBlacklistText(text: String): String = text
+        .lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .map { line ->
+            val alt = imageAltMatchValue(line)
+            val previewUrl = line.substringAfter("#", "").trim()
+            if (previewUrl.isNotBlank()) "$alt #$previewUrl" else alt
+        }
+        .distinctBy { imageAltMatchValue(it) }
+        .joinToString("\n")
+
+    fun imageAltBlacklistValues(text: String): List<String> = normalizeImageAltBlacklistText(text)
+        .lineSequence()
+        .map { imageAltMatchValue(it) }
+        .filter { it.isNotBlank() }
+        .toList()
+
+    fun addImageAltBlacklistEntries(existingText: String, newEntriesText: String): String {
+        val entries = normalizeImageAltBlacklistText(existingText)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toMutableList()
+        val existingAlts = entries.map { imageAltMatchValue(it) }.toMutableSet()
+        normalizeImageAltBlacklistText(newEntriesText).lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { line ->
+                val alt = imageAltMatchValue(line)
+                if (alt.isNotBlank() && existingAlts.add(alt)) entries.add(line)
+            }
+        return entries.joinToString("\n")
+    }
+
+    fun removeImageAltBlacklistEntries(existingText: String, entriesToRemove: Set<String>): String {
+        val removeAlts = entriesToRemove.map { imageAltMatchValue(it) }.filter { it.isNotBlank() }.toSet()
+        if (removeAlts.isEmpty()) return normalizeImageAltBlacklistText(existingText)
+        return normalizeImageAltBlacklistText(existingText)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { line -> imageAltMatchValue(line) !in removeAlts }
+            .joinToString("\n")
     }
 
     fun extractDcconRefsFromCommentApiJson(json: String): List<DcconRef> {
@@ -125,6 +185,15 @@ object DcconFilter {
     fun buildImageUrl(tokenOrUrl: String): String {
         val token = normalizeBlacklistEntry(tokenOrUrl) ?: tokenOrUrl.trim()
         return if (token.contains("dccon.php", ignoreCase = true)) token else "https://dcimg5.dcinside.com/dccon.php?no=$token"
+    }
+
+    private fun resolveImageUrl(rawUrl: String): String? {
+        val src = rawUrl.trim()
+        return when {
+            src.startsWith("http") -> src
+            src.startsWith("//") -> "https:$src"
+            else -> null
+        }
     }
 
     fun addBlacklistEntries(existingText: String, newEntriesText: String): String {

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
 import kotlinx.coroutines.Dispatchers
@@ -137,19 +138,19 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
                 add(BodyElement.TextElement("[보이스리플]"))
                 return@forEach
             }
-            val dccons = child.select("img.written_dccon")
+            val dccons = DcconFilter.extractDcconRefs(child.outerHtml())
             val allImgs = child.select("img")
             when {
-                dccons.isNotEmpty() -> dccons.forEach { img ->
-                    val alt = img.attr("alt").takeIf { it.isNotEmpty() } ?: "디시콘"
-                    add(BodyElement.TextElement("[디시콘: $alt]"))
+                dccons.isNotEmpty() -> dccons.forEach { ref ->
+                    add(BodyElement.ImageElement(DcconFilter.buildImageUrl(ref.token), isDccon = true))
                 }
                 allImgs.isNotEmpty() -> allImgs.forEach { img ->
                     val src = img.attr("src").ifEmpty { img.attr("data-original") }
                         .ifEmpty { img.attr("data-src") }
                     if (src.contains("dccon.php")) {
-                        val alt = img.attr("alt").takeIf { it.isNotEmpty() } ?: "디시콘"
-                        add(BodyElement.TextElement("[디시콘: $alt]"))
+                        DcconFilter.normalizeBlacklistEntry(src)?.let { token ->
+                            add(BodyElement.ImageElement(DcconFilter.buildImageUrl(token), isDccon = true))
+                        }
                     } else {
                         resolveImgSrc(img)?.let { add(BodyElement.ImageElement(it, isDccon = false)) }
                     }
@@ -208,10 +209,9 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
             mentionText.isNotEmpty() -> mentionText
             else -> rawText
         }
-        val dcconUrls = infoDiv.select("img.written_dccon, img[src*=dccon.php]").mapNotNull { img ->
-            val src = img.attr("src").ifEmpty { img.attr("data-src") }
-            when { src.startsWith("http") -> src; src.startsWith("//") -> "https:$src"; else -> null }
-        }.distinct()
+        val dcconUrls = DcconFilter.extractDcconRefs(infoDiv.outerHtml())
+            .map { DcconFilter.buildImageUrl(it.token) }
+            .distinct()
         val content = when {
             hasVr && textContent.isBlank() -> "[🔊 보이스리플]"
             hasVr -> "$textContent\n[🔊 보이스리플]"
@@ -267,6 +267,22 @@ private fun buildMentionAnnotatedString(text: String, textColor: Color): Annotat
     if (lastIndex < text.length) {
         withStyle(SpanStyle(color = textColor)) { append(text.substring(lastIndex)) }
     }
+}
+
+@Composable
+private fun SnapshotDcconImage(url: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    AsyncImage(
+        model = ImageRequest.Builder(context)
+            .data(url)
+            .setHeader("Referer", "https://gall.dcinside.com/")
+            .setHeader("User-Agent", "Mozilla/5.0")
+            .crossfade(true)
+            .build(),
+        contentDescription = "디시콘",
+        modifier = modifier,
+        contentScale = ContentScale.Fit
+    )
 }
 
 @Composable
@@ -423,11 +439,9 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                 )
                             }
                             is BodyElement.ImageElement -> if (element.isDccon) {
-                                AsyncImage(
-                                    model = element.url,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(80.dp),
-                                    contentScale = ContentScale.Fit
+                                SnapshotDcconImage(
+                                    url = element.url,
+                                    modifier = Modifier.size(80.dp)
                                 )
                             } else {
                                 AsyncImage(
@@ -528,11 +542,17 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                             )
                                         }
                                         if (comment.dcconUrls.isNotEmpty()) {
-                                            Text(
-                                                "[디시콘]",
-                                                fontSize = 13.sp,
-                                                color = Color(0xFF4A6583)
-                                            )
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier.padding(top = 6.dp)
+                                            ) {
+                                                comment.dcconUrls.forEach { dcconUrl ->
+                                                    SnapshotDcconImage(
+                                                        url = dcconUrl,
+                                                        modifier = Modifier.size(64.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -545,7 +565,22 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
         }
 
         if (showWebView) {
-            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+            Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(topBarColor)
+                        .padding(start = 8.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showWebView = false }) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "스냅샷으로 돌아가기", tint = PastelNavy)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("원본 페이지 보기", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
+                        Text("저장된 HTML을 원문 형태로 표시합니다", fontSize = 12.sp, color = subTextColor)
+                    }
+                }
                 AndroidView(
                     factory = { ctx ->
                         WebView(ctx).apply {
@@ -565,7 +600,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                             loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().weight(1f)
                 )
             }
         }

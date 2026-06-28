@@ -1,3 +1,28 @@
+﻿## 1.4.3-beta7 배포 완료
+
+### 주요 변화
+- 스냅샷 뷰어에서 디시콘을 `[디시콘]` 텍스트가 아니라 실제 이미지 미리보기로 표시합니다.
+  - 본문/댓글 디시콘 모두 `dccon.php?no=` 토큰 기반으로 복원합니다.
+  - Coil 요청에 DCInside Referer/User-Agent를 넣어 저장 스냅샷에서도 로딩 안정성을 높였습니다.
+- 스냅샷의 원본 HTML 보기 화면에 상단 뒤로가기 바와 설명 문구를 추가했습니다.
+- 이미지 alt 추출/차단 관리 UI를 미리보기형으로 개선했습니다.
+  - 추출 결과에서 이미지 썸네일, alt, 추가됨 상태를 같이 표시합니다.
+  - 차단 목록도 이미지 미리보기/체크박스/선택 삭제 방식으로 관리합니다.
+  - 저장 포맷은 `alt #이미지URL`을 허용하지만, 실제 차단 비교는 기존처럼 `#` 앞의 alt 본문만 사용합니다.
+- 이미지 alt 저장 포맷 호환 및 스냅샷 디시콘 파싱 회귀 테스트를 추가했습니다.
+
+### 검증
+- `./gradlew.bat testReleaseUnitTest` 성공.
+- `./gradlew.bat testReleaseUnitTest assembleRelease` 성공.
+
+### 빌드 정보
+- versionCode = 130
+- versionName = 1.4.3-beta7
+- APK: `완장봇_v1.4.3-beta7.apk`
+- SHA256: `0A3F54121EC9A8C6981A569D727415BEE9CB135C449E8B92B0060E1054F5BC0A`
+- Google Drive file ID: `18ViEc0a94PmCDVTHNZGPZMTvNxrK25h_`
+- Google Drive link: https://drive.google.com/file/d/18ViEc0a94PmCDVTHNZGPZMTvNxrK25h_/view?usp=drivesdk
+
 ## 1.4.1-beta2 배포 준비 완료
 
 ### 주요 변화
