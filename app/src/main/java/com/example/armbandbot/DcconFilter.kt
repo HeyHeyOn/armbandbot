@@ -106,6 +106,44 @@ object DcconFilter {
         return lines.joinToString("\n")
     }
 
+    fun buildImageUrl(tokenOrUrl: String): String {
+        val token = normalizeBlacklistEntry(tokenOrUrl) ?: tokenOrUrl.trim()
+        return if (token.contains("dccon.php", ignoreCase = true)) token else "https://dcimg5.dcinside.com/dccon.php?no=$token"
+    }
+
+    fun addBlacklistEntries(existingText: String, newEntriesText: String): String {
+        val lines = normalizeBlacklistText(existingText)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toMutableList()
+        val existingTokens = lines.mapNotNull { normalizeBlacklistEntry(it.substringBefore("#")) }.toMutableSet()
+        normalizeBlacklistText(newEntriesText).lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { line ->
+                val token = normalizeBlacklistEntry(line.substringBefore("#")) ?: return@forEach
+                val comment = line.substringAfter("#", "").trim()
+                if (existingTokens.add(token)) {
+                    lines.add(if (comment.isNotEmpty()) "$token #$comment" else token)
+                }
+            }
+        return lines.joinToString("\n")
+    }
+
+    fun removeBlacklistTokens(existingText: String, tokensToRemove: Set<String>): String {
+        val normalizedRemove = tokensToRemove.mapNotNull { normalizeBlacklistEntry(it) }.toSet()
+        if (normalizedRemove.isEmpty()) return normalizeBlacklistText(existingText)
+        return normalizeBlacklistText(existingText)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { line ->
+                val token = normalizeBlacklistEntry(line.substringBefore("#"))
+                token == null || token !in normalizedRemove
+            }
+            .joinToString("\n")
+    }
+
     fun extractDcconRefs(html: String): List<DcconRef> {
         if (html.isBlank() || !html.contains("dccon.php", ignoreCase = true)) return emptyList()
         val doc = Jsoup.parseBodyFragment(html)

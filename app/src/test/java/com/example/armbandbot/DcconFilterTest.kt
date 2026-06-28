@@ -143,4 +143,32 @@ class DcconFilterTest {
         assertEquals(listOf("광고이미지"), DcconFilter.extractImageAltRefs(html))
         assertEquals(listOf("DCON"), DcconFilter.extractDcconRefs(html).map { it.token })
     }
+
+    @Test
+    fun parsesMobileAndDesktopPostUrlsIntoDesktopLocators() {
+        assertEquals(
+            DcPostLocator("laboratory1", "2284", "M", "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2284"),
+            DcinsidePostUrls.parsePostLocator("https://m.dcinside.com/board/laboratory1/2284")
+        )
+        assertEquals(
+            DcPostLocator("baseball_new11", "123", "G", "https://gall.dcinside.com/board/view/?id=baseball_new11&no=123"),
+            DcinsidePostUrls.parsePostLocator("https://gall.dcinside.com/board/view/?id=baseball_new11&no=123")
+        )
+        assertEquals(
+            DcPostLocator("miniroom", "55", "MI", "https://gall.dcinside.com/mini/board/view/?id=miniroom&no=55"),
+            DcinsidePostUrls.parsePostLocator("https://gall.dcinside.com/mini/board/view/?id=miniroom&no=55")
+        )
+    }
+
+    @Test
+    fun buildsDcconImageUrlAndEditsBlacklistTokenListsWithoutLosingComments() {
+        assertEquals("https://dcimg5.dcinside.com/dccon.php?no=ABC123", DcconFilter.buildImageUrl("ABC123"))
+
+        val original = "ABC123 #기존\nDEF456 #다른콘"
+        val added = DcconFilter.addBlacklistEntries(original, "https://dcimg5.dcinside.com/dccon.php?no=ABC123\nGHI789")
+        assertEquals("ABC123 #기존\nDEF456 #다른콘\nGHI789", added)
+
+        val removed = DcconFilter.removeBlacklistTokens(added, setOf("DEF456", "GHI789"))
+        assertEquals("ABC123 #기존", removed)
+    }
 }
