@@ -141,6 +141,24 @@ class DcconFilterTest {
     }
 
     @Test
+    fun parsesPackageDetailUnicodeEscapedKoreanTitle() {
+        val json = """
+            {
+              "info": {"package_idx":"27107", "title":"\u005cud551\u005cuad6c\u005cucf58", "icon_cnt":"1"},
+              "detail": [
+                {"title":"1", "path":"TOKEN1"}
+              ]
+            }
+        """.trimIndent()
+
+        val detail = DcconFilter.parsePackageDetailJson(json)
+        val merged = DcconFilter.addSingleTokenWithPackageTitle("", "TOKEN1", detail)
+
+        assertEquals("핑구콘", detail!!.title)
+        assertEquals("TOKEN1 #핑구콘", merged)
+    }
+
+    @Test
     fun packageMergeUpdatesExistingUngroupedTokenWithoutCreatingDuplicates() {
         val detail = DcconPackageDetail("27107", "핑구콘", listOf("TOKEN1", "TOKEN2", "TOKEN3"))
 

@@ -302,25 +302,14 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
     val activeWebViewUrl = webViewUrl
     if (activeWebViewUrl != null) {
-        AlertDialog(
-            onDismissRequest = { webViewUrl = null },
-            title = { Text("원문 바로가기", fontWeight = FontWeight.Bold) },
-            text = {
-                AndroidView(
-                    modifier = Modifier.fillMaxWidth().height(520.dp),
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            webViewClient = WebViewClient()
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            loadUrl(activeWebViewUrl)
-                        }
-                    },
-                    update = { it.loadUrl(activeWebViewUrl) }
-                )
-            },
-            confirmButton = { TextButton(onClick = { webViewUrl = null }) { Text("닫기") } }
+        FullScreenPostWebView(
+            url = activeWebViewUrl,
+            isDarkMode = isDarkMode,
+            textColor = textColor,
+            topBarColor = topBarColor,
+            onBack = { webViewUrl = null }
         )
+        return@DbDashboardScreen
     }
 
     Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
@@ -590,6 +579,54 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 }
 
 @Composable
+private fun FullScreenPostWebView(
+    url: String,
+    isDarkMode: Boolean,
+    textColor: Color,
+    topBarColor: Color,
+    onBack: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize().background(if (isDarkMode) Color(0xFF121212) else Color.White)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(topBarColor)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.ArrowBack,
+                contentDescription = "뒤로",
+                modifier = Modifier.clickable { onBack() }.padding(end = 16.dp),
+                tint = PastelNavy
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("원문 열기", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
+                Text(url, fontSize = 11.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    webViewClient = WebViewClient()
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    settings.builtInZoomControls = true
+                    settings.displayZoomControls = false
+                    loadUrl(url)
+                }
+            },
+            update = { webView ->
+                if (webView.url != url) webView.loadUrl(url)
+            }
+        )
+    }
+}
+
+@Composable
 private fun SwipeDeleteDbRow(
     rowKey: String,
     isOpen: Boolean,
@@ -600,9 +637,10 @@ private fun SwipeDeleteDbRow(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val buttonSize = 58.dp
+    val buttonWidth = 76.dp
+    val buttonHeight = 58.dp
     val buttonGap = 8.dp
-    val maxSwipePx = with(density) { -((buttonSize * 2) + buttonGap * 3).toPx() }
+    val maxSwipePx = with(density) { -((buttonWidth * 2) + buttonGap * 3).toPx() }
     val swipeOffset = remember(rowKey) { androidx.compose.animation.core.Animatable(0f) }
 
     LaunchedEffect(isOpen) {
@@ -619,21 +657,21 @@ private fun SwipeDeleteDbRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(buttonSize)
+                    .size(buttonWidth, buttonHeight)
                     .clip(RoundedCornerShape(12.dp))
                     .background(PastelNavy)
                     .clickable { onOpenLinkClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.OpenInNew, contentDescription = "열기", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.OpenInNew, contentDescription = "원문 열기", tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("열기", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("원문 열기", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Box(
                 modifier = Modifier
-                    .size(buttonSize)
+                    .size(buttonWidth, buttonHeight)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFFD32F2F))
                     .clickable { onDeleteClick() },

@@ -373,31 +373,51 @@ object DcconFilter {
         val quote = jsonObject.indexOf('"', colon + 1)
         if (quote < 0) return null
         val out = StringBuilder()
-        var escaped = false
-        for (i in quote + 1 until jsonObject.length) {
+        var i = quote + 1
+        while (i < jsonObject.length) {
             val ch = jsonObject[i]
-            if (escaped) {
-                out.append(
-                    when (ch) {
-                        '"' -> '"'
-                        '\\' -> '\\'
-                        '/' -> '/'
-                        'n' -> '\n'
-                        'r' -> '\r'
-                        't' -> '\t'
-                        else -> ch
+            if (ch == '"') {
+                return decodeJsonUnicodeEscapes(out.toString())
+            }
+            if (ch == '\\') {
+                val escaped = jsonObject.getOrNull(i + 1) ?: return null
+                when (escaped) {
+                    '"' -> out.append('"')
+                    '\\' -> out.append('\\')
+                    '/' -> out.append('/')
+                    'b' -> out.append('\b')
+                    'f' -> out.append('\u000C')
+                    'n' -> out.append('\n')
+                    'r' -> out.append('\r')
+                    't' -> out.append('\t')
+                    'u' -> {
+                        if (i + 6 > jsonObject.length) return null
+                        val hex = jsonObject.substring(i + 2, i + 6)
+                        val code = hex.toIntOrNull(16) ?: return null
+                        out.append(code.toChar())
+                        i += 4
                     }
-                )
-                escaped = false
-            } else if (ch == '\\') {
-                escaped = true
-            } else if (ch == '"') {
-                return out.toString()
+                    else -> out.append(escaped)
+                }
+                i += 2
             } else {
                 out.append(ch)
+                i += 1
             }
         }
         return null
+    }
+
+    private fun decodeJsonUnicodeEscapes(value: String): String {
+        var decoded = value
+        repeat(2) {
+            val next = Regex("""\\+u([0-9a-fA-F]{4})""").replace(decoded) { match ->
+                match.groupValues[1].toInt(16).toChar().toString()
+            }
+            if (next == decoded) return decoded
+            decoded = next
+        }
+        return decoded
     }
 
     private fun decodeHtmlAndUrl(value: String): String {
