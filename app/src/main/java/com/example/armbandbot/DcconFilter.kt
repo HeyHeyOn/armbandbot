@@ -22,6 +22,13 @@ data class DcconPackageDetail(
     val tokens: List<String>
 )
 
+data class DcconBlacklistGroup(
+    val packageName: String,
+    val tokens: List<String>,
+    val representativeToken: String,
+    val isUngrouped: Boolean = false
+)
+
 object DcconFilter {
     private const val MIN_PREFIX_MATCH_LENGTH = 40
     private val dcconUrlPattern = Regex("""(?:https?:)?//[^\\\s'"<>]+/dccon\.php\?[^\\\s'"<>]*no=([^&\\\s'"<>]+)[^\\\s'"<>]*|(?:^|[^A-Za-z0-9_./-])(dccon\.php\?[^\\\s'"<>]*no=([^&\\\s'"<>]+)[^\\\s'"<>]*)""")
@@ -142,6 +149,39 @@ object DcconFilter {
                 token == null || token !in normalizedRemove
             }
             .joinToString("\n")
+    }
+
+    fun groupBlacklistEntries(text: String): List<DcconBlacklistGroup> {
+        val groupedTokens = linkedMapOf<String, MutableList<String>>()
+        normalizeBlacklistText(text)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { line ->
+                val token = normalizeBlacklistEntry(line.substringBefore("#")) ?: return@forEach
+                val packageName = line.substringAfter("#", "")
+                    .trim()
+                    .ifBlank { "개별 디시콘" }
+                groupedTokens.getOrPut(packageName) { mutableListOf() }.add(token)
+            }
+        return groupedTokens.map { (packageName, tokens) ->
+            val distinctTokens = tokens.distinct()
+            DcconBlacklistGroup(
+                packageName = packageName,
+                tokens = distinctTokens,
+                representativeToken = distinctTokens.first(),
+                isUngrouped = packageName == "개별 디시콘"
+            )
+        }
+    }
+
+    fun toggleVisibleTokenSelection(
+        currentSelection: Set<String>,
+        visibleTokens: List<String>,
+        selectAll: Boolean
+    ): Set<String> {
+        val normalizedVisible = visibleTokens.mapNotNull { normalizeBlacklistEntry(it) }.toSet()
+        return if (selectAll) currentSelection + normalizedVisible else currentSelection - normalizedVisible
     }
 
     fun extractDcconRefs(html: String): List<DcconRef> {

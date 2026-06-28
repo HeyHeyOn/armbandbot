@@ -171,4 +171,37 @@ class DcconFilterTest {
         val removed = DcconFilter.removeBlacklistTokens(added, setOf("DEF456", "GHI789"))
         assertEquals("ABC123 #기존", removed)
     }
+
+    @Test
+    fun groupsBlockedDcconsByPackageNameCommentWithRepresentativeToken() {
+        val text = """
+            PINGU1 #핑구콘
+            SOLO1
+            PINGU2 #핑구콘
+            MOYA1 #뭐야콘
+        """.trimIndent()
+
+        val groups = DcconFilter.groupBlacklistEntries(text)
+
+        assertEquals(listOf("핑구콘", "개별 디시콘", "뭐야콘"), groups.map { it.packageName })
+        assertEquals(listOf("PINGU1", "PINGU2"), groups[0].tokens)
+        assertEquals("PINGU1", groups[0].representativeToken)
+        assertFalse(groups[0].isUngrouped)
+        assertEquals(listOf("SOLO1"), groups[1].tokens)
+        assertTrue(groups[1].isUngrouped)
+    }
+
+    @Test
+    fun togglesAllVisibleDcconTokensWithoutLosingOtherSelections() {
+        val visibleTokens = listOf("A", "B", "C")
+
+        assertEquals(
+            setOf("OLD", "A", "B", "C"),
+            DcconFilter.toggleVisibleTokenSelection(currentSelection = setOf("OLD", "A"), visibleTokens = visibleTokens, selectAll = true)
+        )
+        assertEquals(
+            setOf("OLD"),
+            DcconFilter.toggleVisibleTokenSelection(currentSelection = setOf("OLD", "A", "B"), visibleTokens = visibleTokens, selectAll = false)
+        )
+    }
 }
