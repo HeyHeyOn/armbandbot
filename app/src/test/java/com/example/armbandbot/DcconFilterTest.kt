@@ -90,4 +90,57 @@ class DcconFilterTest {
         assertNull(DcconFilter.findBlockedDccon(html, listOf("ABC")))
         assertFalse(DcconFilter.tokensMatch("ABC", "ABCDEF"))
     }
+
+    @Test
+    fun extractsDcconRefsFromDcinsideCommentApiMemos() {
+        val json = """
+            {
+              "comments": [
+                {"no":"1","memo":"<img class=\\\"written_dccon \\\" src=\\\"https:\\\\/\\\\/dcimg5.dcinside.com\\\\/dccon.php?no=COMMENT1\\\" alt=\\\"찐\\\">"},
+                {"no":"2","memo":"<span>일반 댓글</span>"},
+                {"no":"3","memo":"<video class=\\\"written_dccon\\\" data-src=\\\"https:\\\\/\\\\/dcimg5.dcinside.com\\\\/dccon.php?no=COMMENT2\\\" title=\\\"움짤\\\"></video>"}
+              ]
+            }
+        """.trimIndent()
+
+        val refs = DcconFilter.extractDcconRefsFromCommentApiJson(json)
+
+        assertEquals(listOf("COMMENT1", "COMMENT2"), refs.map { it.token })
+        assertEquals(listOf("comment:1", "comment:3"), refs.map { it.source })
+    }
+
+    @Test
+    fun parsesPackageDetailJsonAndExpandsAllTokensForBlacklist() {
+        val json = """
+            {
+              "info": {"package_idx":"27107", "title":"핑구콘", "icon_cnt":"2"},
+              "detail": [
+                {"title":"1", "path":"TOKEN1"},
+                {"title":"2", "path":"TOKEN2"},
+                {"title":"중복", "path":"TOKEN1"}
+              ]
+            }
+        """.trimIndent()
+
+        val detail = DcconFilter.parsePackageDetailJson(json)
+        val merged = DcconFilter.mergePackageTokensIntoBlacklist("TOKEN0 #기존", detail!!)
+
+        assertEquals("27107", detail.packageIdx)
+        assertEquals("핑구콘", detail.title)
+        assertEquals(listOf("TOKEN1", "TOKEN2"), detail.tokens)
+        assertEquals("TOKEN0 #기존\nTOKEN1 #핑구콘\nTOKEN2 #핑구콘", merged)
+    }
+
+    @Test
+    fun extractsImageAltsWithoutDcconImagesSeparatelyFromDcconUrls() {
+        val html = """
+            <div class="write_div">
+                <img src="normal.jpg" alt="광고이미지">
+                <img class="written_dccon" src="https://dcimg5.dcinside.com/dccon.php?no=DCON" alt="디시콘라벨" conalt="디시콘라벨">
+            </div>
+        """.trimIndent()
+
+        assertEquals(listOf("광고이미지"), DcconFilter.extractImageAltRefs(html))
+        assertEquals(listOf("DCON"), DcconFilter.extractDcconRefs(html).map { it.token })
+    }
 }

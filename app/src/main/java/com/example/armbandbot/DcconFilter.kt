@@ -16,9 +16,15 @@ data class DcconMatch(
     val blacklistToken: String
 )
 
+data class DcconPackageDetail(
+    val packageIdx: String,
+    val title: String,
+    val tokens: List<String>
+)
+
 object DcconFilter {
     private const val MIN_PREFIX_MATCH_LENGTH = 40
-    private val dcconUrlPattern = Regex("(?:https?:)?//[^\\s'\"<>]+/dccon\\.php\\?[^\\s'\"<>]*no=([^&\\s'\"<>]+)[^\\s'\"<>]*|(?:^|[^A-Za-z0-9_./-])(dccon\\.php\\?[^\\s'\"<>]*no=([^&\\s'\"<>]+)[^\\s'\"<>]*)")
+    private val dcconUrlPattern = Regex("""(?:https?:)?//[^\\\s'"<>]+/dccon\.php\?[^\\\s'"<>]*no=([^&\\\s'"<>]+)[^\\\s'"<>]*|(?:^|[^A-Za-z0-9_./-])(dccon\.php\?[^\\\s'"<>]*no=([^&\\\s'"<>]+)[^\\\s'"<>]*)""")
     private val tokenCharsPattern = Regex("^[A-Za-z0-9._%+=:-]+$")
 
     fun normalizeBlacklistEntry(entry: String): String? {
@@ -28,6 +34,76 @@ object DcconFilter {
         return trimmed
             .takeIf { it.matches(tokenCharsPattern) }
             ?.let { decodeHtmlAndUrl(it) }
+    }
+
+    fun normalizeBlacklistText(text: String): String = text
+        .lineSequence()
+        .map { raw ->
+            val comment = raw.substringAfter("#", "").trim()
+            val token = normalizeBlacklistEntry(raw.substringBefore("#")) ?: raw.substringBefore("#").trim()
+            if (comment.isNotEmpty()) "$token #$comment" else token
+        }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .joinToString("\n")
+
+    fun extractImageAltRefs(html: String): List<String> {
+        if (html.isBlank()) return emptyList()
+        val doc = Jsoup.parseBodyFragment(html)
+        return doc.select(".write_div img, img")
+            .filterNot { isDcconElement(it) }
+            .mapNotNull { it.attr("alt").takeIf { alt -> alt.isNotBlank() } }
+            .distinct()
+    }
+
+    fun extractDcconRefsFromCommentApiJson(json: String): List<DcconRef> {
+        if (json.isBlank() || !json.contains("dccon.php", ignoreCase = true)) return emptyList()
+        val refs = linkedMapOf<String, DcconRef>()
+        val commentObjectPattern = Regex("\\{[^{}]*\\\"memo\\\"\\s*:\\s*\\\"", RegexOption.DOT_MATCHES_ALL)
+        commentObjectPattern.findAll(json).forEach { startMatch ->
+            val objectStart = startMatch.range.first
+            val objectEnd = findJsonObjectEnd(json, objectStart) ?: return@forEach
+            val commentObject = json.substring(objectStart, objectEnd + 1)
+            val commentNo = extractJsonStringField(commentObject, "no").orEmpty()
+            val memo = extractJsonStringField(commentObject, "memo").orEmpty()
+            extractDcconRefs(memo).forEach { ref ->
+                refs.putIfAbsent(
+                    ref.token,
+                    ref.copy(source = "comment:${commentNo.ifBlank { refs.size.toString() }}")
+                )
+            }
+        }
+        return refs.values.toList()
+    }
+
+    fun parsePackageDetailJson(json: String): DcconPackageDetail? {
+        if (json.isBlank() || json.trim() == "error") return null
+        val infoObject = extractJsonObject(json, "info") ?: return null
+        val packageIdx = extractJsonStringField(infoObject, "package_idx")?.takeIf { it.isNotBlank() } ?: return null
+        val title = extractJsonStringField(infoObject, "title")?.ifBlank { "디시콘 세트" } ?: "디시콘 세트"
+        val detailArray = extractJsonArray(json, "detail") ?: return null
+        val tokens = linkedSetOf<String>()
+        Regex("\\{[^{}]*\\}", RegexOption.DOT_MATCHES_ALL).findAll(detailArray).forEach { match ->
+            val token = extractJsonStringField(match.value, "path").orEmpty()
+            normalizeBlacklistEntry(token)?.let { tokens.add(it) }
+        }
+        if (tokens.isEmpty()) return null
+        return DcconPackageDetail(packageIdx, title, tokens.toList())
+    }
+
+    fun mergePackageTokensIntoBlacklist(existingText: String, packageDetail: DcconPackageDetail): String {
+        val lines = normalizeBlacklistText(existingText)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toMutableList()
+        val existingTokens = lines.mapNotNull { normalizeBlacklistEntry(it.substringBefore("#")) }.toMutableSet()
+        packageDetail.tokens.forEach { token ->
+            if (existingTokens.add(token)) {
+                lines.add("$token #${packageDetail.title}")
+            }
+        }
+        return lines.joinToString("\n")
     }
 
     fun extractDcconRefs(html: String): List<DcconRef> {
@@ -88,7 +164,7 @@ object DcconFilter {
     private fun extractTokenFromText(text: String): String? {
         if (!text.contains("dccon.php", ignoreCase = true)) return null
         val normalized = text.replace("&amp;", "&")
-        Regex("(?:[?&]|&amp;)no=([^&\\s'\"<>]+)", RegexOption.IGNORE_CASE).find(normalized)?.let {
+        Regex("""(?:[?&]|&amp;)no=([^&\\\s'"<>]+)""", RegexOption.IGNORE_CASE).find(normalized)?.let {
             return decodeHtmlAndUrl(it.groupValues[1])
         }
         val match = dcconUrlPattern.find(normalized) ?: return null
@@ -108,11 +184,116 @@ object DcconFilter {
             protocolRelativeStart >= 0 -> protocolRelativeStart
             else -> start
         }
-        val end = normalized.indexOfAny(charArrayOf('\'', '"', '<', '>', ' ', '\n', '\r', '\t'), prefixStart).let { if (it < 0) normalized.length else it }
+        val end = normalized.indexOfAny(charArrayOf('\\', '\'', '"', '<', '>', ' ', '\n', '\r', '\t'), prefixStart).let { if (it < 0) normalized.length else it }
         return normalized.substring(prefixStart, end).trimStart('(', ',', ' ')
     }
 
+    private fun isDcconElement(element: org.jsoup.nodes.Element): Boolean {
+        val src = listOf("src", "data-src").joinToString(" ") { element.attr(it) }
+        return element.hasClass("written_dccon") ||
+                src.contains("dccon.php", ignoreCase = true) ||
+                element.hasAttr("conalt") ||
+                element.hasAttr("data-dcconoverstatus")
+    }
+
     private fun firstNonBlank(vararg values: String): String? = values.firstOrNull { it.isNotBlank() }
+
+    private fun extractJsonObject(json: String, field: String): String? {
+        val key = "\"$field\""
+        val keyIndex = json.indexOf(key)
+        if (keyIndex < 0) return null
+        val objectStart = json.indexOf('{', keyIndex)
+        if (objectStart < 0) return null
+        val objectEnd = findJsonObjectEnd(json, objectStart) ?: return null
+        return json.substring(objectStart, objectEnd + 1)
+    }
+
+    private fun extractJsonArray(json: String, field: String): String? {
+        val key = "\"$field\""
+        val keyIndex = json.indexOf(key)
+        if (keyIndex < 0) return null
+        val arrayStart = json.indexOf('[', keyIndex)
+        if (arrayStart < 0) return null
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in arrayStart until json.length) {
+            val ch = json[i]
+            if (escaped) {
+                escaped = false
+            } else if (ch == '\\') {
+                escaped = true
+            } else if (ch == '"') {
+                inString = !inString
+            } else if (!inString) {
+                if (ch == '[') depth++
+                if (ch == ']') {
+                    depth--
+                    if (depth == 0) return json.substring(arrayStart, i + 1)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun findJsonObjectEnd(json: String, objectStart: Int): Int? {
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in objectStart until json.length) {
+            val ch = json[i]
+            if (escaped) {
+                escaped = false
+            } else if (ch == '\\') {
+                escaped = true
+            } else if (ch == '"') {
+                inString = !inString
+            } else if (!inString) {
+                if (ch == '{') depth++
+                if (ch == '}') {
+                    depth--
+                    if (depth == 0) return i
+                }
+            }
+        }
+        return null
+    }
+
+    private fun extractJsonStringField(jsonObject: String, field: String): String? {
+        val key = "\"$field\""
+        val keyIndex = jsonObject.indexOf(key)
+        if (keyIndex < 0) return null
+        val colon = jsonObject.indexOf(':', keyIndex + key.length)
+        if (colon < 0) return null
+        val quote = jsonObject.indexOf('"', colon + 1)
+        if (quote < 0) return null
+        val out = StringBuilder()
+        var escaped = false
+        for (i in quote + 1 until jsonObject.length) {
+            val ch = jsonObject[i]
+            if (escaped) {
+                out.append(
+                    when (ch) {
+                        '"' -> '"'
+                        '\\' -> '\\'
+                        '/' -> '/'
+                        'n' -> '\n'
+                        'r' -> '\r'
+                        't' -> '\t'
+                        else -> ch
+                    }
+                )
+                escaped = false
+            } else if (ch == '\\') {
+                escaped = true
+            } else if (ch == '"') {
+                return out.toString()
+            } else {
+                out.append(ch)
+            }
+        }
+        return null
+    }
 
     private fun decodeHtmlAndUrl(value: String): String {
         val htmlDecoded = value.replace("&amp;", "&").trim()
