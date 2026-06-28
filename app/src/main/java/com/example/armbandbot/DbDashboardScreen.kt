@@ -510,7 +510,13 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text("작성자: ${history.targetAuthor}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = subTextColor)
-                                    Text(history.targetContent, fontSize = 13.sp, color = textColor, modifier = Modifier.padding(vertical = 4.dp).background(if(isDarkMode) Color(0xFF4E342E) else Color.White, RoundedCornerShape(4.dp)).padding(8.dp).fillMaxWidth())
+                                    DashboardDcconContentPreview(
+                                        content = history.targetContent,
+                                        textColor = textColor,
+                                        subTextColor = subTextColor,
+                                        backgroundColor = if(isDarkMode) Color(0xFF4E342E) else Color.White,
+                                        modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()
+                                    )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         detailedReason,
@@ -559,7 +565,13 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                             }
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text("작성자: ${history.targetAuthor}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = subTextColor)
-                                            Text(history.targetContent, fontSize = 13.sp, color = textColor, modifier = Modifier.padding(vertical = 4.dp).background(if(isDarkMode) Color(0xFF4A3420) else Color.White, RoundedCornerShape(4.dp)).padding(8.dp).fillMaxWidth())
+                                            DashboardDcconContentPreview(
+                                                content = history.targetContent,
+                                                textColor = textColor,
+                                                subTextColor = subTextColor,
+                                                backgroundColor = if(isDarkMode) Color(0xFF4A3420) else Color.White,
+                                                modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()
+                                            )
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(history.holdReason, fontSize = 12.sp, color = holdOrange, fontWeight = FontWeight.Bold)
                                             Divider(color = if(isDarkMode) Color(0xFF6D4C20) else Color(0xFFFFD8A8), modifier = Modifier.padding(vertical = 6.dp))
@@ -577,6 +589,40 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     PullRefreshIndicator(refreshing = isHoldRefreshing, state = holdPullRefreshState, modifier = Modifier.align(Alignment.TopCenter), contentColor = holdOrange)
                 } // end holdPullRefreshBox
             }
+        }
+    }
+}
+
+@Composable
+private fun DashboardDcconContentPreview(
+    content: String,
+    textColor: Color,
+    subTextColor: Color,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val dcconItems = remember(content) { DcconFilter.dashboardDcconPreviewItems(content) }
+    val strippedText = remember(content) { DcconFilter.stripDcconHtmlForDashboard(content) }
+    Column(
+        modifier = modifier
+            .background(backgroundColor, RoundedCornerShape(4.dp))
+            .padding(8.dp)
+    ) {
+        if (dcconItems.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                items(dcconItems, key = { it.token }) { item ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp)) {
+                        DcconPreviewImage(item.token, modifier = Modifier.size(64.dp))
+                        Text(item.packageName, fontSize = 10.sp, color = subTextColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            if (strippedText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(strippedText, fontSize = 13.sp, color = textColor, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+        } else {
+            Text(content, fontSize = 13.sp, color = textColor)
         }
     }
 }

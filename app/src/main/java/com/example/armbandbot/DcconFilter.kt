@@ -373,6 +373,20 @@ object DcconFilter {
         return refs
     }
 
+    fun dashboardDcconPreviewItems(text: String): List<DcconPreviewItem> = extractDcconRefsForDisplay(text)
+        .map { ref ->
+            val packageName = ref.label?.takeIf { it.isNotBlank() } ?: "디시콘"
+            DcconPreviewItem(ref.token, packageName, buildImageUrl(ref.token))
+        }
+
+    fun stripDcconHtmlForDashboard(text: String): String {
+        if (text.isBlank()) return ""
+        if (!text.contains("dccon.php", ignoreCase = true) && !text.contains("written_dccon", ignoreCase = true)) return text.trim()
+        val doc = Jsoup.parseBodyFragment(text)
+        doc.select("img.written_dccon, video.written_dccon, source[src*=dccon.php], img[src*=dccon.php], video[data-src*=dccon.php]").remove()
+        return doc.body().text().trim()
+    }
+
     fun findBlockedDccon(html: String, blacklist: List<String>): DcconMatch? {
         val tokens = blacklist.mapNotNull { normalizeBlacklistEntry(it) }
         if (tokens.isEmpty()) return null

@@ -25,6 +25,22 @@ class DcconFilterTest {
     }
 
     @Test
+    fun dashboardDcconPreviewItemsConvertSavedHtmlWithoutShowingRawImgTag() {
+        val html = """
+            <img class="written_dccon " src="https://dcimg5.dcinside.com/dccon.php?no=62b5df2be09d3ca567b1c5bc12d46b394aa3b1058c6e4d0ca41648b658e820775f41d8d0ca6079a0800f01ce0219382a3cf6132245765fdc52e2cd0b6c30aebb7132eae341260613aed562c9461d09c0047e77ea2a4c" conalt="3" alt="3" title="3">
+        """.trimIndent()
+
+        val items = DcconFilter.dashboardDcconPreviewItems(html)
+        val stripped = DcconFilter.stripDcconHtmlForDashboard(html)
+
+        assertEquals(1, items.size)
+        assertEquals("3", items.first().packageName)
+        assertTrue(items.first().imageUrl.contains("dccon.php?no="))
+        assertFalse(stripped.contains("<img"))
+        assertFalse(stripped.contains("dccon.php"))
+    }
+
+    @Test
     fun extractsVideoDcconDataSrcAndNestedSourceTokensFromCommentMemo() {
         val html = """
             <video class="written_dccon" data-src="https://dcimg5.dcinside.com/dccon.php?no=VIDEOBASE" conalt="7" alt="7" title="7">

@@ -112,7 +112,7 @@ private fun fetchDcconPackageDetail(tokenOrUrl: String): DcconPackageDetail? {
 }
 
 @Composable
-private fun DcconPreviewImage(tokenOrUrl: String, modifier: Modifier = Modifier) {
+fun DcconPreviewImage(tokenOrUrl: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     AsyncImage(
         model = ImageRequest.Builder(context)
@@ -2062,6 +2062,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             val visibleAlts = draftRefs.map { it.alt }
             val allSelected = visibleAlts.isNotEmpty() && visibleAlts.all { it in selectedImageAlts }
             AlertDialog(
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+                modifier = Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.88f),
                 containerColor = dialogBgColor, titleContentColor = textColor, textContentColor = textColor,
                 onDismissRequest = { isImageAltBlacklistDialogOpen = false },
                 title = { Text("차단할 이미지 alt값 (${draftRefs.size}개)", fontWeight = FontWeight.Bold) },
@@ -2154,7 +2156,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         if (draftRefs.isEmpty()) {
                             Text("등록된 이미지 alt값이 없습니다.", color = subTextColor, modifier = Modifier.padding(vertical = 24.dp))
                         } else {
-                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
                                 items(draftRefs.size) { index ->
                                     val ref = draftRefs[index]
                                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2282,6 +2284,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             val visibleTokens = activeGroup?.tokens ?: draftGroups.flatMap { it.tokens }
             val allVisibleSelected = visibleTokens.isNotEmpty() && visibleTokens.all { it in selectedDcconTokens }
             AlertDialog(
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+                modifier = Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.88f),
                 containerColor = dialogBgColor, titleContentColor = textColor, textContentColor = textColor,
                 onDismissRequest = { isDcconBlacklistDialogOpen = false },
                 title = {
@@ -2393,7 +2397,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         if (draftGroups.isEmpty()) {
                             Text("등록된 디시콘이 없습니다.", color = subTextColor, modifier = Modifier.padding(vertical = 24.dp))
                         } else if (activeGroup == null) {
-                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
                                 items(draftGroups.size) { index ->
                                     val group = draftGroups[index]
                                     val checked = group.tokens.all { it in selectedDcconTokens }
@@ -2425,7 +2429,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 }
                             }
                         } else {
-                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
                                 items(activeGroup.tokens.size) { index ->
                                     val token = activeGroup.tokens[index]
                                     val checked = token in selectedDcconTokens
