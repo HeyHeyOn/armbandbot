@@ -50,7 +50,9 @@ import androidx.compose.ui.zIndex
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
 import com.heyheyon.armbandbot.ui.botColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import kotlin.math.roundToInt
 
@@ -97,6 +99,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     var pendingExportBotId by remember { mutableStateOf<String?>(null) }
     var showDbDashboard by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -124,6 +127,19 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
             Toast.makeText(context, "JSON 설정 파일을 저장했습니다.", Toast.LENGTH_SHORT).show()
         }.onFailure {
             Toast.makeText(context, it.message ?: "JSON 설정 파일 저장에 실패했습니다.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val dbBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { backupDatabaseToUri(context, uri) }
+            }.onSuccess { count ->
+                Toast.makeText(context, "DB 백업을 저장했습니다. (${count}개 파일)", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, it.message ?: "DB 백업에 실패했습니다.", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -168,9 +184,13 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                         Icon(Icons.Filled.FileDownload, contentDescription = "불러오기", tint = actionIconColor, modifier = Modifier.size(30.dp))
                         Text("불러오기", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { showDbDashboard = true }.padding(vertical = 2.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(64.dp).clip(RoundedCornerShape(12.dp)).clickable { showDbDashboard = true }.padding(vertical = 2.dp)) {
                         Icon(Icons.Filled.Save, contentDescription = "DB", tint = actionIconColor, modifier = Modifier.size(30.dp))
                         Text("DB", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { dbBackupLauncher.launch(defaultDatabaseBackupFileName()) }.padding(vertical = 2.dp)) {
+                        Icon(Icons.Filled.FileDownload, contentDescription = "DB 백업", tint = actionIconColor, modifier = Modifier.size(30.dp))
+                        Text("DB 백업", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { onThemeToggle(!isDarkMode) }.padding(vertical = 2.dp)) {
                         Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(30.dp))

@@ -1,3 +1,26 @@
+## 1.4.4-beta2 배포 완료
+
+### 주요 변화
+- DB 스키마 6→7, 7→8 마이그레이션을 추가해 업데이트 시 기존 DB 기록이 삭제되지 않도록 수정했습니다.
+  - 7→8에서는 `block_history.targetNo` 컬럼을 기본값과 함께 추가합니다.
+  - 기존 `fallbackToDestructiveMigration()`을 제거해 이후 마이그레이션 누락 시 조용히 DB를 삭제하지 않게 했습니다.
+- 하단 메뉴에 `DB 백업` 기능을 추가했습니다.
+  - 앱의 `bot_database`, `bot_database-wal`, `bot_database-shm` 파일을 ZIP으로 저장합니다.
+  - 저장 위치는 Android 파일 저장 창에서 사용자가 직접 선택합니다.
+- DB 백업 ZIP 생성과 마이그레이션 SQL 회귀 테스트를 추가했습니다.
+
+### 검증
+- `./gradlew.bat testDebugUnitTest --tests 'com.heyheyon.armbandbot.DatabaseBackupTest'` 성공.
+- `./gradlew.bat testDebugUnitTest assembleRelease` 성공.
+
+### 빌드 정보
+- versionCode = 136
+- versionName = 1.4.4-beta2
+- APK: `완장봇_v1.4.4-beta2.apk`
+- SHA256: `aa8d71ade9715a3ac2af29bde8b234e66a4140a963da70408ff1eca77d9131d8`
+- Google Drive file ID: `183FXeTvzNe1zDjbIKAf2lGQfVMnR-BI9`
+- Google Drive link: https://drive.google.com/file/d/183FXeTvzNe1zDjbIKAf2lGQfVMnR-BI9/view?usp=drivesdk
+
 ## 1.4.4-beta1 배포 완료
 
 ### 주요 변화

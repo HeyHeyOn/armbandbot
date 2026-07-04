@@ -2,6 +2,8 @@ package com.heyheyon.armbandbot
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Entity(
     tableName = "checked_posts",
@@ -273,6 +275,43 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
 
     companion object {
+        const val CREATE_HOLD_HISTORY_SQL = """
+            CREATE TABLE IF NOT EXISTS `hold_history` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `gallType` TEXT NOT NULL,
+                `gallId` TEXT NOT NULL,
+                `postNum` TEXT NOT NULL,
+                `targetType` TEXT NOT NULL,
+                `targetNo` TEXT NOT NULL,
+                `targetAuthor` TEXT NOT NULL,
+                `targetContent` TEXT NOT NULL,
+                `holdReason` TEXT NOT NULL,
+                `holdTime` INTEGER NOT NULL,
+                `snapshotPath` TEXT,
+                `creationDate` TEXT
+            )
+        """
+
+        const val CREATE_HOLD_HISTORY_INDEX_SQL =
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_hold_history_gallType_gallId_postNum_targetType_targetNo` " +
+                "ON `hold_history` (`gallType`, `gallId`, `postNum`, `targetType`, `targetNo`)"
+
+        const val ADD_BLOCK_HISTORY_TARGET_NO_SQL =
+            "ALTER TABLE `block_history` ADD COLUMN `targetNo` TEXT NOT NULL DEFAULT ''"
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(CREATE_HOLD_HISTORY_SQL.trimIndent())
+                db.execSQL(CREATE_HOLD_HISTORY_INDEX_SQL)
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(ADD_BLOCK_HISTORY_TARGET_NO_SQL)
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -283,7 +322,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "bot_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 INSTANCE = instance
                 instance
