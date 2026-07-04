@@ -21,6 +21,13 @@ class DatabaseBackupTest {
     }
 
     @Test
+    fun blockedSnapshotRecordedAtDoesNotUseRegex() {
+        assertEquals(1700000000000L, blockedSnapshotRecordedAtFromName("gall_10_blocked_1700000000000.html"))
+        assertEquals(null, blockedSnapshotRecordedAtFromName("gall_10_blocked_bad.html"))
+        assertEquals(null, blockedSnapshotRecordedAtFromName("gall_10_latest.html"))
+    }
+
+    @Test
     fun defaultBackupFileNameUsesZipExtension() {
         val dir = createTempDir(prefix = "armbandbot-db-backup-test")
         try {

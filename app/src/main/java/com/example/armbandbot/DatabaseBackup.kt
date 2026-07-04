@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
+import org.json.JSONObject
 import java.io.File
 import java.io.OutputStream
 import java.text.SimpleDateFormat
@@ -454,9 +455,23 @@ private fun snapshotPairCandidate(path: String, initial: Boolean, fallbackTime: 
 
 private fun inferSnapshotTime(path: String, fallbackTime: Long?): Long? {
     val fileName = File(path).name
-    Regex("_blocked_(\\d+)\\.html$").find(fileName)?.groupValues?.getOrNull(1)?.toLongOrNull()?.let { return it }
+    blockedSnapshotRecordedAtFromName(fileName)?.let { return it }
     val fileTime = runCatching { File(path).takeIf { it.exists() }?.lastModified()?.takeIf { it > 0L } }.getOrNull()
     return fileTime ?: fallbackTime
+}
+
+fun blockedSnapshotRecordedAtFromName(fileName: String): Long? {
+    val marker = "_blocked_"
+    val suffix = ".html"
+    if (!fileName.endsWith(suffix)) return null
+    val markerIndex = fileName.lastIndexOf(marker)
+    if (markerIndex < 0) return null
+    val start = markerIndex + marker.length
+    val end = fileName.length - suffix.length
+    if (start >= end) return null
+    val digits = fileName.substring(start, end)
+    if (digits.any { !it.isDigit() }) return null
+    return digits.toLongOrNull()
 }
 
 private fun buildManifestJson(snapshots: List<BackupSnapshotFile>): String {
@@ -482,27 +497,38 @@ private fun buildManifestJson(snapshots: List<BackupSnapshotFile>): String {
 }
 
 private fun parseManifestSnapshots(text: String): List<ManifestSnapshot> {
-    val arrayText = Regex("\"snapshotEntries\"\\s*:\\s*\\[(.*)]", RegexOption.DOT_MATCHES_ALL)
-        .find(text)?.groupValues?.getOrNull(1) ?: return emptyList()
-    return Regex("\\{([^{}]*)}").findAll(arrayText).mapNotNull { match ->
-        val obj = match.groupValues[1]
-        val zipPath = jsonValue(obj, "zipPath") ?: return@mapNotNull null
-        val originalPath = jsonValue(obj, "originalPath") ?: zipPath
-        ManifestSnapshot(
-            zipPath = sanitizeZipPath(zipPath),
-            originalPath = originalPath,
-            gallType = jsonValue(obj, "gallType"),
-            gallId = jsonValue(obj, "gallId"),
-            postNum = jsonValue(obj, "postNum"),
-            kind = jsonValue(obj, "kind"),
-            recordedAt = Regex("\"recordedAt\"\\s*:\\s*(\\d+)").find(obj)?.groupValues?.getOrNull(1)?.toLongOrNull()
-        )
-    }.toList()
+    return runCatching {
+        val root = JSONObject(text)
+        val array = root.optJSONArray("snapshotEntries") ?: return emptyList()
+        buildList {
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i) ?: continue
+                val zipPath = obj.optString("zipPath").takeIf { it.isNotBlank() } ?: continue
+                val originalPath = obj.optString("originalPath").takeIf { it.isNotBlank() } ?: zipPath
+                add(
+                    ManifestSnapshot(
+                        zipPath = sanitizeZipPath(zipPath),
+                        originalPath = originalPath,
+                        gallType = obj.optNullableString("gallType"),
+                        gallId = obj.optNullableString("gallId"),
+                        postNum = obj.optNullableString("postNum"),
+                        kind = obj.optNullableString("kind"),
+                        recordedAt = obj.optNullableLong("recordedAt")
+                    )
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
 }
 
-private fun jsonValue(obj: String, key: String): String? {
-    val raw = Regex("\"${Regex.escape(key)}\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"").find(obj)?.groupValues?.getOrNull(1) ?: return null
-    return raw.replace("\\\"", "\"").replace("\\\\", "\\")
+private fun JSONObject.optNullableString(key: String): String? {
+    if (!has(key) || isNull(key)) return null
+    return optString(key).takeIf { it.isNotBlank() }
+}
+
+private fun JSONObject.optNullableLong(key: String): Long? {
+    if (!has(key) || isNull(key)) return null
+    return runCatching { getLong(key) }.getOrNull()
 }
 
 private fun jsonNullable(value: String?): String = value?.let { "\"${jsonEscape(it)}\"" } ?: "null"

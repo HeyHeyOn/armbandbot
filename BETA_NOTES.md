@@ -1,3 +1,24 @@
+## 1.4.4-beta5 배포 완료
+
+### 주요 변화
+- DB 백업 불러오기 중 `Syntax error in regexp pattern`이 계속 발생할 수 있는 남은 후보를 제거했습니다.
+  - beta4에서 제거한 파일명 정규식 외에, 복원 경로에 남아 있던 `_blocked_(\d+)\.html$` 정규식이 더 유력한 원인이었습니다.
+  - `near index 11`이 맞다면 이 패턴의 `\d` 위치와 맞습니다.
+  - manifest 파싱 정규식도 함께 제거하고 JSON 파서 기반으로 변경했습니다.
+  - 결과적으로 `DatabaseBackup.kt`의 백업/복원 경로에는 `Regex(...)` 사용이 남아 있지 않습니다.
+
+### 검증
+- `./gradlew.bat testDebugUnitTest --tests 'com.heyheyon.armbandbot.DatabaseBackupTest'` 통과
+- `./gradlew.bat testDebugUnitTest assembleRelease` 통과
+
+### 배포 정보
+- versionCode: `139`
+- versionName: `1.4.4-beta5`
+- APK: `완장봇_v1.4.4-beta5.apk`
+- SHA-256: `f3bc693aaca7cc42073791f59e70209e7c8179c1ca59ca5a8be147453bfa6afc`
+- Google Drive file ID: `1rEFXHVoBgErMqHuFF8BRCWoea7JvgwCl`
+- Google Drive link: https://drive.google.com/file/d/1rEFXHVoBgErMqHuFF8BRCWoea7JvgwCl/view?usp=drivesdk
+
 ## 1.4.4-beta4 배포 완료
 
 ### 주요 변화
