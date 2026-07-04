@@ -1459,12 +1459,24 @@ class BotService : Service() {
             if (firstPostNumOfThisPage.isEmpty()) firstPostNumOfThisPage = postNumStr
             val replyBox = row.selectFirst(".reply_numbox")
             val currentCommentCount = replyBox?.text()?.split("/")?.firstOrNull()?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0
-            val savedCommentCount = GlobalBotState.getCommentCount(gallType, gallId, postNumStr)
-            if (savedCommentCount != -1 && savedCommentCount == currentCommentCount) {
-                if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변경 없음 (저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
+            val savedPost = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)
+            val savedCommentCount = savedPost?.commentCount ?: -1
+            val savedTitle = savedPost?.title
+            if (!shouldRecheckPost(savedCommentCount, currentCommentCount, savedTitle, text)) {
+                if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
                 continue
             }
-            if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수 변경 감지 (저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
+            if (config.isDebugMode) {
+                val titleChanged = savedCommentCount != -1 && savedTitle?.trim().orEmpty() != text.trim()
+                val reason = when {
+                    savedCommentCount == -1 -> "신규 글"
+                    savedCommentCount != currentCommentCount && titleChanged -> "댓글 수/제목 변경"
+                    savedCommentCount != currentCommentCount -> "댓글 수 변경"
+                    titleChanged -> "제목 변경"
+                    else -> "변경 감지"
+                }
+                sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
+            }
             try {
                 processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, notifyIfEnabled)
             } catch (e: Exception) {

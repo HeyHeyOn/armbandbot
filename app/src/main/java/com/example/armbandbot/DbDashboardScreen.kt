@@ -254,32 +254,34 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             onDismissRequest = { if (!isBackupImporting) showBackupDialog = false },
             title = { Text("DB 백업", fontWeight = FontWeight.Bold) },
             text = {
-                Text(
-                    if (isBackupImporting) "백업을 불러오는 중입니다..."
-                    else "스냅샷 HTML까지 함께 저장하거나, 다른 버전/양식의 백업 DB를 현재 DB에 병합해서 불러옵니다. 현재 데이터는 전체 덮어쓰기하지 않습니다."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !isBackupImporting,
-                    onClick = {
-                        showBackupDialog = false
-                        dbBackupSaveLauncher.launch(defaultDatabaseBackupFileName())
-                    }
-                ) { Text("백업 저장하기", color = PastelNavy, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BackupDialogPillButton(
+                        text = "백업 저장하기",
                         enabled = !isBackupImporting,
+                        isDarkMode = isDarkMode,
+                        onClick = {
+                            showBackupDialog = false
+                            dbBackupSaveLauncher.launch(defaultDatabaseBackupFileName())
+                        }
+                    )
+                    BackupDialogPillButton(
+                        text = if (isBackupImporting) "불러오는 중..." else "백업 불러오기",
+                        enabled = !isBackupImporting,
+                        isDarkMode = isDarkMode,
                         onClick = {
                             showBackupDialog = false
                             dbBackupOpenLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
                         }
-                    ) { Text("백업 불러오기", color = PastelNavy, fontWeight = FontWeight.Bold) }
-                    TextButton(enabled = !isBackupImporting, onClick = { showBackupDialog = false }) { Text("취소") }
+                    )
+                    BackupDialogPillButton(
+                        text = "취소",
+                        enabled = !isBackupImporting,
+                        isDarkMode = isDarkMode,
+                        onClick = { showBackupDialog = false }
+                    )
                 }
-            }
+            },
+            confirmButton = {}
         )
     }
 
@@ -851,5 +853,28 @@ private fun SwipeDeleteDbRow(
                     )
                 }
         ) { content() }
+    }
+}
+
+@Composable
+private fun BackupDialogPillButton(
+    text: String,
+    enabled: Boolean,
+    isDarkMode: Boolean,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().height(46.dp),
+        shape = RoundedCornerShape(50),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isDarkMode) Color(0xFF263238) else Color(0xFFE8EEF7),
+            contentColor = PastelNavy,
+            disabledContainerColor = if (isDarkMode) Color(0xFF2C323A) else Color(0xFFE0E0E0),
+            disabledContentColor = Color.Gray
+        )
+    ) {
+        Text(text, fontWeight = FontWeight.Bold)
     }
 }

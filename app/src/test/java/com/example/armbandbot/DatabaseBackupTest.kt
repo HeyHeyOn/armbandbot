@@ -10,7 +10,18 @@ import java.util.zip.ZipInputStream
 
 class DatabaseBackupTest {
     @Test
-    fun writeDatabaseBackupZipIncludesExistingDatabaseFilesOnly() {
+    fun safeRestoreFileNameDoesNotUseAndroidFragileRegex() {
+        val safeName = safeRestoreFileName("한글 제목 [수정본]?.html")
+
+        assertTrue(safeName.endsWith(".html"))
+        assertFalse(safeName.contains("?"))
+        assertFalse(safeName.contains("["))
+        assertFalse(safeName.contains("]"))
+        assertTrue(safeName.contains("한글"))
+    }
+
+    @Test
+    fun defaultBackupFileNameUsesZipExtension() {
         val dir = createTempDir(prefix = "armbandbot-db-backup-test")
         try {
             val db = File(dir, "bot_database").apply { writeText("main-db") }

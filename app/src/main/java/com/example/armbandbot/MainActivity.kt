@@ -168,12 +168,16 @@ object GlobalBotState {
 
     fun getDb() = db
 
-    fun getCommentCount(gallType: String, gallId: String, postNum: String): Int {
+    fun getSavedPost(gallType: String, gallId: String, postNum: String): CheckedPost? {
         return try {
-            db?.postDao()?.getPost(gallType, gallId, postNum)?.commentCount ?: -1
+            db?.postDao()?.getPost(gallType, gallId, postNum)
         } catch (e: Exception) {
-            -1
+            null
         }
+    }
+
+    fun getCommentCount(gallType: String, gallId: String, postNum: String): Int {
+        return getSavedPost(gallType, gallId, postNum)?.commentCount ?: -1
     }
 
     fun savePost(

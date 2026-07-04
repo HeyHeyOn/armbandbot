@@ -529,8 +529,19 @@ private fun uniqueZipPath(path: String, used: MutableSet<String>): String {
     }
 }
 
+fun safeRestoreFileName(name: String): String {
+    val safe = name.map { ch ->
+        when {
+            ch.isLetterOrDigit() -> ch
+            ch == '.' || ch == '_' || ch == '-' -> ch
+            else -> '_'
+        }
+    }.joinToString("")
+    return safe.ifBlank { "snapshot.html" }
+}
+
 private fun uniqueFile(dir: File, name: String): File {
-    val safeName = name.replace(Regex("[^A-Za-z0-9가-힣._-]"), "_")
+    val safeName = safeRestoreFileName(name)
     var out = File(dir, safeName)
     if (!out.exists()) return out
     val base = out.nameWithoutExtension

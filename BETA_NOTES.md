@@ -1,3 +1,26 @@
+## 1.4.4-beta4 배포 완료
+
+### 주요 변화
+- DB 백업 불러오기 중 `Syntax error in regexp pattern` 토스트가 뜨던 문제를 수정했습니다.
+  - 스냅샷 복원 파일명 정리에서 Android 런타임에 취약한 한글 범위 정규식을 제거했습니다.
+- DB 백업 팝업을 간단하게 정리했습니다.
+  - 장황한 설명 제거.
+  - `백업 저장하기` / `백업 불러오기` / `취소` 버튼을 알약 모양으로 세로 배치.
+- 글 변경 감지 기준에 제목 변경을 추가했습니다.
+  - 기존에는 댓글 수가 같으면 건너뛰었지만, 이제 제목이 바뀐 글은 댓글 수가 같아도 상세 재검사합니다.
+
+### 검증
+- `./gradlew.bat testDebugUnitTest --tests 'com.heyheyon.armbandbot.DatabaseBackupTest.safeRestoreFileNameDoesNotUseAndroidFragileRegex' --tests 'com.heyheyon.armbandbot.PostChangeDetectionTest'` 통과
+- `./gradlew.bat testDebugUnitTest assembleRelease` 통과
+
+### 배포 정보
+- versionCode: `138`
+- versionName: `1.4.4-beta4`
+- APK: `완장봇_v1.4.4-beta4.apk`
+- SHA-256: `976dbe06186e34d030692c5a20086dcf9e2d0c6b07ead02300123ce1302908cc`
+- Google Drive file ID: `1H2NYOiY8nK1p58UlYY3bLxl9JneBYlVX`
+- Google Drive link: https://drive.google.com/file/d/1H2NYOiY8nK1p58UlYY3bLxl9JneBYlVX/view?usp=drivesdk
+
 ## 1.4.4-beta3 배포 완료
 
 ### 주요 변화
