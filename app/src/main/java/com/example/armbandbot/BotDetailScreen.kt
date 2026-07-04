@@ -581,6 +581,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         var isNicknameFilterMode by remember { mutableStateOf(botPref.getBoolean("is_nickname_filter_mode", false)) }
         var nicknameBlacklistText by remember { mutableStateOf(botPref.getStringSet("nickname_blacklist", setOf())?.joinToString("\n") ?: "") }
+        var nicknameBypassBlacklistText by remember { mutableStateOf(botPref.getStringSet("nickname_bypass_blacklist", setOf())?.joinToString("\n") ?: "") }
         var nicknameWhitelistText by remember { mutableStateOf(botPref.getStringSet("nickname_whitelist", setOf())?.joinToString("\n") ?: "") }
 
         var isYudongPostBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_post_block", false)) }
@@ -610,6 +611,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
         var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
         var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
+        var isSpecialCharFilterMode by remember { mutableStateOf(botPref.getBoolean("is_special_char_filter_mode", false)) }
+        var specialCharWhitelistText by remember { mutableStateOf(botPref.getStringSet("special_char_whitelist", setOf())?.joinToString("") ?: "") }
 
         var normalWordsText by remember { mutableStateOf(loadMultilineText("normal")) }
         var bypassWordsText by remember { mutableStateOf(loadMultilineText("bypass")) }
@@ -708,6 +711,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     "DCCON" -> "디시콘 필터"
                                     "VOICE" -> "보이스 필터"
                                     "SPAM" -> "스팸코드 필터"
+                                    "SPECIAL_CHAR" -> "특수문자 필터"
                                     "WORD" -> "금지어 필터"
                                     "SPEED" -> "탐색 범위 및 속도 설정"
                                     "GALLERY_REFRESH" -> "갤러리 설정 자동 갱신"
@@ -971,6 +975,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     }
                                     Column(modifier = if (!isNicknameFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
                                         ReadOnlyTextCard("닉네임 블랙리스트 (발견 즉시 차단)", nicknameBlacklistText, colors) { tempEditText = nicknameBlacklistText; editDialogType = "nickname_blacklist" }
+                                        ReadOnlyTextCard("닉네임 블랙리스트 (우회 방지)", nicknameBypassBlacklistText, colors) { tempEditText = nicknameBypassBlacklistText; editDialogType = "nickname_bypass_blacklist" }
                                         ReadOnlyTextCard("닉네임 화이트리스트 (차단 예외)", nicknameWhitelistText, colors) { tempEditText = nicknameWhitelistText; editDialogType = "nickname_whitelist" }
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
@@ -1434,6 +1439,21 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
                                     }
                                 }
+                                "SPECIAL_CHAR" -> {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text("특수문자 필터", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("한글/영문/숫자와 일반 문장부호, 화이트리스트 외 문자를 차단합니다.", fontSize = 12.sp, color = subTextColor)
+                                            }
+                                            Switch(checked = isSpecialCharFilterMode, onCheckedChange = { isSpecialCharFilterMode = it; botPref.edit().putBoolean("is_special_char_filter_mode", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                        }
+                                    }
+                                    Column(modifier = if (!isSpecialCharFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+                                        ReadOnlyTextCard("특수문자 화이트리스트 (추가 허용)", specialCharWhitelistText, colors) { tempEditText = specialCharWhitelistText; editDialogType = "special_char_whitelist" }
+                                        Text("기본 허용: ㄱ-ㅎ, ㅏ-ㅣ, 가-힣, a-z, A-Z, 0-9, 공백, 일반 문장부호. 이모지/제로폭/외국 문자/장식 문자는 기본 차단됩니다.", fontSize = 12.sp, color = subTextColor, modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
+                                    }
+                                }
                                 "WORD" -> {
                                     ReadOnlyTextCard("일반 금지어 (완전히 일치하는 경우 차단)", normalWordsText, colors) { tempEditText = normalWordsText; editDialogType = "normal" }
                                     ReadOnlyTextCard("우회 금지어 (글자 사이 특수문자 등 무시)", bypassWordsText, colors) { tempEditText = bypassWordsText; editDialogType = "bypass" }
@@ -1673,6 +1693,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     ModernSettingItem("AI 필터", "게시글 2차 AI 검토", Icons.Filled.AutoAwesome, colors, isAiFilterMode, { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }) { currentSubScreen = "AI" }
                                 }
                                 ModernSettingItem("스팸코드 필터", "대문자+숫자 조합 문자열 차단", Icons.Filled.Warning, colors, isSpamCodeFilterMode, { isSpamCodeFilterMode = it; botPref.edit().putBoolean("is_spam_code_filter_mode", it).apply() }) { currentSubScreen = "SPAM" }
+                                ModernSettingItem("특수문자 필터", "일반 허용 문자 외 특수문자 차단", Icons.Filled.Warning, colors, isSpecialCharFilterMode, { isSpecialCharFilterMode = it; botPref.edit().putBoolean("is_special_char_filter_mode", it).apply() }) { currentSubScreen = "SPECIAL_CHAR" }
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("시스템 관리", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
@@ -1975,7 +1996,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         if (editDialogType != null) {
             val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "dccon_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason" || editDialogType == "overseas_ip_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "dccon_block_reason" -> "디시콘 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "block_exempt_post_numbers" -> "차단 예외 글 번호 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "dccon_blacklist" -> "차단할 디시콘 URL/토큰 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "dccon_block_reason" -> "디시콘 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "block_exempt_post_numbers" -> "차단 예외 글 번호 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_bypass_blacklist" -> "우회 방지 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "special_char_whitelist" -> "특수문자 화이트리스트 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "dccon_blacklist" -> "차단할 디시콘 URL/토큰 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
@@ -1996,6 +2017,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."
                 "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"
                 "nickname_blacklist", "nickname_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n김고닉 #호감고닉\n김분탕 #분탕고닉 등"
+                "nickname_bypass_blacklist" -> "줄바꿈으로 구분합니다. 등록한 닉네임 앞뒤나 글자 사이에 다른 문자가 섞여도 차단합니다. (# ← 뒷부분은 무시됨)\n[예시]\n분탕 #분.탕 / xx분♡탕yy 차단"
+                "special_char_whitelist" -> "추가로 허용할 특수문자를 입력합니다. 줄바꿈 없이 붙여 써도 되고 줄바꿈해도 됩니다. (# 주석 가능)\n[예시]\n😀♡"
                 "image_alt_blacklist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\n759b8005c4... #광고1"
                 "dccon_blacklist" -> "디시콘 URL 또는 dccon.php?no= 토큰을 줄바꿈으로 입력합니다. 저장 시 토큰으로 정규화됩니다.\n[예시]\nhttps://dcimg5.dcinside.com/dccon.php?no=... #차단 디시콘"
                 "voice_blacklist" -> "39a4c023b... #어그로보플"
@@ -2038,7 +2061,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "user_blacklist" -> { userBlacklistText = tempEditText; botPref.edit().putStringSet("user_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "user_whitelist" -> { userWhitelistText = tempEditText; botPref.edit().putStringSet("user_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "nickname_blacklist" -> { nicknameBlacklistText = tempEditText; botPref.edit().putStringSet("nickname_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "nickname_bypass_blacklist" -> { nicknameBypassBlacklistText = tempEditText; botPref.edit().putStringSet("nickname_bypass_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
                         "nickname_whitelist" -> { nicknameWhitelistText = tempEditText; botPref.edit().putStringSet("nickname_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "special_char_whitelist" -> { val normalized = tempEditText.lines().map { it.substringBefore("#").trim() }.joinToString("").trim(); specialCharWhitelistText = normalized; botPref.edit().putStringSet("special_char_whitelist", normalized.map { it.toString() }.toSet()).apply() }
                         "image_alt_blacklist" -> {
                             val normalized = DcconFilter.normalizeImageAltBlacklistText(tempEditText)
                             imageAltBlacklistText = normalized

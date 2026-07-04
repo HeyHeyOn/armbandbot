@@ -101,6 +101,7 @@ class BotService : Service() {
 
         val isNicknameFilterMode: Boolean,
         val nicknameBlacklist: List<String>,
+        val nicknameBypassBlacklist: List<String>,
         val nicknameWhitelist: List<String>,
 
         val isYudongPostBlock: Boolean,
@@ -139,6 +140,9 @@ class BotService : Service() {
 
         val isSpamCodeFilterMode: Boolean,
         val spamCodeLength: Int,
+
+        val isSpecialCharFilterMode: Boolean,
+        val specialCharWhitelist: Set<String>,
 
         val isImageFilterMode: Boolean,
         val imageFilterThreshold: Int,
@@ -189,6 +193,7 @@ class BotService : Service() {
         OVERSEAS_IP,
         URL,
         SPAM,
+        SPECIAL_CHAR,
         IMAGE,
         DCCON,
         VOICE,
@@ -201,6 +206,7 @@ class BotService : Service() {
         val isWhitelistedUser: Boolean,
         val isBlacklistedUserId: Boolean,
         val isBlacklistedUserNick: Boolean,
+        val nicknameBypassMatch: String? = null,
         val suspiciousUrlInPost: String? = null,
         val spamCodeMatchPost: String? = null,
         val matchedImageAlt: String? = null,
@@ -220,6 +226,7 @@ class BotService : Service() {
         val isWhitelistedUser: Boolean,
         val isBlacklistedUserId: Boolean,
         val isBlacklistedUserNick: Boolean,
+        val nicknameBypassMatch: String? = null,
         val suspiciousUrlInComment: String? = null,
         val spamCodeMatchComment: String? = null,
         val matchedDcconToken: String? = null,
@@ -248,6 +255,7 @@ class BotService : Service() {
     private data class UserFilterResult(
         val isBlacklistedUserId: Boolean,
         val isBlacklistedUserNick: Boolean,
+        val nicknameBypassMatch: String?,
         val isWhitelistedUser: Boolean
     )
 
@@ -258,6 +266,7 @@ class BotService : Service() {
         val keywordEnabled: Boolean,
         val urlEnabled: Boolean,
         val spamEnabled: Boolean,
+        val specialCharEnabled: Boolean,
         val imageEnabled: Boolean,
         val dcconEnabled: Boolean,
         val voiceEnabled: Boolean,
@@ -3057,6 +3066,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         override = getActionOverride("spam"),
                         sourceLabel = "spam_override"
                     )
+                    ModerationFilterSource.SPECIAL_CHAR -> resolveDefaultModerationActionConfig(config)
                     ModerationFilterSource.YUDONG -> resolveModerationActionConfig(
                         baseConfig = resolveDefaultModerationActionConfig(config),
                         override = getActionOverride("yudong"),
@@ -3441,50 +3451,34 @@ img.written_dccon{max-width:80px;max-height:80px}
         val isBlacklistedUserId =
             config.isUserFilterMode && config.userBlacklist.contains(author)
 
-        val isBlacklistedUserNick =
-            config.isNicknameFilterMode && config.nicknameBlacklist.contains(nick)
-
         val isWhitelistedUser =
             (config.isUserFilterMode && config.userWhitelist.contains(author)) ||
                     (config.isNicknameFilterMode && config.nicknameWhitelist.contains(nick))
 
+        val isBlacklistedUserNick =
+            config.isNicknameFilterMode && !isWhitelistedUser &&
+                    ModerationTextRules.isExactNicknameBlacklisted(nick, config.nicknameBlacklist)
+
+        val nicknameBypassMatch =
+            if (config.isNicknameFilterMode && !isWhitelistedUser) {
+                ModerationTextRules.findNicknameBypassMatch(
+                    nickname = nick,
+                    blockedNicknames = config.nicknameBypassBlacklist,
+                    whitelistedNicknames = config.nicknameWhitelist
+                )
+            } else {
+                null
+            }
+
         return UserFilterResult(
             isBlacklistedUserId = isBlacklistedUserId,
             isBlacklistedUserNick = isBlacklistedUserNick,
+            nicknameBypassMatch = nicknameBypassMatch,
             isWhitelistedUser = isWhitelistedUser
         )
     }
 
-    private fun buildBypassRegex(keyword: String): Regex {
-        val cleanedKeyword = keyword.trim()
-        if (cleanedKeyword.isEmpty()) return Regex("$^")
-
-        val hasKorean = cleanedKeyword.any { it in '가'..'힣' }
-        val hasUpperLatin = cleanedKeyword.any { it in 'A'..'Z' }
-
-        // 한글이 포함된 금지어:
-        // 글자 사이에 "한글이 아닌 것"만 끼어들면 우회로 간주해서 잡음
-        // -> 한글이 끼어들면 매치되지 않음
-        //
-        // 한글이 없는 금지어:
-        // 글자 사이에 "한글/영문/숫자가 아닌 것"만 끼어들면 우회로 간주해서 잡음
-        // -> 한글/영문/숫자가 끼어들면 매치되지 않음
-        val separator = if (hasKorean) {
-            "[^가-힣]*"
-        } else {
-            "[^가-힣A-Za-z0-9]*"
-        }
-
-        val pattern = cleanedKeyword
-            .toCharArray()
-            .joinToString(separator) { Regex.escape(it.toString()) }
-
-        // 영문 대문자를 포함한 우회 금지어는 사용자가 대소문자까지 의도한 것으로 본다.
-        // 예: "AV"가 댓글 멘션 HTML의 javascript:... 안에 있는 "av"와 매칭되는 오탐 방지.
-        val options = if (hasUpperLatin) emptySet() else setOf(RegexOption.IGNORE_CASE)
-
-        return Regex(pattern, options)
-    }
+    private fun buildBypassRegex(keyword: String): Regex = ModerationTextRules.buildBypassRegex(keyword)
 
     private fun isDcconElement(element: org.jsoup.nodes.Element): Boolean {
         val src = element.attr("src")
@@ -4134,6 +4128,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?.map { it.removeCommentAndTrim() }
                 ?.filter { it.isNotEmpty() }
                 ?: emptyList(),
+            nicknameBypassBlacklist = botPref.getStringSet("nickname_bypass_blacklist", setOf())
+                ?.map { it.removeCommentAndTrim() }
+                ?.filter { it.isNotEmpty() }
+                ?: emptyList(),
             nicknameWhitelist = botPref.getStringSet("nickname_whitelist", setOf())
                 ?.map { it.removeCommentAndTrim() }
                 ?.filter { it.isNotEmpty() }
@@ -4178,6 +4176,13 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             isSpamCodeFilterMode = botPref.getBoolean("is_spam_code_filter_mode", false),
             spamCodeLength = safePrefInt("spam_code_length", 6),
+
+            isSpecialCharFilterMode = botPref.getBoolean("is_special_char_filter_mode", false),
+            specialCharWhitelist = botPref.getStringSet("special_char_whitelist", setOf())
+                ?.flatMap { it.removeCommentAndTrim().map { ch -> ch.toString() } }
+                ?.filter { it.isNotEmpty() }
+                ?.toSet()
+                ?: emptySet(),
 
             isImageFilterMode = botPref.getBoolean("is_image_filter_mode", false),
             imageFilterThreshold = safePrefInt("image_filter_threshold", 80),
@@ -4297,11 +4302,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             UserFilterResult(
                 isBlacklistedUserId = false,
                 isBlacklistedUserNick = false,
+                nicknameBypassMatch = null,
                 isWhitelistedUser = false
             )
         }
         val isBlacklistedUserId = userFilter.isBlacklistedUserId
-        val isBlacklistedUserNick = userFilter.isBlacklistedUserNick
+        val isBlacklistedUserNick = userFilter.isBlacklistedUserNick || userFilter.nicknameBypassMatch != null
+        val nicknameBypassMatch = userFilter.nicknameBypassMatch
         val isWhitelistedUser = userFilter.isWhitelistedUser
 
         if (config.isDebugMode && botId.isNotEmpty() && toggles.anyUserFilterEnabled) {
@@ -4326,7 +4333,11 @@ img.written_dccon{max-width:80px;max-height:80px}
             debugDetail = "ID/IP 블랙리스트 일치 ($postAuthor)"
             filterSource = ModerationFilterSource.USER
         } else if (isBlacklistedUserNick) {
-            debugDetail = "닉네임 블랙리스트 일치 ($postNick)"
+            debugDetail = if (nicknameBypassMatch != null) {
+                "닉네임 우회 블랙리스트 일치 ($nicknameBypassMatch → $postNick)"
+            } else {
+                "닉네임 블랙리스트 일치 ($postNick)"
+            }
             filterSource = ModerationFilterSource.NICKNAME
         }
 
@@ -4421,6 +4432,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (toggles.urlEnabled) getSuspiciousUrl(postText, config.urlWhitelistList) else null
 
                 spamCodeMatchPost = spamCodeRegex?.find(postText)?.value
+                val specialCharMatchPost =
+                    if (toggles.specialCharEnabled) ModerationTextRules.findDisallowedSpecialCharacter(postText, config.specialCharWhitelist) else null
 
                 if (config.isDebugMode && botId.isNotEmpty()) {
                     if (toggles.keywordEnabled) {
@@ -4431,6 +4444,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                     if (toggles.spamEnabled) {
                         sendLog("[디버그][필터/spam] 스팸코드: ${spamCodeMatchPost ?: "없음"}", botId)
+                    }
+                    if (toggles.specialCharEnabled) {
+                        sendLog("[디버그][필터/special] 특수문자: ${specialCharMatchPost ?: "없음"}", botId)
                     }
                 }
 
@@ -4453,7 +4469,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 shouldBlockExecute =
                     (keywordMatched && keywordTargetAllowed) ||
                             (suspiciousUrlInPost != null) ||
-                            (spamCodeMatchPost != null)
+                            (spamCodeMatchPost != null) ||
+                            (specialCharMatchPost != null)
 
                 if (matchedNormalWord != null && keywordTargetAllowed) {
                     debugDetail = "일반 금지어 감지 ($matchedNormalWord)"
@@ -4471,6 +4488,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                 } else if (filterSource == ModerationFilterSource.UNKNOWN && spamCodeMatchPost != null) {
                     debugDetail = "스팸코드 감지 ($spamCodeMatchPost)"
                     filterSource = ModerationFilterSource.SPAM
+                } else if (filterSource == ModerationFilterSource.UNKNOWN && specialCharMatchPost != null) {
+                    blockReasonPrefix = "특수문자 필터"
+                    notiType = "spam"
+                    debugDetail = "허용되지 않은 특수문자 감지 ($specialCharMatchPost)"
+                    filterSource = ModerationFilterSource.SPECIAL_CHAR
                 }
 
                 if (!shouldBlockExecute && toggles.dcconEnabled) {
@@ -4569,11 +4591,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             UserFilterResult(
                 isBlacklistedUserId = false,
                 isBlacklistedUserNick = false,
+                nicknameBypassMatch = null,
                 isWhitelistedUser = false
             )
         }
         val isBlacklistedUserId = userFilter.isBlacklistedUserId
-        val isBlacklistedUserNick = userFilter.isBlacklistedUserNick
+        val isBlacklistedUserNick = userFilter.isBlacklistedUserNick || userFilter.nicknameBypassMatch != null
+        val nicknameBypassMatch = userFilter.nicknameBypassMatch
         val isWhitelistedUser = userFilter.isWhitelistedUser
 
         if (config.isDebugMode && botId.isNotEmpty() && toggles.anyUserFilterEnabled) {
@@ -4593,7 +4617,11 @@ img.written_dccon{max-width:80px;max-height:80px}
             debugDetail = "댓글 작성자 ID/IP 블랙리스트 일치 ($cmtAuthor)"
             filterSource = ModerationFilterSource.USER
         } else if (isBlacklistedUserNick) {
-            debugDetail = "댓글 작성자 닉네임 블랙리스트 일치 ($cmtNick)"
+            debugDetail = if (nicknameBypassMatch != null) {
+                "댓글 작성자 닉네임 우회 블랙리스트 일치 ($nicknameBypassMatch → $cmtNick)"
+            } else {
+                "댓글 작성자 닉네임 블랙리스트 일치 ($cmtNick)"
+            }
             filterSource = ModerationFilterSource.NICKNAME
         }
 
@@ -4679,6 +4707,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (toggles.urlEnabled) getSuspiciousUrl(commentVisibleText, config.urlWhitelistList) else null
 
                 spamCodeMatchComment = spamCodeRegex?.find(commentVisibleText)?.value
+                val specialCharMatchComment =
+                    if (toggles.specialCharEnabled) ModerationTextRules.findDisallowedSpecialCharacter(commentVisibleText, config.specialCharWhitelist) else null
 
                 if (config.isDebugMode && botId.isNotEmpty()) {
                     if (toggles.keywordEnabled) {
@@ -4689,6 +4719,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                     if (toggles.spamEnabled) {
                         sendLog("[디버그][필터/spam] 댓글 스팸코드: ${spamCodeMatchComment ?: "없음"}", botId)
+                    }
+                    if (toggles.specialCharEnabled) {
+                        sendLog("[디버그][필터/special] 댓글 특수문자: ${specialCharMatchComment ?: "없음"}", botId)
                     }
                 }
 
@@ -4711,7 +4744,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 isBadComment =
                     (keywordMatched && keywordTargetAllowed) ||
                             (suspiciousUrlInComment != null) ||
-                            (spamCodeMatchComment != null)
+                            (spamCodeMatchComment != null) ||
+                            (specialCharMatchComment != null)
 
                 if (matchedNormalWord != null && keywordTargetAllowed) {
                     debugDetail = "댓글 일반 금지어 감지 ($matchedNormalWord)"
@@ -4729,6 +4763,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                 } else if (filterSource == ModerationFilterSource.UNKNOWN && spamCodeMatchComment != null) {
                     debugDetail = "댓글 스팸코드 감지 ($spamCodeMatchComment)"
                     filterSource = ModerationFilterSource.SPAM
+                } else if (filterSource == ModerationFilterSource.UNKNOWN && specialCharMatchComment != null) {
+                    blockReasonPrefix = "특수문자 필터"
+                    notiType = "spam"
+                    debugDetail = "댓글 허용되지 않은 특수문자 감지 ($specialCharMatchComment)"
+                    filterSource = ModerationFilterSource.SPECIAL_CHAR
                 }
 
                 if (!isBadComment && toggles.dcconEnabled) {
@@ -4785,6 +4824,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         val keywordEnabled = config.normalWords.isNotEmpty() || config.bypassWords.isNotEmpty()
         val urlEnabled = config.isUrlFilterMode
         val spamEnabled = config.isSpamCodeFilterMode
+        val specialCharEnabled = config.isSpecialCharFilterMode
         val imageEnabled = config.isImageFilterMode
         val dcconEnabled = config.isDcconFilterMode && config.dcconBlacklist.isNotEmpty()
         val voiceEnabled = config.isVoiceFilterMode
@@ -4810,6 +4850,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             keywordEnabled = keywordEnabled,
             urlEnabled = urlEnabled,
             spamEnabled = spamEnabled,
+            specialCharEnabled = specialCharEnabled,
             imageEnabled = imageEnabled,
             dcconEnabled = dcconEnabled,
             voiceEnabled = voiceEnabled,
@@ -5559,7 +5600,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 logCategory = "$blockReasonPrefix 차단!",
                 logMessage = "번호: $postNumStr",
                 notificationType = notiType ?: "keyword",
-                notificationTitle = "${notiType ?: "keyword"} 차단됨",
+                notificationTitle = if (blockReasonPrefix == "특수문자 필터") "특수문자 차단됨" else "${notiType ?: "keyword"} 차단됨",
                 notificationMessage = "$blockReasonPrefix 사유로 게시글이 차단되었습니다."
             )
 
@@ -5675,7 +5716,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 logCategory = "$blockReasonPrefixCmt 차단!",
                 logMessage = "작성자: $cmtDisplayAuthor",
                 notificationType = notiTypeCmt ?: "keyword",
-                notificationTitle = "${notiTypeCmt ?: "keyword"} 차단됨",
+                notificationTitle = if (blockReasonPrefixCmt == "특수문자 필터") "특수문자 차단됨" else "${notiTypeCmt ?: "keyword"} 차단됨",
                 notificationMessage = "$blockReasonPrefixCmt 사유로 댓글이 차단되었습니다."
             )
 

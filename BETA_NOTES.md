@@ -1,3 +1,28 @@
+## 1.4.4-beta1 배포 완료
+
+### 주요 변화
+- 닉네임 필터에 `닉네임 블랙리스트 (우회 방지)`를 추가했습니다.
+  - 기존 우회 금지어와 같은 규칙을 사용해 등록 닉네임 앞뒤나 글자 사이에 다른 문자가 섞여도 감지합니다.
+  - 기존 닉네임 블랙리스트는 완전 일치 방식으로 유지하고, 닉네임 화이트리스트는 우회 방지 목록보다 우선 적용됩니다.
+- `특수문자 필터`를 추가했습니다.
+  - 한글/영문/숫자/공백/일반 문장부호와 별도 화이트리스트 외 문자를 차단합니다.
+  - 오탐 방지를 위해 기본값은 OFF입니다.
+  - 댓글은 HTML 원문이 아니라 표시 텍스트 기준으로 검사합니다.
+- 신규 설정의 기본값/런타임 마이그레이션/설정 내보내기·가져오기를 반영했습니다.
+- 닉네임 우회 감지와 특수문자 허용/차단 회귀 테스트를 추가했습니다.
+
+### 검증
+- `./gradlew testDebugUnitTest` 성공.
+- `./gradlew assembleRelease` 성공.
+
+### 빌드 정보
+- versionCode = 135
+- versionName = 1.4.4-beta1
+- APK: `완장봇_v1.4.4-beta1.apk`
+- SHA256: `17dd913f5dcee48143c8758aa8d3e98aa7d5aaf9e1d5214e19a0e4124bd7dd14`
+- Google Drive file ID: `1LWtHfHnVAMTA8BNxfpuiEy9prtm2U8bG`
+- Google Drive link: https://drive.google.com/file/d/1LWtHfHnVAMTA8BNxfpuiEy9prtm2U8bG/view?usp=drivesdk
+
 ## 1.4.3-beta9 배포 완료
 
 ### 주요 변화
