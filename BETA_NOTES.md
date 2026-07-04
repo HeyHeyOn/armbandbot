@@ -1,3 +1,31 @@
+## 1.4.4 정식 릴리즈 완료
+
+### 주요 변화
+- 닉네임 예외 키워드와 특수문자 기반 필터를 추가했습니다.
+  - 공백/기호 변형을 포함한 우회 표현을 더 안정적으로 감지합니다.
+  - 운영자가 지정한 닉네임 예외는 우선 제외됩니다.
+- DB 백업/불러오기를 추가하고, 기존 기록과 병합 복원되도록 개선했습니다.
+  - 백업 ZIP에 DB와 스냅샷 HTML을 함께 포함합니다.
+  - 불러오기 시 글/차단/보류 기록을 현재 DB와 병합하고 스냅샷 경로를 보정합니다.
+  - 구버전/컬럼 누락 백업도 가능한 범위에서 읽도록 보완했습니다.
+- DB 업데이트 안정성을 강화했습니다.
+  - 스키마 마이그레이션을 추가해 업데이트 중 기존 DB가 삭제되지 않도록 했습니다.
+- 글 변경 감지 기준에 제목 변경을 포함했습니다.
+  - 댓글 수가 같아도 제목이 바뀐 글은 다시 검사합니다.
+
+### 검증
+- `./gradlew.bat testDebugUnitTest assembleRelease` 통과
+- `lintVitalRelease` 포함 릴리즈 빌드 통과
+
+### 배포 정보
+- versionCode: `140`
+- versionName: `1.4.4`
+- APK: `완장봇_v1.4.4.apk`
+- SHA-256: `82e9dff8338eae9af0c67adf27237a9c9e34eaea3648bf97783114cbff30607b`
+- 파일 크기: `12,814,034 bytes`
+- Google Drive file ID: `1500I51NCWgeJuNTHpPUAlrka7nQ2ooXJ`
+- Google Drive link: https://drive.google.com/file/d/1500I51NCWgeJuNTHpPUAlrka7nQ2ooXJ/view?usp=drivesdk
+
 ## 1.4.4-beta5 배포 완료
 
 ### 주요 변화
