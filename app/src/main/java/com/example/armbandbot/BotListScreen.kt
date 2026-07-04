@@ -50,9 +50,7 @@ import androidx.compose.ui.zIndex
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
 import com.heyheyon.armbandbot.ui.botColors
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.UUID
 import kotlin.math.roundToInt
 
@@ -130,18 +128,6 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
         }
     }
 
-    val dbBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        coroutineScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { backupDatabaseToUri(context, uri) }
-            }.onSuccess { count ->
-                Toast.makeText(context, "DB 백업을 저장했습니다. (${count}개 파일)", Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(context, it.message ?: "DB 백업에 실패했습니다.", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
 
     val density = LocalDensity.current
     val itemHeightPx = remember(density) { with(density) { 60.dp.toPx() } }
@@ -187,10 +173,6 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(64.dp).clip(RoundedCornerShape(12.dp)).clickable { showDbDashboard = true }.padding(vertical = 2.dp)) {
                         Icon(Icons.Filled.Save, contentDescription = "DB", tint = actionIconColor, modifier = Modifier.size(30.dp))
                         Text("DB", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { dbBackupLauncher.launch(defaultDatabaseBackupFileName()) }.padding(vertical = 2.dp)) {
-                        Icon(Icons.Filled.FileDownload, contentDescription = "DB 백업", tint = actionIconColor, modifier = Modifier.size(30.dp))
-                        Text("DB 백업", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { onThemeToggle(!isDarkMode) }.padding(vertical = 2.dp)) {
                         Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(30.dp))

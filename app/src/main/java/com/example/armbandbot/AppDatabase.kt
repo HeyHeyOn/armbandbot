@@ -120,6 +120,9 @@ interface PostDao {
     @Query("SELECT * FROM checked_posts ORDER BY checkTime DESC LIMIT 100")
     fun getRecentPosts(): List<CheckedPost>
 
+    @Query("SELECT * FROM checked_posts")
+    fun getAllPostsForBackupMerge(): List<CheckedPost>
+
     @Query("UPDATE checked_posts SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
     fun updateSnapshotPath(gallType: String, gallId: String, postNum: String, path: String)
 
@@ -268,6 +271,12 @@ interface PostDao {
         LIMIT :limit OFFSET :offset
     """)
     fun getBlockHistoryAsc(type: String, limit: Int, offset: Int): List<BlockHistory>
+
+    @Query("SELECT * FROM block_history")
+    fun getAllBlockHistoryForBackupMerge(): List<BlockHistory>
+
+    @Query("SELECT * FROM hold_history")
+    fun getAllHoldHistoryForBackupMerge(): List<HoldHistory>
 }
 
 @Database(entities = [CheckedPost::class, BlockHistory::class, HoldHistory::class], version = 8, exportSchema = false)

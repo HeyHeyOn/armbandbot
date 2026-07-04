@@ -1,10 +1,13 @@
 package com.heyheyon.armbandbot
 
 import android.content.Context
+import android.net.Uri
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -104,6 +107,8 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
     var snapshotViewerPath by remember { mutableStateOf<String?>(null) }
     var showClearDbConfirm by remember { mutableStateOf(false) }
+    var showBackupDialog by remember { mutableStateOf(false) }
+    var isBackupImporting by remember { mutableStateOf(false) }
     var recordedPostCount by remember { mutableStateOf(0) }
     var pendingDeletePost by remember { mutableStateOf<CheckedPost?>(null) }
     var pendingDeleteBlock by remember { mutableStateOf<BlockHistory?>(null) }
@@ -155,6 +160,46 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         recordedPostCount = withContext(Dispatchers.IO) { postDao?.getPostCount() ?: 0 }
     }
 
+    suspend fun reloadAllDashboardData() {
+        withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
+        loadGeneralData()
+        loadBlockData()
+        loadHoldData()
+    }
+
+    val dbBackupSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { backupDatabaseToUri(context, uri) }
+            }.onSuccess { count ->
+                Toast.makeText(context, "DB 백업을 저장했습니다. (DB/스냅샷 ${count}개)", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, it.message ?: "DB 백업에 실패했습니다.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val dbBackupOpenLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            isBackupImporting = true
+            runCatching {
+                withContext(Dispatchers.IO) { restoreDatabaseBackupFromUri(context, uri) }
+            }.onSuccess { result ->
+                reloadAllDashboardData()
+                Toast.makeText(
+                    context,
+                    "백업 불러오기 완료: 글 +${result.insertedPosts}/${result.updatedPosts}갱신, 차단 +${result.insertedBlockHistory}, 보류 +${result.insertedHoldHistory}, 스냅샷 ${result.restoredSnapshots}개",
+                    Toast.LENGTH_LONG
+                ).show()
+            }.onFailure {
+                Toast.makeText(context, it.message ?: "DB 백업 불러오기에 실패했습니다.", Toast.LENGTH_LONG).show()
+            }
+            isBackupImporting = false
+        }
+    }
+
     LaunchedEffect(botId) {
         withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
         loadGeneralData(); loadBlockData(); loadHoldData()
@@ -202,6 +247,40 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     if (snapshotViewerPath != null) {
         SnapshotViewerScreen(snapshotPath = snapshotViewerPath!!, onBack = { snapshotViewerPath = null })
         return@DbDashboardScreen
+    }
+
+    if (showBackupDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isBackupImporting) showBackupDialog = false },
+            title = { Text("DB 백업", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    if (isBackupImporting) "백업을 불러오는 중입니다..."
+                    else "스냅샷 HTML까지 함께 저장하거나, 다른 버전/양식의 백업 DB를 현재 DB에 병합해서 불러옵니다. 현재 데이터는 전체 덮어쓰기하지 않습니다."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isBackupImporting,
+                    onClick = {
+                        showBackupDialog = false
+                        dbBackupSaveLauncher.launch(defaultDatabaseBackupFileName())
+                    }
+                ) { Text("백업 저장하기", color = PastelNavy, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        enabled = !isBackupImporting,
+                        onClick = {
+                            showBackupDialog = false
+                            dbBackupOpenLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                        }
+                    ) { Text("백업 불러오기", color = PastelNavy, fontWeight = FontWeight.Bold) }
+                    TextButton(enabled = !isBackupImporting, onClick = { showBackupDialog = false }) { Text("취소") }
+                }
+            }
+        )
     }
 
     if (showClearDbConfirm) {
@@ -347,6 +426,19 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             }
 
 
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { showBackupDialog = true },
+                color = if (isDarkMode) Color(0xFF263238) else Color(0xFFE8EEF7),
+                contentColor = PastelNavy,
+                shape = RoundedCornerShape(50)
+            ) {
+                Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Save, contentDescription = "DB 백업", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("백업", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
                 modifier = Modifier.clip(RoundedCornerShape(50)).clickable { showClearDbConfirm = true },

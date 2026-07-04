@@ -1,3 +1,35 @@
+## 1.4.4-beta3 배포 완료
+
+### 주요 변화
+- DB 백업 ZIP에 기존 DB 파일뿐 아니라 스냅샷 HTML도 함께 포함하도록 개선했습니다.
+  - `manifest.json`을 추가해 백업 포맷 버전, 앱 버전, 스냅샷 원래 경로/ZIP 경로/시점 정보를 함께 남깁니다.
+  - ZIP 내부에는 절대경로가 들어가지 않도록 상대 경로만 사용합니다.
+- DB 백업 버튼을 메인 하단에서 DB 대시보드 상단 `초기화` 버튼 왼쪽으로 이동했습니다.
+  - `백업 저장하기` / `백업 불러오기` 선택 팝업을 추가했습니다.
+- 백업 불러오기는 전체 덮어쓰기 대신 병합 복원 방식으로 추가했습니다.
+  - 현재 DB를 유지하면서 백업 DB의 글/차단/보류 기록을 병합합니다.
+  - 스냅샷은 현재 캐시 영역으로 복사한 뒤 경로를 보정합니다.
+- DB 양식 변경 호환성을 반영했습니다.
+  - 백업 DB는 현재 Room 스키마로 강제 오픈하지 않고 SQLite 컬럼 존재 여부 기준으로 읽습니다.
+  - 없는 컬럼은 기본값으로 보완해 구버전/다른 양식 백업도 가능한 범위에서 복원합니다.
+  - 없는 테이블은 건너뛰어 DB-only 구형 백업도 처리할 수 있게 했습니다.
+- 스냅샷 병합 규칙을 반영했습니다.
+  - 기존 기록이 없으면 백업 기록/스냅샷을 가져옵니다.
+  - 기존 기록이 있으면 최초 스냅샷은 더 오래된 쪽, 최신 스냅샷은 더 최신 쪽을 우선합니다.
+- 백업 포맷/스냅샷 포함/스냅샷 병합/구버전 컬럼 누락 호환 회귀 테스트를 추가했습니다.
+
+### 검증
+- `./gradlew.bat testDebugUnitTest --tests 'com.heyheyon.armbandbot.DatabaseBackupTest'` 성공.
+- `./gradlew.bat testDebugUnitTest assembleRelease` 성공.
+
+### 빌드 정보
+- versionCode = 137
+- versionName = 1.4.4-beta3
+- APK: `완장봇_v1.4.4-beta3.apk`
+- SHA256: `835d4c6592b5b33f986c44af4ec8bd025a77b6446f35a661ad9d041204538e9a`
+- Google Drive file ID: `1IEnzB13Yn7Kn7XtEKJ6qd3MGdVM2ndlN`
+- Google Drive link: https://drive.google.com/file/d/1IEnzB13Yn7Kn7XtEKJ6qd3MGdVM2ndlN/view?usp=drivesdk
+
 ## 1.4.4-beta2 배포 완료
 
 ### 주요 변화

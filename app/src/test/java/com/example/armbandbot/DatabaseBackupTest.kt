@@ -1,6 +1,7 @@
 package com.heyheyon.armbandbot
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -18,14 +19,7 @@ class DatabaseBackupTest {
             val output = ByteArrayOutputStream()
 
             val count = writeDatabaseBackupZip(listOf(db, wal, missingShm), output)
-            val entries = mutableMapOf<String, String>()
-            ZipInputStream(output.toByteArray().inputStream()).use { zip ->
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    entries[entry.name] = zip.readBytes().decodeToString()
-                    zip.closeEntry()
-                }
-            }
+            val entries = readZipEntries(output)
 
             assertEquals(2, count)
             assertEquals("main-db", entries["bot_database"])
@@ -37,6 +31,90 @@ class DatabaseBackupTest {
     }
 
     @Test
+    fun writeDatabaseBackupZipIncludesSnapshotsUnderRelativePathsAndManifest() {
+        val dir = createTempDir(prefix = "armbandbot-db-backup-snapshot-test")
+        try {
+            val db = File(dir, "bot_database").apply { writeText("main-db") }
+            val snapshotDir = File(dir, "snapshots_botA").apply { mkdirs() }
+            val initial = File(snapshotDir, "gall_10_initial.html").apply { writeText("initial-html") }
+            val latest = File(snapshotDir, "gall_10_latest.html").apply { writeText("latest-html") }
+            val output = ByteArrayOutputStream()
+
+            val count = writeDatabaseBackupZip(
+                databaseFiles = listOf(db),
+                snapshotFiles = listOf(
+                    BackupSnapshotFile(initial, "snapshots/snapshots_botA/gall_10_initial.html", initial.absolutePath, "M", "gall", "10", "initial", 100L),
+                    BackupSnapshotFile(latest, "snapshots/snapshots_botA/gall_10_latest.html", latest.absolutePath, "M", "gall", "10", "latest", 200L)
+                ),
+                outputStream = output
+            )
+            val entries = readZipEntries(output)
+
+            assertEquals(3, count)
+            assertEquals("main-db", entries["bot_database"])
+            assertEquals("initial-html", entries["snapshots/snapshots_botA/gall_10_initial.html"])
+            assertEquals("latest-html", entries["snapshots/snapshots_botA/gall_10_latest.html"])
+            assertTrue(entries["manifest.json"]!!.contains("\"formatVersion\":2"))
+            assertTrue(entries["manifest.json"]!!.contains("snapshots/snapshots_botA/gall_10_initial.html"))
+            assertFalse("ZIP should not expose absolute paths as entry names", entries.keys.any { it.contains(dir.absolutePath.replace('\\', '/')) })
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun chooseSnapshotCandidateKeepsOlderInitialAndNewerLatest() {
+        val currentInitial = SnapshotCandidate("current_initial.html", 200L)
+        val backupInitial = SnapshotCandidate("backup_initial.html", 100L)
+        val currentLatest = SnapshotCandidate("current_latest.html", 300L)
+        val backupLatest = SnapshotCandidate("backup_latest.html", 500L)
+
+        assertEquals("backup_initial.html", chooseSnapshotCandidate(currentInitial, backupInitial, preferOlder = true)?.path)
+        assertEquals("backup_latest.html", chooseSnapshotCandidate(currentLatest, backupLatest, preferOlder = false)?.path)
+    }
+
+    @Test
+    fun checkedPostFromBackupColumnsToleratesOldSchemasWithMissingOptionalColumns() {
+        val row = checkedPostFromBackupColumns(
+            mapOf(
+                "gallType" to "M",
+                "gallId" to "oldgall",
+                "postNum" to "123",
+                "commentCount" to 7,
+                "checkTime" to 111L
+            )
+        )
+
+        assertEquals("M", row.gallType)
+        assertEquals("oldgall", row.gallId)
+        assertEquals("123", row.postNum)
+        assertEquals(7, row.commentCount)
+        assertEquals(111L, row.checkTime)
+        assertEquals(null, row.snapshotPath)
+        assertEquals(null, row.creationDate)
+    }
+
+    @Test
+    fun blockHistoryFromBackupColumnsToleratesPreTargetNoSchema() {
+        val row = blockHistoryFromBackupColumns(
+            mapOf(
+                "gallType" to "M",
+                "gallId" to "oldgall",
+                "postNum" to "123",
+                "targetType" to "COMMENT",
+                "targetAuthor" to "작성자",
+                "targetContent" to "내용",
+                "blockReason" to "사유",
+                "blockTime" to 222L
+            )
+        )
+
+        assertEquals("", row.targetNo)
+        assertEquals("COMMENT", row.targetType)
+        assertEquals(222L, row.blockTime)
+    }
+
+    @Test
     fun migrationSqlAddsTargetNoWithoutDroppingBlockHistory() {
         assertEquals(
             "ALTER TABLE `block_history` ADD COLUMN `targetNo` TEXT NOT NULL DEFAULT ''",
@@ -44,5 +122,17 @@ class DatabaseBackupTest {
         )
         assertTrue(AppDatabase.CREATE_HOLD_HISTORY_SQL.contains("CREATE TABLE IF NOT EXISTS `hold_history`"))
         assertTrue(AppDatabase.CREATE_HOLD_HISTORY_INDEX_SQL.contains("CREATE UNIQUE INDEX IF NOT EXISTS"))
+    }
+
+    private fun readZipEntries(output: ByteArrayOutputStream): Map<String, String> {
+        val entries = mutableMapOf<String, String>()
+        ZipInputStream(output.toByteArray().inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries[entry.name] = zip.readBytes().decodeToString()
+                zip.closeEntry()
+            }
+        }
+        return entries
     }
 }
