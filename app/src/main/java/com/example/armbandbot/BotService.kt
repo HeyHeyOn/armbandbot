@@ -1770,7 +1770,8 @@ class BotService : Service() {
         doc: org.jsoup.nodes.Document,
         comments: JSONArray? = null,
         blockedCommentNo: String? = null,
-        blockedTs: String? = null
+        blockedTs: String? = null,
+        existingSnapshotPath: String? = null
     ): String? {
             if (!config.isExpertMode) return null
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
@@ -2113,14 +2114,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                 } else {
                     val initialFile = File(cacheDir, "${gallId}_${postNumStr}_initial.html")
                     val latestFile = File(cacheDir, "${gallId}_${postNumStr}_latest.html")
-                    if (!initialFile.exists()) {
-                        initialFile.writeText(html)
-                        if (latestFile.exists()) latestFile.delete()
-                        initialFile.absolutePath
-                    } else {
-                        latestFile.writeText(html)
-                        latestFile.absolutePath
-                    }
+                    saveGeneralSnapshotPreservingExistingInitial(
+                        initialFile = initialFile,
+                        latestFile = latestFile,
+                        existingSnapshotPath = existingSnapshotPath,
+                        html = html
+                    )
                 }
             } catch (e: Exception) {
                 Log.e("BotService", "[$botId] snapshot save failed", e)
@@ -2285,7 +2284,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                         gallId = gallId,
                         postNumStr = postNumStr,
                         doc = postDoc,
-                        comments = commentsArray
+                        comments = commentsArray,
+                        existingSnapshotPath = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath
                     )
                     if (!result.isNullOrBlank()) {
                         sendLog("[스냅샷][전체] 저장 완료: $result", botId)
@@ -2945,7 +2945,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                 doc = doc,
                 comments = comments,
                 blockedCommentNo = blockedCommentNo,
-                blockedTs = blockedTs
+                blockedTs = blockedTs,
+                existingSnapshotPath = if (blockedTs == null) {
+                    GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath
+                } else {
+                    null
+                }
             )
             if (config.isDebugMode) {
                 sendLog("[디버그][성능] 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)

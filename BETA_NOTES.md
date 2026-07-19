@@ -1,3 +1,30 @@
+## 1.4.5-beta2 배포 완료
+
+### 주요 변화
+- DB 백업에서 복원한 스냅샷을 첫 재검사할 때 기존 최초본이 현재 상태로 대체되던 문제를 수정했습니다.
+  - 복원된 최초 스냅샷을 현재 봇 저장 폴더로 먼저 승계하고, 재검사 결과는 최신 스냅샷으로 저장합니다.
+  - 첫 재검사 직후부터 최초/최신 스냅샷 전환 UI를 사용할 수 있습니다.
+  - 반복 복원으로 파일명에 번호가 붙은 스냅샷도 최초본을 찾아 승계합니다.
+  - 승계 중 오류가 발생해도 불완전한 최초 파일이 남지 않도록 임시 파일 저장 후 확정합니다.
+- 신규 글의 최초 저장과 기존 활성 최초본 보존 동작을 포함한 회귀 테스트를 추가했습니다.
+
+### 검증
+- `./gradlew.bat testDebugUnitTest --tests 'com.heyheyon.armbandbot.SnapshotRecoveryTest'` 통과
+- `./gradlew.bat clean testDebugUnitTest assembleRelease lintVitalRelease` 통과
+- 독립 코드 리뷰 통과
+- APK `versionCode 142` / `versionName 1.4.5-beta2` 확인
+- APK Signature Scheme v2 서명 검증 통과
+- Drive 재다운로드 파일의 SHA-256이 로컬 APK와 일치
+
+### 배포 정보
+- versionCode: `142`
+- versionName: `1.4.5-beta2`
+- APK: `완장봇_v1.4.5-beta2.apk`
+- SHA-256: `2b74336490d5facb7fe74c56781776cf9ef539edfe8f6c06869b884b5caf9da7`
+- 파일 크기: `12,814,034 bytes`
+- Google Drive file ID: `1Qp6alkRJOVQjuwBdhbEovhFjj0POjzg7`
+- Google Drive link: https://drive.google.com/file/d/1Qp6alkRJOVQjuwBdhbEovhFjj0POjzg7/view?usp=drivesdk
+
 ## 1.4.5-beta1 배포 완료
 
 ### 주요 변화
