@@ -201,8 +201,15 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     }
 
     LaunchedEffect(botId) {
-        withContext(Dispatchers.IO) { galleries = postDao?.getGalleries() ?: emptyList() }
+        val recoveredSnapshots = withContext(Dispatchers.IO) {
+            val recovered = GlobalBotState.recoverOrphanedSnapshotPaths(context)
+            galleries = postDao?.getGalleries() ?: emptyList()
+            recovered
+        }
         loadGeneralData(); loadBlockData(); loadHoldData()
+        if (recoveredSnapshots > 0) {
+            Toast.makeText(context, "연결이 끊긴 스냅샷 ${recoveredSnapshots}개를 복구했습니다.", Toast.LENGTH_LONG).show()
+        }
     }
 
     LaunchedEffect(tabIndex, selectedGall, selectedBlockType, sortField, isAscending, searchQuery, generalLimit, blockLimit, holdLimit) {

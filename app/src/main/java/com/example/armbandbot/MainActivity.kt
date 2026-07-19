@@ -180,6 +180,35 @@ object GlobalBotState {
         return getSavedPost(gallType, gallId, postNum)?.commentCount ?: -1
     }
 
+    fun recoverOrphanedSnapshotPaths(context: Context): Int {
+        val dao = db?.postDao() ?: return 0
+        val snapshotFilesByName = buildSnapshotFileIndex(context.cacheDir)
+        if (snapshotFilesByName.isEmpty()) return 0
+
+        val posts = dao.getAllPostsForBackupMerge()
+        val ambiguousIdentities = findAmbiguousSnapshotIdentities(posts)
+        var recoveredCount = 0
+        posts.forEach { post ->
+            val identity = SnapshotIdentity(post.gallId, post.postNum)
+            if (identity in ambiguousIdentities) return@forEach
+
+            val currentPath = post.snapshotPath
+            if (!currentPath.isNullOrBlank() && File(currentPath).isFile) return@forEach
+
+            val recoveredPath = findRecoverableSnapshotPath(snapshotFilesByName, post.gallId, post.postNum)
+            if (!recoveredPath.isNullOrBlank()) {
+                recoveredCount += dao.updateSnapshotPathIfUnchanged(
+                    gallType = post.gallType,
+                    gallId = post.gallId,
+                    postNum = post.postNum,
+                    expectedPath = currentPath,
+                    newPath = recoveredPath
+                )
+            }
+        }
+        return recoveredCount
+    }
+
     fun savePost(
         gallType: String,
         gallId: String,
@@ -193,7 +222,7 @@ object GlobalBotState {
         creationDate: String? = null
     ) {
         try {
-            db?.postDao()?.insertOrUpdate(
+            db?.postDao()?.insertOrUpdatePreservingSnapshot(
                 CheckedPost(
                     gallType = gallType,
                     gallId = gallId,

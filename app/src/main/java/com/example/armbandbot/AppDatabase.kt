@@ -63,6 +63,12 @@ interface PostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertOrUpdate(post: CheckedPost)
 
+    @Transaction
+    fun insertOrUpdatePreservingSnapshot(post: CheckedPost) {
+        val existing = getPost(post.gallType, post.gallId, post.postNum)
+        insertOrUpdate(mergeCheckedPostPreservingSnapshot(existing, post))
+    }
+
     @Query("SELECT * FROM checked_posts WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum LIMIT 1")
     fun getPost(gallType: String, gallId: String, postNum: String): CheckedPost?
 
@@ -125,6 +131,19 @@ interface PostDao {
 
     @Query("UPDATE checked_posts SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
     fun updateSnapshotPath(gallType: String, gallId: String, postNum: String, path: String)
+
+    @Query("""
+        UPDATE checked_posts SET snapshotPath = :newPath
+        WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum
+          AND ((snapshotPath IS NULL AND :expectedPath IS NULL) OR snapshotPath = :expectedPath)
+    """)
+    fun updateSnapshotPathIfUnchanged(
+        gallType: String,
+        gallId: String,
+        postNum: String,
+        expectedPath: String?,
+        newPath: String
+    ): Int
 
     @Query("UPDATE block_history SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
     fun updateBlockHistorySnapshotPath(gallType: String, gallId: String, postNum: String, path: String)

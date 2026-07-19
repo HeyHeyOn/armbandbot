@@ -1,3 +1,29 @@
+## 1.4.5-beta1 배포 완료
+
+### 주요 변화
+- 글 상태가 바뀌거나 원문을 다시 불러올 수 없을 때도 기존 스냅샷 연결이 사라지지 않도록 수정했습니다.
+- 1.4.4에서 연결이 끊긴 스냅샷도 다시 사용할 수 있도록 자동 복구를 추가했습니다.
+  - DB 대시보드 진입 시 캐시에 남은 최초/최신 스냅샷을 찾아 해당 글 기록에 다시 연결합니다.
+  - 최신 스냅샷이 있으면 최신본을 우선하고, 없으면 최초 스냅샷을 연결합니다.
+  - 복구된 항목이 있으면 복구 개수를 안내합니다.
+- 스냅샷 보존과 자동 복구 동작을 검증하는 회귀 테스트를 추가했습니다.
+
+### 검증
+- `./gradlew.bat testDebugUnitTest` 통과
+- `./gradlew.bat clean testDebugUnitTest assembleRelease lintVitalRelease` 통과
+- APK `versionCode 141` / `versionName 1.4.5-beta1` 확인
+- APK Signature Scheme v2 서명 검증 통과
+- Drive 재다운로드 파일의 SHA-256이 로컬 APK와 일치
+
+### 배포 정보
+- versionCode: `141`
+- versionName: `1.4.5-beta1`
+- APK: `완장봇_v1.4.5-beta1.apk`
+- SHA-256: `f030e70814286e767a19865ecce79c7c1b1241483c30440d979918f4c0bd9b75`
+- 파일 크기: `12,814,034 bytes`
+- Google Drive file ID: `12MGz-BTJrlmeeZIwapa3wjAXQlvSkceM`
+- Google Drive link: https://drive.google.com/file/d/12MGz-BTJrlmeeZIwapa3wjAXQlvSkceM/view?usp=drivesdk
+
 ## 1.4.4 정식 릴리즈 완료
 
 ### 주요 변화
