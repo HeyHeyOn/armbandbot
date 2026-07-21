@@ -31,6 +31,89 @@ class ModerationTextRulesTest {
     }
 
     @Test
+    fun bypassKeywordKeepsLegacyUppercaseCaseSensitivityWhenToggleIsOff() {
+        assertFalse(
+            ModerationTextRules.matchesBypassKeyword(
+                text = "광고 a.b.c.d1234",
+                keyword = "ABCD1234",
+                ignoreLatinCase = false,
+                normalizeUnicode = false
+            )
+        )
+    }
+
+    @Test
+    fun bypassKeywordIgnoresLatinCaseWhenToggleIsOn() {
+        assertTrue(
+            ModerationTextRules.matchesBypassKeyword(
+                text = "광고 a.b-C.d1234",
+                keyword = "ABCD1234",
+                ignoreLatinCase = true,
+                normalizeUnicode = false
+            )
+        )
+    }
+
+    @Test
+    fun caseToggleDoesNotFoldNonLatinScripts() {
+        assertFalse(
+            ModerationTextRules.matchesBypassKeyword(
+                text = "aа",
+                keyword = "AА",
+                ignoreLatinCase = true,
+                normalizeUnicode = false
+            )
+        )
+    }
+
+    @Test
+    fun unicodeToggleNormalizesFullwidthKeywordCharacters() {
+        assertFalse(
+            ModerationTextRules.matchesBypassKeyword(
+                text = "ＡＢＣＤ1234",
+                keyword = "ABCD1234",
+                ignoreLatinCase = false,
+                normalizeUnicode = false
+            )
+        )
+        assertTrue(
+            ModerationTextRules.matchesBypassKeyword(
+                text = "ＡＢＣＤ1234",
+                keyword = "ABCD1234",
+                ignoreLatinCase = false,
+                normalizeUnicode = true
+            )
+        )
+    }
+
+    @Test
+    fun unicodeToggleDetectsCyrillicAndCherokeeHomoglyphs() {
+        assertFalse(
+            ModerationTextRules.matchesBypassKeyword(
+                text = "신작 А.Ꮩ 빠르게 올라오는 곳",
+                keyword = "AV",
+                ignoreLatinCase = false,
+                normalizeUnicode = false
+            )
+        )
+        assertTrue(
+            ModerationTextRules.matchesBypassKeyword(
+                text = "신작 А.Ꮩ 빠르게 올라오는 곳",
+                keyword = "AV",
+                ignoreLatinCase = false,
+                normalizeUnicode = true
+            )
+        )
+    }
+
+    @Test
+    fun unicodeToggleRemovesFormatCharactersBeforeMatching() {
+        assertEquals("AB", ModerationTextRules.normalizeBypassUnicode("A\u180EB"))
+        assertEquals("AB", ModerationTextRules.normalizeBypassUnicode("A\u200BB"))
+        assertEquals("AB", ModerationTextRules.normalizeBypassUnicode("A\u2060B"))
+    }
+
+    @Test
     fun specialCharacterFilterAllowsKoreanLatinDigitsSpacesAndCommonPunctuation() {
         val text = "안녕하세요 ㄱㅎ ㅏㅣ ABC xyz 123 .,‘’-\"“”@&₩)(;:/[]{}#%^*+=\\_|~<>$£¥•\n"
 

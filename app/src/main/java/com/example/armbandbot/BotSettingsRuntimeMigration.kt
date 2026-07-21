@@ -13,6 +13,8 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "ai_filter_use_custom_model" to false,
     "ai_use_custom_action_config" to false,
     "auto_login_enabled" to false,
+    "bypass_ignore_case_enabled" to false,
+    "bypass_unicode_normalization_enabled" to false,
     "delete_only_mode" to false,
     "delete_post_on_block" to true,
     "dccon_delete_only_mode" to false,

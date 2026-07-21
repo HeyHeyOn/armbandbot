@@ -175,6 +175,8 @@ class BotService : Service() {
 
         val normalWords: Array<String>,
         val bypassWords: Array<String>,
+        val bypassIgnoreCaseEnabled: Boolean,
+        val bypassUnicodeNormalizationEnabled: Boolean,
         val keywordApplyYudongOnly: Boolean,
         val keywordApplyKkangOnly: Boolean
     )
@@ -3495,8 +3497,6 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
     }
 
-    private fun buildBypassRegex(keyword: String): Regex = ModerationTextRules.buildBypassRegex(keyword)
-
     private fun isDcconElement(element: org.jsoup.nodes.Element): Boolean {
         val src = element.attr("src")
         return element.hasClass("written_dccon") ||
@@ -4254,6 +4254,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?.filter { it.isNotEmpty() }
                 ?.toTypedArray()
                 ?: arrayOf(),
+            bypassIgnoreCaseEnabled = botPref.getBoolean("bypass_ignore_case_enabled", false),
+            bypassUnicodeNormalizationEnabled = botPref.getBoolean("bypass_unicode_normalization_enabled", false),
             keywordApplyYudongOnly = botPref.getBoolean("keyword_apply_yudong_only", false),
             keywordApplyKkangOnly = botPref.getBoolean("keyword_apply_kkang_only", false)
         )
@@ -4443,7 +4445,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (toggles.keywordEnabled) config.normalWords.firstOrNull { postText.contains(it, ignoreCase = true) } else null
 
                 val matchedBypassWord =
-                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(postText) } else null
+                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull {
+                        ModerationTextRules.matchesBypassKeyword(
+                            text = postText,
+                            keyword = it,
+                            ignoreLatinCase = config.bypassIgnoreCaseEnabled,
+                            normalizeUnicode = config.bypassUnicodeNormalizationEnabled
+                        )
+                    } else null
 
                 suspiciousUrlInPost =
                     if (toggles.urlEnabled) getSuspiciousUrl(postText, config.urlWhitelistList) else null
@@ -4718,7 +4727,14 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (toggles.keywordEnabled) config.normalWords.firstOrNull { commentVisibleText.contains(it, ignoreCase = true) } else null
 
                 val matchedBypassWord =
-                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull { buildBypassRegex(it).containsMatchIn(commentVisibleText) } else null
+                    if (toggles.keywordEnabled) config.bypassWords.firstOrNull {
+                        ModerationTextRules.matchesBypassKeyword(
+                            text = commentVisibleText,
+                            keyword = it,
+                            ignoreLatinCase = config.bypassIgnoreCaseEnabled,
+                            normalizeUnicode = config.bypassUnicodeNormalizationEnabled
+                        )
+                    } else null
 
                 suspiciousUrlInComment =
                     if (toggles.urlEnabled) getSuspiciousUrl(commentVisibleText, config.urlWhitelistList) else null

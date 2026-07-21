@@ -446,6 +446,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var keywordDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("keyword_delete_only_mode")) botPref.getBoolean("keyword_delete_only_mode", false) else isDeleteOnlyMode) }
         var keywordApplyYudongOnly by remember { mutableStateOf(botPref.getBoolean("keyword_apply_yudong_only", false)) }
         var keywordApplyKkangOnly by remember { mutableStateOf(botPref.getBoolean("keyword_apply_kkang_only", false)) }
+        var bypassIgnoreCaseEnabled by remember { mutableStateOf(botPref.getBoolean("bypass_ignore_case_enabled", false)) }
+        var bypassUnicodeNormalizationEnabled by remember { mutableStateOf(botPref.getBoolean("bypass_unicode_normalization_enabled", false)) }
 
         var userUseCustomAction by remember { mutableStateOf(botPref.getBoolean("user_use_custom_action_config", false)) }
         var userActionMode by remember { mutableStateOf(readActionMode("user", isDeleteOnlyMode)) }
@@ -1457,6 +1459,34 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 "WORD" -> {
                                     ReadOnlyTextCard("일반 금지어 (완전히 일치하는 경우 차단)", normalWordsText, colors) { tempEditText = normalWordsText; editDialogType = "normal" }
                                     ReadOnlyTextCard("우회 금지어 (글자 사이 특수문자 등 무시)", bypassWordsText, colors) { tempEditText = bypassWordsText; editDialogType = "bypass" }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("우회 금지어 강화", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                                    Text("영문 대소문자 우회 감지", color = textColor, fontWeight = FontWeight.Bold)
+                                                    Text("대문자와 소문자를 같은 문자로 처리합니다. 예: abcd → AbCd", fontSize = 12.sp, color = subTextColor)
+                                                }
+                                                Switch(checked = bypassIgnoreCaseEnabled, onCheckedChange = {
+                                                    bypassIgnoreCaseEnabled = it
+                                                    botPref.edit().putBoolean("bypass_ignore_case_enabled", it).apply()
+                                                }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                            }
+                                            Divider(color = dividerColor)
+                                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                                    Text("유니코드 문자 우회 감지", color = textColor, fontWeight = FontWeight.Bold)
+                                                    Text("전각 문자, 보이지 않는 문자와 비슷하게 생긴 외국 문자를 정규화합니다.", fontSize = 12.sp, color = subTextColor)
+                                                }
+                                                Switch(checked = bypassUnicodeNormalizationEnabled, onCheckedChange = {
+                                                    bypassUnicodeNormalizationEnabled = it
+                                                    botPref.edit().putBoolean("bypass_unicode_normalization_enabled", it).apply()
+                                                }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
+                                            }
+                                        }
+                                    }
 
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text("금지어 적용 대상", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))

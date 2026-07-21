@@ -46,9 +46,17 @@ class BotSettingsRuntimeMigrationTest {
         assertEquals(emptySet<String>(), migrated["nickname_bypass_blacklist"])
         assertEquals(emptySet<String>(), migrated["special_char_whitelist"])
         assertFalse(migrated["is_special_char_filter_mode"] as Boolean)
+        assertFalse(migrated["bypass_ignore_case_enabled"] as Boolean)
+        assertFalse(migrated["bypass_unicode_normalization_enabled"] as Boolean)
         assertFalse(migrated["is_search_mode"] as Boolean)
         assertFalse(migrated["is_ai_filter_mode"] as Boolean)
         assertTrue(migrated["noti_master"] as Boolean)
+    }
+
+    @Test
+    fun bypassEnhancementTogglesAreExportable() {
+        assertTrue("bypass_ignore_case_enabled" in EXPORTABLE_BOOLEAN_KEYS)
+        assertTrue("bypass_unicode_normalization_enabled" in EXPORTABLE_BOOLEAN_KEYS)
     }
 
     @Test
