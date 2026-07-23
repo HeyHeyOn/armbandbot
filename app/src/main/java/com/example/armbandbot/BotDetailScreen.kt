@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -171,6 +172,210 @@ private fun ImageAltPreviewImage(imageUrl: String?, modifier: Modifier = Modifie
             )
         } else {
             Icon(Icons.Filled.Image, contentDescription = null, tint = Color(0xFF9E9E9E), modifier = Modifier.size(28.dp))
+        }
+    }
+}
+
+@Composable
+private fun BypassKeywordOptionsSection(
+    botPref: SharedPreferences,
+    isDarkMode: Boolean,
+    cardColor: Color,
+    textColor: Color,
+    subTextColor: Color,
+    dividerColor: Color,
+    kkangCriteriaGuide: String,
+) {
+    var ignoreLatinCase by remember(botPref) {
+        mutableStateOf(botPref.all["bypass_ignore_case_enabled"] as? Boolean ?: false)
+    }
+    var normalizeUnicode by remember(botPref) {
+        mutableStateOf(botPref.all["bypass_unicode_normalization_enabled"] as? Boolean ?: false)
+    }
+    var applyYudongOnly by remember(botPref) {
+        mutableStateOf(botPref.all["keyword_apply_yudong_only"] as? Boolean ?: false)
+    }
+    var applyKkangOnly by remember(botPref) {
+        mutableStateOf(botPref.all["keyword_apply_kkang_only"] as? Boolean ?: false)
+    }
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = Color.White,
+        checkedTrackColor = PastelNavy,
+        uncheckedThumbColor = if (isDarkMode) Color.LightGray else Color.White,
+        uncheckedTrackColor = if (isDarkMode) Color(0xFF555555) else Color.LightGray,
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+    Text("우회 금지어 강화", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text("영문 대소문자 우회 감지", color = textColor, fontWeight = FontWeight.Bold)
+                    Text("대문자와 소문자를 같은 문자로 처리합니다. 예: abcd → AbCd", fontSize = 12.sp, color = subTextColor)
+                }
+                Switch(checked = ignoreLatinCase, onCheckedChange = {
+                    ignoreLatinCase = it
+                    botPref.edit().putBoolean("bypass_ignore_case_enabled", it).apply()
+                }, colors = switchColors)
+            }
+            HorizontalDivider(color = dividerColor)
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text("유니코드 문자 우회 감지", color = textColor, fontWeight = FontWeight.Bold)
+                    Text("전각 문자, 보이지 않는 문자와 비슷하게 생긴 외국 문자를 정규화합니다.", fontSize = 12.sp, color = subTextColor)
+                }
+                Switch(checked = normalizeUnicode, onCheckedChange = {
+                    normalizeUnicode = it
+                    botPref.edit().putBoolean("bypass_unicode_normalization_enabled", it).apply()
+                }, colors = switchColors)
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+    Text("금지어 적용 대상", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("둘 다 끄면 모든 작성자에게 금지어 필터가 적용됩니다.", color = subTextColor, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("유동에게만 적용", color = textColor, fontWeight = FontWeight.Bold)
+                Switch(checked = applyYudongOnly, onCheckedChange = {
+                    applyYudongOnly = it
+                    botPref.edit().putBoolean("keyword_apply_yudong_only", it).apply()
+                }, colors = switchColors)
+            }
+            HorizontalDivider(color = dividerColor)
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("깡계에게만 적용", color = textColor, fontWeight = FontWeight.Bold)
+                    Text(kkangCriteriaGuide, fontSize = 12.sp, color = subTextColor)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(checked = applyKkangOnly, onCheckedChange = {
+                    applyKkangOnly = it
+                    botPref.edit().putBoolean("keyword_apply_kkang_only", it).apply()
+                }, colors = switchColors)
+            }
+        }
+    }
+}
+
+@Composable
+private fun KeywordActionSettingsSection(
+    botPref: SharedPreferences,
+    isDarkMode: Boolean,
+    cardColor: Color,
+    dialogBgColor: Color,
+    textColor: Color,
+    subTextColor: Color,
+    dividerColor: Color,
+    defaultActionMode: String,
+    defaultBlockDurationHours: Int,
+    defaultDeletePostOnBlock: Boolean,
+    actionModeOptions: Map<String, String>,
+    blockDurationOptions: Map<Int, String>,
+    blockReasonText: String,
+    onEditBlockReason: () -> Unit,
+) {
+    var useCustomAction by remember(botPref) { mutableStateOf(botPref.getBoolean("keyword_use_custom_action_config", false)) }
+    var actionMode by remember(botPref) {
+        mutableStateOf(
+            when (botPref.getString("keyword_block_process_mode", null)) {
+                "HOLD" -> "hold"
+                "DELETE" -> "delete"
+                "BLOCK" -> "block"
+                else -> if (botPref.getBoolean("keyword_delete_only_mode", defaultActionMode == "delete")) "delete" else defaultActionMode
+            }
+        )
+    }
+    var blockDurationHours by remember(botPref) { mutableStateOf(botPref.getInt("keyword_block_duration_hours", defaultBlockDurationHours)) }
+    var deletePostOnBlock by remember(botPref) {
+        mutableStateOf(if (botPref.contains("keyword_delete_post_on_block")) botPref.getBoolean("keyword_delete_post_on_block", true) else defaultDeletePostOnBlock)
+    }
+    var actionDropdownExpanded by remember { mutableStateOf(false) }
+    var durationDropdownExpanded by remember { mutableStateOf(false) }
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = Color.White,
+        checkedTrackColor = PastelNavy,
+        uncheckedThumbColor = if (isDarkMode) Color.LightGray else Color.White,
+        uncheckedTrackColor = if (isDarkMode) Color(0xFF555555) else Color.LightGray,
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+    Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor)
+                    Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor)
+                }
+                Switch(checked = useCustomAction, onCheckedChange = {
+                    useCustomAction = it
+                    botPref.edit().putBoolean("keyword_use_custom_action_config", it).apply()
+                }, colors = switchColors)
+            }
+        }
+    }
+    Column(modifier = if (!useCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
+        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor)
+                    Box {
+                        OutlinedButton(onClick = { if (useCustomAction) actionDropdownExpanded = true }) {
+                            Text(actionModeOptions[actionMode] ?: "차단", color = textColor)
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                        }
+                        DropdownMenu(expanded = actionDropdownExpanded, onDismissRequest = { actionDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                            actionModeOptions.forEach { (mode, label) ->
+                                DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
+                                    actionMode = mode
+                                    val storedMode = when (mode) { "delete" -> "DELETE"; "hold" -> "HOLD"; else -> "BLOCK" }
+                                    botPref.edit()
+                                        .putString("keyword_block_process_mode", storedMode)
+                                        .putBoolean("keyword_delete_only_mode", mode == "delete")
+                                        .apply()
+                                    actionDropdownExpanded = false
+                                })
+                            }
+                        }
+                    }
+                }
+                if (actionMode == "block") {
+                    HorizontalDivider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor)
+                        Box {
+                            OutlinedButton(onClick = { if (useCustomAction) durationDropdownExpanded = true }) {
+                                Text(blockDurationOptions[blockDurationHours] ?: "${blockDurationHours}시간", color = textColor)
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                            }
+                            DropdownMenu(expanded = durationDropdownExpanded, onDismissRequest = { durationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
+                                blockDurationOptions.forEach { (hours, label) ->
+                                    DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
+                                        blockDurationHours = hours
+                                        botPref.edit().putInt("keyword_block_duration_hours", hours).apply()
+                                        durationDropdownExpanded = false
+                                    })
+                                }
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("차단 시 글/댓글 함께 삭제", color = textColor)
+                        Switch(checked = deletePostOnBlock, onCheckedChange = {
+                            deletePostOnBlock = it
+                            botPref.edit().putBoolean("keyword_delete_post_on_block", it).apply()
+                        }, colors = switchColors)
+                    }
+                }
+            }
+        }
+        if (actionMode == "block") {
+            ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", blockReasonText, botColors(isDarkMode), onEditBlockReason)
         }
     }
 }
@@ -436,18 +641,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var blockExemptPostNumbersText by remember { mutableStateOf(botPref.getStringSet("block_exempt_post_numbers", setOf())?.joinToString("\n") ?: "") }
 
         // 금지어 필터 개별 차단 설정
-        var keywordUseCustomAction by remember { mutableStateOf(botPref.getBoolean("keyword_use_custom_action_config", false)) }
-        var keywordActionMode by remember { mutableStateOf(readActionMode("keyword", isDeleteOnlyMode)) }
-        var keywordBlockDurationHours by remember { mutableStateOf(botPref.getInt("keyword_block_duration_hours", blockDurationHours)) }
-        var isKeywordActionModeDropdownExpanded by remember { mutableStateOf(false) }
-        var isKeywordBlockDurationDropdownExpanded by remember { mutableStateOf(false) }
         var keywordBlockReasonText by remember { mutableStateOf(botPref.getString("keyword_block_reason_text", null) ?: blockReasonText) }
-        var keywordDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("keyword_delete_post_on_block")) botPref.getBoolean("keyword_delete_post_on_block", true) else isDeletePostOnBlock) }
-        var keywordDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("keyword_delete_only_mode")) botPref.getBoolean("keyword_delete_only_mode", false) else isDeleteOnlyMode) }
-        var keywordApplyYudongOnly by remember { mutableStateOf(botPref.getBoolean("keyword_apply_yudong_only", false)) }
-        var keywordApplyKkangOnly by remember { mutableStateOf(botPref.getBoolean("keyword_apply_kkang_only", false)) }
-        var bypassIgnoreCaseEnabled by remember { mutableStateOf(botPref.getBoolean("bypass_ignore_case_enabled", false)) }
-        var bypassUnicodeNormalizationEnabled by remember { mutableStateOf(botPref.getBoolean("bypass_unicode_normalization_enabled", false)) }
 
         var userUseCustomAction by remember { mutableStateOf(botPref.getBoolean("user_use_custom_action_config", false)) }
         var userActionMode by remember { mutableStateOf(readActionMode("user", isDeleteOnlyMode)) }
@@ -1460,114 +1654,35 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     ReadOnlyTextCard("일반 금지어 (완전히 일치하는 경우 차단)", normalWordsText, colors) { tempEditText = normalWordsText; editDialogType = "normal" }
                                     ReadOnlyTextCard("우회 금지어 (글자 사이 특수문자 등 무시)", bypassWordsText, colors) { tempEditText = bypassWordsText; editDialogType = "bypass" }
 
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text("우회 금지어 강화", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                                                    Text("영문 대소문자 우회 감지", color = textColor, fontWeight = FontWeight.Bold)
-                                                    Text("대문자와 소문자를 같은 문자로 처리합니다. 예: abcd → AbCd", fontSize = 12.sp, color = subTextColor)
-                                                }
-                                                Switch(checked = bypassIgnoreCaseEnabled, onCheckedChange = {
-                                                    bypassIgnoreCaseEnabled = it
-                                                    botPref.edit().putBoolean("bypass_ignore_case_enabled", it).apply()
-                                                }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
-                                            }
-                                            Divider(color = dividerColor)
-                                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                                                    Text("유니코드 문자 우회 감지", color = textColor, fontWeight = FontWeight.Bold)
-                                                    Text("전각 문자, 보이지 않는 문자와 비슷하게 생긴 외국 문자를 정규화합니다.", fontSize = 12.sp, color = subTextColor)
-                                                }
-                                                Switch(checked = bypassUnicodeNormalizationEnabled, onCheckedChange = {
-                                                    bypassUnicodeNormalizationEnabled = it
-                                                    botPref.edit().putBoolean("bypass_unicode_normalization_enabled", it).apply()
-                                                }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
-                                            }
-                                        }
-                                    }
+                                    BypassKeywordOptionsSection(
+                                        botPref = botPref,
+                                        isDarkMode = isDarkMode,
+                                        cardColor = cardColor,
+                                        textColor = textColor,
+                                        subTextColor = subTextColor,
+                                        dividerColor = dividerColor,
+                                        kkangCriteriaGuide = kkangCriteriaGuideText(),
+                                    )
 
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text("금지어 적용 대상", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
-                                            Text("둘 다 끄면 모든 작성자에게 금지어 필터가 적용됩니다.", color = subTextColor, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
-                                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Text("유동에게만 적용", color = textColor, fontWeight = FontWeight.Bold)
-                                                Switch(checked = keywordApplyYudongOnly, onCheckedChange = { keywordApplyYudongOnly = it; botPref.edit().putBoolean("keyword_apply_yudong_only", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
-                                            }
-                                            Divider(color = dividerColor)
-                                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text("깡계에게만 적용", color = textColor, fontWeight = FontWeight.Bold)
-                                                    Text(kkangCriteriaGuideText(), fontSize = 12.sp, color = subTextColor)
-                                                }
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Switch(checked = keywordApplyKkangOnly, onCheckedChange = { keywordApplyKkangOnly = it; botPref.edit().putBoolean("keyword_apply_kkang_only", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-                                    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Column {
-                                                    Text("개별 차단 설정 사용", fontWeight = FontWeight.Bold, color = textColor)
-                                                    Text("끄면 기본 차단 설정을 따릅니다.", fontSize = 12.sp, color = subTextColor)
-                                                }
-                                                Switch(checked = keywordUseCustomAction, onCheckedChange = { keywordUseCustomAction = it; botPref.edit().putBoolean("keyword_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
-                                            }
-                                        }
-                                    }
-                                    Column(modifier = if (!keywordUseCustomAction) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                                            Column(modifier = Modifier.padding(16.dp)) {
-                                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("처리 방식", fontWeight = FontWeight.Bold, color = textColor)
-                                                    Box {
-                                                        OutlinedButton(onClick = { if (keywordUseCustomAction) isKeywordActionModeDropdownExpanded = true }) {
-                                                            Text(actionModeOptions[keywordActionMode] ?: "차단", color = textColor)
-                                                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
-                                                        }
-                                                        DropdownMenu(expanded = isKeywordActionModeDropdownExpanded, onDismissRequest = { isKeywordActionModeDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                            actionModeOptions.forEach { (mode, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = {
-                                                                keywordActionMode = mode
-                                                                keywordDeleteOnlyMode = mode == "delete"
-                                                                saveActionMode("keyword", mode)
-                                                                isKeywordActionModeDropdownExpanded = false
-                                                            }) }
-                                                        }
-                                                    }
-                                                }
-                                                if (keywordActionMode == "block") {
-                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
-                                                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                        Text("차단 기간", fontWeight = FontWeight.Bold, color = textColor)
-                                                        Box {
-                                                            OutlinedButton(onClick = { if (keywordUseCustomAction) isKeywordBlockDurationDropdownExpanded = true }) {
-                                                                Text(blockDurationOptions[keywordBlockDurationHours] ?: "${keywordBlockDurationHours}시간", color = textColor)
-                                                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
-                                                            }
-                                                            DropdownMenu(expanded = isKeywordBlockDurationDropdownExpanded, onDismissRequest = { isKeywordBlockDurationDropdownExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
-                                                                blockDurationOptions.forEach { (hours, label) -> DropdownMenuItem(text = { Text(label, color = textColor) }, onClick = { keywordBlockDurationHours = hours; botPref.edit().putInt("keyword_block_duration_hours", hours).apply(); isKeywordBlockDurationDropdownExpanded = false }) }
-                                                            }
-                                                        }
-                                                    }
-                                                    Divider(color = dividerColor, modifier = Modifier.padding(bottom = 8.dp))
-                                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                        Text("차단 시 글/댓글 함께 삭제", color = textColor)
-                                                        Switch(checked = keywordDeletePostOnBlock, onCheckedChange = { keywordDeletePostOnBlock = it; botPref.edit().putBoolean("keyword_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray))
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        if (keywordActionMode == "block") {
-                                            ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", keywordBlockReasonText, colors) { tempEditText = keywordBlockReasonText; editDialogType = "keyword_block_reason" }
-                                        }
-                                    }
+                                    KeywordActionSettingsSection(
+                                        botPref = botPref,
+                                        isDarkMode = isDarkMode,
+                                        cardColor = cardColor,
+                                        dialogBgColor = dialogBgColor,
+                                        textColor = textColor,
+                                        subTextColor = subTextColor,
+                                        dividerColor = dividerColor,
+                                        defaultActionMode = if (isDeleteOnlyMode) "delete" else "block",
+                                        defaultBlockDurationHours = blockDurationHours,
+                                        defaultDeletePostOnBlock = isDeletePostOnBlock,
+                                        actionModeOptions = actionModeOptions,
+                                        blockDurationOptions = blockDurationOptions,
+                                        blockReasonText = keywordBlockReasonText,
+                                        onEditBlockReason = {
+                                            tempEditText = keywordBlockReasonText
+                                            editDialogType = "keyword_block_reason"
+                                        },
+                                    )
                                 }
                                 "SPEED" -> {
                                     Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp)) {
