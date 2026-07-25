@@ -94,6 +94,113 @@ class SnapshotViewerTest {
     }
 
     @Test
+    fun snapshotMediaPolicyOnlyAllowsHttpsDcImageAndDcconHosts() {
+        val valid = listOf(
+            "https://images.dcinside.com/source.jpg",
+            "https://dcimg5.dcinside.com/dccon.php?no=TOKEN",
+            "https://dcimg3.dcinside.co.kr/dccon.php?no=TOKEN2",
+            "//dcimg1.dcinside.com/image.webp",
+        )
+        valid.forEach { raw ->
+            assertTrue(raw, safeSnapshotMediaUrl(raw)?.startsWith("https://") == true)
+        }
+
+        val invalid = listOf(
+            "http://images.dcinside.com/source.jpg",
+            "https://user:password@images.dcinside.com/source.jpg",
+            "https://images.dcinside.com:443/source.jpg",
+            "https://evil.example/source.jpg",
+            "https://localhost/source.jpg",
+            "https://127.0.0.1/source.jpg",
+            "https://10.0.0.1/source.jpg",
+            "https://169.254.1.1/source.jpg",
+            "https://[::1]/source.jpg",
+            "https://images.dcinside.com.evil.example/source.jpg",
+            "https://notmedia.dcinside.com/source.jpg",
+            "javascript:alert(1)",
+        )
+        invalid.forEach { raw -> assertNull(raw, safeSnapshotMediaUrl(raw)) }
+    }
+
+    @Test
+    fun maliciousRestoredPumMediaNeverReachesPreviewElements() {
+        val card = """
+            <section class="armbandbot-pum-card" data-status="RESOLVED" data-source-key="MI/safe/1">
+              <div class="armbandbot-pum-body">
+                <p><img src="http://dcimg5.dcinside.com/plain.jpg"></p>
+                <p><img src="https://127.0.0.1/private"></p>
+                <p><img src="https://images.dcinside.com.evil.test/lookalike.jpg"></p>
+                <p><img src="https://images.dcinside.com/good.jpg"></p>
+              </div>
+            </section>
+        """.trimIndent()
+
+        val preview = parseSnapshot(writeSnapshot(snapshotHtml(card = card)).path).pumPreview!!
+
+        assertEquals("https://images.dcinside.com/good.jpg", preview.thumbnailUrl)
+        assertEquals(
+            listOf(BodyElement.ImageElement("https://images.dcinside.com/good.jpg")),
+            preview.bodyElements,
+        )
+    }
+
+    @Test
+    fun hugePumBodyIsDeterministicallyBoundedAndMarkedTruncated() {
+        val paragraphs = (1..(SNAPSHOT_PUM_MAX_BODY_ELEMENTS + 20)).joinToString("") {
+            "<p>${"x".repeat(500)}</p>"
+        }
+        val images = (1..(SNAPSHOT_PUM_MAX_MEDIA_URLS + 20)).joinToString("") {
+            "<img src=\"https://dcimg5.dcinside.com/image/$it.jpg\">"
+        }
+        val card = """
+            <section class="armbandbot-pum-card" data-status="RESOLVED" data-source-key="MI/safe/1">
+              <div class="armbandbot-pum-body">$images$paragraphs</div>
+            </section>
+        """.trimIndent()
+
+        val preview = parseSnapshot(writeSnapshot(snapshotHtml(card = card)).path).pumPreview!!
+        val mediaCount = preview.bodyElements.sumOf {
+            when (it) {
+                is BodyElement.ImageElement -> 1
+                is BodyElement.DcconRowElement -> it.urls.size
+                is BodyElement.TextElement -> 0
+            }
+        }
+        val textChars = preview.bodyElements.filterIsInstance<BodyElement.TextElement>().sumOf { it.text.length }
+
+        assertTrue(preview.bodyTruncated)
+        assertTrue(preview.bodyElements.size <= SNAPSHOT_PUM_MAX_BODY_ELEMENTS)
+        assertTrue(mediaCount <= SNAPSHOT_PUM_MAX_MEDIA_URLS)
+        assertTrue(textChars <= SNAPSHOT_PUM_MAX_TEXT_CHARS)
+        assertEquals("https://dcimg5.dcinside.com/image/1.jpg", preview.thumbnailUrl)
+    }
+
+    @Test
+    fun expandedPumBodyDoesNotComposeRepresentativeMediaTwice() {
+        val preview = SnapshotPumPreview(
+            status = PumSourceStatus.RESOLVED,
+            thumbnailUrl = "https://dcimg5.dcinside.com/dccon.php?no=A",
+            bodyElements = listOf(
+                BodyElement.DcconRowElement(
+                    listOf(
+                        "https://dcimg5.dcinside.com/dccon.php?no=A",
+                        "https://dcimg5.dcinside.com/dccon.php?no=B",
+                    )
+                ),
+                BodyElement.TextElement("본문"),
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                BodyElement.ImageElement("https://dcimg5.dcinside.com/dccon.php?no=B", isDccon = true),
+                BodyElement.TextElement("본문"),
+            ),
+            pumExpandedBodyElements(preview),
+        )
+    }
+
+    @Test
     fun legacySnapshotAndCommentMetadataRemainUnchangedWithoutPumCard() {
         val html = snapshotHtml(outerBody = "<p>레거시 본문</p>", card = "", title = "레거시 제목")
             .replace("</body>", """

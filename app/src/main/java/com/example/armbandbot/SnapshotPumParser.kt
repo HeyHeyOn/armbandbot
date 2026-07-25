@@ -16,6 +16,17 @@ data class SnapshotPumPreview(
     val previewText: String = "",
     val thumbnailUrl: String? = null,
     val bodyElements: List<BodyElement> = emptyList(),
+    val bodyTruncated: Boolean = false,
+)
+
+internal const val SNAPSHOT_PUM_MAX_BODY_ELEMENTS = 64
+internal const val SNAPSHOT_PUM_MAX_MEDIA_URLS = 24
+internal const val SNAPSHOT_PUM_MAX_TEXT_CHARS = 20_000
+private const val SNAPSHOT_PUM_MAX_SOURCE_NODES = 256
+
+internal data class BoundedSnapshotBody(
+    val elements: List<BodyElement>,
+    val truncated: Boolean,
 )
 
 internal fun parseSnapshotPumPreview(card: Element?): SnapshotPumPreview? {
@@ -29,11 +40,12 @@ internal fun parseSnapshotPumPreview(card: Element?): SnapshotPumPreview? {
         ?.let { DcinsidePostUrls.parseSafeCanonicalPostUrl(it, null) }
         ?.takeIf { sourceKey != null && it.key == sourceKey }
         ?.url
-    val bodyElements = if (status == PumSourceStatus.RESOLVED) {
-        SnapshotBodyParser.parseChildren(card.selectFirst(".armbandbot-pum-body"), includeDirectText = true)
+    val boundedBody = if (status == PumSourceStatus.RESOLVED) {
+        SnapshotBodyParser.parsePumChildren(card.selectFirst(".armbandbot-pum-body"))
     } else {
-        emptyList()
+        BoundedSnapshotBody(emptyList(), truncated = false)
     }
+    val bodyElements = boundedBody.elements
     return SnapshotPumPreview(
         status = status,
         galleryLabel = card.selectFirst(".armbandbot-pum-gallery")?.text().orEmpty(),
@@ -52,6 +64,7 @@ internal fun parseSnapshotPumPreview(card: Element?): SnapshotPumPreview? {
             }
         },
         bodyElements = bodyElements,
+        bodyTruncated = boundedBody.truncated,
     )
 }
 
@@ -88,6 +101,114 @@ internal object SnapshotBodyParser {
         } else {
             root?.children()?.forEach { child -> addChild(child) }
         }
+    }
+
+    fun parsePumChildren(root: Element?): BoundedSnapshotBody {
+        if (root == null) return BoundedSnapshotBody(emptyList(), truncated = false)
+        val elements = mutableListOf<BodyElement>()
+        var mediaCount = 0
+        var textChars = 0
+        var truncated = false
+
+        fun addText(raw: String) {
+            if (elements.size >= SNAPSHOT_PUM_MAX_BODY_ELEMENTS) {
+                truncated = true
+                return
+            }
+            if (raw.isEmpty()) {
+                elements += BodyElement.TextElement("")
+                return
+            }
+            val remaining = SNAPSHOT_PUM_MAX_TEXT_CHARS - textChars
+            if (remaining <= 0) {
+                truncated = true
+                return
+            }
+            val text = raw.take(remaining)
+            elements += BodyElement.TextElement(text)
+            textChars += text.length
+            if (text.length != raw.length) truncated = true
+        }
+
+        fun addMedia(url: String, isDccon: Boolean) {
+            if (elements.size >= SNAPSHOT_PUM_MAX_BODY_ELEMENTS || mediaCount >= SNAPSHOT_PUM_MAX_MEDIA_URLS) {
+                truncated = true
+                return
+            }
+            elements += BodyElement.ImageElement(url, isDccon)
+            mediaCount++
+        }
+
+        fun addElement(child: Element) {
+            if (elements.size >= SNAPSHOT_PUM_MAX_BODY_ELEMENTS) {
+                truncated = true
+                return
+            }
+            if (isVoice(child)) {
+                addText("[보이스리플]")
+                return
+            }
+            val dccons = DcconFilter.extractDcconRefsForDisplay(child.outerHtml())
+            val images = child.select("img")
+            when {
+                dccons.isNotEmpty() -> {
+                    val available = minOf(SNAPSHOT_PUM_MAX_MEDIA_URLS - mediaCount, dccons.size)
+                    val urls = dccons.asSequence()
+                        .map { DcconFilter.buildImageUrl(it.token) }
+                        .mapNotNull(::safeSnapshotMediaUrl)
+                        .take(available)
+                        .toList()
+                    if (urls.size < dccons.size) truncated = true
+                    if (urls.isNotEmpty() && elements.size < SNAPSHOT_PUM_MAX_BODY_ELEMENTS) {
+                        elements += if (urls.size == 1) BodyElement.ImageElement(urls.first(), isDccon = true)
+                        else BodyElement.DcconRowElement(urls)
+                        mediaCount += urls.size
+                    } else if (urls.isNotEmpty()) {
+                        truncated = true
+                    }
+                }
+                images.isNotEmpty() -> {
+                    for (image in images) {
+                        if (mediaCount >= SNAPSHOT_PUM_MAX_MEDIA_URLS ||
+                            elements.size >= SNAPSHOT_PUM_MAX_BODY_ELEMENTS) {
+                            truncated = true
+                            break
+                        }
+                        val raw = image.attr("src").ifEmpty { image.attr("data-original") }.ifEmpty { image.attr("data-src") }
+                        val isDccon = raw.contains("dccon.php", ignoreCase = true)
+                        val url = if (isDccon) {
+                            DcconFilter.normalizeBlacklistEntry(raw)
+                                ?.let(DcconFilter::buildImageUrl)
+                                ?.let(::safeSnapshotMediaUrl)
+                        } else {
+                            safeSnapshotMediaUrl(raw)
+                        }
+                        url?.let { addMedia(it, isDccon) }
+                    }
+                }
+                else -> {
+                    val rawHtml = child.html().replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
+                    val text = org.jsoup.Jsoup.parseBodyFragment(rawHtml).body()?.text()
+                        ?.replace("⏎", "\n")
+                        ?.replace(Regex("\n[ \\t]+"), "\n")
+                        ?: child.text()
+                    addText(text)
+                }
+            }
+        }
+
+        val nodes = root.childNodes()
+        for ((index, node) in nodes.withIndex()) {
+            if (index >= SNAPSHOT_PUM_MAX_SOURCE_NODES || elements.size >= SNAPSHOT_PUM_MAX_BODY_ELEMENTS) {
+                truncated = true
+                break
+            }
+            when (node) {
+                is Element -> addElement(node)
+                is org.jsoup.nodes.TextNode -> node.text().trim().takeIf(String::isNotEmpty)?.let(::addText)
+            }
+        }
+        return BoundedSnapshotBody(elements, truncated)
     }
 
     private fun MutableList<BodyElement>.addChild(child: Element) {
@@ -139,7 +260,11 @@ internal fun safeSnapshotMediaUrl(raw: String): String? {
     if (trimmed.isEmpty()) return null
     val normalized = if (trimmed.startsWith("//")) "https:$trimmed" else trimmed
     val uri = runCatching { URI(normalized) }.getOrNull() ?: return null
-    if (uri.userInfo != null || uri.host.isNullOrBlank() ||
-        (!uri.scheme.equals("https", true) && !uri.scheme.equals("http", true))) return null
+    if (!uri.scheme.equals("https", true) || uri.userInfo != null || uri.port != -1 || uri.host.isNullOrBlank()) {
+        return null
+    }
+    val host = uri.host.lowercase(Locale.ROOT)
+    val approvedHost = Regex("(?:image|images|dcimg[0-9]+)\\.dcinside\\.(?:com|co\\.kr)")
+    if (!approvedHost.matches(host)) return null
     return uri.toASCIIString()
 }

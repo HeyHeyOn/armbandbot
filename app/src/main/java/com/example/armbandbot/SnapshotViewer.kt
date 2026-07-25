@@ -381,7 +381,11 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                             }
                         }
                         d.pumPreview?.let { preview ->
-                            SnapshotPumCard(preview = preview, isDarkMode = isDarkMode)
+                            SnapshotPumCard(
+                                preview = preview,
+                                isDarkMode = isDarkMode,
+                                snapshotIdentity = currentPath,
+                            )
                         }
                         HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
                     }

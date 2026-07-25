@@ -1,20 +1,20 @@
 package com.heyheyon.armbandbot
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -26,6 +26,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,10 +39,32 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.heyheyon.armbandbot.ui.PastelNavy
 
+internal fun pumExpandedBodyElements(preview: SnapshotPumPreview): List<BodyElement> = buildList {
+    val thumbnail = preview.thumbnailUrl
+    preview.bodyElements.forEach { element ->
+        when (element) {
+            is BodyElement.TextElement -> add(element)
+            is BodyElement.ImageElement -> if (element.url != thumbnail) add(element)
+            is BodyElement.DcconRowElement -> {
+                val remaining = element.urls.filterNot { it == thumbnail }
+                when (remaining.size) {
+                    0 -> Unit
+                    1 -> add(BodyElement.ImageElement(remaining.first(), isDccon = true))
+                    else -> add(BodyElement.DcconRowElement(remaining))
+                }
+            }
+        }
+    }
+}
+
 /** Small, isolated PUM viewer to keep SnapshotViewerScreen's method count and composition shallow. */
 @Composable
-internal fun SnapshotPumCard(preview: SnapshotPumPreview, isDarkMode: Boolean) {
-    var expanded by remember(preview.sourceKey, preview.contentHash) { mutableStateOf(false) }
+internal fun SnapshotPumCard(
+    preview: SnapshotPumPreview,
+    isDarkMode: Boolean,
+    snapshotIdentity: String,
+) {
+    var expanded by remember(snapshotIdentity, preview.sourceKey, preview.contentHash) { mutableStateOf(false) }
     val resolved = preview.status == PumSourceStatus.RESOLVED
     val background = when {
         !resolved && isDarkMode -> Color(0xFF3B3020)
@@ -91,22 +118,40 @@ internal fun SnapshotPumCard(preview: SnapshotPumPreview, isDarkMode: Boolean) {
                     modifier = Modifier.fillMaxWidth().height(180.dp).padding(top = 8.dp),
                 )
             }
+            if (preview.bodyTruncated) {
+                Text(
+                    "일부 내용이 생략되었습니다",
+                    color = secondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
 
             if (preview.bodyElements.isNotEmpty()) {
-                Text(
-                    if (expanded) "원문 내용 접기" else "원문 내용 보기",
-                    color = PastelNavy,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 10.dp).clickable { expanded = !expanded },
-                )
-                // Keep the potentially large source tree out of composition until explicitly requested.
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = if (expanded) "펌 원문 내용 접기" else "펌 원문 내용 펼치기"
+                            stateDescription = if (expanded) "펼쳐짐" else "접힘"
+                        },
+                ) {
+                    Text(
+                        if (expanded) "원문 내용 접기" else "원문 내용 보기",
+                        color = PastelNavy,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                    )
+                }
+                // Keep the bounded source tree out of composition until explicitly requested.
                 if (expanded) {
                     Column(
                         Modifier.fillMaxWidth().padding(top = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        preview.bodyElements.forEachIndexed { index, element ->
+                        pumExpandedBodyElements(preview).forEachIndexed { index, element ->
                             key("pum-body-$index-${element.hashCode()}") {
                                 SnapshotPumBodyElement(element, pumImageReferer(preview), foreground)
                             }
@@ -115,13 +160,22 @@ internal fun SnapshotPumCard(preview: SnapshotPumPreview, isDarkMode: Boolean) {
                 }
             }
             preview.sourceUrl?.let { url ->
-                Text(
-                    "원본 링크",
-                    color = PastelNavy,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 10.dp).clickable { uriHandler.openUri(url) },
-                )
+                TextButton(
+                    onClick = { uriHandler.openUri(url) },
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "펌 원문 링크 열기"
+                        },
+                ) {
+                    Text(
+                        "원본 링크",
+                        color = PastelNavy,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                    )
+                }
             }
         }
     }
@@ -141,11 +195,9 @@ private fun SnapshotPumBodyElement(element: BodyElement, referer: String, textCo
             contentDescription = if (element.isDccon) "펌 원문 디시콘" else "펌 원문 이미지",
             modifier = if (element.isDccon) Modifier.size(80.dp) else Modifier.fillMaxWidth().height(240.dp),
         )
-        is BodyElement.DcconRowElement -> Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-            element.urls.forEachIndexed { index, url ->
-                key("pum-dccon-$index-$url") {
-                    SnapshotPumImage(url, referer, "펌 원문 디시콘", Modifier.size(80.dp))
-                }
+        is BodyElement.DcconRowElement -> LazyRow(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+            itemsIndexed(element.urls, key = { index, url -> "pum-dccon-$index-$url" }) { _, url ->
+                SnapshotPumImage(url, referer, "펌 원문 디시콘", Modifier.size(80.dp))
             }
         }
     }
@@ -153,10 +205,11 @@ private fun SnapshotPumBodyElement(element: BodyElement, referer: String, textCo
 
 @Composable
 private fun SnapshotPumImage(url: String, referer: String, contentDescription: String, modifier: Modifier) {
+    val safeUrl = safeSnapshotMediaUrl(url) ?: return
     val context = LocalContext.current
     AsyncImage(
         model = ImageRequest.Builder(context)
-            .data(url)
+            .data(safeUrl)
             .setHeader("Referer", referer)
             .setHeader("User-Agent", "Mozilla/5.0")
             .crossfade(true)
