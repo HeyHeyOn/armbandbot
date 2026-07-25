@@ -19,6 +19,22 @@ class PumParserTest {
         assertFalse(PumParser.hasListMarker(nestedInFooter))
     }
 
+    @Test fun `list marker decision is scoped to the current title link`() {
+        val document = Jsoup.parse("""
+            <table>
+              <tr class='ub-content'><td class='gall_tit ub-word'>
+                <a class='first' href='/board/view/?id=x&amp;no=1'>ordinary</a>
+              </td></tr>
+              <tr class='ub-content'><td class='gall_tit ub-word'>
+                <a class='second' href='/board/view/?id=x&amp;no=2'><span class='font_blue009'>(펌)</span> copied</a>
+              </td></tr>
+            </table>
+        """.trimIndent())
+
+        assertFalse(PumParser.hasListMarker(document.selectFirst("a.first")!!))
+        assertTrue(PumParser.hasListMarker(document.selectFirst("a.second")!!))
+    }
+
     @Test fun `detail loader and marker produce confirmed detection`() {
         val detection = PumParser.parseDetail(Jsoup.parse(fixture("pum_detail.html")), listMarker = true)
         assertEquals(PumDetectionStatus.PUM_CONFIRMED, detection.status)

@@ -52,4 +52,75 @@ class PostChangeDetectionTest {
             )
         )
     }
+
+    @Test
+    fun everyCycleRechecksUnchangedPumRowsWhenSourceFilteringIsEnabled() {
+        assertTrue(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "(펌) 같은 제목",
+                currentTitle = "(펌) 같은 제목",
+                isPumSourceFilterMode = true,
+                pumRecheckEveryCycle = true,
+                hasPumListMarker = true
+            )
+        )
+    }
+
+    @Test
+    fun everyCycleDoesNotForceUnchangedOrdinaryRows() {
+        assertFalse(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                isPumSourceFilterMode = true,
+                pumRecheckEveryCycle = true,
+                hasPumListMarker = false
+            )
+        )
+    }
+
+    @Test
+    fun everyCycleDoesNotForcePumRowsWhenSourceFilteringIsDisabled() {
+        assertFalse(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "(펌) 같은 제목",
+                currentTitle = "(펌) 같은 제목",
+                isPumSourceFilterMode = false,
+                pumRecheckEveryCycle = true,
+                hasPumListMarker = true
+            )
+        )
+    }
+
+    @Test
+    fun disabledEveryCycleKeepsExistingChangeDetectionForPumRows() {
+        assertFalse(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "(펌) 같은 제목",
+                currentTitle = "(펌) 같은 제목",
+                isPumSourceFilterMode = true,
+                pumRecheckEveryCycle = false,
+                hasPumListMarker = true
+            )
+        )
+        assertTrue(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "(펌) 이전 제목",
+                currentTitle = "(펌) 바뀐 제목",
+                isPumSourceFilterMode = true,
+                pumRecheckEveryCycle = false,
+                hasPumListMarker = true
+            )
+        )
+    }
 }

@@ -153,6 +153,9 @@ class BotService : Service() {
         val isVoiceFilterMode: Boolean,
         val voiceBlacklist: List<String>,
 
+        val isPumSourceFilterMode: Boolean,
+        val pumRecheckEveryCycle: Boolean,
+
         val isAiFilterMode: Boolean,
         val aiFilterProvider: String,
         val aiFilterEndpoint: String,
@@ -1464,7 +1467,16 @@ class BotService : Service() {
             val savedPost = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)
             val savedCommentCount = savedPost?.commentCount ?: -1
             val savedTitle = savedPost?.title
-            if (!shouldRecheckPost(savedCommentCount, currentCommentCount, savedTitle, text)) {
+            val hasPumListMarker = PumParser.hasListMarker(titleElement)
+            if (!shouldRecheckPost(
+                    savedCommentCount = savedCommentCount,
+                    currentCommentCount = currentCommentCount,
+                    savedTitle = savedTitle,
+                    currentTitle = text,
+                    isPumSourceFilterMode = config.isPumSourceFilterMode,
+                    pumRecheckEveryCycle = config.pumRecheckEveryCycle,
+                    hasPumListMarker = hasPumListMarker
+                )) {
                 if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
                 continue
             }
@@ -1475,6 +1487,7 @@ class BotService : Service() {
                     savedCommentCount != currentCommentCount && titleChanged -> "댓글 수/제목 변경"
                     savedCommentCount != currentCommentCount -> "댓글 수 변경"
                     titleChanged -> "제목 변경"
+                    config.isPumSourceFilterMode && config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
                     else -> "변경 감지"
                 }
                 sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
@@ -4218,6 +4231,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?.map { it.removeCommentAndTrim() }
                 ?.filter { it.isNotEmpty() }
                 ?: emptyList(),
+
+            isPumSourceFilterMode = botPref.getBoolean("is_pum_source_filter_mode", false),
+            pumRecheckEveryCycle = botPref.getBoolean("pum_recheck_every_cycle", false),
 
             isAiFilterMode = botPref.getBoolean("is_ai_filter_mode", false),
             aiFilterProvider = botPref.getString("ai_filter_provider", "openai_compatible")?.trim().orEmpty(),

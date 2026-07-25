@@ -13,6 +13,18 @@ object PumParser {
         document.select("tr.ub-content > td.gall_tit.ub-word > a[href] > span.font_blue009")
             .any { it.text() == "(펌)" }
 
+    /** Checks only the supplied list row's title link, never another post in the document. */
+    fun hasListMarker(titleLink: Element): Boolean {
+        if (titleLink.tagName() != "a" || !titleLink.hasAttr("href")) return false
+        val titleCell = titleLink.parent() ?: return false
+        val row = titleCell.parent() ?: return false
+        if (titleCell.tagName() != "td" || !titleCell.hasClass("gall_tit") || !titleCell.hasClass("ub-word")) return false
+        if (row.tagName() != "tr" || !row.hasClass("ub-content")) return false
+        return titleLink.children().any {
+            it.tagName() == "span" && it.hasClass("font_blue009") && it.text() == "(펌)"
+        }
+    }
+
     fun parseDetail(document: Document, listMarker: Boolean = hasListMarker(document)): PumDetection {
         val loader = document.select(".write_div script").asSequence().mapNotNull(::parseLoader).firstOrNull()
         val status = when {
