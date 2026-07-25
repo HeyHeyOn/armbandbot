@@ -33,7 +33,7 @@ class BotService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private val activeBots = ConcurrentHashMap<String, Job>()
     private val aiBatchQueues = ConcurrentHashMap<String, AiBatchQueue>()
-    private val aiBatchResults = ConcurrentHashMap<String, ConcurrentHashMap<PostKey, AiFilterPostDecision>>()
+    private val aiBatchResults = ConcurrentHashMap<String, ConcurrentHashMap<PostKey, AiBatchResult>>()
     private val aiBatchFailureBackoffUntil = ConcurrentHashMap<String, Long>()
     private val pendingAiPostPlans = ConcurrentHashMap<String, MutableList<AiPostExecutionPlan>>()
     private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
@@ -2445,14 +2445,62 @@ img.written_dccon{max-width:80px;max-height:80px}
         val spamCodeMatchPost = postAnalysis.spamCodeMatchPost
         val matchedImageAlt = postAnalysis.matchedImageAlt
         val matchedVoiceIdPost = postAnalysis.matchedVoiceIdPost
+        val currentAiComments = buildList {
+            if (commentsArray != null) {
+                for (i in 0 until commentsArray.length()) {
+                    val commentObj = commentsArray.optJSONObject(i) ?: continue
+                    val commentNo = commentObj.optString("no", "").trim()
+                    if (commentNo.isBlank()) continue
+                    val commentMemo = commentObj.optString("memo", "")
+                    if (isDeletedCommentMemo(commentMemo)) continue
+                    add(
+                        AiFilterCommentInput(
+                            commentId = commentNo,
+                            authorIdOrIp = commentObj.optString("user_id", "").ifEmpty { commentObj.optString("ip", "") },
+                            nickname = commentObj.optString("name", ""),
+                            body = commentMemo,
+                        )
+                    )
+                }
+            }
+        }
+        val currentAiPostInput = AiFilterPostInput(
+            postKey = postKey,
+            title = text,
+            authorIdOrIp = postAuthor,
+            nickname = postNick,
+            body = postText,
+            mediaSources = postImageAlts,
+            comments = currentAiComments,
+        )
+        val stalePostPlans = aiPostPlans.filter { it.postKey == postKey && !it.matches(currentAiPostInput) }
+        stalePostPlans.forEach {
+            aiPostPlans.remove(it)
+            aiPostPlanKeys.remove(it.postKey)
+        }
+        val staleCommentPlans = aiCommentPlans.filter { it.postKey == postKey && !it.matches(currentAiPostInput) }
+        staleCommentPlans.forEach {
+            aiCommentPlans.remove(it)
+            aiCommentPlanKeys.remove(it.postKey to it.commentNo)
+        }
         var aiDecision = postAnalysis.aiDecision
         var aiReviewReason = postAnalysis.aiReviewReason
         var blockReasonPrefix = postAnalysis.blockReasonPrefix
         var notiType = postAnalysis.notiType
 
-        val cachedAiPostDecision = aiBatchResults[botId]?.remove(postKey)
+        val cachedAiBatchResult = aiBatchResults[botId]?.remove(postKey)
+        var consumedAiBatchResult = cachedAiBatchResult
+            ?.takeIf { it.matches(postKey, currentAiPostInput) }
+        val cachedAiPostDecision = consumedAiBatchResult?.decision
+        if (cachedAiBatchResult != null && cachedAiPostDecision == null && config.isDebugMode && botId.isNotEmpty()) {
+            sendLog("[AI 배치] 입력 변경으로 오래된 결과 폐기 / 글번호: $postNumStr", botId)
+        }
         if (cachedAiPostDecision != null) {
-            aiDecision = cachedAiPostDecision.decision
+            val application = applyAiPostDecision(cachedAiPostDecision)
+            aiDecision = application.decision
+            application.reviewReason?.let { aiReviewReason = it }
+            application.blockReasonPrefix?.let { blockReasonPrefix = it }
+            application.notificationType?.let { notiType = it }
             if (config.isDebugMode && botId.isNotEmpty()) {
                 sendLog("[AI 결과][게시글] 번호: $postNumStr / decision=${aiDecision?.type} / reason=${aiDecision?.reason ?: "없음"} / category=${aiDecision?.category ?: "other"} / confidence=${aiDecision?.confidence ?: 0}", botId)
                 cachedAiPostDecision.commentDecisions.forEach { commentDecision ->
@@ -2464,7 +2512,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                     postKey = postKey,
                     reason = aiDecision?.reason ?: "AI 판단 사유 없음",
                     category = aiDecision?.category ?: "other",
-                    confidence = aiDecision?.confidence ?: 0
+                    confidence = aiDecision?.confidence ?: 0,
+                    inputFingerprint = AiInputFingerprint.from(currentAiPostInput),
                 )
             }
             cachedAiPostDecision.commentDecisions
@@ -2477,7 +2526,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                             commentNo = commentDecision.commentId,
                             reason = commentDecision.decision.reason,
                             category = commentDecision.decision.category,
-                            confidence = commentDecision.decision.confidence
+                            confidence = commentDecision.decision.confidence,
+                            inputFingerprint = AiInputFingerprint.from(currentAiPostInput),
                         )
                     }
                 }
@@ -2493,30 +2543,6 @@ img.written_dccon{max-width:80px;max-height:80px}
                 sendLog("[AI 배치] AI 필터 활성 / 글 번호: $postNumStr / 댓글 수: ${commentsArray?.length() ?: 0}", botId)
             }
             runCatching {
-                val aiComments = buildList {
-                    if (commentsArray != null) {
-                        for (i in 0 until commentsArray.length()) {
-                            val commentObj = commentsArray.optJSONObject(i) ?: continue
-                            val commentNo = commentObj.optString("no", "").trim()
-                            if (commentNo.isBlank()) continue
-                            val cmtUid = commentObj.optString("user_id", "")
-                            val cmtIp = commentObj.optString("ip", "")
-                            val cmtNick = commentObj.optString("name", "")
-                            val cmtAuthor = cmtUid.ifEmpty { cmtIp }
-                            val commentMemo = commentObj.optString("memo", "")
-                            if (isDeletedCommentMemo(commentMemo)) continue
-                            add(
-                                AiFilterCommentInput(
-                                    commentId = commentNo,
-                                    authorIdOrIp = cmtAuthor,
-                                    nickname = cmtNick,
-                                    body = commentMemo,
-                                )
-                            )
-                        }
-                    }
-                }
-
                 val queue = aiBatchQueues.getOrPut(botId) {
                     AiBatchQueue(
                         maxPosts = config.aiFilterBatchMaxPosts.coerceAtLeast(1),
@@ -2527,15 +2553,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                 val queueItem = AiBatchQueueItem(
                     postKey = postKey,
-                    postInput = AiFilterPostInput(
-                        postKey = postKey,
-                        title = text,
-                        authorIdOrIp = postAuthor,
-                        nickname = postNick,
-                        body = postText,
-                        mediaSources = postImageAlts,
-                        comments = aiComments,
-                    )
+                    postInput = currentAiPostInput
                 )
                 queue.addOrReplace(queueItem)
 
@@ -2558,7 +2576,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         sendLog("[AI 배치] 이전 호출 실패로 ${remainSec}초 뒤 재시도합니다.", botId)
                     }
                 } else if (isOversizeSingle || shouldFlushNow) {
-                    val flushItems = if (isOversizeSingle) listOf(queueItem) else queue.drainFlushable()
+                    val flushItems = if (isOversizeSingle) listOfNotNull(queue.remove(queueItem.postKey)) else queue.drainFlushable()
                     val aiProviderName = when {
                         config.aiFilterProvider.equals("gemini_direct", ignoreCase = true) -> "GEMINI_DIRECT"
                         config.aiFilterProvider.equals("groq", ignoreCase = true) -> "GROQ"
@@ -2614,14 +2632,17 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                     val resultCache = aiBatchResults.getOrPut(botId) { ConcurrentHashMap() }
                     aiBatchEvaluation.postDecisions.forEach { decision ->
-                        resultCache[decision.postKey] = decision
+                        val evaluatedInput = flushItems.firstOrNull { it.postKey == decision.postKey }?.postInput
+                            ?: return@forEach
+                        resultCache[decision.postKey] = AiBatchResult.forInput(decision, evaluatedInput)
 
                         if (decision.decision.type == AiFilterDecisionType.BLOCK && aiPostPlanKeys.add(decision.postKey)) {
                             aiPostPlans += AiPostExecutionPlan(
                                 postKey = decision.postKey,
                                 reason = decision.decision.reason,
                                 category = decision.decision.category,
-                                confidence = decision.decision.confidence
+                                confidence = decision.decision.confidence,
+                                inputFingerprint = AiInputFingerprint.from(evaluatedInput),
                             )
                             if (botId.isNotEmpty() && config.isDebugMode) {
                                 sendLog("[AI 배치][즉시집행 복구] 글 실행계획 추가 / 글번호: ${decision.postNo} / reason=${decision.decision.reason} / category=${decision.decision.category} / confidence=${decision.decision.confidence}", botId)
@@ -2638,7 +2659,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         commentNo = commentDecision.commentId,
                                         reason = commentDecision.decision.reason,
                                         category = commentDecision.decision.category,
-                                        confidence = commentDecision.decision.confidence
+                                        confidence = commentDecision.decision.confidence,
+                                        inputFingerprint = AiInputFingerprint.from(evaluatedInput),
                                     )
                                     if (botId.isNotEmpty() && config.isDebugMode) {
                                         sendLog("[AI 배치][즉시집행 복구] 댓글 실행계획 추가 / 글번호: ${decision.postNo} / comment=${commentDecision.commentId} / reason=${commentDecision.decision.reason} / category=${commentDecision.decision.category} / confidence=${commentDecision.decision.confidence}", botId)
@@ -2684,7 +2706,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                             if (config.isDebugMode) {
                                 logModerationActionResolution(botId, "ai_post_immediate", aiOverride, resolvedConfig)
                             }
-                            handleBadPost(
+                            val executionResult = handleBadPost(
                                 config = config,
                                 botId = botId,
                                 gallType = targetKey.gallType,
@@ -2728,9 +2750,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     )
                                 },
                             )
-                            aiPostPlans.removeAll { it.postKey == decision.postKey }
-                            pendingAiPostPlans[botId] = aiPostPlans
-                            resultCache.remove(decision.postKey)
+                            if (!AiExecutionPolicy.shouldRetry(executionResult.success, executionResult.response)) {
+                                aiPostPlans.removeAll { it.postKey == decision.postKey }
+                                pendingAiPostPlans[botId] = aiPostPlans
+                                resultCache.remove(decision.postKey)
+                            } else if (config.isDebugMode && botId.isNotEmpty()) {
+                                sendLog("[AI 배치][재시도] 글 즉시집행 실패로 계획과 결과 유지 / 글번호: ${decision.postNo}", botId)
+                            }
                         }.onFailure {
                             if (config.isDebugMode && botId.isNotEmpty()) {
                                 sendLog("[AI 배치][즉시집행 복구] 글 즉시집행 실패 / 글번호: ${decision.postNo} / error=${it.message ?: "원인 불명"}", botId)
@@ -2811,7 +2837,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     if (config.isDebugMode) {
                                         logModerationActionResolution(botId, "ai_comment_immediate", aiOverride, resolvedConfig)
                                     }
-                                    handleBadComment(
+                                    val executionResult = handleBadComment(
                                         config = config,
                                         botId = botId,
                                         gallType = targetKey.gallType,
@@ -2851,8 +2877,15 @@ img.written_dccon{max-width:80px;max-height:80px}
                                             )
                                         }
                                     )
-                                    aiCommentPlans.removeAll { it.postKey == postDecision.postKey && it.commentNo == commentDecision.commentId }
-                                    pendingAiCommentPlans[botId] = aiCommentPlans
+                                    if (!AiExecutionPolicy.shouldRetry(executionResult.success, executionResult.response)) {
+                                        aiCommentPlans.removeAll { it.postKey == postDecision.postKey && it.commentNo == commentDecision.commentId }
+                                        pendingAiCommentPlans[botId] = aiCommentPlans
+                                        resultCache.computeIfPresent(postDecision.postKey) { _, result ->
+                                            result.withoutComment(commentDecision.commentId)
+                                        }
+                                    } else if (config.isDebugMode && botId.isNotEmpty()) {
+                                        sendLog("[AI 배치][재시도] 댓글 즉시집행 실패로 계획 유지 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId}", botId)
+                                    }
                                 }.onFailure {
                                     if (config.isDebugMode && botId.isNotEmpty()) {
                                         sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 실패 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId} / error=${it.message ?: "원인 불명"}", botId)
@@ -2864,11 +2897,22 @@ img.written_dccon{max-width:80px;max-height:80px}
                     flushItems.forEach { flushedItem ->
                         val flushedDecision = resultCache[flushedItem.postKey] ?: return@forEach
                         if (botId.isNotEmpty() && config.isDebugMode && flushedItem.postKey != postKey) {
-                            sendLog("[AI 배치][즉시집행 복구] 대기 결과 유지 / 글번호: ${flushedItem.postNo} / postDecision=${flushedDecision.decision.type} / commentDecisions=${flushedDecision.commentDecisions.size}", botId)
+                            sendLog("[AI 배치][즉시집행 복구] 대기 결과 유지 / 글번호: ${flushedItem.postNo} / postDecision=${flushedDecision.decision.decision.type} / commentDecisions=${flushedDecision.decision.commentDecisions.size}", botId)
                         }
                     }
 
-                    val batchPostDecision = resultCache.remove(postKey)
+                    val batchResult = resultCache.remove(postKey)
+                    val batchPostDecision = batchResult
+                        ?.takeIf { it.matches(postKey, currentAiPostInput) }
+                        ?.decision
+                    if (batchPostDecision != null) {
+                        consumedAiBatchResult = batchResult
+                        val application = applyAiPostDecision(batchPostDecision)
+                        aiDecision = application.decision
+                        application.reviewReason?.let { aiReviewReason = it }
+                        application.blockReasonPrefix?.let { blockReasonPrefix = it }
+                        application.notificationType?.let { notiType = it }
+                    }
                     if (batchPostDecision != null && config.isDebugMode && botId.isNotEmpty()) {
                         sendLog("[AI 결과][게시글] 번호: $postNumStr / decision=${batchPostDecision.decision.type} / reason=${batchPostDecision.decision.reason} / category=${batchPostDecision.decision.category} / confidence=${batchPostDecision.decision.confidence}", botId)
                         batchPostDecision.commentDecisions.forEach { commentDecision ->
@@ -3125,13 +3169,18 @@ img.written_dccon{max-width:80px;max-height:80px}
                 }
             )
 
-            if (postBlockResult.success) {
+            if (!AiExecutionPolicy.shouldRetry(postBlockResult.success, postBlockResult.response)) {
                 if (postBlockResult.mode != ModerationActionMode.HOLD) {
                     isPostBlocked = true
                 }
                 dbBlockReason = postBlockResult.blockReason
             } else {
                 moderationFailed = true
+                if (aiPostExecutionPlan != null) {
+                    consumedAiBatchResult?.let { result ->
+                        aiBatchResults.getOrPut(botId) { ConcurrentHashMap() }[postKey] = result
+                    }
+                }
                 if (aiPostExecutionPlan != null && aiPostPlans.none { it.postKey == aiPostExecutionPlan.postKey }) {
                     aiPostPlans.add(aiPostExecutionPlan)
                     aiPostPlanKeys.add(aiPostExecutionPlan.postKey)
@@ -3335,7 +3384,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                             }
                         )
 
-                        if (commentBlockResult.success) {
+                        if (!AiExecutionPolicy.shouldRetry(commentBlockResult.success, commentBlockResult.response)) {
+                            if (aiCommentPlan != null) {
+                                consumedAiBatchResult = consumedAiBatchResult?.withoutComment(aiCommentPlan.commentNo)
+                                consumedAiBatchResult?.let { prunedResult ->
+                                    aiBatchResults[botId]?.computeIfPresent(postKey) { _, _ -> prunedResult }
+                                }
+                            }
                             dbBlockReason = commentBlockResult.blockReason
                             if (commentBlockResult.mode != ModerationActionMode.HOLD) {
                                 isPostBlocked = true
@@ -3346,6 +3401,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                             }
                         } else {
                             moderationFailed = true
+                            if (aiCommentPlan != null) {
+                                consumedAiBatchResult?.let { result ->
+                                    aiBatchResults.getOrPut(botId) { ConcurrentHashMap() }[postKey] = result
+                                }
+                            }
                             if (aiCommentPlan != null && aiCommentPlans.none { it.postKey == aiCommentPlan.postKey && it.commentNo == aiCommentPlan.commentNo }) {
                                 aiCommentPlans.add(aiCommentPlan)
                                 aiCommentPlanKeys.add(aiCommentPlan.postKey to aiCommentPlan.commentNo)
