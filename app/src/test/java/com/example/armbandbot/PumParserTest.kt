@@ -12,6 +12,11 @@ class PumParserTest {
         assertTrue(PumParser.hasListMarker(pum))
         val normal = Jsoup.parse(fixture("normal_title_contains_pum.html"))
         assertFalse(PumParser.hasListMarker(normal))
+
+        val nestedInTitle = Jsoup.parse("""<tr class='ub-content'><td class='gall_tit ub-word'><a href='/board/view/?id=x&no=1'><span class='title'><span class='font_blue009'>(펌)</span></span></a></td></tr>""")
+        val nestedInFooter = Jsoup.parse("""<tr class='ub-content'><td class='gall_tit ub-word'><a href='/board/view/?id=x&no=1'>title</a><footer><span class='font_blue009'>(펌)</span></footer></td></tr>""")
+        assertFalse(PumParser.hasListMarker(nestedInTitle))
+        assertFalse(PumParser.hasListMarker(nestedInFooter))
     }
 
     @Test fun `detail loader and marker produce confirmed detection`() {
@@ -75,5 +80,35 @@ class PumParserTest {
     @Test fun `repum card points directly at ultimate original`() {
         val card = PumParser.parseCard(fixture("repum_points_to_original.html"), PostKey("G", "outer", "8"))
         assertEquals(PostKey("G", "ultimate", "77"), card.sourceKey)
+    }
+
+    @Test fun `card only trusts documented card body link and requires one distinct safe source`() {
+        val valid = "https://gall.dcinside.com/board/view/?id=good&no=1"
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<a href='$valid'>outside</a><div class='cloned_card_body'>broken</div>", null).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<div class='cloned_card_body'><a href='$valid'>one</a><a href='https://gall.dcinside.com/board/view/?id=other&no=2'>two</a></div>", null).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<div class='cloned_card_body'><a href='$valid'>safe</a><a href='https://evil.example/board/view/?id=x&no=2'>disallowed</a></div>", null).status)
+        assertEquals(PumCardStatus.RESOLVED, PumParser.parseCard("<div class='cloned_card_body'><a href='$valid'>one</a><a href='$valid&from=copy'>duplicate</a></div>", null).status)
+        listOf(
+            "<html><form action='/login'>login</form></html>",
+            "<div class='cloned_card_body'>server error</div>",
+            "<div class='cloned_card_body'><a href='https://evil.example/board/view/?id=x&no=1'>bad</a></div>",
+            "<div class='cloned_card_body'><a href='javascript:alert(1)'>bad</a></div>"
+        ).forEach { assertEquals(it, PumCardStatus.INVALID, PumParser.parseCard(it, null).status) }
+    }
+
+    @Test fun `loader extraction binds data to pum ajax block and endpoint is exact`() {
+        val adversarial = """<div class='write_div'><script>
+            $.ajax({url:'/unrelated', data:{gall_id:'wrong',gall_no:'1',gall_type:'G'}, complete:function(){ return {nested:'}'}; }});
+            $.ajax({url:'/ajax/pum_ajax/get_contents', data:{gall_id:'right',gall_no:'2',gall_type:'M'}});
+        </script></div>"""
+        assertEquals(PostKey("M", "right", "2"), PumParser.parseDetail(Jsoup.parse(adversarial), false).loader?.outerPost)
+        listOf(
+            "https://gall.dcinside.com/ajax/pum_ajax/get_contents?x=1",
+            "https://gall.dcinside.com/ajax/pum_ajax/get_contents#x",
+            "https://gall.dcinside.com:444/ajax/pum_ajax/get_contents"
+        ).forEach { endpoint ->
+            val html = "<div class='write_div'><script>$.ajax({url:'$endpoint',data:{gall_id:'x',gall_no:'1'}});</script></div>"
+            assertNull(endpoint, PumParser.parseDetail(Jsoup.parse(html), false).loader)
+        }
     }
 }

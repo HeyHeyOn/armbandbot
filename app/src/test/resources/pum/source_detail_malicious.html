@@ -1,0 +1,8 @@
+<!doctype html><html><head><meta http-equiv="refresh" content="0;url=https://evil.example"><style>.x{display:none}</style></head><body>
+<span class="title_subject">Malicious test</span>
+<div class="write_div"><!-- hidden --><div style="color:red" class="x" data-secret="yes">visible <strong>kept</strong></div>
+<img src="/safe.jpg" srcset="https://evil.example/a 2x" alt="safe alt" style="x" onerror="bad()">
+<a href="javascript:bad()" formaction="https://evil.example" title="link title">unsafe link</a>
+<svg><a xlink:href="https://evil.example"><text>svg text</text></a></svg><math><mi>math text</mi></math>
+<style>body{background:url(https://evil.example)}</style><meta http-equiv="refresh" content="0;url=x">
+<div class="comment_box"><p>nested comment secret</p></div></div></body></html>

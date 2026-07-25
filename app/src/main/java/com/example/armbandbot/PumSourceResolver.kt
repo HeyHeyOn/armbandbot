@@ -2,6 +2,9 @@ package com.heyheyon.armbandbot
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Comment
+import org.jsoup.nodes.Element
+import org.jsoup.nodes.Node
 import java.io.ByteArrayOutputStream
 import java.io.ByteArrayInputStream
 import java.io.IOException
@@ -99,7 +102,10 @@ class PumSourceResolver(
         }
         val key = card.sourceKey ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
         val sourceUrl = card.sourceUrl ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
-        return sourceCache.getOrPut(key) { resolveSource(key, sourceUrl) }
+        sourceCache[key]?.let { return it }
+        val resolved = resolveSource(key, sourceUrl)
+        if (resolved.status != PumSourceStatus.TEMPORARY_FAILURE) sourceCache[key] = resolved
+        return resolved
     }
 
     private fun resolveSource(key: PostKey, sourceUrl: String): PumResolution {
@@ -124,33 +130,60 @@ class PumSourceResolver(
         val body = document.selectFirst(".write_div")
             ?: return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
         val title = document.selectFirst(".title_subject, .write_subject, .write_title")?.text()?.normalizeWhitespace().orEmpty()
-        val sanitized = body.clone()
-        sanitized.select("script, form, iframe, object, embed, input").remove()
-        for (element in sanitized.allElements) {
-            element.attributes().asList().forEach { attr ->
-                val name = attr.key.lowercase(Locale.ROOT)
-                if (name.startsWith("on") || name == "srcdoc") element.removeAttr(attr.key)
-            }
-            for (attribute in listOf("src", "href", "poster")) {
-                if (!element.hasAttr(attribute)) continue
-                val absolute = element.absUrl(attribute)
-                val uri = try { URI(absolute) } catch (_: Exception) { null }
-                if (uri?.scheme?.lowercase(Locale.ROOT) != "https" || uri.host.isNullOrBlank()) {
-                    element.removeAttr(attribute)
-                } else {
-                    element.attr(attribute, absolute)
-                }
-            }
-        }
+        val sanitized = sanitizeBody(body)
         val bodyText = sanitized.text().normalizeWhitespace()
         val imageAlts = sanitized.select("img[alt]").map { it.attr("alt").normalizeWhitespace() }.filter { it.isNotEmpty() }
         val media = sanitized.select("img[src], video[src], audio[src], source[src], [poster]")
             .flatMap { element -> listOf("src", "poster").mapNotNull { attr -> element.attr(attr).takeIf { it.isNotBlank() } } }
             .distinct()
-        val normalized = listOf(title, bodyText, imageAlts.joinToString("\n"), media.joinToString("\n")).joinToString("\n--\n")
-        val hash = MessageDigest.getInstance("SHA-256").digest(normalized.toByteArray())
+        val canonicalHtml = sanitized.html()
+        val hashInput = listOf(
+            key.gallType, key.gallId, key.postNo, sourceUrl, title, bodyText,
+            imageAlts.joinToString("\n"), media.joinToString("\n"), canonicalHtml,
+        ).joinToString("") { value -> "${value.toByteArray(Charsets.UTF_8).size}:$value" }
+        val hash = MessageDigest.getInstance("SHA-256").digest(hashInput.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
-        return PumResolution(PumSourceStatus.RESOLVED, key, sourceUrl, title, bodyText, imageAlts, sanitized.html(), media, hash)
+        return PumResolution(PumSourceStatus.RESOLVED, key, sourceUrl, title, bodyText, imageAlts, canonicalHtml, media, hash)
+    }
+
+    private fun sanitizeBody(original: Element): Element {
+        val body = original.clone()
+        body.select(".comment_box, .comment_wrap, .reply_box, .cmt_info, [id^=comment]").remove()
+        body.select("script, style, meta, link, base, form, button, input, textarea, select, option, iframe, frame, object, embed, canvas, template, noscript, svg, math").remove()
+        removeComments(body)
+
+        // Unknown presentation tags are unwrapped so their static text survives; active-content
+        // families above are removed with their descendants.
+        body.allElements.toList().asReversed().forEach { element ->
+            if (element !== body && element.tagName().lowercase(Locale.ROOT) !in ALLOWED_TAGS) element.unwrap()
+        }
+        body.allElements.forEach { element ->
+            val tag = element.tagName().lowercase(Locale.ROOT)
+            val allowed = ALLOWED_ATTRIBUTES[tag].orEmpty()
+            val retained = element.attributes().asList().mapNotNull { attribute ->
+                val name = attribute.key.lowercase(Locale.ROOT)
+                if (name !in allowed) return@mapNotNull null
+                var value = attribute.value
+                if (name in URL_ATTRIBUTES) {
+                    value = element.absUrl(name)
+                    val uri = try { URI(value) } catch (_: Exception) { null }
+                    if (uri?.scheme?.lowercase(Locale.ROOT) != "https" || uri.host.isNullOrBlank() || uri.userInfo != null) {
+                        return@mapNotNull null
+                    }
+                }
+                name to value
+            }.sortedBy { it.first }
+            element.attributes().asList().forEach { element.removeAttr(it.key) }
+            retained.forEach { (name, value) -> element.attr(name, value) }
+        }
+        body.ownerDocument()?.outputSettings()?.prettyPrint(false)
+        return body
+    }
+
+    private fun removeComments(node: Node) {
+        node.childNodes().toList().forEach { child ->
+            if (child is Comment) child.remove() else removeComments(child)
+        }
     }
 
     private fun credentialHeaders(referer: String): Map<String, String> = buildMap {
@@ -179,7 +212,13 @@ class PumSourceResolver(
                             ?.url
                         RedirectKind.CARD -> safeCardEndpoint(absolute)
                     } ?: throw UnsafeRedirectException()
-                    request = request.copy(url = safeUrl, method = "GET", formData = emptyMap())
+                    request = if (response.statusCode == 307 || response.statusCode == 308) {
+                        request.copy(url = safeUrl)
+                    } else {
+                        // RFC 7231: 303 is always retrieval; retain conventional browser behavior
+                        // for POST requests receiving 301/302.
+                        request.copy(url = safeUrl, method = "GET", formData = emptyMap())
+                    }
                     return@repeat
                 }
                 return BufferedResponse(response.statusCode, readLimited(body, response.contentLength, maxBytes))
@@ -191,8 +230,8 @@ class PumSourceResolver(
     private fun safeCardEndpoint(raw: String): String? {
         val uri = try { URI(raw) } catch (_: Exception) { return null }
         if (!uri.scheme.equals("https", true) || !uri.host.equals("gall.dcinside.com", true) || uri.port != -1 || uri.userInfo != null) return null
-        if (uri.path != "/ajax/pum_ajax/get_contents") return null
-        return uri.toString()
+        if (uri.path != "/ajax/pum_ajax/get_contents" || uri.rawQuery != null || uri.rawFragment != null) return null
+        return "https://gall.dcinside.com/ajax/pum_ajax/get_contents"
     }
 
     private fun readLimited(input: InputStream, contentLength: Long, maxBytes: Int): String {
@@ -222,5 +261,17 @@ class PumSourceResolver(
         const val SOURCE_MAX_BYTES = 2 * 1024 * 1024
         private const val MAX_REDIRECTS = 3
         private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
+        private val URL_ATTRIBUTES = setOf("href", "src", "poster")
+        private val ALLOWED_TAGS = setOf(
+            "div", "p", "br", "span", "strong", "b", "em", "i", "u", "s", "del", "blockquote",
+            "pre", "code", "ul", "ol", "li", "hr", "a", "img", "video", "audio", "source",
+        )
+        private val ALLOWED_ATTRIBUTES = mapOf(
+            "a" to setOf("href", "title"),
+            "img" to setOf("src", "alt", "title"),
+            "video" to setOf("src", "poster", "controls", "title"),
+            "audio" to setOf("src", "controls", "title"),
+            "source" to setOf("src", "type"),
+        )
     }
 }

@@ -119,11 +119,87 @@ class PumSourceResolverTest {
             "https://gall.dcinside.com/mini/board/view/?id=mini&no=3"
         )
         links.forEach { link ->
-            val card = "<a href='$link'>원문</a>"
+            val card = "<div class='cloned_card_body'><a href='$link'>원문</a></div>"
             val http = FakeClient().apply { body(card); body(fixture("source_detail.html")) }
             assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(http).resolve(loaderDoc, true).status)
             assertEquals(link, http.requests[1].url)
             assertEquals(link, http.requests[1].headers["Referer"])
         }
+    }
+
+    @Test fun `sanitizer is strict allowlist and hash includes canonical markup`() {
+        val malicious = fixture("source_detail_malicious.html")
+        fun resolve(source: String): PumResolution {
+            val http = FakeClient().apply { body(fixture("pum_card_resolved.html")); body(source) }
+            return PumSourceResolver(http).resolve(loaderDoc, true)
+        }
+        val first = resolve(malicious)
+        val second = resolve(malicious)
+        assertEquals(PumSourceStatus.RESOLVED, first.status)
+        assertEquals(first.contentHash, second.contentHash)
+        val html = first.sanitizedHtml.lowercase()
+        listOf("style=", "<style", "<meta", "<svg", "<math", "srcset", "xlink:href", "formaction", "onclick", "javascript:", "<!--", "comment_box", "data-secret", "class=").forEach {
+            assertFalse("must remove $it from $html", html.contains(it))
+        }
+        assertTrue(html.contains("<strong>kept</strong>"))
+        assertTrue(html.contains("alt=\"safe alt\""))
+        assertTrue(first.mediaSources.contains("https://gall.dcinside.com/safe.jpg"))
+        val markupOnlyChange = malicious.replace("<strong>kept</strong>", "<em>kept</em>")
+        val changedMarkup = resolve(markupOnlyChange)
+        assertEquals(first.bodyText, changedMarkup.bodyText)
+        assertNotEquals(first.contentHash, changedMarkup.contentHash)
+        assertNotEquals(first.contentHash, resolve(malicious.replace("safe alt", "changed alt")).contentHash)
+    }
+
+    @Test fun `card redirects require canonical endpoint and honor redirect methods`() {
+        val bad = FakeClient().apply { body("", 302, mapOf("Location" to "https://gall.dcinside.com/ajax/pum_ajax/get_contents?x=1")) }
+        assertEquals(PumSourceStatus.INVALID_SOURCE, PumSourceResolver(bad).resolve(loaderDoc, true).status)
+        assertEquals(1, bad.requests.size)
+        val seeOther = FakeClient().apply {
+            body("", 303, mapOf("Location" to "https://gall.dcinside.com/ajax/pum_ajax/get_contents")); body(fixture("pum_card_missing.html"))
+        }
+        PumSourceResolver(seeOther).resolve(loaderDoc, true)
+        assertEquals("GET", seeOther.requests[1].method)
+        assertTrue(seeOther.requests[1].formData.isEmpty())
+        val preserve = FakeClient().apply {
+            body("", 307, mapOf("Location" to "https://gall.dcinside.com/ajax/pum_ajax/get_contents")); body(fixture("pum_card_missing.html"))
+        }
+        PumSourceResolver(preserve).resolve(loaderDoc, true)
+        assertEquals("POST", preserve.requests[1].method)
+        assertEquals(preserve.requests[0].formData, preserve.requests[1].formData)
+    }
+
+    @Test fun `redirect loops are bounded`() {
+        val http = FakeClient().apply { repeat(4) { body("", 308, mapOf("Location" to "https://gall.dcinside.com/ajax/pum_ajax/get_contents")) } }
+        assertEquals(PumSourceStatus.TEMPORARY_FAILURE, PumSourceResolver(http).resolve(loaderDoc, true).status)
+        assertEquals(4, http.requests.size)
+    }
+
+    @Test fun `source two MiB declared limit rejects before buffering`() {
+        class CountingStream : InputStream() {
+            var reads = 0
+            override fun read(): Int { reads++; return 'x'.code }
+        }
+        val stream = CountingStream()
+        val http = FakeClient().apply {
+            body(fixture("pum_card_resolved.html"))
+            responses += PumHttpResponse(200, emptyMap(), PumSourceResolver.SOURCE_MAX_BYTES.toLong() + 1, stream)
+        }
+        assertEquals(PumSourceStatus.TEMPORARY_FAILURE, PumSourceResolver(http).resolve(loaderDoc, true).status)
+        assertEquals(0, stream.reads)
+    }
+
+    @Test fun `temporary source failures are not cached but stable outcomes are`() {
+        val http = FakeClient().apply {
+            body(fixture("pum_card_resolved.html")); responses += IOException("temporary")
+            body(fixture("pum_card_resolved.html")); body(fixture("source_detail.html"))
+            body(fixture("pum_card_resolved.html"))
+        }
+        val resolver = PumSourceResolver(http)
+        assertEquals(PumSourceStatus.TEMPORARY_FAILURE, resolver.resolve(loaderDoc, true).status)
+        val stable = resolver.resolve(loaderDoc, true)
+        assertEquals(PumSourceStatus.RESOLVED, stable.status)
+        assertSame(stable, resolver.resolve(loaderDoc, true))
+        assertEquals(5, http.requests.size)
     }
 }
