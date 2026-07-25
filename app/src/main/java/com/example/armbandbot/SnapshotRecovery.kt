@@ -1,9 +1,28 @@
 package com.heyheyon.armbandbot
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 internal data class SnapshotIdentity(val gallId: String, val postNum: String)
 internal typealias SnapshotFileIndex = Map<String, List<File>>
+
+internal data class SnapshotVersionPaths(val initialPath: String, val latestPath: String)
+
+private val snapshotVersionName = Regex("^(.+)_(initial|latest)(_[0-9]+)?\\.html$")
+
+/** Pairs plain and explicitly supported numbered restore snapshots. */
+internal fun deriveSnapshotVersionPaths(snapshotPath: String): SnapshotVersionPaths? {
+    val file = File(snapshotPath)
+    val match = snapshotVersionName.matchEntire(file.name) ?: return null
+    val prefix = match.groupValues[1]
+    val suffix = match.groupValues[3]
+    val parent = file.parentFile
+    return SnapshotVersionPaths(
+        File(parent, "${prefix}_initial${suffix}.html").path,
+        File(parent, "${prefix}_latest${suffix}.html").path,
+    )
+}
 
 internal fun mergeCheckedPostPreservingSnapshot(
     existing: CheckedPost?,
@@ -66,67 +85,88 @@ internal fun saveGeneralSnapshotPreservingExistingInitial(
     html: String,
     allowedSnapshotRoots: List<File> = listOfNotNull(initialFile.parentFile?.parentFile),
 ): String {
-    val existingInitial = existingSnapshotPath
+    val expectedPrefix = initialFile.name.removeSuffix("_initial.html")
+    val trustedExisting = existingSnapshotPath
         ?.takeIf { it.isNotBlank() }
         ?.let(::File)
-        ?.asInitialSnapshotCandidate()
-        ?.takeIf { candidate -> candidate.isTrustedReadableSnapshot(initialFile, allowedSnapshotRoots) }
+        ?.validatedLegacySnapshot(expectedPrefix, allowedSnapshotRoots)
 
-    // A pre-1.4.5 DB path is itself the baseline identity. Keep both its bytes and its path;
-    // copying it into the current bot folder would cause the DB row to be replaced on recheck.
-    if (existingInitial != null) {
-        latestFile.parentFile?.mkdirs()
-        latestFile.writeText(html)
-        return existingInitial.absolutePath
+    if (trustedExisting != null) {
+        val pair = deriveSnapshotVersionPaths(trustedExisting.path)
+            ?: error("Validated snapshot did not have a supported version name")
+        // Derive both destinations from the canonical trusted parent, but never follow a sibling
+        // symlink while selecting a write target.
+        val initialCandidate = File(pair.initialPath)
+        val latestCandidate = File(pair.latestPath)
+        val trustedName = snapshotVersionName.matchEntire(trustedExisting.name)
+            ?: error("Validated snapshot did not have a supported version name")
+        val baseline = if (trustedName.groupValues[2] == "initial") {
+            trustedExisting
+        } else {
+            initialCandidate.validatedLegacySnapshot(expectedPrefix, allowedSnapshotRoots)
+                ?: run {
+                    if (initialCandidate.exists() || Files.isSymbolicLink(initialCandidate.toPath())) {
+                        error("Refusing to overwrite an untrusted initial sibling")
+                    }
+                    // A latest-only legacy row still contains the oldest bytes we know about. Commit
+                    // those bytes to a new baseline before attempting to update latest.
+                    atomicWrite(initialCandidate, trustedExisting.readBytes())
+                    initialCandidate.validatedLegacySnapshot(expectedPrefix, allowedSnapshotRoots)
+                        ?: error("Could not preserve legacy latest as initial baseline")
+                }
+        }
+
+        // Always update beside the canonical baseline (including numbered restores), so the viewer
+        // can discover both versions. Atomic replacement cannot partially overwrite the old latest.
+        if (Files.isSymbolicLink(latestCandidate.toPath())) {
+            error("Refusing to write latest through a symbolic link")
+        }
+        atomicWrite(latestCandidate, html.toByteArray(Charsets.UTF_8))
+        return baseline.canonicalPath
     }
 
     return if (!initialFile.isFile) {
-        initialFile.parentFile?.mkdirs()
-        initialFile.writeText(html)
+        atomicWrite(initialFile, html.toByteArray(Charsets.UTF_8))
         if (latestFile.exists()) latestFile.delete()
         initialFile.absolutePath
     } else {
-        latestFile.writeText(html)
+        atomicWrite(latestFile, html.toByteArray(Charsets.UTF_8))
         latestFile.absolutePath
     }
 }
 
-private fun File.isTrustedReadableSnapshot(expectedInitial: File, allowedRoots: List<File>): Boolean {
-    val canonicalCandidate = runCatching { canonicalFile }.getOrNull() ?: return false
-    if (!canonicalCandidate.isFile || !canonicalCandidate.canRead() || canonicalCandidate.length() <= 0L) return false
-    val expectedPrefix = expectedInitial.name.removeSuffix("_initial.html")
-    if (!canonicalCandidate.name.startsWith("${expectedPrefix}_initial") ||
-        !canonicalCandidate.name.endsWith(".html", ignoreCase = true)) return false
-    val snapshotDirectory = canonicalCandidate.parentFile ?: return false
-    if (!snapshotDirectory.name.startsWith("snapshots_")) return false
+/** Returns the canonical file, never the caller's traversal or symlink alias. */
+private fun File.validatedLegacySnapshot(expectedPrefix: String, allowedRoots: List<File>): File? {
+    val canonicalCandidate = runCatching { canonicalFile }.getOrNull() ?: return null
+    val exactAllowedName = Regex(
+        "^${Regex.escape(expectedPrefix)}_(?:initial|latest)(?:_[0-9]+)?\\.html$"
+    )
+    if (!exactAllowedName.matches(canonicalCandidate.name)) return null
+    if (!canonicalCandidate.isFile || !canonicalCandidate.canRead() || canonicalCandidate.length() <= 0L) return null
+    val snapshotDirectory = canonicalCandidate.parentFile ?: return null
+    if (!snapshotDirectory.name.startsWith("snapshots_")) return null
     val inAllowedRoot = allowedRoots.any { root ->
         val canonicalRoot = runCatching { root.canonicalFile }.getOrNull() ?: return@any false
-        canonicalCandidate.toPath().startsWith(canonicalRoot.toPath())
+        canonicalCandidate.toPath().startsWith(canonicalRoot.toPath()) && canonicalCandidate != canonicalRoot
     }
-    if (!inAllowedRoot) return false
-    return runCatching { canonicalCandidate.inputStream().use { it.read() >= 0 } }.getOrDefault(false)
+    if (!inAllowedRoot) return null
+    return canonicalCandidate.takeIf {
+        runCatching { it.inputStream().use { stream -> stream.read() >= 0 } }.getOrDefault(false)
+    }
 }
 
-private fun File.asInitialSnapshotCandidate(): File? {
-    val htmlSuffix = ".html"
-    if (!name.endsWith(htmlSuffix, ignoreCase = true)) return null
-
-    val stem = name.dropLast(htmlSuffix.length)
-    val lowerStem = stem.lowercase()
-    fun numberedSuffixAfter(marker: String): Pair<Int, String>? {
-        val markerIndex = lowerStem.lastIndexOf(marker)
-        if (markerIndex < 0) return null
-        val suffix = stem.substring(markerIndex + marker.length)
-        val isRestoreSuffix = suffix.isEmpty() ||
-            (suffix.startsWith('_') && suffix.length > 1 && suffix.drop(1).all(Char::isDigit))
-        return if (isRestoreSuffix) markerIndex to suffix else null
+private fun atomicWrite(target: File, bytes: ByteArray) {
+    val parent = target.parentFile ?: error("Snapshot has no parent directory")
+    if (!parent.exists() && !parent.mkdirs()) error("Could not create snapshot directory")
+    val temp = Files.createTempFile(parent.toPath(), ".snapshot-", ".tmp")
+    try {
+        Files.write(temp, bytes)
+        try {
+            Files.move(temp, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            Files.move(temp, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    } finally {
+        Files.deleteIfExists(temp)
     }
-
-    numberedSuffixAfter("_initial")?.let { return this }
-    val (latestIndex, restoreSuffix) = numberedSuffixAfter("_latest") ?: return null
-    val initialSibling = File(
-        parentFile,
-        stem.substring(0, latestIndex) + "_initial" + restoreSuffix + htmlSuffix
-    )
-    return initialSibling.takeIf { it.isFile } ?: this
 }

@@ -292,19 +292,9 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
     val context = LocalContext.current
     var showWebView by remember { mutableStateOf(false) }
 
-    val initialPath = remember(snapshotPath) {
-        when {
-            snapshotPath.endsWith("_latest.html") -> snapshotPath.replace("_latest.html", "_initial.html")
-            snapshotPath.endsWith("_initial.html") -> snapshotPath
-            else -> null
-        }
-    }
-    val latestPath = remember(snapshotPath) {
-        when {
-            snapshotPath.endsWith("_initial.html") -> snapshotPath.replace("_initial.html", "_latest.html")
-            else -> snapshotPath
-        }
-    }
+    val versionPaths = remember(snapshotPath) { deriveSnapshotVersionPaths(snapshotPath) }
+    val initialPath = versionPaths?.initialPath
+    val latestPath = versionPaths?.latestPath ?: snapshotPath
     val hasInitial = remember(initialPath, latestPath) {
         initialPath?.let { File(it).exists() && File(latestPath).exists() && it != latestPath } ?: false
     }
@@ -376,7 +366,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
             }
 
             if (hasInitial) {
-                val isShowingLatest = currentPath.endsWith("_latest.html")
+                val isShowingLatest = currentPath == latestPath
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

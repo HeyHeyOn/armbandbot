@@ -7,6 +7,15 @@ import java.io.File
 
 class SnapshotViewerTest {
     @Test
+    fun numberedInitialAndLatestPathsArePairedForSwitching() {
+        val initial = File("/cache/snapshots_imported/armbandbot_244_initial_2.html")
+        val latest = File("/cache/snapshots_imported/armbandbot_244_latest_2.html")
+
+        assertEquals(SnapshotVersionPaths(initial.path, latest.path), deriveSnapshotVersionPaths(initial.path))
+        assertEquals(SnapshotVersionPaths(initial.path, latest.path), deriveSnapshotVersionPaths(latest.path))
+    }
+
+    @Test
     fun parseSnapshotKeepsBodyAndCommentDcconsAsImageUrls() {
         val html = """
             <html><body>

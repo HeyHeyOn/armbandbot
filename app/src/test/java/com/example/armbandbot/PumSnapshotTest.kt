@@ -11,6 +11,15 @@ import java.nio.file.Files
 
 class PumSnapshotTest {
     @Test
+    fun immediateBlockOnlyReceivesPumResolutionForMatchingPost() {
+        val resolution = resolved(sanitizedHtml = "<p>source</p>")
+        val current = PostKey("MI", "test", "10")
+
+        assertEquals(resolution, matchingPumResolution(current, current, resolution))
+        assertEquals(null, matchingPumResolution(PostKey("MI", "test", "11"), current, resolution))
+    }
+
+    @Test
     fun resolvedCardIsStaticStoredAndDoesNotMutateLiveDocument() {
         val live = Jsoup.parse("<html><body><article><div class='write_div'><script>loadPum()</script><p>outer</p></div></article></body></html>")
         val before = live.html()
@@ -73,6 +82,54 @@ class PumSnapshotTest {
     }
 
     @Test
+    fun adversarialBehaviorIsRemovedFromWholeSnapshotAndSourceCard() {
+        val live = Jsoup.parse("""
+            <html><head>
+              <meta http-equiv='refresh' content='0;url=javascript:boom'>
+              <base href='https://evil.test/'><style>body{display:none}</style>
+              <link rel='stylesheet' href='https://evil.test/x.css'>
+            </head><body style='background:url(javascript:boom)' onload='boom()'>
+              <svg><animate onbegin='boom()'/><a xlink:href='javascript:boom'>svg</a></svg>
+              <math href='javascript:boom'><mtext>math</mtext></math>
+              <div class='write_div'><img srcset='javascript:boom 1x' background='javascript:boom'></div>
+            </body></html>
+        """.trimIndent())
+        val source = resolved(sanitizedHtml = """
+            <p style='color:red' onclick='boom()'>safe text</p>
+            <a href='#safe'>anchor</a><a href='blob:https://evil.test/id' cite='javascript:boom'>bad</a>
+            <img src='http://images.example/safe.jpg' srcset='data:text/html,boom 2x' data-src='file:///secret'>
+            <video poster='https://media.example/poster.jpg'><source src='https://media.example/a.mp4'></video>
+            <form action='https://evil.test/'><input formaction='javascript:boom'></form>
+            <object data='https://evil.test/gadget'></object><svg><script>boom()</script></svg><math>gadget</math>
+        """.trimIndent())
+
+        val snapshot = PumSnapshot.withStaticCard(live, source)
+        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
+
+        assertTrue(snapshot.select("meta, base, style, link, svg, math, script, form, iframe, object, embed, input").isEmpty())
+        assertTrue(snapshot.select("[style], [srcset], [cite], [background], [xlink\\:href], [action], [formaction], [data]").isEmpty())
+        assertFalse(snapshot.html().contains("javascript:", true))
+        assertFalse(snapshot.html().contains("data:text", true))
+        assertFalse(snapshot.html().contains("file:", true))
+        assertFalse(snapshot.html().contains("blob:", true))
+        assertEquals("#safe", card.selectFirst("a[href]")!!.attr("href"))
+        assertEquals("http://images.example/safe.jpg", card.selectFirst("img")!!.attr("src"))
+        assertEquals("https://media.example/a.mp4", card.selectFirst("source")!!.attr("src"))
+        assertTrue(card.text().contains("safe text"))
+    }
+
+    @Test
+    fun nullResolutionStillSanitizesClonedSnapshot() {
+        val live = Jsoup.parse("<div class='write_div' style='color:red' onclick='boom()'><script>boom()</script><p>ordinary</p></div>")
+
+        val snapshot = PumSnapshot.withStaticCard(live, null)
+
+        assertTrue(snapshot.select("script, [style], [onclick]").isEmpty())
+        assertTrue(snapshot.text().contains("ordinary"))
+        assertTrue(live.select("script, [style], [onclick]").isNotEmpty())
+    }
+
+    @Test
     fun unresolvedCardStoresAvailableMetadataAndWarning() {
         val resolution = PumResolution(
             status = PumSourceStatus.TEMPORARY_FAILURE,
@@ -112,7 +169,7 @@ class PumSnapshotTest {
         )
         val blockedHtml = PumSnapshot.withStaticCard(live, sourceB).html()
 
-        assertEquals(initial.absolutePath, preservedPath)
+        assertEquals(initial.canonicalPath, preservedPath)
         assertTrue(baselineBytes.contentEquals(initial.readBytes()))
         assertTrue(Jsoup.parse(initial.readText()).selectFirst(".armbandbot-pum-body")!!.text().contains("source A"))
         assertTrue(Jsoup.parse(latest.readText()).selectFirst(".armbandbot-pum-body")!!.text().contains("source B"))
@@ -122,11 +179,11 @@ class PumSnapshotTest {
     }
 
     @Test
-    fun nullResolutionLeavesOrdinarySnapshotContentUnchangedApartFromClone() {
+    fun nullResolutionKeepsOrdinarySnapshotContentApartFromSafetyCleanup() {
         val live = Jsoup.parse("<html><body><div class='write_div'><p>ordinary</p></div></body></html>")
         val snapshot = PumSnapshot.withStaticCard(live, null)
 
-        assertEquals(live.html(), snapshot.html())
+        assertEquals(live.text(), snapshot.text())
         assertTrue(snapshot.select(".armbandbot-pum-card").isEmpty())
     }
 

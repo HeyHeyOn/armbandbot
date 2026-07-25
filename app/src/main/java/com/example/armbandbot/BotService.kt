@@ -2810,7 +2810,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         liveDoc = immediatePostDoc,
                                         comments = null,
                                         blockedCommentNo = null,
-                                        blockedTs = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                        blockedTs = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date()),
+                                        pumResolution = matchingPumResolution(
+                                            targetKey,
+                                            postKey,
+                                            pumModeration.sourceResolution,
+                                        ),
                                     )
                                 },
                             )
@@ -2937,7 +2942,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                                                 postNumStr = targetKey.postNo,
                                                 commentNo = commentDecision.commentId,
                                                 cookie = cookie,
-                                                comments = targetInput.comments
+                                                comments = targetInput.comments,
+                                                pumResolution = matchingPumResolution(
+                                                    targetKey,
+                                                    postKey,
+                                                    pumModeration.sourceResolution,
+                                                ),
                                             )
                                         }
                                     )

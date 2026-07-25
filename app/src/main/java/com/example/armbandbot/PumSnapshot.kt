@@ -11,6 +11,12 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
+internal fun matchingPumResolution(
+    targetKey: PostKey,
+    currentKey: PostKey,
+    currentResolution: PumResolution?,
+): PumResolution? = currentResolution.takeIf { targetKey == currentKey }
+
 /** Builds a self-contained, inert PUM source card without ever changing the live detail document. */
 object PumSnapshot {
     fun withStaticCard(
@@ -19,11 +25,9 @@ object PumSnapshot {
         checkedAt: String = currentCheckedAt(),
     ): Document {
         val snapshot = liveDocument.clone()
+        removeExecutableBehavior(snapshot)
         if (resolution == null) return snapshot
 
-        // In a PUM snapshot the remote loader must not survive even if the caller has not run the
-        // general snapshot cleanup yet.
-        removeExecutableBehavior(snapshot)
         snapshot.select(".armbandbot-pum-card").remove()
         val card = buildCard(resolution, checkedAt)
         val body = snapshot.selectFirst(".write_div") ?: snapshot.body()
@@ -32,27 +36,7 @@ object PumSnapshot {
     }
 
     internal fun removeExecutableBehavior(document: Document) {
-        document.select("iframe").toList().forEach { iframe ->
-            val safe = safeHttpsUrl(iframe.absUrl("src").ifBlank { iframe.attr("src") })
-            if (safe != null && runCatching { URI(safe).path.orEmpty().contains("/voice/player") }.getOrDefault(false)) {
-                iframe.replaceWith(Element("span").addClass("armbandbot-pum-voice").text("보이스 원문 (정적 표시)"))
-            } else {
-                iframe.remove()
-            }
-        }
-        document.select("script, form, object, embed, input, button, textarea, select, frame").remove()
-        document.allElements.forEach { element ->
-            element.attributes().asList().toList().forEach { attribute ->
-                if (attribute.key.lowercase(Locale.ROOT).startsWith("on")) element.removeAttr(attribute.key)
-            }
-            listOf("href", "src", "poster", "action", "formaction").forEach { attr ->
-                if (element.hasAttr(attr)) {
-                    val raw = element.absUrl(attr).ifBlank { element.attr(attr) }
-                    val safe = safeHttpsUrl(raw)
-                    if (safe == null) element.removeAttr(attr) else element.attr(attr, safe)
-                }
-            }
-        }
+        sanitizeTree(document)
     }
 
     private fun buildCard(resolution: PumResolution, checkedAt: String): Element {
@@ -93,38 +77,47 @@ object PumSnapshot {
         return card
     }
 
-    private fun sanitizeSourceBody(html: String): Element {
+    internal fun sanitizeSourceBody(html: String): Element {
         val parsed = Jsoup.parseBodyFragment(html, "https://gall.dcinside.com/")
         val body = parsed.body()
         removeComments(body)
+        sanitizeTree(body)
+        return Element("div").also { container -> body.childNodes().toList().forEach(container::appendChild) }
+    }
 
-        // Preserve voice replies as inert evidence before removing every browsing context.
-        body.select("iframe").toList().forEach { iframe ->
-            val safe = safeHttpsUrl(iframe.absUrl("src").ifBlank { iframe.attr("src") })
-            if (safe != null && URI(safe).path.orEmpty().contains("/voice/player")) {
+    private fun sanitizeTree(root: Element) {
+        // Preserve voice evidence as inert text before deleting every browsing context.
+        root.select("iframe").toList().forEach { iframe ->
+            val safe = safeHttpUrl(iframe.attr("src"))
+            if (safe != null && runCatching { URI(safe).path.orEmpty().contains("/voice/player") }.getOrDefault(false)) {
                 iframe.replaceWith(Element("span").addClass("armbandbot-pum-voice").text("보이스 원문 (정적 표시)"))
             } else {
                 iframe.remove()
             }
         }
-        body.select("script, style, meta, link, base, form, button, input, textarea, select, option, frame, object, embed, canvas, template, noscript, svg, math").remove()
+        root.select(
+            "script, meta, base, style, link, form, iframe, object, embed, input, button, " +
+                "textarea, select, option, frame, canvas, template, noscript, svg, math"
+        ).remove()
 
-        body.allElements.forEach { element ->
+        val alwaysRemove = setOf(
+            "style", "srcdoc", "srcset", "cite", "background", "xlink:href", "action",
+            "formaction", "data", "ping", "manifest", "usemap", "codebase", "archive"
+        )
+        val validatedUrls = setOf("href", "src", "poster", "data-original", "data-src")
+        root.allElements.forEach { element ->
             element.attributes().asList().toList().forEach { attribute ->
                 val name = attribute.key.lowercase(Locale.ROOT)
-                if (name.startsWith("on") || name in setOf("style", "srcdoc", "action", "formaction")) {
-                    element.removeAttr(attribute.key)
-                }
-            }
-            listOf("href", "src", "poster").forEach { attr ->
-                if (element.hasAttr(attr)) {
-                    val raw = element.absUrl(attr).ifBlank { element.attr(attr) }
-                    val safe = safeHttpsUrl(raw)
-                    if (safe == null) element.removeAttr(attr) else element.attr(attr, safe)
+                when {
+                    name.startsWith("on") || name in alwaysRemove -> element.removeAttr(attribute.key)
+                    name in validatedUrls -> {
+                        val raw = element.attr(attribute.key)
+                        val safe = if (name == "href") safeLinkUrl(raw) else safeHttpUrl(raw)
+                        if (safe == null) element.removeAttr(attribute.key) else element.attr(attribute.key, safe)
+                    }
                 }
             }
         }
-        return Element("div").also { container -> body.childNodes().toList().forEach(container::appendChild) }
     }
 
     private fun safeSourceUrl(resolution: PumResolution): String? {
@@ -135,11 +128,18 @@ object PumSnapshot {
             ?.url
     }
 
-    private fun safeHttpsUrl(raw: String): String? {
+    private fun safeLinkUrl(raw: String): String? {
+        val anchor = raw.trim()
+        if (anchor.matches(Regex("#[A-Za-z0-9_.:-]+"))) return anchor
+        return safeHttpUrl(raw)
+    }
+
+    private fun safeHttpUrl(raw: String): String? {
         if (raw.isBlank()) return null
-        val normalized = if (raw.startsWith("//")) "https:$raw" else raw
+        val normalized = if (raw.trim().startsWith("//")) "https:${raw.trim()}" else raw.trim()
         val uri = try { URI(normalized) } catch (_: Exception) { return null }
-        if (!uri.scheme.equals("https", true) || uri.host.isNullOrBlank() || uri.userInfo != null) return null
+        if ((!uri.scheme.equals("https", true) && !uri.scheme.equals("http", true)) ||
+            uri.host.isNullOrBlank() || uri.userInfo != null) return null
         return uri.toASCIIString()
     }
 

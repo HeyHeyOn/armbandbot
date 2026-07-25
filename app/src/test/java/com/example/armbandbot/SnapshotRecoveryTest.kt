@@ -112,10 +112,11 @@ class SnapshotRecoveryTest {
             html = "rechecked snapshot"
         )
 
-        assertEquals(importedInitial.absolutePath, savedPath)
+        assertEquals(importedInitial.canonicalPath, savedPath)
         assertTrue(!activeInitial.exists())
         assertEquals("original snapshot", importedInitial.readText())
-        assertEquals("rechecked snapshot", activeLatest.readText())
+        assertEquals("rechecked snapshot", File(importedDir, "armbandbot_244_latest.html").readText())
+        assertTrue(!activeLatest.exists())
         cacheRoot.deleteRecursively()
     }
 
@@ -139,9 +140,10 @@ class SnapshotRecoveryTest {
         )
 
         assertTrue(!activeInitial.exists())
-        assertEquals(importedInitial.absolutePath, savedPath)
+        assertEquals(importedInitial.canonicalPath, savedPath)
         assertEquals("original snapshot", importedInitial.readText())
-        assertEquals("rechecked snapshot", activeLatest.readText())
+        assertEquals("rechecked snapshot", importedLatest.readText())
+        assertTrue(!activeLatest.exists())
         cacheRoot.deleteRecursively()
     }
 
@@ -166,7 +168,8 @@ class SnapshotRecoveryTest {
 
         assertTrue(!activeInitial.exists())
         assertEquals("numbered original snapshot", importedInitial.readText())
-        assertEquals("rechecked snapshot", activeLatest.readText())
+        assertEquals("rechecked snapshot", importedLatest.readText())
+        assertTrue(!activeLatest.exists())
         cacheRoot.deleteRecursively()
     }
 
@@ -232,11 +235,55 @@ class SnapshotRecoveryTest {
             allowedSnapshotRoots = listOf(cacheRoot)
         )
 
-        assertEquals(legacyInitial.absolutePath, savedPath)
+        assertEquals(legacyInitial.canonicalPath, savedPath)
         assertTrue(!activeInitial.exists())
         assertTrue(originalBytes.contentEquals(legacyInitial.readBytes()))
-        assertEquals("PUM source B", activeLatest.readText())
+        assertEquals("PUM source B", File(legacyDir, "armbandbot_244_latest.html").readText())
+        assertTrue(!activeLatest.exists())
         cacheRoot.deleteRecursively()
+    }
+
+    @Test
+    fun trustedLegacyLatestOnlyBecomesBaselineBeforeLatestIsUpdated() {
+        val cacheRoot = Files.createTempDirectory("snapshot_legacy_latest_only").toFile()
+        val legacyDir = File(cacheRoot, "snapshots_legacy").apply { mkdirs() }
+        val legacyLatest = File(legacyDir, "armbandbot_244_latest.html").apply { writeBytes("old bytes".toByteArray()) }
+        val activeDir = File(cacheRoot, "snapshots_current").apply { mkdirs() }
+
+        val savedPath = saveGeneralSnapshotPreservingExistingInitial(
+            File(activeDir, "armbandbot_244_initial.html"),
+            File(activeDir, "armbandbot_244_latest.html"),
+            legacyLatest.absolutePath,
+            "current latest",
+            listOf(cacheRoot),
+        )
+
+        val baseline = File(legacyDir, "armbandbot_244_initial.html")
+        assertEquals(baseline.canonicalPath, savedPath)
+        assertEquals("old bytes", baseline.readText())
+        assertEquals("current latest", legacyLatest.readText())
+        cacheRoot.deleteRecursively()
+    }
+
+    @Test
+    fun exactLegacyFilenameAllowlistRejectsBackupAndForeignPrefix() {
+        listOf("armbandbot_244_initial_backup_initial.html", "foreign_244_initial.html").forEach { name ->
+            val cacheRoot = Files.createTempDirectory("snapshot_bad_name").toFile()
+            val importedDir = File(cacheRoot, "snapshots_imported").apply { mkdirs() }
+            val candidate = File(importedDir, name).apply { writeText("untrusted") }
+            val activeDir = File(cacheRoot, "snapshots_current").apply { mkdirs() }
+            val activeInitial = File(activeDir, "armbandbot_244_initial.html")
+
+            val savedPath = saveGeneralSnapshotPreservingExistingInitial(
+                activeInitial, File(activeDir, "armbandbot_244_latest.html"), candidate.absolutePath,
+                "safe baseline", listOf(cacheRoot),
+            )
+
+            assertEquals(activeInitial.absolutePath, savedPath)
+            assertEquals("safe baseline", activeInitial.readText())
+            assertEquals("untrusted", candidate.readText())
+            cacheRoot.deleteRecursively()
+        }
     }
 
     @Test
@@ -264,6 +311,36 @@ class SnapshotRecoveryTest {
         assertEquals("attacker", outsideInitial.readText())
         cacheRoot.deleteRecursively()
         outsideRoot.deleteRecursively()
+    }
+
+    @Test
+    fun latestWriteFailureNeverOverwritesPreservedBaseline() {
+        val cacheRoot = Files.createTempDirectory("snapshot_write_failure").toFile()
+        val importedDir = File(cacheRoot, "snapshots_imported").apply { mkdirs() }
+        val baseline = File(importedDir, "armbandbot_244_initial.html").apply { writeText("baseline bytes") }
+        val latestAsDirectory = File(importedDir, "armbandbot_244_latest.html").apply {
+            mkdirs()
+            File(this, "keep").writeText("force non-empty directory")
+        }
+        val activeDir = File(cacheRoot, "snapshots_current").apply { mkdirs() }
+
+        var failed = false
+        try {
+            saveGeneralSnapshotPreservingExistingInitial(
+                File(activeDir, "armbandbot_244_initial.html"),
+                File(activeDir, "armbandbot_244_latest.html"),
+                baseline.absolutePath,
+                "must not replace baseline",
+                listOf(cacheRoot),
+            )
+        } catch (_: Exception) {
+            failed = true
+        }
+
+        assertTrue(failed)
+        assertEquals("baseline bytes", baseline.readText())
+        assertTrue(latestAsDirectory.isDirectory)
+        cacheRoot.deleteRecursively()
     }
 
     @Test
