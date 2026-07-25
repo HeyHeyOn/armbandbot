@@ -1,6 +1,7 @@
 package com.heyheyon.armbandbot
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,6 +9,75 @@ import java.io.File
 import java.nio.file.Files
 
 class SnapshotRecoveryTest {
+    @Test
+    fun canonicalContainmentIsStrictAndDoesNotAcceptPrefixCollisions() {
+        val parent = Files.createTempDirectory("snapshot_containment").toFile()
+        val trusted = File(parent, "cache").apply { mkdirs() }
+        val inside = File(trusted, "snapshots_bot/armbandbot_244_initial.html")
+        val prefixCollision = File(parent, "cache-evil/snapshots_bot/armbandbot_244_initial.html")
+
+        assertTrue(isCanonicalFileStrictlyInside(inside, listOf(trusted)))
+        assertFalse(isCanonicalFileStrictlyInside(trusted, listOf(trusted)))
+        assertFalse(isCanonicalFileStrictlyInside(prefixCollision, listOf(trusted)))
+        parent.deleteRecursively()
+    }
+
+    @Test
+    fun injectedSymlinkPredicateRejectsExistingAndDanglingLegacyTargets() {
+        listOf(true, false).forEach { linkHasTarget ->
+            val cacheRoot = Files.createTempDirectory("snapshot_symlink_rejection").toFile()
+            val importedDir = File(cacheRoot, "snapshots_imported").apply { mkdirs() }
+            val suspicious = File(importedDir, "armbandbot_244_initial.html")
+            if (linkHasTarget) suspicious.writeText("must not be trusted")
+            val activeDir = File(cacheRoot, "snapshots_current").apply { mkdirs() }
+            val activeInitial = File(activeDir, "armbandbot_244_initial.html")
+
+            val saved = saveGeneralSnapshotPreservingExistingInitial(
+                activeInitial,
+                File(activeDir, "armbandbot_244_latest.html"),
+                suspicious.absolutePath,
+                "safe baseline",
+                listOf(cacheRoot),
+                symlinkPredicate = { it.absolutePath == suspicious.absolutePath },
+            )
+
+            assertEquals(activeInitial.absolutePath, saved)
+            assertEquals("safe baseline", activeInitial.readText())
+            if (linkHasTarget) assertEquals("must not be trusted", suspicious.readText())
+            cacheRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedLatestReplacementRollsBackOldBytesAndCleansTemporaryFiles() {
+        val cacheRoot = Files.createTempDirectory("snapshot_rollback").toFile()
+        val directory = File(cacheRoot, "snapshots_bot").apply { mkdirs() }
+        val latest = File(directory, "armbandbot_244_latest.html").apply { writeText("old latest") }
+        var renameCalls = 0
+        val operations = object : SnapshotFileOperations {
+            override fun rename(source: File, destination: File): Boolean {
+                renameCalls++
+                return if (renameCalls == 2) false else source.renameTo(destination)
+            }
+        }
+
+        val failure = runCatching {
+            writeSnapshotFileSafely(
+                latest,
+                "new latest".toByteArray(),
+                listOf(cacheRoot),
+                replaceExisting = true,
+                symlinkPredicate = { false },
+                fileOperations = operations,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure != null)
+        assertEquals("old latest", latest.readText())
+        assertTrue(directory.listFiles().orEmpty().none { it.name.startsWith(".snapshot-") })
+        cacheRoot.deleteRecursively()
+    }
+
     @Test
     fun mergeCheckedPostKeepsExistingSnapshotWhenIncomingPathIsMissing() {
         val existing = checkedPost(snapshotPath = "/cache/gallery_244_initial.html", title = "기존 제목")
