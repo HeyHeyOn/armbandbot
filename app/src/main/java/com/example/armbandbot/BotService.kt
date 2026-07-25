@@ -527,6 +527,7 @@ class BotService : Service() {
                 pendingAiCommentPlans.remove(botId)
                 spamBurstRecentEvents.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstRecentEvents.remove(it) }
                 recentModerationFailures.keys.filter { it.startsWith("$botId:") }.forEach { recentModerationFailures.remove(it) }
+                recentPumResolutionFailures.keys.filter { it.startsWith("$botId:") }.forEach { recentPumResolutionFailures.remove(it) }
                 spamBurstStates.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstStates.remove(it) }
                 lastHealthLogAt.remove(botId)
                 runtimeProtectionLastGcAt.remove(botId)
@@ -2289,7 +2290,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             ) {
                 runCatching {
                     checkNotNull(pumSourceResolver) { "PUM resolver missing for enabled scan cycle" }
-                        .resolve(postDoc)
+                        .resolve(postDoc, pcPostDetailUrl)
                 }.getOrElse {
                     // Resolver failures are fail-open; do not expose exception text or request data.
                     PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
@@ -2303,6 +2304,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
         }
         val postText = pumModeration.moderationContent
+        val moderationImageAlts = pumModeration.composeImageAlts(postImageAlts)
+        val moderationRawHtml = pumModeration.composeRawHtml(postRawHtml)
         pumModeration.sourceResolution
             ?.takeIf { it.status != PumSourceStatus.RESOLVED }
             ?.let { resolution -> logPumResolutionFailure(botId, postKey, resolution.status) }
@@ -2384,8 +2387,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             postUid = postUid,
             postTitle = text,
             postText = postText,
-            postImageAlts = postImageAlts,
-            postRawHtml = postRawHtml,
+            postImageAlts = moderationImageAlts,
+            postRawHtml = moderationRawHtml,
             postWriterHtml = postWriterHtml,
             gallogCache = gallogCache,
             tokenToUse = tokenToUse,
@@ -2518,8 +2521,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             title = text,
             authorIdOrIp = postAuthor,
             nickname = postNick,
-            body = postText,
-            mediaSources = postImageAlts,
+            body = pumModeration.aiBody,
+            mediaSources = pumModeration.composeMediaSources(postImageAlts),
             comments = currentAiComments,
         )
         val stalePostPlans = aiPostPlans.filter { it.postKey == postKey && !it.matches(currentAiPostInput) }

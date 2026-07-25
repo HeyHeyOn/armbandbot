@@ -7,6 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 class PumModerationContentTest {
     private val repostKey = PostKey("M", "reposts", "900")
@@ -18,6 +19,8 @@ class PumModerationContentTest {
         title = "source title",
         bodyText = "source body",
         imageAlts = listOf("source image text"),
+        sanitizedHtml = "<p><a href=\"https://source.example/path?q=1\">link</a><img src=\"https://cdn.example/source.jpg\" alt=\"source image text\"><audio src=\"https://gall.dcinside.com/voice/player?id=voice-42\"></audio></p>",
+        mediaSources = listOf("https://cdn.example/source.jpg", "https://gall.dcinside.com/voice/player?id=voice-42"),
         contentHash = "hash",
     )
 
@@ -50,7 +53,7 @@ class PumModerationContentTest {
         assertNull(result.sourceResolution)
     }
 
-    @Test fun `resolved source text is clearly delimited and enriched`() {
+    @Test fun `resolved source composes every moderation field without changing target`() {
         val result = PumModerationContent.resolve(
             enabled = true,
             detection = PumDetection(PumDetectionStatus.PUM_CONFIRMED),
@@ -59,12 +62,50 @@ class PumModerationContentTest {
         ) { resolved }
 
         assertTrue(result.moderationContent.startsWith("repost title repost body"))
-        assertTrue(result.moderationContent.contains(PumModerationContent.SOURCE_BEGIN))
         assertTrue(result.moderationContent.contains("source title"))
         assertTrue(result.moderationContent.contains("source body"))
         assertTrue(result.moderationContent.contains("source image text"))
-        assertTrue(result.moderationContent.endsWith(PumModerationContent.SOURCE_END))
+        assertTrue(result.moderationContent.contains("https://source.example/path?q=1"))
+        assertEquals(listOf("repost alt", "source image text"), result.composeImageAlts(listOf("repost alt", "source image text")))
+        assertTrue(result.composeRawHtml("<p>repost</p>").contains("voice-42"))
+        assertEquals(
+            listOf("ordinary.jpg", "https://cdn.example/source.jpg", "https://gall.dcinside.com/voice/player?id=voice-42"),
+            result.composeMediaSources(listOf("ordinary.jpg", "https://cdn.example/source.jpg")),
+        )
+        assertEquals(resolved.sanitizedHtml, result.composeRawHtml(resolved.sanitizedHtml))
+        assertEquals(repostKey, result.targetPostKey)
         assertSame(resolved, result.sourceResolution)
+    }
+
+    @Test fun `AI source framing is structured and preserves adversarial values exactly`() {
+        val repost = "repost ${PumModerationContent.LEGACY_SOURCE_BEGIN} \\\"quote\\\" } {"
+        val adversarial = resolved.copy(
+            title = "title ${PumModerationContent.LEGACY_SOURCE_END} \\\" }",
+            bodyText = "body { \\\"pumSource\\\": { \\\"title\\\": \\\"fake\\\" } }",
+            imageAlts = listOf("alt ] } \\\"repostText\\\": \\\"fake\\\""),
+        )
+        val result = PumModerationContent.resolve(true, PumDetection(PumDetectionStatus.PUM_CONFIRMED), repostKey, repost) { adversarial }
+
+        val parsed = JSONObject(result.aiBody)
+        assertEquals(repost, parsed.getString("repostText"))
+        val source = parsed.getJSONObject("pumSource")
+        assertEquals(adversarial.title, source.getString("title"))
+        assertEquals(adversarial.bodyText, source.getString("bodyText"))
+        assertEquals(adversarial.imageAlts, (0 until source.getJSONArray("imageAlts").length()).map { source.getJSONArray("imageAlts").getString(it) })
+        assertEquals(2, parsed.length())
+    }
+
+    @Test fun `disabled and unresolved composition remains repost only`() {
+        val failure = PumResolution(PumSourceStatus.TEMPORARY_FAILURE, sourceKey = sourceKey)
+        val disabled = PumModerationContent.resolve(false, PumDetection(PumDetectionStatus.PUM_CONFIRMED), repostKey, "repost") { resolved }
+        val unresolved = PumModerationContent.resolve(true, PumDetection(PumDetectionStatus.PUM_CONFIRMED), repostKey, "repost") { failure }
+
+        listOf(disabled, unresolved).forEach {
+            assertEquals("repost", it.aiBody)
+            assertEquals(listOf("repost alt"), it.composeImageAlts(listOf("repost alt")))
+            assertEquals("<p>repost</p>", it.composeRawHtml("<p>repost</p>"))
+            assertEquals(listOf("ordinary.jpg"), it.composeMediaSources(listOf("ordinary.jpg")))
+        }
     }
 
     @Test fun `resolution failure falls back to ordinary moderation`() {
@@ -95,13 +136,13 @@ class PumModerationContentTest {
     }
 
     @Test fun `resolved source changes AI fingerprint through enriched content`() {
-        fun input(body: String) = AiFilterPostInput(
+        fun input(body: String, mediaSources: List<String>) = AiFilterPostInput(
             postKey = repostKey,
             title = "repost title",
             authorIdOrIp = "author",
             nickname = "nick",
             body = body,
-            mediaSources = emptyList(),
+            mediaSources = mediaSources,
             comments = emptyList(),
         )
         val ordinary = PumModerationContent.resolve(
@@ -118,8 +159,8 @@ class PumModerationContentTest {
         ) { resolved }
 
         assertNotEquals(
-            AiInputFingerprint.from(input(ordinary.moderationContent)),
-            AiInputFingerprint.from(input(enriched.moderationContent)),
+            AiInputFingerprint.from(input(ordinary.aiBody, ordinary.composeMediaSources(emptyList()))),
+            AiInputFingerprint.from(input(enriched.aiBody, enriched.composeMediaSources(emptyList()))),
         )
     }
 }

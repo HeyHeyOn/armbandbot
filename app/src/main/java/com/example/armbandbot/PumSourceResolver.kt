@@ -166,17 +166,24 @@ class PumSourceResolver(
         require(resolutionTimeoutMs > 0 && resolutionTimeoutMs <= Long.MAX_VALUE / NANOS_PER_MILLISECOND)
     }
 
-    fun resolve(outerDetail: Document, listMarker: Boolean = PumParser.hasListMarker(outerDetail)): PumResolution {
+    fun resolve(
+        outerDetail: Document,
+        canonicalOuterPostUrl: String?,
+        listMarker: Boolean = PumParser.hasListMarker(outerDetail),
+    ): PumResolution {
         val loader = PumParser.parseDetail(outerDetail, listMarker).loader
             ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
         val deadline = ResolutionDeadline(nanoTime(), resolutionTimeoutMs * NANOS_PER_MILLISECOND)
-        val outerReferer = DcinsidePostUrls.canonicalDetailUrl(loader.outerPost)
+        val outerReferer = canonicalOuterPostUrl
+            ?.let { DcinsidePostUrls.parseSafeCanonicalPostUrl(it, null) }
+            ?.takeIf { it.key == loader.outerPost }
+            ?.url
         val cardResult = try {
             fetch(
                 PumHttpRequest(
                     loader.endpoint,
                     method = "POST",
-                    headers = credentialHeaders(outerReferer),
+                    headers = credentialHeaders(loader.endpoint, outerReferer),
                     formData = loader.formData,
                 ),
                 CARD_MAX_BYTES,
@@ -206,7 +213,7 @@ class PumSourceResolver(
                 it
             }
         }
-        val resolved = resolveSource(key, sourceUrl, deadline)
+        val resolved = resolveSource(key, sourceUrl, outerReferer, deadline)
         if (resolved.status != PumSourceStatus.TEMPORARY_FAILURE) {
             if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
             sourceCache[key] = resolved
@@ -214,10 +221,16 @@ class PumSourceResolver(
         return resolved
     }
 
-    private fun resolveSource(key: PostKey, sourceUrl: String, deadline: ResolutionDeadline): PumResolution {
+    /** Compatibility entry point for parser/resolver unit callers; production supplies the URL. */
+    fun resolve(outerDetail: Document, listMarker: Boolean = PumParser.hasListMarker(outerDetail)): PumResolution {
+        val outerPost = PumParser.parseDetail(outerDetail, listMarker).loader?.outerPost
+        return resolve(outerDetail, outerPost?.let(DcinsidePostUrls::canonicalDetailUrl), listMarker)
+    }
+
+    private fun resolveSource(key: PostKey, sourceUrl: String, outerReferer: String?, deadline: ResolutionDeadline): PumResolution {
         val fetched = try {
             fetch(
-                PumHttpRequest(sourceUrl, headers = credentialHeaders(sourceUrl)),
+                PumHttpRequest(sourceUrl, headers = credentialHeaders(sourceUrl, outerReferer)),
                 SOURCE_MAX_BYTES,
                 RedirectKind.SOURCE,
                 key,
@@ -296,10 +309,19 @@ class PumSourceResolver(
         }
     }
 
-    private fun credentialHeaders(referer: String): Map<String, String> = buildMap {
+    private fun credentialHeaders(requestUrl: String, referer: String?): Map<String, String> = buildMap {
         put("User-Agent", userAgent)
-        put("Referer", referer)
-        cookies()?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
+        referer?.let { put("Referer", it) }
+        if (isCanonicalDcinsideRequest(requestUrl)) {
+            cookies()?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
+        }
+    }
+
+    private fun isCanonicalDcinsideRequest(raw: String): Boolean {
+        val uri = try { URI(raw) } catch (_: Exception) { return false }
+        return uri.scheme.equals("https", true) &&
+            uri.host.equals("gall.dcinside.com", true) &&
+            uri.port == -1 && uri.userInfo == null && uri.rawFragment == null
     }
 
     private fun fetch(

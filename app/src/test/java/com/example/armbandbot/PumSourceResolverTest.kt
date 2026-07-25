@@ -10,6 +10,7 @@ import java.io.InputStream
 class PumSourceResolverTest {
     private fun fixture(name: String) = javaClass.getResource("/pum/$name")!!.readText()
     private val outer = PostKey("M", "laboratory1", "900")
+    private val outerUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=900"
     private val loaderDoc get() = Jsoup.parse(fixture("pum_detail.html"))
 
     private class FakeClient : PumHttpClient {
@@ -43,8 +44,29 @@ class PumSourceResolverTest {
         assertEquals("POST", http.requests[0].method)
         assertEquals("https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=900", http.requests[0].headers["Referer"])
         assertEquals("https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345", http.requests[1].url)
-        assertEquals(http.requests[1].url, http.requests[1].headers["Referer"])
+        assertEquals(outerUrl, http.requests[1].headers["Referer"])
         assertTrue(http.requests.all { !it.followRedirects })
+    }
+
+    @Test fun `outer repost is the fixed referer for card source and redirects`() {
+        val sourceUrl = "https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345"
+        val http = FakeClient().apply {
+            body("", 307, mapOf("Location" to "https://gall.dcinside.com/ajax/pum_ajax/get_contents"))
+            body(fixture("pum_card_resolved.html"))
+            body("", 307, mapOf("Location" to sourceUrl))
+            body(fixture("source_detail.html"))
+        }
+
+        assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(http).resolve(loaderDoc, outerUrl, true).status)
+        assertEquals(4, http.requests.size)
+        assertTrue(http.requests.all { it.headers["Referer"] == outerUrl })
+    }
+
+    @Test fun `invalid outer url is omitted as referer instead of using request itself`() {
+        val http = FakeClient().apply { body(fixture("pum_card_resolved.html")); body(fixture("source_detail.html")) }
+
+        assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(http).resolve(loaderDoc, "https://evil.example/repost", true).status)
+        assertTrue(http.requests.all { "Referer" !in it.headers })
     }
 
     @Test fun `cycle-local resolvers keep bot cookies isolated on validated dcinside requests`() {
@@ -127,7 +149,7 @@ class PumSourceResolverTest {
         assertTrue("read ${stream.reads} bytes", stream.reads > 524_288 && stream.reads < 600_000)
     }
 
-    @Test fun `regular minor and mini source requests use canonical detail as url and referer`() {
+    @Test fun `regular minor and mini source requests use canonical detail with outer referer`() {
         val links = listOf(
             "https://gall.dcinside.com/board/view/?id=gall&no=1",
             "https://gall.dcinside.com/mgallery/board/view/?id=minor&no=2",
@@ -138,7 +160,7 @@ class PumSourceResolverTest {
             val http = FakeClient().apply { body(card); body(fixture("source_detail.html")) }
             assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(http).resolve(loaderDoc, true).status)
             assertEquals(link, http.requests[1].url)
-            assertEquals(link, http.requests[1].headers["Referer"])
+            assertEquals(outerUrl, http.requests[1].headers["Referer"])
         }
     }
 
