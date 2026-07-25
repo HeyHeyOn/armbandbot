@@ -1,6 +1,7 @@
 package com.heyheyon.armbandbot
 
 import java.net.URLDecoder
+import java.net.URI
 import java.util.Locale
 
 data class DcPostLocator(
@@ -10,7 +11,49 @@ data class DcPostLocator(
     val refererUrl: String
 )
 
+data class SafeDcPostUrl(
+    val key: PostKey,
+    val url: String,
+    val refererUrl: String,
+)
+
 object DcinsidePostUrls {
+    /** Strict parser for URLs obtained from untrusted PUM markup and redirects. */
+    fun parseSafeCanonicalPostUrl(rawUrl: String, self: PostKey? = null): SafeDcPostUrl? {
+        val uri = try { URI(rawUrl.trim()) } catch (_: Exception) { return null }
+        if (!uri.scheme.equals("https", ignoreCase = true) ||
+            !uri.host.equals("gall.dcinside.com", ignoreCase = true) ||
+            uri.port != -1 || uri.userInfo != null || uri.fragment != null
+        ) return null
+
+        val type = when (uri.path) {
+            "/board/view/", "/board/view" -> "G"
+            "/mgallery/board/view/", "/mgallery/board/view" -> "M"
+            "/mini/board/view/", "/mini/board/view" -> "MI"
+            else -> return null
+        }
+        val values = linkedMapOf<String, String>()
+        for (part in (uri.rawQuery ?: return null).split('&')) {
+            val pair = part.split('=', limit = 2)
+            if (pair.size != 2) continue
+            val name = decode(pair[0])
+            if (name in values) return null
+            values[name] = decode(pair[1])
+        }
+        val id = values["id"] ?: return null
+        val no = values["no"] ?: return null
+        if (!id.matches(Regex("[A-Za-z0-9_-]+")) || !no.matches(Regex("[0-9]+"))) return null
+        val key = PostKey(type, id, no)
+        if (key == self) return null
+        val canonical = canonicalDetailUrl(key)
+        return SafeDcPostUrl(key, canonical, canonical)
+    }
+
+    fun canonicalDetailUrl(key: PostKey): String {
+        val prefix = when (key.gallType) { "M" -> "/mgallery"; "MI" -> "/mini"; else -> "" }
+        return "https://gall.dcinside.com$prefix/board/view/?id=${key.gallId}&no=${key.postNo}"
+    }
+
     fun parsePostLocator(rawUrl: String): DcPostLocator? {
         val url = rawUrl.trim()
         if (url.isBlank()) return null
