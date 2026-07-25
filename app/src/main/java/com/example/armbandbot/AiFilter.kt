@@ -9,6 +9,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
 import java.util.LinkedHashMap
 
 internal enum class AiFilterProvider {
@@ -180,16 +181,43 @@ internal data class AiFilterBatchEvaluation(
 internal class AiFilterClient(
     private val config: AiFilterConfig,
     private val logger: (String) -> Unit = {},
+    private val clockMillis: () -> Long = System::currentTimeMillis,
+    private val apiCaller: ((AiFilterBatchRequest, AiWireRegistry) -> String)? = null,
 ) {
     companion object {
         private const val CACHE_LIMIT = 100
-        private val evaluationCache = object : LinkedHashMap<String, AiFilterBatchEvaluation>(CACHE_LIMIT, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AiFilterBatchEvaluation>?): Boolean = size > CACHE_LIMIT
+        internal const val CACHE_TTL_MS = 5 * 60 * 1000L
+        private data class CacheEntry(val evaluation: AiFilterBatchEvaluation, val createdAtMillis: Long)
+        private val evaluationCache = object : LinkedHashMap<String, CacheEntry>(CACHE_LIMIT, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CacheEntry>?): Boolean = size > CACHE_LIMIT
         }
         private val cacheLock = Any()
+
+        internal fun clearCacheForTest() = synchronized(cacheLock) { evaluationCache.clear() }
+
+        internal fun sanitizeUrlForLog(url: String): String = runCatching {
+            val uri = URI(url)
+            URI(uri.scheme, uri.authority, uri.path, null, null).toString()
+        }.getOrElse { url.substringBefore('?') }
+
+        private fun credentialNamespace(credential: String): String =
+            MessageDigest.getInstance("SHA-256")
+                .digest(credential.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
     }
 
     private val systemPrompt = config.systemPrompt.ifBlank { DefaultAiFilterSystemPrompt }
+
+    private fun redactForLog(value: String): String {
+        var redacted = value
+        if (config.endpoint.contains('?')) {
+            redacted = redacted.replace(config.endpoint, sanitizeUrlForLog(config.endpoint))
+        }
+        if (config.apiKey.isNotBlank()) {
+            redacted = redacted.replace(config.apiKey, "[REDACTED_SECRET]")
+        }
+        return redacted
+    }
 
     fun evaluateBatch(request: AiFilterBatchRequest): AiFilterBatchEvaluation {
         if (!config.enabled) return AiFilterBatchEvaluation()
@@ -206,25 +234,22 @@ internal class AiFilterClient(
 
         val cacheKey = buildCacheKey(request)
         synchronized(cacheLock) {
-            evaluationCache[cacheKey]?.let {
-                logger("AI 배치 캐시 사용 (post=${it.postDecisions.size}, failure=${it.failureReason != null})")
-                return it
+            evaluationCache[cacheKey]?.let { entry ->
+                if (clockMillis() - entry.createdAtMillis < CACHE_TTL_MS) {
+                    logger("AI 배치 캐시 사용 (post=${entry.evaluation.postDecisions.size})")
+                    return entry.evaluation
+                }
+                evaluationCache.remove(cacheKey)
             }
         }
 
         val requestUri = runCatching { URI(buildRequestUrl()) }.getOrNull()
-        val keyPreview = when {
-            config.apiKey.isBlank() -> "blank"
-            config.apiKey.length <= 8 -> "len=${config.apiKey.length}"
-            else -> "${config.apiKey.take(4)}...len=${config.apiKey.length}"
-        }
         val debugSummary = buildString {
             append("provider=${config.provider.name}")
             append(" / model=${config.model}")
             append(" / endpointHost=${requestUri?.host ?: "none"}")
             append(" / urlHasKey=${buildRequestUrl().contains("key=")}")
             append(" / customEndpoint=${config.endpoint.isNotBlank()}")
-            append(" / key=$keyPreview")
         }
 
         val evaluation = try {
@@ -232,17 +257,17 @@ internal class AiFilterClient(
                 logger("MARKER_AI_ENTER_V2 posts=${request.posts.size}")
             }
             val registry = AiWireRegistry.create(request)
-            val responseText = callApi(request, registry)
+            val responseText = apiCaller?.invoke(request, registry) ?: callApi(request, registry)
             parseBatchResponse(responseText, request, registry).copy(debugSummary = debugSummary)
         } catch (e: Exception) {
-            val failureMessage = e.message ?: "AI 배치 호출 실패"
+            val failureMessage = redactForLog(e.message ?: "AI 배치 호출 실패")
             logger("AI 배치 호출 실패 [MARKER_AI_CATCH_V2]: $failureMessage")
             AiFilterBatchEvaluation(failureReason = failureMessage, debugSummary = debugSummary)
         }
 
         if (evaluation.failureReason == null && evaluation.postDecisions.isNotEmpty()) {
             synchronized(cacheLock) {
-                evaluationCache[cacheKey] = evaluation
+                evaluationCache[cacheKey] = CacheEntry(evaluation, clockMillis())
             }
         } else {
             logger("AI 배치 캐시 저장 생략 (failure=${evaluation.failureReason != null}, postDecisions=${evaluation.postDecisions.size})")
@@ -257,6 +282,7 @@ internal class AiFilterClient(
             fun field(value: String) { append(value.length).append(':').append(value).append('|') }
             field(config.provider.name)
             field(config.endpoint)
+            field(credentialNamespace(config.apiKey))
             field(config.model)
             field(config.userPrompt)
             field(systemPrompt)
@@ -396,7 +422,7 @@ internal class AiFilterClient(
             AiFilterProvider.GEMINI_DIRECT -> {
                 if (config.endpoint.isNotBlank()) config.endpoint else {
                     val encodedModel = URLEncoder.encode(config.model, Charsets.UTF_8.name())
-                    "https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent?key=${config.apiKey}"
+                    "https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent"
                 }
             }
             AiFilterProvider.GROQ -> {
@@ -417,6 +443,18 @@ internal class AiFilterClient(
         return "http://$hostAndPort/v1/chat/completions"
     }
 
+    internal fun buildRequestUrlForTest(): String = buildRequestUrl()
+
+    internal fun buildAuthHeadersForTest(requestUrl: String = buildRequestUrl()): Map<String, String> = buildMap {
+        when (config.provider) {
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> put("Authorization", "Bearer ${config.apiKey}")
+            AiFilterProvider.LM_STUDIO -> if (config.apiKey.isNotBlank()) put("Authorization", "Bearer ${config.apiKey}")
+            AiFilterProvider.GEMINI_DIRECT -> if (!requestUrl.contains("key=", ignoreCase = true)) {
+                put("x-goog-api-key", config.apiKey)
+            }
+        }
+    }
+
     internal fun buildProviderPayloadForTest(request: AiFilterBatchRequest): String {
         val registry = AiWireRegistry.create(request)
         return when (config.provider) {
@@ -431,27 +469,9 @@ internal class AiFilterClient(
             AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ, AiFilterProvider.LM_STUDIO -> buildOpenAiPayload(registry)
             AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(registry)
         }
-        val requestUri = runCatching { URI(requestUrl) }.getOrNull()
-        val keyPreview = when {
-            config.apiKey.isBlank() -> "blank"
-            config.apiKey.length <= 8 -> "len=${config.apiKey.length}"
-            else -> "${config.apiKey.take(4)}...len=${config.apiKey.length}"
-        }
-        val sanitizedUrl = buildString {
-            append(requestUri?.scheme ?: "")
-            if (!requestUri?.host.isNullOrBlank()) {
-                append("://")
-                append(requestUri?.host)
-            }
-            append(requestUri?.rawPath ?: requestUrl)
-            val rawQuery = requestUri?.rawQuery.orEmpty()
-            if (rawQuery.isNotBlank()) {
-                val hasKey = rawQuery.contains("key=", ignoreCase = true)
-                append("?")
-                append(if (hasKey) "key=[REDACTED_SECRET]" else rawQuery)
-            }
-        }
+        val sanitizedUrl = sanitizeUrlForLog(requestUrl)
         val payloadPreview = payload.toString().replace("\n", " ").replace("\r", " ").take(400)
+
         val authModePreview = when (config.provider) {
             AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> "bearer"
             AiFilterProvider.LM_STUDIO -> if (config.apiKey.isBlank()) "none" else "bearer"
@@ -459,7 +479,7 @@ internal class AiFilterClient(
         }
         if (config.debugLoggingEnabled) {
             logger(
-                "AI REQUEST PREP / provider=${config.provider.name} / model=${config.model} / url=${sanitizedUrl.ifBlank { requestUrl.take(120) }} / apiKey=$keyPreview / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()} / payload=$payloadPreview"
+                "AI REQUEST PREP / provider=${config.provider.name} / model=${config.model} / url=$sanitizedUrl / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()} / payload=$payloadPreview"
             )
         }
 
@@ -474,22 +494,7 @@ internal class AiFilterClient(
                 readTimeout = config.timeoutMs
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
-                when (config.provider) {
-                    AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> {
-                        setRequestProperty("Authorization", "Bearer ${config.apiKey}")
-                    }
-                    AiFilterProvider.LM_STUDIO -> {
-                        if (config.apiKey.isNotBlank()) {
-                            setRequestProperty("Authorization", "Bearer ${config.apiKey}")
-                        }
-                    }
-                    AiFilterProvider.GEMINI_DIRECT -> {
-                        val useHeaderKey = !requestUrl.contains("key=")
-                        if (useHeaderKey) {
-                            setRequestProperty("x-goog-api-key", config.apiKey)
-                        }
-                    }
-                }
+                buildAuthHeadersForTest(requestUrl).forEach(::setRequestProperty)
             }
 
             connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
@@ -500,14 +505,15 @@ internal class AiFilterClient(
                 return text
             }
 
-            Log.w("AiFilterClient", "HTTP $status: $text")
-            val trimmedError = text.replace("\n", " ").replace("\r", " ").take(300)
+            val safeErrorText = redactForLog(text)
+            Log.w("AiFilterClient", "HTTP $status: $safeErrorText")
+            val trimmedError = safeErrorText.replace("\n", " ").replace("\r", " ").take(300)
             val authModePreview = when (config.provider) {
                 AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ -> "bearer"
                 AiFilterProvider.LM_STUDIO -> if (config.apiKey.isBlank()) "none" else "bearer"
                 AiFilterProvider.GEMINI_DIRECT -> if (requestUrl.contains("key=")) "url-key" else "x-goog-api-key"
             }
-            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / key=$keyPreview / customEndpoint=${config.endpoint.isNotBlank()} / body=$trimmedError")
+            logger("AI HTTP 오류 / provider=${config.provider.name} / model=${config.model} / status=$status / attempt=${attempt + 1} / authMode=$authModePreview / urlHasKey=${requestUrl.contains("key=")} / customEndpoint=${config.endpoint.isNotBlank()} / body=$trimmedError")
             lastError = "HTTP $status / $trimmedError"
 
             val shouldRetry = status in retryableStatuses && attempt < retryDelaysMs.size
@@ -576,9 +582,26 @@ internal class AiFilterClient(
             ?: AiFilterBatchEvaluation(failureReason = "AI 응답 파싱 실패", parsedContentText = content)
     }
 
+    private fun expectedTypedKeys(registry: AiWireRegistry): Set<String> = buildSet {
+        registry.posts.forEach { post ->
+            add("P|${post.wirePostId}")
+            registry.commentsFor(post).forEach { (key, _) -> add("C|$key") }
+        }
+    }
+
+    private fun hasExactCoverage(keys: List<String>, registry: AiWireRegistry): Boolean {
+        val expected = expectedTypedKeys(registry)
+        return keys.size == expected.size && keys.distinct().size == keys.size && keys.toSet() == expected
+    }
+
     private fun parseStructuredJsonBatchResponse(content: String, request: AiFilterBatchRequest, registry: AiWireRegistry): AiFilterBatchEvaluation? {
         val parsed = parseJsonObjectFromContent(content) ?: return null
         val resultsArray = parsed.optJSONArray("results") ?: return null
+        val typedKeys = (0 until resultsArray.length()).map { index ->
+            val item = resultsArray.optJSONObject(index) ?: return null
+            "${item.optString("type", "").trim().uppercase()}|${item.optString("key", "")}"
+        }
+        if (!hasExactCoverage(typedKeys, registry)) return null
         val keyCounts = (0 until resultsArray.length())
             .mapNotNull { resultsArray.optJSONObject(it)?.optString("key", "")?.takeIf(String::isNotBlank) }
             .groupingBy { it }
@@ -643,7 +666,7 @@ internal class AiFilterClient(
             }
         }
 
-        if (parsedCount == 0) return null
+        if (parsedCount != expectedTypedKeys(registry).size) return null
         val postDecisions = request.posts.mapNotNull { post ->
             val commentDecisions = commentDecisionMap[post.postKey].orEmpty()
             val postDecision = postDecisionMap[post.postKey] ?: if (commentDecisions.isNotEmpty()) {
@@ -666,6 +689,19 @@ internal class AiFilterClient(
     private fun parseLegacyJsonBatchResponse(content: String, request: AiFilterBatchRequest, registry: AiWireRegistry): AiFilterBatchEvaluation? {
         val parsed = parseJsonObjectFromContent(content) ?: return null
         val resultsArray = parsed.optJSONArray("results") ?: return null
+        val typedKeys = buildList {
+            for (i in 0 until resultsArray.length()) {
+                val item = resultsArray.optJSONObject(i) ?: return null
+                add("P|${item.optString("post_no", "")}")
+                item.optJSONArray("comments")?.let { comments ->
+                    for (j in 0 until comments.length()) {
+                        val comment = comments.optJSONObject(j) ?: return null
+                        add("C|${comment.optString("comment_id", "")}")
+                    }
+                }
+            }
+        }
+        if (!hasExactCoverage(typedKeys, registry)) return null
         val postKeyCounts = (0 until resultsArray.length())
             .mapNotNull { resultsArray.optJSONObject(it)?.optString("post_no", "")?.takeIf(String::isNotBlank) }
             .groupingBy { it }.eachCount()
@@ -711,7 +747,9 @@ internal class AiFilterClient(
             }
             postDecisions += AiFilterPostDecision(postKey = requestPost.postKey, decision = postDecision, commentDecisions = commentDecisions)
         }
-        if (postDecisions.isEmpty()) return null
+        if (postDecisions.size != request.posts.size ||
+            postDecisions.sumOf { it.commentDecisions.size } != request.posts.sumOf { it.comments.size }
+        ) return null
         logger("AI legacy JSON 파싱 완료: postDecisions=${postDecisions.size}")
         return AiFilterBatchEvaluation(postDecisions = postDecisions)
     }
@@ -726,9 +764,13 @@ internal class AiFilterClient(
     }
 
     private fun parseCompactBatchResponse(content: String, request: AiFilterBatchRequest, registry: AiWireRegistry): AiFilterBatchEvaluation? {
-        val parsedLines = content.lineSequence()
+        val rawLines = content.lineSequence()
             .map { it.trim().removePrefix("`").removeSuffix("`").trim() }
             .filter { it.isNotBlank() }
+            .toList()
+        val rawKeys = rawLines.mapNotNull(::identifyCompactTypedKey)
+        if (rawKeys.size != rawLines.size || !hasExactCoverage(rawKeys, registry)) return null
+        val parsedLines = rawLines.asSequence()
             .mapNotNull(::parseCompactLine)
             .toList()
         val keyCounts = parsedLines.groupingBy {
@@ -796,7 +838,7 @@ internal class AiFilterClient(
                 }
             }
 
-        if (parsedLineCount == 0) return null
+        if (parsedLineCount != expectedTypedKeys(registry).size) return null
 
         val postDecisions = request.posts.mapNotNull { post ->
             val commentDecisions = commentDecisionMap[post.postKey].orEmpty()
@@ -819,6 +861,23 @@ internal class AiFilterClient(
         }
         logger("AI compact 파싱 완료: lines=$parsedLineCount / postDecisions=${postDecisions.size}")
         return AiFilterBatchEvaluation(postDecisions = postDecisions)
+    }
+
+    /** Extract the wire identity before validating the decision token. */
+    private fun identifyCompactTypedKey(line: String): String? {
+        val parts = line.split("|")
+        if (parts.size < 2) return null
+        return when (val type = parts[0].trim().uppercase()) {
+            "P" -> "P|${parts[1]}"
+            "C" -> {
+                val key = if (parts[1].contains(':')) parts[1] else {
+                    if (parts.size < 3) return null
+                    "${parts[1]}:${parts[2]}"
+                }
+                "$type|$key"
+            }
+            else -> null
+        }
     }
 
     private data class ParsedCompactLine(
