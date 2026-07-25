@@ -52,32 +52,103 @@ internal fun pumConnectionTimeouts(
     )
 }
 
+internal class DeadlineBoundInputStream(
+    private val delegate: InputStream,
+    private val configuredReadTimeoutMs: Int,
+    requestBudgetMs: Long,
+    private val nanoTime: () -> Long,
+    private val applyReadTimeout: (Int) -> Unit,
+    private val onClose: () -> Unit,
+    private val startedAtNanos: Long = nanoTime(),
+) : InputStream() {
+    private val timeoutNanos = if (requestBudgetMs >= Long.MAX_VALUE / NANOS_PER_MILLISECOND) {
+        Long.MAX_VALUE
+    } else {
+        requestBudgetMs.coerceAtLeast(0L) * NANOS_PER_MILLISECOND
+    }
+    private var closed = false
+
+    init {
+        require(configuredReadTimeoutMs > 0)
+    }
+
+    override fun read(): Int = beforeBlockingRead { delegate.read() }
+    override fun read(buffer: ByteArray): Int = beforeBlockingRead { delegate.read(buffer) }
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+        beforeBlockingRead { delegate.read(buffer, offset, length) }
+    override fun skip(byteCount: Long): Long = beforeBlockingRead { delegate.skip(byteCount) }
+    override fun available(): Int = delegate.available()
+    override fun mark(readLimit: Int) = delegate.mark(readLimit)
+    override fun reset() = delegate.reset()
+    override fun markSupported(): Boolean = delegate.markSupported()
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        try {
+            delegate.close()
+        } finally {
+            onClose()
+        }
+    }
+
+    private inline fun <T> beforeBlockingRead(operation: () -> T): T {
+        val remainingNanos = timeoutNanos - (nanoTime() - startedAtNanos)
+        if (remainingNanos <= 0L) throw IOException("PUM request deadline exceeded")
+        val remainingMs = ((remainingNanos - 1L) / NANOS_PER_MILLISECOND + 1L)
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+        applyReadTimeout(minOf(configuredReadTimeoutMs, remainingMs))
+        return operation()
+    }
+
+    private companion object {
+        const val NANOS_PER_MILLISECOND = 1_000_000L
+    }
+}
+
 /** Small production adapter; redirect policy and response limits are enforced by [PumSourceResolver]. */
 class UrlConnectionPumHttpClient(
     private val connectTimeoutMs: Int = 15_000,
     private val readTimeoutMs: Int = 20_000,
+    private val nanoTime: () -> Long = System::nanoTime,
 ) : PumHttpClient {
     override fun execute(request: PumHttpRequest): PumHttpResponse {
+        val startedAtNanos = nanoTime()
         val connection = URL(request.url).openConnection() as HttpURLConnection
-        val timeouts = pumConnectionTimeouts(connectTimeoutMs, readTimeoutMs, request.timeoutBudgetMs)
-        connection.instanceFollowRedirects = false
-        connection.connectTimeout = timeouts.connectMs
-        connection.readTimeout = timeouts.readMs
-        connection.requestMethod = request.method
-        request.headers.forEach(connection::setRequestProperty)
-        if (request.method == "POST") {
-            val encoded = request.formData.entries.joinToString("&") {
-                "${URLEncoder.encode(it.key, "UTF-8")}=${URLEncoder.encode(it.value, "UTF-8")}"
-            }.toByteArray()
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-            connection.setFixedLengthStreamingMode(encoded.size)
-            connection.outputStream.use { it.write(encoded) }
+        try {
+            val timeouts = pumConnectionTimeouts(connectTimeoutMs, readTimeoutMs, request.timeoutBudgetMs)
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = timeouts.connectMs
+            connection.readTimeout = timeouts.readMs
+            connection.requestMethod = request.method
+            request.headers.forEach(connection::setRequestProperty)
+            if (request.method == "POST") {
+                val encoded = request.formData.entries.joinToString("&") {
+                    "${URLEncoder.encode(it.key, "UTF-8")}=${URLEncoder.encode(it.value, "UTF-8")}"
+                }.toByteArray()
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                connection.setFixedLengthStreamingMode(encoded.size)
+                connection.outputStream.use { it.write(encoded) }
+            }
+            val status = connection.responseCode
+            val headers = connection.headerFields.filterKeys { it != null }.mapValues { it.value.joinToString(",") }
+            val stream = if (status >= 400) connection.errorStream else connection.inputStream
+            val deadlineBoundStream = DeadlineBoundInputStream(
+                delegate = stream ?: ByteArrayInputStream(byteArrayOf()),
+                configuredReadTimeoutMs = readTimeoutMs,
+                requestBudgetMs = request.timeoutBudgetMs,
+                nanoTime = nanoTime,
+                applyReadTimeout = { connection.readTimeout = it },
+                onClose = connection::disconnect,
+                startedAtNanos = startedAtNanos,
+            )
+            return PumHttpResponse(status, headers, connection.contentLengthLong, deadlineBoundStream)
+        } catch (failure: Exception) {
+            connection.disconnect()
+            throw failure
         }
-        val status = connection.responseCode
-        val headers = connection.headerFields.filterKeys { it != null }.mapValues { it.value.joinToString(",") }
-        val stream = if (status >= 400) connection.errorStream else connection.inputStream
-        return PumHttpResponse(status, headers, connection.contentLengthLong, stream ?: ByteArrayInputStream(byteArrayOf()))
     }
 }
 
@@ -128,9 +199,18 @@ class PumSourceResolver(
         }
         val key = card.sourceKey ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
         val sourceUrl = card.sourceUrl ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
-        sourceCache[key]?.let { return it }
+        sourceCache[key]?.let {
+            return if (deadline.expired()) {
+                PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
+            } else {
+                it
+            }
+        }
         val resolved = resolveSource(key, sourceUrl, deadline)
-        if (resolved.status != PumSourceStatus.TEMPORARY_FAILURE) sourceCache[key] = resolved
+        if (resolved.status != PumSourceStatus.TEMPORARY_FAILURE) {
+            if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
+            sourceCache[key] = resolved
+        }
         return resolved
     }
 
@@ -151,7 +231,9 @@ class PumSourceResolver(
         if (fetched.statusCode == 404 || fetched.statusCode == 410) return PumResolution(PumSourceStatus.MISSING, key, sourceUrl)
         if (fetched.statusCode !in 200..299) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
         val document = Jsoup.parse(fetched.text, sourceUrl)
-        if (PumParser.parseDetail(document, false).loader != null) {
+        val sourceDetection = PumParser.parseDetail(document, false)
+        if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
+        if (sourceDetection.loader != null) {
             return PumResolution(PumSourceStatus.UNSUPPORTED_SOURCE, key, sourceUrl)
         }
         val body = document.selectFirst(".write_div")

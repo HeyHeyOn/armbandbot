@@ -251,6 +251,38 @@ class PumSourceResolverTest {
         )
     }
 
+    @Test fun `streaming reads recompute the remaining request budget and disconnect on close`() {
+        var nowNanos = 0L
+        var delegateReads = 0
+        var disconnected = false
+        val appliedTimeouts = mutableListOf<Int>()
+        val delegate = object : InputStream() {
+            override fun read(): Int {
+                delegateReads++
+                if (delegateReads == 1) nowNanos = 99_000_000L
+                return 'x'.code
+            }
+        }
+        val stream = DeadlineBoundInputStream(
+            delegate = delegate,
+            configuredReadTimeoutMs = 20_000,
+            requestBudgetMs = 100,
+            nanoTime = { nowNanos },
+            applyReadTimeout = appliedTimeouts::add,
+            onClose = { disconnected = true },
+        )
+
+        assertEquals('x'.code, stream.read())
+        assertEquals('x'.code, stream.read())
+        assertEquals(listOf(100, 1), appliedTimeouts)
+        nowNanos = 100_000_000L
+        assertThrows(IOException::class.java) { stream.read() }
+        assertEquals(2, delegateReads)
+
+        stream.close()
+        assertTrue(disconnected)
+    }
+
     @Test fun `deadline expiring while source is parsed maps to temporary failure`() {
         var clockReads = 0
         val http = FakeClient().apply { body(fixture("pum_card_resolved.html")); body(fixture("source_detail.html")) }
@@ -263,6 +295,28 @@ class PumSourceResolverTest {
         assertEquals(PumSourceStatus.TEMPORARY_FAILURE, result.status)
         assertEquals(15, clockReads)
         assertEquals(2, http.requests.size)
+    }
+
+    @Test fun `deadline crossing during unsupported source parsing is temporary and is not cached`() {
+        var clockReads = 0
+        var expire = true
+        val http = FakeClient().apply {
+            body(fixture("pum_card_resolved.html")); body(fixture("pum_detail.html"))
+            body(fixture("pum_card_resolved.html")); body(fixture("pum_detail.html"))
+        }
+        val resolver = PumSourceResolver(
+            http,
+            resolutionTimeoutMs = 100,
+            nanoTime = {
+                clockReads++
+                if (expire && clockReads >= 15) 100_000_000L else 0L
+            },
+        )
+
+        assertEquals(PumSourceStatus.TEMPORARY_FAILURE, resolver.resolve(loaderDoc, true).status)
+        expire = false
+        assertEquals(PumSourceStatus.UNSUPPORTED_SOURCE, resolver.resolve(loaderDoc, true).status)
+        assertEquals(4, http.requests.size)
     }
 
     @Test fun `source two MiB declared limit rejects before buffering`() {
