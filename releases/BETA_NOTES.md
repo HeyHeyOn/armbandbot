@@ -1,3 +1,33 @@
+# 완장봇 1.5.0-beta2
+
+## 1.5.0-beta2 배포 완료
+
+### 수정 사항
+- Android 실기기에서 정상 스냅샷 경로를 심볼릭 링크로 잘못 판정해 전체 스냅샷 저장이 실패하던 문제를 수정했습니다.
+- 앱이 신뢰한 캐시 루트와 Android 시스템 상위 경로는 검사 대상에서 제외하고, 캐시 루트 아래의 실제 스냅샷 경로 구성요소만 심볼릭 링크 여부를 검사합니다.
+- 실제 하위 심볼릭 링크·끊어진 링크·신뢰 경로 이탈은 기존처럼 차단하며, 최초 스냅샷 보존 및 최신 스냅샷 교체 안전장치를 유지합니다.
+
+### 검증
+- 실기기 로그의 `Snapshot target path contains a symbolic link` 실패 조건을 회귀 테스트로 재현한 뒤 수정
+- `SnapshotRecoveryTest` 22개 통과
+- debug/release 단위 테스트 각각 183개 통과
+- `lintDebug` 오류 0
+- `assembleRelease` 및 APK v2 서명 검증 통과
+- DEX `invoke-*/range` 최대 입력 `246/255` — 여유 9워드
+- 독립 보안·정확성 리뷰 승인
+
+### 배포 정보
+- versionName: `1.5.0`
+- versionCode: `151`
+- APK: `완장봇_v1.5.0-beta2.apk`
+- 크기: `12,912,334 bytes`
+- SHA-256: `9e554dfcd1aebbbb43453b77760a28d779b369a23b630612d8194230bf2f3d2c`
+- Drive 파일 ID: `1S9WfTJfly7QZ2jLWS3qkdqv0_DhORcb4`
+- Drive 링크: https://drive.google.com/file/d/1S9WfTJfly7QZ2jLWS3qkdqv0_DhORcb4/view?usp=drivesdk
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
+---
+
 # 완장봇 1.5.0-beta1
 
 ## 1.5.0-beta1 배포 완료
