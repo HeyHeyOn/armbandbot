@@ -1,5 +1,6 @@
 package com.heyheyon.armbandbot
 
+import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
 import java.io.File
@@ -181,7 +182,7 @@ private fun File.validatedLegacySnapshot(
     allowedRoots: List<File>,
     symlinkPredicate: (File) -> Boolean,
 ): File? {
-    if (hasSymbolicLinkInPath(symlinkPredicate)) return null
+    if (hasSymbolicLinkBelowAllowedRoot(allowedRoots, symlinkPredicate)) return null
     val canonicalCandidate = runCatching { canonicalFile }.getOrNull() ?: return null
     val exactAllowedName = Regex(
         "^${Regex.escape(expectedPrefix)}_(?:initial|latest)(?:_[0-9]+)?\\.html$"
@@ -205,16 +206,52 @@ internal fun isCanonicalFileStrictlyInside(candidate: File, allowedRoots: List<F
     }
 }
 
-private fun File.hasSymbolicLinkInPath(symlinkPredicate: (File) -> Boolean): Boolean =
-    generateSequence(absoluteFile) { it.parentFile }.any(symlinkPredicate)
+/**
+ * Checks only path components controlled below a trusted root. The configured root and its system
+ * ancestors may themselves be Android storage aliases (for example /data/user/0 vs /data/data).
+ */
+private fun File.hasSymbolicLinkBelowAllowedRoot(
+    allowedRoots: List<File>,
+    symlinkPredicate: (File) -> Boolean,
+): Boolean {
+    val canonicalCandidate = runCatching { canonicalFile }.getOrNull() ?: return true
+    val absoluteCandidate = absoluteFile
+    val anchor = allowedRoots.firstNotNullOfOrNull { root ->
+        val canonicalRoot = runCatching { root.canonicalFile }.getOrNull()
+            ?: return@firstNotNullOfOrNull null
+        val canonicallyInside = generateSequence(canonicalCandidate.parentFile) { it.parentFile }
+            .any { it == canonicalRoot }
+        if (!canonicallyInside) return@firstNotNullOfOrNull null
+
+        sequenceOf(root.absoluteFile, canonicalRoot.absoluteFile)
+            .distinct()
+            .firstOrNull { possibleAnchor ->
+                generateSequence(absoluteCandidate.parentFile) { it.parentFile }
+                    .any { parent -> parent == possibleAnchor }
+            }
+    } ?: return true
+
+    return generateSequence(absoluteCandidate) { it.parentFile }
+        .takeWhile { it != anchor }
+        .any(symlinkPredicate)
+}
 
 /**
  * Uses lstat, available since API 21, so dangling links are rejected without following them.
  * The canonical-path fallback keeps local JVM tests useful when Android's Os stub is unavailable.
  */
 private fun isSymbolicLinkWithoutFollowing(file: File): Boolean {
-    val lstatResult = runCatching { OsConstants.S_ISLNK(Os.lstat(file.absolutePath).st_mode) }.getOrNull()
-    if (lstatResult != null) return lstatResult
+    try {
+        return OsConstants.S_ISLNK(Os.lstat(file.absolutePath).st_mode)
+    } catch (error: ErrnoException) {
+        if (error.errno == OsConstants.ENOENT || error.errno == OsConstants.ENOTDIR) return false
+        return true
+    } catch (error: Throwable) {
+        val androidOsUnavailable = error is LinkageError || error is NullPointerException ||
+            (error is RuntimeException &&
+                (error.message == "Stub!" || error.message?.contains("not mocked") == true))
+        if (!androidOsUnavailable) return true
+    }
     if (File.separatorChar == '\\') return false
     return runCatching { file.absoluteFile.path != file.canonicalFile.path }.getOrDefault(true)
 }
@@ -233,7 +270,9 @@ private fun validateSnapshotWriteTarget(
         "Snapshot target is not in a snapshot directory"
     }
     require(isCanonicalFileStrictlyInside(target, allowedRoots)) { "Snapshot target is outside trusted roots" }
-    require(!target.hasSymbolicLinkInPath(symlinkPredicate)) { "Snapshot target path contains a symbolic link" }
+    require(!target.hasSymbolicLinkBelowAllowedRoot(allowedRoots, symlinkPredicate)) {
+        "Snapshot target path contains a symbolic link"
+    }
 }
 
 /**

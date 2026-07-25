@@ -23,6 +23,36 @@ class SnapshotRecoveryTest {
     }
 
     @Test
+    fun trustedAllowedRootAndItsAncestorsAreExcludedFromSymlinkChecks() {
+        val parent = Files.createTempDirectory("snapshot_trusted_root").toFile()
+        val cacheRoot = File(parent, "cache").apply { mkdirs() }
+        val directory = File(cacheRoot, "snapshots_bot").apply { mkdirs() }
+        val initial = File(directory, "armbandbot_244_initial.html")
+        val checkedPaths = mutableListOf<File>()
+
+        val saved = saveGeneralSnapshotPreservingExistingInitial(
+            initial,
+            File(directory, "armbandbot_244_latest.html"),
+            null,
+            "first snapshot",
+            listOf(cacheRoot),
+            symlinkPredicate = { candidate ->
+                checkedPaths += candidate.absoluteFile
+                candidate.absoluteFile == cacheRoot.absoluteFile ||
+                    generateSequence(cacheRoot.absoluteFile.parentFile) { it.parentFile }
+                        .any { ancestor -> candidate.absoluteFile == ancestor }
+            },
+        )
+
+        assertEquals(initial.absolutePath, saved)
+        assertEquals("first snapshot", initial.readText())
+        assertTrue(checkedPaths.contains(initial.absoluteFile))
+        assertTrue(checkedPaths.contains(directory.absoluteFile))
+        assertFalse(checkedPaths.contains(cacheRoot.absoluteFile))
+        parent.deleteRecursively()
+    }
+
+    @Test
     fun injectedSymlinkPredicateRejectsExistingAndDanglingLegacyTargets() {
         listOf(true, false).forEach { linkHasTarget ->
             val cacheRoot = Files.createTempDirectory("snapshot_symlink_rejection").toFile()
