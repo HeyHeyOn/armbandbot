@@ -1,3 +1,36 @@
+## 1.4.5 정식 릴리즈 완료
+
+### 주요 변화
+- 우회 금지어에 두 가지 독립적인 강화 설정을 추가했습니다.
+  - 영문 대소문자를 섞은 우회 표현을 감지할 수 있습니다.
+  - 전각 문자, 보이지 않는 문자와 일부 비슷하게 생긴 외국 문자를 이용한 우회를 감지할 수 있습니다.
+  - 두 설정은 기존 사용자와 새 봇에서 기본적으로 꺼져 있으며, 일반 금지어·닉네임 우회 블랙리스트·원문·차단 기록은 변경하지 않습니다.
+- 스냅샷 보존과 복구를 개선했습니다.
+  - 구버전 또는 DB 불러오기로 연결이 끊긴 스냅샷을 다시 연결합니다.
+  - 복원된 최초 스냅샷은 보존하고 첫 재검사 결과부터 최신본으로 분리합니다.
+  - 첫 재검사 직후부터 최초/최신 스냅샷을 전환할 수 있습니다.
+- 큰 상세 설정 화면을 하위 Composable로 분리하고, 릴리즈 APK의 DEX 입력 한계를 검사하는 회귀 검증을 추가했습니다.
+  - beta3에서 봇 상세 화면 진입 시 종료되던 DEX 인자 초과 회귀를 beta4에서 수정했습니다.
+
+### 검증
+- `./gradlew.bat clean testDebugUnitTest assembleRelease lintVitalRelease` 통과
+- 단위 테스트 79개 통과, 실패·오류·건너뜀 0개
+- DEX invoke-range 검사 통과: 최대 `ins=246`, 한계 대비 여유 9
+- APK `versionCode 145` / `versionName 1.4.5` 확인
+- APK Signature Scheme v2 및 기존 1.4.4와 동일한 인증서 지문 확인
+- Google Drive 재다운로드 파일의 크기와 SHA-256이 로컬 APK와 일치
+- 매뉴얼·패치노트·처음 사용 가이드 수정 후 탭·문단 순서·스타일 재검증
+- 연결된 Android 기기가 없어 실제 업데이트 설치 검증은 수행하지 못했습니다.
+
+### 배포 정보
+- versionCode: `145`
+- versionName: `1.4.5`
+- APK: `완장봇_v1.4.5.apk`
+- SHA-256: `cfbc25ce9301234e5c50325a97aee5036de5f908f368692b89c040141f50fb7a`
+- 파일 크기: `12,830,414 bytes`
+- Google Drive file ID: `1vr0XmqInIAzTEnC1oICjMHmT3cbHBeaH`
+- Google Drive link: https://drive.google.com/file/d/1vr0XmqInIAzTEnC1oICjMHmT3cbHBeaH/view?usp=drivesdk
+
 ## 1.4.5-beta2 배포 완료
 
 ### 주요 변화
