@@ -112,8 +112,9 @@ class SnapshotRecoveryTest {
             html = "rechecked snapshot"
         )
 
-        assertEquals(activeLatest.absolutePath, savedPath)
-        assertEquals("original snapshot", activeInitial.readText())
+        assertEquals(importedInitial.absolutePath, savedPath)
+        assertTrue(!activeInitial.exists())
+        assertEquals("original snapshot", importedInitial.readText())
         assertEquals("rechecked snapshot", activeLatest.readText())
         cacheRoot.deleteRecursively()
     }
@@ -122,7 +123,7 @@ class SnapshotRecoveryTest {
     fun firstRecheckUsesInitialSiblingWhenRestoredPathPointsToLatest() {
         val cacheRoot = Files.createTempDirectory("snapshot_recheck_latest").toFile()
         val importedDir = File(cacheRoot, "snapshots_imported").apply { mkdirs() }
-        File(importedDir, "armbandbot_244_initial.html").writeText("original snapshot")
+        val importedInitial = File(importedDir, "armbandbot_244_initial.html").apply { writeText("original snapshot") }
         val importedLatest = File(importedDir, "armbandbot_244_latest.html").apply {
             writeText("previous latest snapshot")
         }
@@ -130,14 +131,16 @@ class SnapshotRecoveryTest {
         val activeInitial = File(activeDir, "armbandbot_244_initial.html")
         val activeLatest = File(activeDir, "armbandbot_244_latest.html")
 
-        saveGeneralSnapshotPreservingExistingInitial(
+        val savedPath = saveGeneralSnapshotPreservingExistingInitial(
             initialFile = activeInitial,
             latestFile = activeLatest,
             existingSnapshotPath = importedLatest.absolutePath,
             html = "rechecked snapshot"
         )
 
-        assertEquals("original snapshot", activeInitial.readText())
+        assertTrue(!activeInitial.exists())
+        assertEquals(importedInitial.absolutePath, savedPath)
+        assertEquals("original snapshot", importedInitial.readText())
         assertEquals("rechecked snapshot", activeLatest.readText())
         cacheRoot.deleteRecursively()
     }
@@ -146,7 +149,7 @@ class SnapshotRecoveryTest {
     fun firstRecheckFindsNumberedInitialSiblingForRepeatedRestore() {
         val cacheRoot = Files.createTempDirectory("snapshot_recheck_numbered").toFile()
         val importedDir = File(cacheRoot, "snapshots_imported").apply { mkdirs() }
-        File(importedDir, "armbandbot_244_initial_2.html").writeText("numbered original snapshot")
+        val importedInitial = File(importedDir, "armbandbot_244_initial_2.html").apply { writeText("numbered original snapshot") }
         val importedLatest = File(importedDir, "armbandbot_244_latest_2.html").apply {
             writeText("numbered previous latest")
         }
@@ -161,7 +164,8 @@ class SnapshotRecoveryTest {
             html = "rechecked snapshot"
         )
 
-        assertEquals("numbered original snapshot", activeInitial.readText())
+        assertTrue(!activeInitial.exists())
+        assertEquals("numbered original snapshot", importedInitial.readText())
         assertEquals("rechecked snapshot", activeLatest.readText())
         cacheRoot.deleteRecursively()
     }
@@ -206,6 +210,60 @@ class SnapshotRecoveryTest {
         assertEquals("active original", activeInitial.readText())
         assertEquals("later snapshot", activeLatest.readText())
         cacheRoot.deleteRecursively()
+    }
+
+    @Test
+    fun legacyActiveInitialOutsideCurrentBotFolderKeepsItsBytesAndDbPath() {
+        val cacheRoot = Files.createTempDirectory("snapshot_legacy_active").toFile()
+        val legacyDir = File(cacheRoot, "snapshots_legacyBot").apply { mkdirs() }
+        val legacyInitial = File(legacyDir, "armbandbot_244_initial.html").apply {
+            writeBytes("legacy baseline".toByteArray())
+        }
+        val originalBytes = legacyInitial.readBytes()
+        val activeDir = File(cacheRoot, "snapshots_currentBot").apply { mkdirs() }
+        val activeInitial = File(activeDir, "armbandbot_244_initial.html")
+        val activeLatest = File(activeDir, "armbandbot_244_latest.html")
+
+        val savedPath = saveGeneralSnapshotPreservingExistingInitial(
+            initialFile = activeInitial,
+            latestFile = activeLatest,
+            existingSnapshotPath = legacyInitial.absolutePath,
+            html = "PUM source B",
+            allowedSnapshotRoots = listOf(cacheRoot)
+        )
+
+        assertEquals(legacyInitial.absolutePath, savedPath)
+        assertTrue(!activeInitial.exists())
+        assertTrue(originalBytes.contentEquals(legacyInitial.readBytes()))
+        assertEquals("PUM source B", activeLatest.readText())
+        cacheRoot.deleteRecursively()
+    }
+
+    @Test
+    fun untrustedOutsideOrTraversedSnapshotPathCannotSuppressNewInitial() {
+        val cacheRoot = Files.createTempDirectory("snapshot_traversal_root").toFile()
+        val outsideRoot = Files.createTempDirectory("snapshot_traversal_outside").toFile()
+        val outsideDir = File(outsideRoot, "snapshots_fake").apply { mkdirs() }
+        val outsideInitial = File(outsideDir, "armbandbot_244_initial.html").apply { writeText("attacker") }
+        val activeDir = File(cacheRoot, "snapshots_currentBot").apply { mkdirs() }
+        val activeInitial = File(activeDir, "armbandbot_244_initial.html")
+        val activeLatest = File(activeDir, "armbandbot_244_latest.html")
+        val traversed = File(activeDir, "../../${outsideRoot.name}/snapshots_fake/${outsideInitial.name}").path
+
+        val savedPath = saveGeneralSnapshotPreservingExistingInitial(
+            initialFile = activeInitial,
+            latestFile = activeLatest,
+            existingSnapshotPath = traversed,
+            html = "safe new baseline",
+            allowedSnapshotRoots = listOf(cacheRoot)
+        )
+
+        assertEquals(activeInitial.absolutePath, savedPath)
+        assertEquals("safe new baseline", activeInitial.readText())
+        assertTrue(!activeLatest.exists())
+        assertEquals("attacker", outsideInitial.readText())
+        cacheRoot.deleteRecursively()
+        outsideRoot.deleteRecursively()
     }
 
     @Test

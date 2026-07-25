@@ -252,6 +252,9 @@ class PumSourceResolver(
         val body = document.selectFirst(".write_div")
             ?: return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
         val title = document.selectFirst(".title_subject, .write_subject, .write_title")?.text()?.normalizeWhitespace().orEmpty()
+        val author = document.selectFirst(".gall_writer, .ub-writer")?.let { writer ->
+            writer.attr("data-nick").ifBlank { writer.text() }.normalizeWhitespace()
+        }.orEmpty()
         val sanitized = sanitizeBody(body)
         val bodyText = sanitized.text().normalizeWhitespace()
         val imageAlts = sanitized.select("img[alt]").map { it.attr("alt").normalizeWhitespace() }.filter { it.isNotEmpty() }
@@ -266,12 +269,33 @@ class PumSourceResolver(
         val hash = MessageDigest.getInstance("SHA-256").digest(hashInput.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
         if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
-        return PumResolution(PumSourceStatus.RESOLVED, key, sourceUrl, title, bodyText, imageAlts, canonicalHtml, media, hash)
+        return PumResolution(
+            status = PumSourceStatus.RESOLVED,
+            sourceKey = key,
+            sourceUrl = sourceUrl,
+            title = title,
+            bodyText = bodyText,
+            imageAlts = imageAlts,
+            sanitizedHtml = canonicalHtml,
+            mediaSources = media,
+            contentHash = hash,
+            author = author,
+        )
     }
 
     private fun sanitizeBody(original: Element): Element {
         val body = original.clone()
         body.select(".comment_box, .comment_wrap, .reply_box, .cmt_info, [id^=comment]").remove()
+        body.select("iframe").toList().forEach { iframe ->
+            val raw = iframe.absUrl("src").ifBlank { iframe.attr("src") }
+            val uri = runCatching { URI(if (raw.startsWith("//")) "https:$raw" else raw) }.getOrNull()
+            if (uri?.scheme.equals("https", true) && !uri?.host.isNullOrBlank() &&
+                uri?.userInfo == null && uri?.path.orEmpty().contains("/voice/player")) {
+                iframe.replaceWith(Element("span").addClass("armbandbot-pum-voice").text("보이스 원문 (정적 표시)"))
+            } else {
+                iframe.remove()
+            }
+        }
         body.select("script, style, meta, link, base, form, button, input, textarea, select, option, iframe, frame, object, embed, canvas, template, noscript, svg, math").remove()
         removeComments(body)
 
@@ -287,6 +311,7 @@ class PumSourceResolver(
                 val name = attribute.key.lowercase(Locale.ROOT)
                 if (name !in allowed) return@mapNotNull null
                 var value = attribute.value
+                if (name == "class" && value != "armbandbot-pum-voice") return@mapNotNull null
                 if (name in URL_ATTRIBUTES) {
                     value = element.absUrl(name)
                     val uri = try { URI(value) } catch (_: Exception) { null }
@@ -424,6 +449,7 @@ class PumSourceResolver(
             "pre", "code", "ul", "ol", "li", "hr", "a", "img", "video", "audio", "source",
         )
         private val ALLOWED_ATTRIBUTES = mapOf(
+            "span" to setOf("class"),
             "a" to setOf("href", "title"),
             "img" to setOf("src", "alt", "title"),
             "video" to setOf("src", "poster", "controls", "title"),

@@ -1,0 +1,148 @@
+package com.heyheyon.armbandbot
+
+import org.jsoup.Jsoup
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+import java.nio.file.Files
+
+class PumSnapshotTest {
+    @Test
+    fun resolvedCardIsStaticStoredAndDoesNotMutateLiveDocument() {
+        val live = Jsoup.parse("<html><body><article><div class='write_div'><script>loadPum()</script><p>outer</p></div></article></body></html>")
+        val before = live.html()
+        val resolution = resolved(
+            sanitizedHtml = """
+                <p onclick='steal()'>source body</p>
+                <!-- private source comment -->
+                <img class='written_dccon' src='//dcimg.example/con.gif' alt='콘'>
+                <img src='https://images.example/a.jpg' onerror='steal()'>
+                <iframe src='https://gall.dcinside.com/voice/player?vr=7'></iframe>
+                <script>alert(1)</script>
+            """.trimIndent(),
+            mediaSources = listOf("https://images.example/a.jpg")
+        )
+
+        val snapshot = PumSnapshot.withStaticCard(live, resolution, checkedAt = "2026-07-25T12:00:00Z")
+        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
+
+        assertNotSame(live, snapshot)
+        assertEquals(before, live.html())
+        assertEquals("RESOLVED", card.attr("data-status"))
+        assertEquals("MI/test/10", card.attr("data-source-key"))
+        assertEquals("https://gall.dcinside.com/mini/board/view/?id=test&no=10", card.attr("data-source-url"))
+        assertEquals("2026-07-25T12:00:00Z", card.attr("data-checked-at"))
+        assertEquals("abc123", card.attr("data-content-hash"))
+        assertTrue(card.text().contains("펌 원문"))
+        assertTrue(card.text().contains("test 갤러리"))
+        assertTrue(card.text().contains("source title"))
+        assertTrue(card.text().contains("source author"))
+        assertTrue(card.text().contains("source preview"))
+        assertTrue(card.text().contains("source body"))
+        assertEquals(2, card.select("img").size)
+        assertEquals("https://dcimg.example/con.gif", card.selectFirst("img.written_dccon")!!.attr("src"))
+        assertTrue(card.selectFirst(".armbandbot-pum-voice")!!.text().contains("보이스"))
+        assertTrue(card.select("script, form, iframe, object, embed, input").isEmpty())
+        assertFalse(card.html().contains("onclick", true))
+        assertFalse(card.html().contains("onerror", true))
+        assertFalse(card.html().contains("private source comment"))
+        assertFalse(snapshot.html().contains("loadPum()"))
+    }
+
+    @Test
+    fun dangerousUrlsAndExecutableElementsAreRemoved() {
+        val resolution = resolved(
+            sourceUrl = "javascript:alert(1)",
+            sanitizedHtml = """
+                <a href='javascript:alert(1)'>bad</a>
+                <img src='data:text/html,boom'>
+                <video poster='vbscript:boom'><source src='file:///secret'></video>
+                <form><input autofocus onfocus='steal()'></form><object data='https://evil.test/x'></object>
+            """.trimIndent()
+        )
+
+        val card = PumSnapshot.withStaticCard(Jsoup.parse("<div class=write_div>outer</div>"), resolution).selectFirst(".armbandbot-pum-card")!!
+
+        assertFalse(card.hasAttr("data-source-url"))
+        assertTrue(card.select("form, input, object, script, iframe, embed").isEmpty())
+        assertTrue(card.select("[src], [href], [poster]").isEmpty())
+        assertFalse(card.html().contains("onfocus", true))
+    }
+
+    @Test
+    fun unresolvedCardStoresAvailableMetadataAndWarning() {
+        val resolution = PumResolution(
+            status = PumSourceStatus.TEMPORARY_FAILURE,
+            sourceKey = PostKey("M", "warn", "77"),
+            sourceUrl = "https://gall.dcinside.com/mgallery/board/view/?id=warn&no=77"
+        )
+
+        val card = PumSnapshot.withStaticCard(
+            Jsoup.parse("<div class=write_div>outer</div>"),
+            resolution,
+            checkedAt = "2026-07-25T13:00:00Z"
+        ).selectFirst(".armbandbot-pum-card")!!
+
+        assertEquals("TEMPORARY_FAILURE", card.attr("data-status"))
+        assertEquals("M/warn/77", card.attr("data-source-key"))
+        assertEquals("2026-07-25T13:00:00Z", card.attr("data-checked-at"))
+        assertTrue(card.text().contains("원문을 불러오지 못했습니다"))
+        assertTrue(card.select("script, iframe").isEmpty())
+    }
+
+    @Test
+    fun initialAndLatestKeepIndependentPumSourceVersionsAndBlockCardIsStatic() {
+        val root = Files.createTempDirectory("pum_snapshot_versions").toFile()
+        val dir = File(root, "snapshots_bot").apply { mkdirs() }
+        val initial = File(dir, "test_10_initial.html")
+        val latest = File(dir, "test_10_latest.html")
+        val live = Jsoup.parse("<div class='write_div'><script>loader()</script>outer</div>")
+        val sourceA = resolved(sanitizedHtml = "<p>source A</p>")
+        val sourceB = resolved(sanitizedHtml = "<p>source B</p>")
+
+        val initialPath = saveGeneralSnapshotPreservingExistingInitial(
+            initial, latest, null, PumSnapshot.withStaticCard(live, sourceA).html(), listOf(root)
+        )
+        val baselineBytes = initial.readBytes()
+        val preservedPath = saveGeneralSnapshotPreservingExistingInitial(
+            initial, latest, initialPath, PumSnapshot.withStaticCard(live, sourceB).html(), listOf(root)
+        )
+        val blockedHtml = PumSnapshot.withStaticCard(live, sourceB).html()
+
+        assertEquals(initial.absolutePath, preservedPath)
+        assertTrue(baselineBytes.contentEquals(initial.readBytes()))
+        assertTrue(Jsoup.parse(initial.readText()).selectFirst(".armbandbot-pum-body")!!.text().contains("source A"))
+        assertTrue(Jsoup.parse(latest.readText()).selectFirst(".armbandbot-pum-body")!!.text().contains("source B"))
+        assertTrue(Jsoup.parse(blockedHtml).selectFirst(".armbandbot-pum-card")!!.text().contains("source B"))
+        assertFalse(blockedHtml.contains("loader()"))
+        root.deleteRecursively()
+    }
+
+    @Test
+    fun nullResolutionLeavesOrdinarySnapshotContentUnchangedApartFromClone() {
+        val live = Jsoup.parse("<html><body><div class='write_div'><p>ordinary</p></div></body></html>")
+        val snapshot = PumSnapshot.withStaticCard(live, null)
+
+        assertEquals(live.html(), snapshot.html())
+        assertTrue(snapshot.select(".armbandbot-pum-card").isEmpty())
+    }
+
+    private fun resolved(
+        sourceUrl: String = "https://gall.dcinside.com/mini/board/view/?id=test&no=10",
+        sanitizedHtml: String,
+        mediaSources: List<String> = emptyList()
+    ) = PumResolution(
+        status = PumSourceStatus.RESOLVED,
+        sourceKey = PostKey("MI", "test", "10"),
+        sourceUrl = sourceUrl,
+        title = "source title",
+        bodyText = "source preview",
+        sanitizedHtml = sanitizedHtml,
+        mediaSources = mediaSources,
+        contentHash = "abc123",
+        author = "source author"
+    )
+}

@@ -1671,7 +1671,8 @@ class BotService : Service() {
         gallType: String,
         gallId: String,
         postNumStr: String,
-        cookie: String
+        cookie: String,
+        pumResolution: PumResolution? = null,
     ): String? {
         val html = buildSnapshotHtml(
             botId = botId,
@@ -1689,10 +1690,11 @@ class BotService : Service() {
                 botId = botId,
                 gallId = gallId,
                 postNumStr = postNumStr,
-                doc = Jsoup.parse(html),
+                liveDoc = Jsoup.parse(html),
                 comments = null,
                 blockedCommentNo = null,
-                blockedTs = System.currentTimeMillis().toString()
+                blockedTs = System.currentTimeMillis().toString(),
+                pumResolution = pumResolution,
             )
         } catch (e: Exception) {
             Log.e("BotService", "[$botId] block snapshot save failed", e)
@@ -1708,7 +1710,8 @@ class BotService : Service() {
         postNumStr: String,
         commentNo: String,
         cookie: String,
-        comments: List<AiFilterCommentInput>
+        comments: List<AiFilterCommentInput>,
+        pumResolution: PumResolution? = null,
     ): String? {
         return try {
             val config = loadBotConfig(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))
@@ -1770,10 +1773,11 @@ class BotService : Service() {
                 botId = botId,
                 gallId = gallId,
                 postNumStr = postNumStr,
-                doc = postDoc,
+                liveDoc = postDoc,
                 comments = commentsJson,
                 blockedCommentNo = commentNo,
-                blockedTs = System.currentTimeMillis().toString()
+                blockedTs = System.currentTimeMillis().toString(),
+                pumResolution = pumResolution,
             )
         } catch (e: Exception) {
             Log.e("BotService", "[$botId] comment block snapshot save failed", e)
@@ -1787,13 +1791,15 @@ class BotService : Service() {
         botId: String,
         gallId: String,
         postNumStr: String,
-        doc: org.jsoup.nodes.Document,
+        liveDoc: org.jsoup.nodes.Document,
         comments: JSONArray? = null,
         blockedCommentNo: String? = null,
         blockedTs: String? = null,
-        existingSnapshotPath: String? = null
+        existingSnapshotPath: String? = null,
+        pumResolution: PumResolution? = null,
     ): String? {
             if (!config.isExpertMode) return null
+            val doc = PumSnapshot.withStaticCard(liveDoc, pumResolution)
             sendLog("[디버그] postDoc 스냅샷 저장 시도: $postNumStr", botId)
 
             // 1. 광고/네비/헤더/푸터/사이드바 등 불필요 요소 제거
@@ -2120,7 +2126,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                 }
             }
 
-            // 6. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
+            // 6. PUM evidence is static even for comments appended above (including voice replies).
+            if (pumResolution != null) PumSnapshot.removeExecutableBehavior(doc)
+
+            // 7. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
             return try {
                 val cacheDir = File(cacheDir, "snapshots_$botId")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
@@ -2138,7 +2147,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                         initialFile = initialFile,
                         latestFile = latestFile,
                         existingSnapshotPath = existingSnapshotPath,
-                        html = html
+                        html = html,
+                        allowedSnapshotRoots = listOf(this@BotService.cacheDir, this@BotService.filesDir),
                     )
                 }
             } catch (e: Exception) {
@@ -2337,9 +2347,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                         botId = botId,
                         gallId = gallId,
                         postNumStr = postNumStr,
-                        doc = postDoc,
+                        liveDoc = postDoc,
                         comments = commentsArray,
-                        existingSnapshotPath = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath
+                        existingSnapshotPath = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath,
+                        pumResolution = pumModeration.sourceResolution,
                     )
                     if (!result.isNullOrBlank()) {
                         sendLog("[스냅샷][전체] 저장 완료: $result", botId)
@@ -2796,7 +2807,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         botId = botId,
                                         gallId = targetKey.gallId,
                                         postNumStr = targetKey.postNo,
-                                        doc = immediatePostDoc,
+                                        liveDoc = immediatePostDoc,
                                         comments = null,
                                         blockedCommentNo = null,
                                         blockedTs = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -3049,7 +3060,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 botId = botId,
                 gallId = gallId,
                 postNumStr = postNumStr,
-                doc = doc,
+                liveDoc = doc,
                 comments = comments,
                 blockedCommentNo = blockedCommentNo,
                 blockedTs = blockedTs,
@@ -3057,7 +3068,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                     GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath
                 } else {
                     null
-                }
+                },
+                pumResolution = pumModeration.sourceResolution,
             )
             if (config.isDebugMode) {
                 sendLog("[디버그][성능] 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)

@@ -1,8 +1,6 @@
 package com.heyheyon.armbandbot
 
 import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
 
 internal data class SnapshotIdentity(val gallId: String, val postNum: String)
 internal typealias SnapshotFileIndex = Map<String, List<File>>
@@ -65,18 +63,25 @@ internal fun saveGeneralSnapshotPreservingExistingInitial(
     initialFile: File,
     latestFile: File,
     existingSnapshotPath: String?,
-    html: String
+    html: String,
+    allowedSnapshotRoots: List<File> = listOfNotNull(initialFile.parentFile?.parentFile),
 ): String {
-    if (!initialFile.isFile) {
-        val existingSnapshot = existingSnapshotPath
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::File)
-            ?.takeIf { it.isFile }
-        val existingInitial = existingSnapshot?.asInitialSnapshotCandidate()
-        existingInitial?.let { copySnapshotAtomically(it, initialFile) }
+    val existingInitial = existingSnapshotPath
+        ?.takeIf { it.isNotBlank() }
+        ?.let(::File)
+        ?.asInitialSnapshotCandidate()
+        ?.takeIf { candidate -> candidate.isTrustedReadableSnapshot(initialFile, allowedSnapshotRoots) }
+
+    // A pre-1.4.5 DB path is itself the baseline identity. Keep both its bytes and its path;
+    // copying it into the current bot folder would cause the DB row to be replaced on recheck.
+    if (existingInitial != null) {
+        latestFile.parentFile?.mkdirs()
+        latestFile.writeText(html)
+        return existingInitial.absolutePath
     }
 
     return if (!initialFile.isFile) {
+        initialFile.parentFile?.mkdirs()
         initialFile.writeText(html)
         if (latestFile.exists()) latestFile.delete()
         initialFile.absolutePath
@@ -86,24 +91,20 @@ internal fun saveGeneralSnapshotPreservingExistingInitial(
     }
 }
 
-private fun copySnapshotAtomically(source: File, target: File) {
-    if (target.isFile) return
-    val parent = target.parentFile ?: throw IOException("스냅샷 저장 폴더가 없습니다.")
-    parent.mkdirs()
-    val temporary = File.createTempFile("${target.name}.", ".tmp", parent)
-    try {
-        source.inputStream().use { input ->
-            FileOutputStream(temporary).use { output ->
-                input.copyTo(output)
-                output.fd.sync()
-            }
-        }
-        if (!target.exists() && !temporary.renameTo(target)) {
-            throw IOException("최초 스냅샷 승계 파일을 확정하지 못했습니다.")
-        }
-    } finally {
-        if (temporary.exists()) temporary.delete()
+private fun File.isTrustedReadableSnapshot(expectedInitial: File, allowedRoots: List<File>): Boolean {
+    val canonicalCandidate = runCatching { canonicalFile }.getOrNull() ?: return false
+    if (!canonicalCandidate.isFile || !canonicalCandidate.canRead() || canonicalCandidate.length() <= 0L) return false
+    val expectedPrefix = expectedInitial.name.removeSuffix("_initial.html")
+    if (!canonicalCandidate.name.startsWith("${expectedPrefix}_initial") ||
+        !canonicalCandidate.name.endsWith(".html", ignoreCase = true)) return false
+    val snapshotDirectory = canonicalCandidate.parentFile ?: return false
+    if (!snapshotDirectory.name.startsWith("snapshots_")) return false
+    val inAllowedRoot = allowedRoots.any { root ->
+        val canonicalRoot = runCatching { root.canonicalFile }.getOrNull() ?: return@any false
+        canonicalCandidate.toPath().startsWith(canonicalRoot.toPath())
     }
+    if (!inAllowedRoot) return false
+    return runCatching { canonicalCandidate.inputStream().use { it.read() >= 0 } }.getOrDefault(false)
 }
 
 private fun File.asInitialSnapshotCandidate(): File? {
