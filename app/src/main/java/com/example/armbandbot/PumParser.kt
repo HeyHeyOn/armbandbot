@@ -7,8 +7,6 @@ import java.net.URI
 
 object PumParser {
     private const val CARD_ENDPOINT = "https://gall.dcinside.com/ajax/pum_ajax/get_contents"
-    private val assignmentPattern = Regex("""(?:var\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*['\"]([^'\"]+)['\"]""")
-    private val ajaxPattern = Regex("""(?:\$\s*\.\s*)?ajax\s*\(""", RegexOption.IGNORE_CASE)
 
     /** The marker is emitted as a direct child of the detail link in a DC list-title cell. */
     fun hasListMarker(document: Document): Boolean =
@@ -29,8 +27,10 @@ object PumParser {
     fun parseCard(html: String, outerPost: PostKey?): PumCard {
         val document = Jsoup.parse(html, "https://gall.dcinside.com/")
         val body = document.selectFirst(".cloned_card_body") ?: return PumCard(PumCardStatus.INVALID)
-        val links = body.select("a[href]")
+        // DCInside marks the original-post control explicitly. Other links are card content.
+        val links = body.select("a.source_link")
         val parsed = links.map { link ->
+            if (!link.hasAttr("href")) return@map null
             val raw = link.absUrl("href").ifBlank { link.attr("href") }
             DcinsidePostUrls.parseSafeCanonicalPostUrl(raw, outerPost)
         }
@@ -50,29 +50,32 @@ object PumParser {
 
     private fun parseLoader(script: Element): PumLoaderRequest? {
         val code = script.data().ifBlank { script.html() }
-        for (ajax in ajaxPattern.findAll(code)) {
-            val openParen = ajax.range.last
+        for ((ajaxStart, openParen) in ajaxCalls(code)) {
             val closeParen = matchingDelimiter(code, openParen, '(', ')') ?: continue
-            val block = code.substring(openParen + 1, closeParen)
-            val endpointRaw = Regex("""url\s*:\s*['\"]([^'\"]+)['\"]""", RegexOption.IGNORE_CASE)
-                .find(block)?.groupValues?.get(1) ?: continue
+            val optionsOpen = skipTrivia(code, openParen + 1, closeParen)
+            if (code.getOrNull(optionsOpen) != '{') continue
+            val optionsClose = matchingDelimiter(code, optionsOpen, '{', '}') ?: continue
+            if (optionsClose > closeParen) continue
+            val options = objectProperties(code, optionsOpen, optionsClose) ?: continue
+            val endpointRaw = options.firstOrNull { it.key.equals("url", true) }
+                ?.let { stringValue(code, it.valueStart, it.valueEnd) } ?: continue
             val endpoint = canonicalCardEndpoint(endpointRaw) ?: continue
-            val dataLabel = Regex("""\bdata\s*:""", RegexOption.IGNORE_CASE).find(block) ?: continue
-            val dataOpen = block.indexOf('{', dataLabel.range.last + 1).takeIf { it >= 0 } ?: continue
-            val dataClose = matchingDelimiter(block, dataOpen, '{', '}') ?: continue
-            val dataBlock = block.substring(dataOpen + 1, dataClose)
+            val data = options.firstOrNull { it.key.equals("data", true) } ?: continue
+            val dataOpen = skipTrivia(code, data.valueStart, data.valueEnd)
+            if (code.getOrNull(dataOpen) != '{') continue
+            val dataClose = matchingDelimiter(code, dataOpen, '{', '}') ?: continue
+            if (dataClose >= data.valueEnd) continue
+            val dataProperties = objectProperties(code, dataOpen, dataClose) ?: continue
 
             // Only assignments visible before this AJAX invocation may supply literal values.
-            val assignments = linkedMapOf<String, String>()
-            assignmentPattern.findAll(code.substring(0, ajax.range.first)).forEach {
-                assignments[it.groupValues[1]] = it.groupValues[2]
-            }
+            val assignments = literalAssignments(code, ajaxStart)
             val values = linkedMapOf<String, String>()
-            Regex("""['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?\s*:\s*(?:['\"]([^'\"]+)['\"]|([A-Za-z_][A-Za-z0-9_]*))""")
-                .findAll(dataBlock).forEach { match ->
-                    val resolved = match.groupValues[2].ifBlank { assignments[match.groupValues[3]].orEmpty() }
-                    if (resolved.isNotBlank()) values[match.groupValues[1]] = resolved
-                }
+            dataProperties.forEach { property ->
+                val literal = stringValue(code, property.valueStart, property.valueEnd)
+                val variable = identifierValue(code, property.valueStart, property.valueEnd)
+                val resolved = literal ?: variable?.let(assignments::get)
+                if (!resolved.isNullOrBlank()) values[property.key] = resolved
+            }
             val id = values["gall_id"] ?: values["id"] ?: continue
             val no = values["gall_no"] ?: values["no"] ?: continue
             val type = (values["gall_type"] ?: values["gallery_type"] ?: values["_GALLTYPE_"] ?: "G").uppercase()
@@ -80,6 +83,167 @@ object PumParser {
             return PumLoaderRequest(endpoint, PostKey(type, id, no), values.toMap())
         }
         return null
+    }
+
+    private data class JsProperty(val key: String, val valueStart: Int, val valueEnd: Int)
+
+    /** Finds executable ajax(...) calls, skipping comments and all JS string literal forms. */
+    private fun ajaxCalls(code: String): List<Pair<Int, Int>> {
+        val calls = mutableListOf<Pair<Int, Int>>()
+        var i = 0
+        while (i < code.length) {
+            i = skipTrivia(code, i, code.length)
+            val c = code.getOrNull(i) ?: break
+            if (c == '\'' || c == '"' || c == '`') {
+                i = stringEnd(code, i) ?: code.length
+                continue
+            }
+            if (isIdentifierStart(c)) {
+                val end = identifierEnd(code, i)
+                if (code.substring(i, end).equals("ajax", true)) {
+                    val open = skipTrivia(code, end, code.length)
+                    if (code.getOrNull(open) == '(') calls += i to open
+                }
+                i = end
+            } else i++
+        }
+        return calls
+    }
+
+    private fun literalAssignments(code: String, limit: Int): Map<String, String> {
+        val result = linkedMapOf<String, String>()
+        var i = 0
+        while (i < limit) {
+            i = skipTrivia(code, i, limit)
+            val c = code.getOrNull(i) ?: break
+            if (c == '\'' || c == '"' || c == '`') {
+                i = stringEnd(code, i) ?: limit
+                continue
+            }
+            if (!isIdentifierStart(c)) { i++; continue }
+            val nameEnd = identifierEnd(code, i)
+            val equals = skipTrivia(code, nameEnd, limit)
+            val valueStart = skipTrivia(code, equals + 1, limit)
+            if (code.getOrNull(equals) == '=' && code.getOrNull(equals + 1) != '=' &&
+                code.getOrNull(valueStart) in setOf('\'', '"')) {
+                val valueEnd = stringEnd(code, valueStart)
+                if (valueEnd != null && valueEnd <= limit) {
+                    result[code.substring(i, nameEnd)] = code.substring(valueStart + 1, valueEnd - 1)
+                    i = valueEnd
+                    continue
+                }
+            }
+            i = nameEnd
+        }
+        return result
+    }
+
+    private fun objectProperties(code: String, open: Int, close: Int): List<JsProperty>? {
+        val properties = mutableListOf<JsProperty>()
+        var i = open + 1
+        while (true) {
+            i = skipTrivia(code, i, close)
+            while (code.getOrNull(i) == ',') i = skipTrivia(code, i + 1, close)
+            if (i >= close) return properties
+            val key: String
+            if (code[i] == '\'' || code[i] == '"') {
+                val end = stringEnd(code, i) ?: return null
+                if (end > close) return null
+                key = code.substring(i + 1, end - 1)
+                i = end
+            } else if (isIdentifierStart(code[i])) {
+                val end = identifierEnd(code, i)
+                key = code.substring(i, end)
+                i = end
+            } else return null
+            i = skipTrivia(code, i, close)
+            if (code.getOrNull(i) != ':') return null
+            val valueStart = skipTrivia(code, i + 1, close)
+            val valueEnd = topLevelValueEnd(code, valueStart, close) ?: return null
+            properties += JsProperty(key, valueStart, valueEnd)
+            i = valueEnd
+        }
+    }
+
+    private fun topLevelValueEnd(code: String, start: Int, objectClose: Int): Int? {
+        var round = 0
+        var curly = 0
+        var square = 0
+        var i = start
+        while (i < objectClose) {
+            i = skipTrivia(code, i, objectClose)
+            if (i >= objectClose) break
+            when (code[i]) {
+                '\'', '"', '`' -> { i = stringEnd(code, i) ?: return null; continue }
+                '(' -> round++
+                ')' -> round--
+                '{' -> curly++
+                '}' -> curly--
+                '[' -> square++
+                ']' -> square--
+                ',' -> if (round == 0 && curly == 0 && square == 0) return i
+            }
+            if (round < 0 || curly < 0 || square < 0) return null
+            i++
+        }
+        return objectClose
+    }
+
+    private fun stringValue(code: String, start: Int, end: Int): String? {
+        val at = skipTrivia(code, start, end)
+        if (code.getOrNull(at) !in setOf('\'', '"')) return null
+        val after = stringEnd(code, at) ?: return null
+        if (skipTrivia(code, after, end) != end) return null
+        return code.substring(at + 1, after - 1)
+    }
+
+    private fun identifierValue(code: String, start: Int, end: Int): String? {
+        val at = skipTrivia(code, start, end)
+        if (!isIdentifierStart(code.getOrNull(at) ?: return null)) return null
+        val after = identifierEnd(code, at)
+        return code.substring(at, after).takeIf { skipTrivia(code, after, end) == end }
+    }
+
+    private fun skipTrivia(code: String, from: Int, limit: Int): Int {
+        var i = from
+        while (i < limit) {
+            if (code[i].isWhitespace()) { i++; continue }
+            if (code[i] == '/' && code.getOrNull(i + 1) == '/') {
+                i += 2
+                while (i < limit && code[i] != '\n' && code[i] != '\r') i++
+                continue
+            }
+            if (code[i] == '/' && code.getOrNull(i + 1) == '*') {
+                val end = code.indexOf("*/", i + 2)
+                i = if (end < 0 || end + 2 > limit) limit else end + 2
+                continue
+            }
+            break
+        }
+        return i
+    }
+
+    /** Returns the index immediately after a quoted literal. Templates are deliberately opaque. */
+    private fun stringEnd(code: String, quoteAt: Int): Int? {
+        val quote = code[quoteAt]
+        var escaped = false
+        var i = quoteAt + 1
+        while (i < code.length) {
+            val c = code[i]
+            if (escaped) escaped = false
+            else if (c == '\\') escaped = true
+            else if (c == quote) return i + 1
+            i++
+        }
+        return null
+    }
+
+    private fun isIdentifierStart(c: Char) = c == '_' || c == '$' || c.isLetter()
+    private fun isIdentifierPart(c: Char) = isIdentifierStart(c) || c.isDigit()
+    private fun identifierEnd(code: String, from: Int): Int {
+        var i = from + 1
+        while (i < code.length && isIdentifierPart(code[i])) i++
+        return i
     }
 
     private fun canonicalCardEndpoint(raw: String): String? {

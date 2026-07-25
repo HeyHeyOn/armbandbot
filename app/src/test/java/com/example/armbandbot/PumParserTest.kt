@@ -85,9 +85,11 @@ class PumParserTest {
     @Test fun `card only trusts documented card body link and requires one distinct safe source`() {
         val valid = "https://gall.dcinside.com/board/view/?id=good&no=1"
         assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<a href='$valid'>outside</a><div class='cloned_card_body'>broken</div>", null).status)
-        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<div class='cloned_card_body'><a href='$valid'>one</a><a href='https://gall.dcinside.com/board/view/?id=other&no=2'>two</a></div>", null).status)
-        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<div class='cloned_card_body'><a href='$valid'>safe</a><a href='https://evil.example/board/view/?id=x&no=2'>disallowed</a></div>", null).status)
-        assertEquals(PumCardStatus.RESOLVED, PumParser.parseCard("<div class='cloned_card_body'><a href='$valid'>one</a><a href='$valid&from=copy'>duplicate</a></div>", null).status)
+        assertEquals(PumCardStatus.RESOLVED, PumParser.parseCard("<div class='cloned_card_body'><a class='source_link' href='$valid'>source</a><a href='https://gall.dcinside.com/board/view/?id=benign&no=9'>related post</a></div>", null).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<div class='cloned_card_body'><a class='source_link' href='$valid'>one</a><a class='source_link' href='https://gall.dcinside.com/board/view/?id=other&no=2'>two</a></div>", null).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<div class='cloned_card_body'><a href='$valid'>canonical but not source</a></div>", null).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard("<div class='cloned_card_body'><a class='source_link' href='javascript:alert(1)'>malformed source</a><a href='$valid'>benign</a></div>", null).status)
+        assertEquals(PumCardStatus.RESOLVED, PumParser.parseCard("<div class='cloned_card_body'><a class='source_link' href='$valid'>one</a><a class='source_link' href='$valid&from=copy'>duplicate</a></div>", null).status)
         listOf(
             "<html><form action='/login'>login</form></html>",
             "<div class='cloned_card_body'>server error</div>",
@@ -110,5 +112,35 @@ class PumParserTest {
             val html = "<div class='write_div'><script>$.ajax({url:'$endpoint',data:{gall_id:'x',gall_no:'1'}});</script></div>"
             assertNull(endpoint, PumParser.parseDetail(Jsoup.parse(html), false).loader)
         }
+    }
+
+    @Test fun `loader scanner ignores comments strings templates and commented assignments`() {
+        val html = """<div class='write_div'><script>
+            // $.ajax({url:'/ajax/pum_ajax/get_contents',data:{gall_id:'comment',gall_no:'1'}});
+            /* ajax({url:'/ajax/pum_ajax/get_contents',data:{gall_id:'block',gall_no:'2'}}); */
+            var decoy = "$.ajax({url:'/ajax/pum_ajax/get_contents',data:{gall_id:'string',gall_no:'3'}})";
+            var template = `ajax({url:'/ajax/pum_ajax/get_contents',data:{gall_id:'template',gall_no:'4'}})`;
+            // var gall_id = 'commented';
+            /* var gall_no = '999'; */
+            var gall_id = 'real'; var gall_no = '5';
+            var assignmentText = "var gall_id = 'stringed'; var gall_no = '777';";
+            var assignmentTemplate = `gall_id = 'templated'; gall_no = '888';`;
+            $.ajax({url:'/ajax/pum_ajax/get_contents',data:{gall_id:gall_id,gall_no:gall_no,gall_type:'M'}});
+        </script></div>"""
+        assertEquals(PostKey("M", "real", "5"), PumParser.parseDetail(Jsoup.parse(html), false).loader?.outerPost)
+
+        val fakeOnly = """<div class='write_div'><script>const text = "ajax({url:'/ajax/pum_ajax/get_contents',data:{gall_id:'fake',gall_no:'8'}})";</script></div>"""
+        assertNull(PumParser.parseDetail(Jsoup.parse(fakeOnly), false).loader)
+    }
+
+    @Test fun `loader requires top level url and data options`() {
+        val nestedUrl = """<div class='write_div'><script>
+            $.ajax({url:'/unrelated', beforeSend:function(){ return {url:'/ajax/pum_ajax/get_contents'}; }, data:{gall_id:'fake',gall_no:'1'}});
+        </script></div>"""
+        val nestedData = """<div class='write_div'><script>
+            $.ajax({url:'/ajax/pum_ajax/get_contents', callbacks:{data:{gall_id:'fake',gall_no:'2'}}});
+        </script></div>"""
+        assertNull(PumParser.parseDetail(Jsoup.parse(nestedUrl), false).loader)
+        assertNull(PumParser.parseDetail(Jsoup.parse(nestedData), false).loader)
     }
 }

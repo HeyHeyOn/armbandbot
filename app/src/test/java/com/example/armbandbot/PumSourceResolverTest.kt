@@ -119,7 +119,7 @@ class PumSourceResolverTest {
             "https://gall.dcinside.com/mini/board/view/?id=mini&no=3"
         )
         links.forEach { link ->
-            val card = "<div class='cloned_card_body'><a href='$link'>원문</a></div>"
+            val card = "<div class='cloned_card_body'><a class='source_link' href='$link'>원문</a></div>"
             val http = FakeClient().apply { body(card); body(fixture("source_detail.html")) }
             assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(http).resolve(loaderDoc, true).status)
             assertEquals(link, http.requests[1].url)
