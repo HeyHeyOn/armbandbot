@@ -47,6 +47,21 @@ class PumSourceResolverTest {
         assertTrue(http.requests.all { !it.followRedirects })
     }
 
+    @Test fun `cycle-local resolvers keep bot cookies isolated on validated dcinside requests`() {
+        fun resolvedClient() = FakeClient().apply {
+            body(fixture("pum_card_resolved.html"))
+            body(fixture("source_detail.html"))
+        }
+        val first = resolvedClient()
+        val second = resolvedClient()
+
+        assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(first, cookies = { "bot=one" }).resolve(loaderDoc, true).status)
+        assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(second, cookies = { "bot=two" }).resolve(loaderDoc, true).status)
+
+        assertTrue(first.requests.all { it.url.startsWith("https://gall.dcinside.com/") && it.headers["Cookie"] == "bot=one" })
+        assertTrue(second.requests.all { it.url.startsWith("https://gall.dcinside.com/") && it.headers["Cookie"] == "bot=two" })
+    }
+
     @Test fun `maps missing invalid timeout and malformed source states`() {
         val missing = FakeClient().apply { body(fixture("pum_card_missing.html")) }
         assertEquals(PumSourceStatus.MISSING, PumSourceResolver(missing).resolve(loaderDoc, true).status)

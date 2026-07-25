@@ -39,6 +39,7 @@ class BotService : Service() {
     private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
     private val spamBurstRecentEvents = ConcurrentHashMap<String, MutableList<SpamBurstEvent>>()
     private val recentModerationFailures = ConcurrentHashMap<String, Long>()
+    private val recentPumResolutionFailures = ConcurrentHashMap<String, Long>()
     private val spamBurstStates = ConcurrentHashMap<String, SpamBurstState>()
     private val lastHealthLogAt = ConcurrentHashMap<String, Long>()
     private val runtimeProtectionLastGcAt = ConcurrentHashMap<String, Long>()
@@ -52,6 +53,7 @@ class BotService : Service() {
     private val maxPendingAiPlansPerBot = 200
     private val maxSpamBurstEventsPerKey = 300
     private val moderationFailureRetrySuppressMs = 10 * 60 * 1000L
+    private val pumResolutionFailureLogIntervalMs = 10 * 60 * 1000L
 
     private data class BotConfig(
         val isDebugMode: Boolean,
@@ -1302,6 +1304,18 @@ class BotService : Service() {
                 urlList = urlList
             )
 
+            // Resolver state (normalized-source cache and this bot's credentials) lives for one
+            // scan cycle only. Disabled mode creates no resolver and makes no PUM requests.
+            val pumSourceResolver = if (config.isPumSourceFilterMode) {
+                PumSourceResolver(
+                    http = UrlConnectionPumHttpClient(),
+                    cookies = { currentCookie },
+                    userAgent = dcUserAgent,
+                )
+            } else {
+                null
+            }
+
             val gallogCache = mutableMapOf<String, Pair<Int, Int>>()
             val pageMinMs = config.pageMinMs
             val pageMaxMs = config.pageMaxMs
@@ -1323,6 +1337,7 @@ class BotService : Service() {
                     blockDuration = blockDuration,
                     blockReason = blockReason,
                     delChk = delChk,
+                    pumSourceResolver = pumSourceResolver,
                     notifyIfEnabled = ::notifyIfEnabled
                 )
 
@@ -1392,6 +1407,7 @@ class BotService : Service() {
         blockDuration: String,
         blockReason: String,
         delChk: String,
+        pumSourceResolver: PumSourceResolver?,
         notifyIfEnabled: (String, String, String) -> Unit
     ): PageProcessResult {
         if (config.isDebugMode) {
@@ -1479,7 +1495,7 @@ class BotService : Service() {
                 sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
             }
             try {
-                processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, notifyIfEnabled)
+                processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
             } catch (e: Exception) {
                 if (DeletedPostHandling.isDeletedOrUnavailablePost(e)) {
                     GlobalBotState.savePost(
@@ -1547,6 +1563,7 @@ class BotService : Service() {
         blockDuration: String,
         blockReason: String,
         delChk: String,
+        pumSourceResolver: PumSourceResolver?,
         notifyIfEnabled: (String, String, String) -> Unit
     ): UrlProcessOutcome {
         val parsedTarget = parseTargetUrl(rawUrl) ?: return UrlProcessOutcome.CONTINUE
@@ -1588,6 +1605,7 @@ class BotService : Service() {
                         blockDuration = blockDuration,
                         blockReason = blockReason,
                         delChk = delChk,
+                        pumSourceResolver = pumSourceResolver,
                         notifyIfEnabled = notifyIfEnabled
                     )
                     when (pageResult.managerPermissionStatus) {
@@ -2191,6 +2209,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         blockReason: String,
         delChk: String,
         postWriterHtml: String,
+        pumSourceResolver: PumSourceResolver?,
         notifyIfEnabled: (String, String, String) -> Unit
     ) {
         if (config.isDebugMode) {
@@ -2258,8 +2277,38 @@ img.written_dccon{max-width:80px;max-height:80px}
             sendLog("[디버그][게시글] 번호: $postNumStr / 댓글 수 (API): ${rawCommentsArray?.length() ?: 0} / 검사 대상: ${commentsArray?.length() ?: 0}", botId)
             sendLog("[디버그][성능] 댓글 fetch / 글번호: $postNumStr / ${System.currentTimeMillis() - commentFetchStartedAt}ms", botId)
         }
-        val postText = "$text $contentText"
         val postKey = PostKey(gallType = gallType, gallId = gallId, postNo = postNumStr)
+        val legacyPostText = "$text $contentText"
+        val pumModeration = if (config.isPumSourceFilterMode) {
+            val detection = PumParser.parseDetail(postDoc)
+            PumModerationContent.resolve(
+                enabled = true,
+                detection = detection,
+                originalPostKey = postKey,
+                originalContent = legacyPostText,
+            ) {
+                runCatching {
+                    checkNotNull(pumSourceResolver) { "PUM resolver missing for enabled scan cycle" }
+                        .resolve(postDoc)
+                }.getOrElse {
+                    // Resolver failures are fail-open; do not expose exception text or request data.
+                    PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
+                }
+            }
+        } else {
+            // Do not even parse PUM structure while disabled: the legacy request path is unchanged.
+            PumModerationContent(
+                targetPostKey = postKey,
+                moderationContent = legacyPostText,
+            )
+        }
+        val postText = pumModeration.moderationContent
+        pumModeration.sourceResolution
+            ?.takeIf { it.status != PumSourceStatus.RESOLVED }
+            ?.let { resolution -> logPumResolutionFailure(botId, postKey, resolution.status) }
+        if (config.isDebugMode && pumModeration.hasResolvedSource) {
+            sendLog("[PUM_SOURCE] status=RESOLVED target=${postKey.gallType}/${postKey.gallId}/${postKey.postNo}", botId)
+        }
         val postProcessStartedAt = System.currentTimeMillis()
         val botPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
         val overrideCache = mutableMapOf<String, ModerationActionOverride>()
@@ -4332,6 +4381,31 @@ img.written_dccon{max-width:80px;max-height:80px}
             keywordApplyKkangOnly = botPref.getBoolean("keyword_apply_kkang_only", false)
         )
     }
+    private fun logPumResolutionFailure(
+        botId: String,
+        target: PostKey,
+        status: PumSourceStatus,
+    ) {
+        val now = System.currentTimeMillis()
+        val rateLimitKey = "$botId:${status.name}"
+        val shouldLog = synchronized(recentPumResolutionFailures) {
+            val previous = recentPumResolutionFailures[rateLimitKey]
+            if (previous != null && now - previous < pumResolutionFailureLogIntervalMs) {
+                false
+            } else {
+                recentPumResolutionFailures[rateLimitKey] = now
+                true
+            }
+        }
+        if (shouldLog) {
+            // Deliberately exclude source URLs, response content, cookies, and request parameters.
+            sendLog(
+                "[PUM_SOURCE] status=${status.name} fallback=ORDINARY_MODERATION target=${target.gallType}/${target.gallId}/${target.postNo}",
+                botId,
+            )
+        }
+    }
+
     private fun isKeywordTargetAllowed(
         config: BotConfig,
         botId: String,
