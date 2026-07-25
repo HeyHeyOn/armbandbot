@@ -95,6 +95,42 @@ class AiBatchQueueTest {
     }
 
     @Test
+    fun immediateExecutionOnlyAllowsCurrentPostWithMatchingFingerprint() {
+        val currentInput = item(PostKey("M", "gallery", "42"), "current").postInput
+        val otherInput = item(PostKey("M", "gallery", "41"), "other").postInput
+        val currentBlock = AiBatchResult.forInput(
+            postDecision(currentInput.postKey, AiFilterDecisionType.BLOCK),
+            currentInput,
+        )
+        val nonCurrentBlock = AiBatchResult.forInput(
+            postDecision(otherInput.postKey, AiFilterDecisionType.BLOCK),
+            otherInput,
+        )
+
+        assertFalse(
+            AiImmediateExecutionPolicy.shouldExecute(
+                result = nonCurrentBlock,
+                currentPostKey = currentInput.postKey,
+                currentInput = currentInput,
+            )
+        )
+        assertTrue(
+            AiImmediateExecutionPolicy.shouldExecute(
+                result = currentBlock,
+                currentPostKey = currentInput.postKey,
+                currentInput = currentInput,
+            )
+        )
+        assertFalse(
+            AiImmediateExecutionPolicy.shouldExecute(
+                result = currentBlock,
+                currentPostKey = currentInput.postKey,
+                currentInput = currentInput.copy(body = "edited"),
+            )
+        )
+    }
+
+    @Test
     fun reviewApplicationIsIdenticalForFreshAndDelayedResults() {
         val key = PostKey("M", "gallery", "42")
         val review = postDecision(key, AiFilterDecisionType.REVIEW, "needs review")

@@ -80,6 +80,14 @@ internal object AiExecutionPolicy {
     }
 }
 
+internal object AiImmediateExecutionPolicy {
+    fun shouldExecute(
+        result: AiBatchResult,
+        currentPostKey: PostKey,
+        currentInput: AiFilterPostInput,
+    ): Boolean = result.postKey == currentPostKey && result.matches(currentPostKey, currentInput)
+}
+
 internal data class AiBatchQueueItem(
     val postKey: PostKey,
     val postInput: AiFilterPostInput,

@@ -2669,9 +2669,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                             }
                     }
 
-                    val immediatePostExecutions = aiBatchEvaluation.postDecisions.filter {
-                        it.postKey != postKey && it.decision.type == AiFilterDecisionType.BLOCK
-                    }
+                    // Bound results for every post, including the current one, are consumed by the
+                    // fingerprint-checked normal scan path below. Never moderate another post from
+                    // the queued snapshot that happened to be flushed while processing this post.
+                    val immediatePostExecutions = emptyList<AiFilterPostDecision>()
                     immediatePostExecutions.forEach { decision ->
                         val targetInput = flushItems.firstOrNull { it.postKey == decision.postKey }?.postInput
                         if (targetInput == null) {
@@ -2764,7 +2765,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         }
                     }
 
-                    val immediateCommentExecutions = aiBatchEvaluation.postDecisions.filter { it.postKey != postKey }
+                    val immediateCommentExecutions = emptyList<AiFilterPostDecision>()
                     immediateCommentExecutions.forEach { postDecision ->
                         val targetInput = flushItems.firstOrNull { it.postKey == postDecision.postKey }?.postInput
                         if (targetInput == null) {
@@ -2903,7 +2904,13 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                     val batchResult = resultCache.remove(postKey)
                     val batchPostDecision = batchResult
-                        ?.takeIf { it.matches(postKey, currentAiPostInput) }
+                        ?.takeIf {
+                            AiImmediateExecutionPolicy.shouldExecute(
+                                result = it,
+                                currentPostKey = postKey,
+                                currentInput = currentAiPostInput,
+                            )
+                        }
                         ?.decision
                     if (batchPostDecision != null) {
                         consumedAiBatchResult = batchResult
