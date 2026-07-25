@@ -22,6 +22,7 @@ data class PumHttpRequest(
     val headers: Map<String, String> = emptyMap(),
     val formData: Map<String, String> = emptyMap(),
     val followRedirects: Boolean = false,
+    val timeoutBudgetMs: Long = Long.MAX_VALUE,
 )
 
 data class PumHttpResponse(
@@ -36,6 +37,21 @@ fun interface PumHttpClient {
     fun execute(request: PumHttpRequest): PumHttpResponse
 }
 
+internal data class PumConnectionTimeouts(val connectMs: Int, val readMs: Int)
+
+internal fun pumConnectionTimeouts(
+    connectTimeoutMs: Int,
+    readTimeoutMs: Int,
+    requestBudgetMs: Long,
+): PumConnectionTimeouts {
+    require(connectTimeoutMs > 0 && readTimeoutMs > 0)
+    val safeBudgetMs = requestBudgetMs.coerceAtLeast(1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    return PumConnectionTimeouts(
+        connectMs = minOf(connectTimeoutMs, safeBudgetMs),
+        readMs = minOf(readTimeoutMs, safeBudgetMs),
+    )
+}
+
 /** Small production adapter; redirect policy and response limits are enforced by [PumSourceResolver]. */
 class UrlConnectionPumHttpClient(
     private val connectTimeoutMs: Int = 15_000,
@@ -43,9 +59,10 @@ class UrlConnectionPumHttpClient(
 ) : PumHttpClient {
     override fun execute(request: PumHttpRequest): PumHttpResponse {
         val connection = URL(request.url).openConnection() as HttpURLConnection
+        val timeouts = pumConnectionTimeouts(connectTimeoutMs, readTimeoutMs, request.timeoutBudgetMs)
         connection.instanceFollowRedirects = false
-        connection.connectTimeout = connectTimeoutMs
-        connection.readTimeout = readTimeoutMs
+        connection.connectTimeout = timeouts.connectMs
+        connection.readTimeout = timeouts.readMs
         connection.requestMethod = request.method
         request.headers.forEach(connection::setRequestProperty)
         if (request.method == "POST") {
@@ -103,6 +120,7 @@ class PumSourceResolver(
         }
         if (cardResult.statusCode !in 200..299) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
         val card = PumParser.parseCard(cardResult.text, loader.outerPost)
+        if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
         when (card.status) {
             PumCardStatus.MISSING -> return PumResolution(PumSourceStatus.MISSING)
             PumCardStatus.INVALID -> return PumResolution(PumSourceStatus.INVALID_SOURCE)
@@ -110,7 +128,6 @@ class PumSourceResolver(
         }
         val key = card.sourceKey ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
         val sourceUrl = card.sourceUrl ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
-        if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
         sourceCache[key]?.let { return it }
         val resolved = resolveSource(key, sourceUrl, deadline)
         if (resolved.status != PumSourceStatus.TEMPORARY_FAILURE) sourceCache[key] = resolved
@@ -153,6 +170,7 @@ class PumSourceResolver(
         ).joinToString("") { value -> "${value.toByteArray(Charsets.UTF_8).size}:$value" }
         val hash = MessageDigest.getInstance("SHA-256").digest(hashInput.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
+        if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
         return PumResolution(PumSourceStatus.RESOLVED, key, sourceUrl, title, bodyText, imageAlts, canonicalHtml, media, hash)
     }
 
@@ -211,8 +229,10 @@ class PumSourceResolver(
     ): BufferedResponse {
         var request = initial
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
-            deadline.throwIfExpired()
-            val response = http.execute(request.copy(followRedirects = false))
+            val remainingBudgetMs = deadline.remainingTimeoutMs()
+            val response = http.execute(
+                request.copy(followRedirects = false, timeoutBudgetMs = remainingBudgetMs),
+            )
             response.body.use { body ->
                 deadline.throwIfExpired()
                 if (response.statusCode in REDIRECT_CODES) {
@@ -273,6 +293,12 @@ class PumSourceResolver(
         private val timeoutNanos: Long,
     ) {
         fun expired(): Boolean = nanoTime() - startedAtNanos >= timeoutNanos
+        fun remainingTimeoutMs(): Long {
+            val remainingNanos = timeoutNanos - (nanoTime() - startedAtNanos)
+            if (remainingNanos <= 0) throw ResolutionDeadlineExceededException()
+            return remainingNanos / NANOS_PER_MILLISECOND +
+                if (remainingNanos % NANOS_PER_MILLISECOND == 0L) 0L else 1L
+        }
         fun throwIfExpired() {
             if (expired()) throw ResolutionDeadlineExceededException()
         }

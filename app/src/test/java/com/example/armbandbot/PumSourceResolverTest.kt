@@ -210,6 +210,61 @@ class PumSourceResolverTest {
         assertEquals(listOf("POST", "GET", "GET"), http.requests.map { it.method })
     }
 
+    @Test fun `request timeout budgets decrease across card source and redirect calls`() {
+        var nowNanos = 0L
+        val sourceUrl = "https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345"
+        val http = object : PumHttpClient {
+            val requests = mutableListOf<PumHttpRequest>()
+            override fun execute(request: PumHttpRequest): PumHttpResponse {
+                requests += request
+                nowNanos += 20_000_000L
+                return when (requests.size) {
+                    1 -> fixture("pum_card_resolved.html").let {
+                        PumHttpResponse(200, emptyMap(), it.toByteArray().size.toLong(), ByteArrayInputStream(it.toByteArray()))
+                    }
+                    2 -> PumHttpResponse(307, mapOf("Location" to sourceUrl), 0, ByteArrayInputStream(byteArrayOf()))
+                    else -> fixture("source_detail.html").let {
+                        PumHttpResponse(200, emptyMap(), it.toByteArray().size.toLong(), ByteArrayInputStream(it.toByteArray()))
+                    }
+                }
+            }
+        }
+
+        val result = PumSourceResolver(http, resolutionTimeoutMs = 100, nanoTime = { nowNanos }).resolve(loaderDoc, true)
+
+        assertEquals(PumSourceStatus.RESOLVED, result.status)
+        assertEquals(listOf(100L, 80L, 60L), http.requests.map { it.timeoutBudgetMs })
+    }
+
+    @Test fun `url connection timeout policy bounds both configured timeouts by request budget`() {
+        assertEquals(
+            PumConnectionTimeouts(connectMs = 37, readMs = 37),
+            pumConnectionTimeouts(connectTimeoutMs = 15_000, readTimeoutMs = 20_000, requestBudgetMs = 37),
+        )
+        assertEquals(
+            PumConnectionTimeouts(connectMs = 1, readMs = 1),
+            pumConnectionTimeouts(connectTimeoutMs = 15_000, readTimeoutMs = 20_000, requestBudgetMs = 0),
+        )
+        assertEquals(
+            PumConnectionTimeouts(connectMs = 11, readMs = 17),
+            pumConnectionTimeouts(connectTimeoutMs = 11, readTimeoutMs = 17, requestBudgetMs = Long.MAX_VALUE),
+        )
+    }
+
+    @Test fun `deadline expiring while source is parsed maps to temporary failure`() {
+        var clockReads = 0
+        val http = FakeClient().apply { body(fixture("pum_card_resolved.html")); body(fixture("source_detail.html")) }
+        val result = PumSourceResolver(
+            http,
+            resolutionTimeoutMs = 100,
+            nanoTime = { if (++clockReads >= 15) 100_000_000L else 0L },
+        ).resolve(loaderDoc, true)
+
+        assertEquals(PumSourceStatus.TEMPORARY_FAILURE, result.status)
+        assertEquals(15, clockReads)
+        assertEquals(2, http.requests.size)
+    }
+
     @Test fun `source two MiB declared limit rejects before buffering`() {
         class CountingStream : InputStream() {
             var reads = 0
