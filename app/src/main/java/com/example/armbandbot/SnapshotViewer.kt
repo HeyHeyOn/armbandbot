@@ -64,7 +64,8 @@ data class SnapshotData(
     val date: String = "",
     val viewCount: String = "",
     val bodyElements: List<BodyElement> = emptyList(),
-    val comments: List<SnapshotComment> = emptyList()
+    val comments: List<SnapshotComment> = emptyList(),
+    val pumPreview: SnapshotPumPreview? = null,
 )
 
 enum class CommentSort { ORIGINAL, LATEST, REPLIES }
@@ -112,6 +113,8 @@ private fun resolveImgSrc(img: Element): String? {
 
 fun parseSnapshot(htmlPath: String): SnapshotData {
     val doc = Jsoup.parse(File(htmlPath), "UTF-8")
+    val pumCard = doc.selectFirst(".armbandbot-pum-card")
+    val pumPreview = parseSnapshotPumPreview(pumCard)
 
     val title = doc.select(".title_subject").text()
 
@@ -129,47 +132,10 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     val viewCount = Regex("[0-9,]+").find(doc.select(".gall_count").text())?.value ?: ""
 
     val bodyEl = doc.select(".write_div").first()
-    val bodyElements: List<BodyElement> = buildList {
-        bodyEl?.children()?.forEach { child ->
-            if (child.hasClass("vr_player") || child.hasClass("vr_player_tag") ||
-                child.hasClass("voice_wrap") ||
-                child.select(".vr_player, .vr_player_tag, div.voice_wrap, iframe[src*=voice/player]").isNotEmpty() ||
-                child.html().contains("voice/player")
-            ) {
-                add(BodyElement.TextElement("[보이스리플]"))
-                return@forEach
-            }
-            val dccons = DcconFilter.extractDcconRefsForDisplay(child.outerHtml())
-            val allImgs = child.select("img")
-            when {
-                dccons.isNotEmpty() -> {
-                    val urls = dccons.map { ref -> DcconFilter.buildImageUrl(ref.token) }
-                    if (urls.size == 1) add(BodyElement.ImageElement(urls.first(), isDccon = true))
-                    else add(BodyElement.DcconRowElement(urls))
-                }
-                allImgs.isNotEmpty() -> allImgs.forEach { img ->
-                    val src = img.attr("src").ifEmpty { img.attr("data-original") }
-                        .ifEmpty { img.attr("data-src") }
-                    if (src.contains("dccon.php")) {
-                        DcconFilter.normalizeBlacklistEntry(src)?.let { token ->
-                            add(BodyElement.ImageElement(DcconFilter.buildImageUrl(token), isDccon = true))
-                        }
-                    } else {
-                        resolveImgSrc(img)?.let { add(BodyElement.ImageElement(it, isDccon = false)) }
-                    }
-                }
-                else -> {
-                    // <br> 태그를 \n으로 변환하여 줄바꿈 보존
-                    val rawHtml = child.html()
-                        .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "⏎")
-                    val tempBody = Jsoup.parseBodyFragment(rawHtml).body()
-                    val text = tempBody?.text()?.replace("⏎", "\n") ?: child.text()
-                    if (text.isNotBlank()) add(BodyElement.TextElement(text))
-                    else add(BodyElement.TextElement("")) // 빈 단락 구분용
-                }
-            }
-        }
-    }
+    // The source card is rendered separately and must not contaminate outer post text/media.
+    val bodyElements = SnapshotBodyParser.parseChildren(bodyEl?.clone()?.also {
+        it.select(".armbandbot-pum-card").remove()
+    })
 
     var lastDepth0Index: Int? = null
     val comments = mutableListOf<SnapshotComment>()
@@ -251,7 +217,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
         }
     }
 
-    return SnapshotData(title, author, date, viewCount, bodyElements, comments)
+    return SnapshotData(title, author, date, viewCount, bodyElements, comments, pumPreview)
 }
 
 private fun buildMentionAnnotatedString(text: String, textColor: Color): AnnotatedString = buildAnnotatedString {
@@ -413,6 +379,9 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                             if (d.viewCount.isNotBlank()) {
                                 Text("조회 ${d.viewCount}", fontSize = 13.sp, color = subTextColor)
                             }
+                        }
+                        d.pumPreview?.let { preview ->
+                            SnapshotPumCard(preview = preview, isDarkMode = isDarkMode)
                         }
                         HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
                     }
