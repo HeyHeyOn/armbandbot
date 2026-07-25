@@ -262,6 +262,87 @@ private fun BypassKeywordOptionsSection(
 }
 
 @Composable
+private fun PumSourceSettingsSection(botPref: SharedPreferences) {
+    val isDarkMode = LocalIsDarkMode.current
+    val cardColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
+    val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
+    val subTextColor = if (isDarkMode) Color(0xFFAAAEB3) else Color.Gray
+    val dividerColor = if (isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE)
+    var sourceFilterEnabled by remember(botPref) {
+        mutableStateOf(botPref.getBoolean("is_pum_source_filter_mode", false))
+    }
+    var recheckEveryCycle by remember(botPref) {
+        mutableStateOf(botPref.getBoolean("pum_recheck_every_cycle", false))
+    }
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = Color.White,
+        checkedTrackColor = PastelNavy,
+        uncheckedThumbColor = if (isDarkMode) Color.LightGray else Color.White,
+        uncheckedTrackColor = if (isDarkMode) Color(0xFF555555) else Color.LightGray,
+    )
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text("펌 원문 내용 검사", fontWeight = FontWeight.Bold, color = textColor)
+                    Text("원문을 추가로 불러와 검사하므로 외부·원문 요청이 늘 수 있습니다.", fontSize = 12.sp, color = subTextColor)
+                }
+                Switch(
+                    checked = sourceFilterEnabled,
+                    onCheckedChange = { enabled ->
+                        sourceFilterEnabled = enabled
+                        if (!enabled) recheckEveryCycle = false
+                        val editor = botPref.edit().putBoolean("is_pum_source_filter_mode", enabled)
+                        if (!enabled) editor.putBoolean("pum_recheck_every_cycle", false)
+                        editor.apply()
+                    },
+                    colors = switchColors,
+                )
+            }
+            HorizontalDivider(color = dividerColor)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        "펌 글을 매 사이클마다 검사",
+                        fontWeight = FontWeight.Bold,
+                        color = if (sourceFilterEnabled) textColor else subTextColor,
+                    )
+                    Text("켜면 현재 목록에 보이는 펌 글의 원문을 매 사이클 다시 검사합니다.", fontSize = 12.sp, color = subTextColor)
+                }
+                Switch(
+                    checked = sourceFilterEnabled && recheckEveryCycle,
+                    onCheckedChange = { enabled ->
+                        recheckEveryCycle = enabled
+                        botPref.edit().putBoolean("pum_recheck_every_cycle", enabled).apply()
+                    },
+                    enabled = sourceFilterEnabled,
+                    colors = switchColors,
+                )
+            }
+            Text(
+                "설정한 목록 페이지 밖의 글은 추적하거나 검사하지 않습니다.",
+                fontSize = 12.sp,
+                color = subTextColor,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun KeywordActionSettingsSection(
     botPref: SharedPreferences,
     isDarkMode: Boolean,
@@ -1820,6 +1901,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("게시물 차단 필터", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
+                                PumSourceSettingsSection(botPref)
                                 ModernSettingItem("금지어 필터", "금지어 기반 차단 설정", Icons.Filled.Create, colors) { currentSubScreen = "WORD" }
                                 ModernSettingItem("유저 ID/IP 필터", "식별코드/IP 기반 차단 설정", Icons.Filled.Person, colors, isUserFilterMode, { isUserFilterMode = it; botPref.edit().putBoolean("is_user_filter_mode", it).apply() }) { currentSubScreen = "USER" }
                                 ModernSettingItem("닉네임 필터", "닉네임 기반 차단 설정", Icons.Filled.Face, colors, isNicknameFilterMode, { isNicknameFilterMode = it; botPref.edit().putBoolean("is_nickname_filter_mode", it).apply() }) { currentSubScreen = "NICKNAME" }

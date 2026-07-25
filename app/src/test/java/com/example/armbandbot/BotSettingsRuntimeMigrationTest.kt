@@ -50,7 +50,24 @@ class BotSettingsRuntimeMigrationTest {
         assertFalse(migrated["bypass_unicode_normalization_enabled"] as Boolean)
         assertFalse(migrated["is_search_mode"] as Boolean)
         assertFalse(migrated["is_ai_filter_mode"] as Boolean)
+        assertFalse(migrated["is_pum_source_filter_mode"] as Boolean)
+        assertFalse(migrated["pum_recheck_every_cycle"] as Boolean)
         assertTrue(migrated["noti_master"] as Boolean)
+    }
+
+    @Test
+    fun migrationPreservesPumSettingsAndMakesThemExportable() {
+        val migrated = migrateBotSettingsSnapshot(
+            mapOf(
+                "is_pum_source_filter_mode" to true,
+                "pum_recheck_every_cycle" to true
+            )
+        )
+
+        assertTrue(migrated["is_pum_source_filter_mode"] as Boolean)
+        assertTrue(migrated["pum_recheck_every_cycle"] as Boolean)
+        assertTrue("is_pum_source_filter_mode" in EXPORTABLE_BOOLEAN_KEYS)
+        assertTrue("pum_recheck_every_cycle" in EXPORTABLE_BOOLEAN_KEYS)
     }
 
     @Test

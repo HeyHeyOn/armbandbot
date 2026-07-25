@@ -28,6 +28,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_yudong_post_block", "is_yudong_comment_block", "is_yudong_image_block", "is_yudong_voice_block",
     "is_kkang_filter_mode", "is_kkang_post_block", "is_kkang_comment_block", "is_kkang_image_block", "is_kkang_voice_block",
     "is_url_filter_mode", "is_image_filter_mode", "is_dccon_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode", "is_special_char_filter_mode",
+    "is_pum_source_filter_mode", "pum_recheck_every_cycle",
     "bypass_ignore_case_enabled", "bypass_unicode_normalization_enabled",
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
@@ -138,7 +139,7 @@ private fun applyImportedSettings(botPref: SharedPreferences, imported: BotSetti
     editor.apply()
 }
 
-private fun BotSettingsExport.toJson(): JSONObject = JSONObject().apply {
+internal fun BotSettingsExport.toJson(): JSONObject = JSONObject().apply {
     put("type", BOT_SETTINGS_FILE_TYPE)
     put("schemaVersion", schemaVersion)
     put("exportVersion", exportVersion)
