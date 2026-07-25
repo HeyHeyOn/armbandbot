@@ -68,7 +68,7 @@ object PumParser {
             val dataProperties = objectProperties(code, dataOpen, dataClose) ?: continue
 
             // Only assignments visible before this AJAX invocation may supply literal values.
-            val assignments = literalAssignments(code, ajaxStart)
+            val assignments = literalAssignments(code, ajaxStart) ?: continue
             val values = linkedMapOf<String, String>()
             dataProperties.forEach { property ->
                 val literal = stringValue(code, property.valueStart, property.valueEnd)
@@ -110,8 +110,9 @@ object PumParser {
         return calls
     }
 
-    private fun literalAssignments(code: String, limit: Int): Map<String, String> {
+    private fun literalAssignments(code: String, limit: Int): Map<String, String>? {
         val result = linkedMapOf<String, String>()
+        var braceDepth = 0
         var i = 0
         while (i < limit) {
             i = skipTrivia(code, i, limit)
@@ -120,11 +121,22 @@ object PumParser {
                 i = stringEnd(code, i) ?: limit
                 continue
             }
+            if (c == '{') {
+                braceDepth++
+                i++
+                continue
+            }
+            if (c == '}') {
+                if (braceDepth == 0) return null
+                braceDepth--
+                i++
+                continue
+            }
             if (!isIdentifierStart(c)) { i++; continue }
             val nameEnd = identifierEnd(code, i)
             val equals = skipTrivia(code, nameEnd, limit)
             val valueStart = skipTrivia(code, equals + 1, limit)
-            if (code.getOrNull(equals) == '=' && code.getOrNull(equals + 1) != '=' &&
+            if (braceDepth == 0 && code.getOrNull(equals) == '=' && code.getOrNull(equals + 1) != '=' &&
                 code.getOrNull(valueStart) in setOf('\'', '"')) {
                 val valueEnd = stringEnd(code, valueStart)
                 if (valueEnd != null && valueEnd <= limit) {
@@ -135,7 +147,7 @@ object PumParser {
             }
             i = nameEnd
         }
-        return result
+        return result.takeIf { braceDepth == 0 }
     }
 
     private fun objectProperties(code: String, open: Int, close: Int): List<JsProperty>? {

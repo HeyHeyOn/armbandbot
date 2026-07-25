@@ -175,6 +175,41 @@ class PumSourceResolverTest {
         assertEquals(4, http.requests.size)
     }
 
+    @Test fun `overall deadline is shared across card source and redirects`() {
+        var nowNanos = 0L
+        val cardHtml = fixture("pum_card_resolved.html")
+        val sourceUrl = "https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345"
+        val http = object : PumHttpClient {
+            val requests = mutableListOf<PumHttpRequest>()
+            override fun execute(request: PumHttpRequest): PumHttpResponse {
+                requests += request
+                nowNanos += 40_000_000L
+                return if (requests.size == 1) {
+                    val bytes = cardHtml.toByteArray()
+                    PumHttpResponse(200, emptyMap(), bytes.size.toLong(), ByteArrayInputStream(bytes))
+                } else {
+                    PumHttpResponse(
+                        307,
+                        mapOf("Location" to sourceUrl),
+                        0,
+                        ByteArrayInputStream(byteArrayOf()),
+                    )
+                }
+            }
+        }
+        val resolver = PumSourceResolver(
+            http = http,
+            resolutionTimeoutMs = 100,
+            nanoTime = { nowNanos },
+        )
+
+        val result = resolver.resolve(loaderDoc, true)
+
+        assertEquals(PumSourceStatus.TEMPORARY_FAILURE, result.status)
+        assertEquals(3, http.requests.size)
+        assertEquals(listOf("POST", "GET", "GET"), http.requests.map { it.method })
+    }
+
     @Test fun `source two MiB declared limit rejects before buffering`() {
         class CountingStream : InputStream() {
             var reads = 0

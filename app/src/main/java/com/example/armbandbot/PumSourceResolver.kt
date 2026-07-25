@@ -69,12 +69,19 @@ class PumSourceResolver(
     private val http: PumHttpClient,
     private val cookies: () -> String? = { null },
     private val userAgent: String = "Mozilla/5.0 (compatible; ArmbandBot)",
+    private val resolutionTimeoutMs: Long = DEFAULT_RESOLUTION_TIMEOUT_MS,
+    private val nanoTime: () -> Long = System::nanoTime,
 ) {
     private val sourceCache = mutableMapOf<PostKey, PumResolution>()
+
+    init {
+        require(resolutionTimeoutMs > 0 && resolutionTimeoutMs <= Long.MAX_VALUE / NANOS_PER_MILLISECOND)
+    }
 
     fun resolve(outerDetail: Document, listMarker: Boolean = PumParser.hasListMarker(outerDetail)): PumResolution {
         val loader = PumParser.parseDetail(outerDetail, listMarker).loader
             ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
+        val deadline = ResolutionDeadline(nanoTime(), resolutionTimeoutMs * NANOS_PER_MILLISECOND)
         val outerReferer = DcinsidePostUrls.canonicalDetailUrl(loader.outerPost)
         val cardResult = try {
             fetch(
@@ -87,6 +94,7 @@ class PumSourceResolver(
                 CARD_MAX_BYTES,
                 RedirectKind.CARD,
                 loader.outerPost,
+                deadline,
             )
         } catch (_: UnsafeRedirectException) {
             return PumResolution(PumSourceStatus.INVALID_SOURCE)
@@ -102,19 +110,21 @@ class PumSourceResolver(
         }
         val key = card.sourceKey ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
         val sourceUrl = card.sourceUrl ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
+        if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
         sourceCache[key]?.let { return it }
-        val resolved = resolveSource(key, sourceUrl)
+        val resolved = resolveSource(key, sourceUrl, deadline)
         if (resolved.status != PumSourceStatus.TEMPORARY_FAILURE) sourceCache[key] = resolved
         return resolved
     }
 
-    private fun resolveSource(key: PostKey, sourceUrl: String): PumResolution {
+    private fun resolveSource(key: PostKey, sourceUrl: String, deadline: ResolutionDeadline): PumResolution {
         val fetched = try {
             fetch(
                 PumHttpRequest(sourceUrl, headers = credentialHeaders(sourceUrl)),
                 SOURCE_MAX_BYTES,
                 RedirectKind.SOURCE,
                 key,
+                deadline,
             )
         } catch (_: UnsafeRedirectException) {
             return PumResolution(PumSourceStatus.INVALID_SOURCE, key, sourceUrl)
@@ -197,11 +207,14 @@ class PumSourceResolver(
         maxBytes: Int,
         kind: RedirectKind,
         self: PostKey,
+        deadline: ResolutionDeadline,
     ): BufferedResponse {
         var request = initial
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            deadline.throwIfExpired()
             val response = http.execute(request.copy(followRedirects = false))
             response.body.use { body ->
+                deadline.throwIfExpired()
                 if (response.statusCode in REDIRECT_CODES) {
                     if (redirectCount == MAX_REDIRECTS) throw IOException("Too many redirects")
                     val location = response.header("Location") ?: throw UnsafeRedirectException()
@@ -221,7 +234,7 @@ class PumSourceResolver(
                     }
                     return@repeat
                 }
-                return BufferedResponse(response.statusCode, readLimited(body, response.contentLength, maxBytes))
+                return BufferedResponse(response.statusCode, readLimited(body, response.contentLength, maxBytes, deadline))
             }
         }
         throw IOException("Too many redirects")
@@ -234,13 +247,15 @@ class PumSourceResolver(
         return "https://gall.dcinside.com/ajax/pum_ajax/get_contents"
     }
 
-    private fun readLimited(input: InputStream, contentLength: Long, maxBytes: Int): String {
+    private fun readLimited(input: InputStream, contentLength: Long, maxBytes: Int, deadline: ResolutionDeadline): String {
         if (contentLength > maxBytes) throw IOException("Response too large")
         val output = ByteArrayOutputStream(minOf(maxBytes, if (contentLength >= 0) contentLength.toInt() else 8192))
         val buffer = ByteArray(8192)
         var total = 0
         while (true) {
+            deadline.throwIfExpired()
             val count = input.read(buffer)
+            deadline.throwIfExpired()
             if (count < 0) break
             total += count
             if (total > maxBytes) throw IOException("Response too large")
@@ -253,12 +268,24 @@ class PumSourceResolver(
     private fun PumHttpResponse.header(name: String): String? = headers.entries.firstOrNull { it.key.equals(name, true) }?.value
 
     private data class BufferedResponse(val statusCode: Int, val text: String)
+    private inner class ResolutionDeadline(
+        private val startedAtNanos: Long,
+        private val timeoutNanos: Long,
+    ) {
+        fun expired(): Boolean = nanoTime() - startedAtNanos >= timeoutNanos
+        fun throwIfExpired() {
+            if (expired()) throw ResolutionDeadlineExceededException()
+        }
+    }
     private enum class RedirectKind { CARD, SOURCE }
     private class UnsafeRedirectException : IOException()
+    private class ResolutionDeadlineExceededException : IOException("PUM resolution deadline exceeded")
 
     companion object {
         const val CARD_MAX_BYTES = 512 * 1024
         const val SOURCE_MAX_BYTES = 2 * 1024 * 1024
+        const val DEFAULT_RESOLUTION_TIMEOUT_MS = 30_000L
+        private const val NANOS_PER_MILLISECOND = 1_000_000L
         private const val MAX_REDIRECTS = 3
         private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
         private val URL_ATTRIBUTES = setOf("href", "src", "poster")

@@ -35,6 +35,37 @@ class PumParserTest {
         assertEquals(PostKey("G", "variable_gall", "42"), loader?.outerPost)
     }
 
+    @Test fun `loader variables only resolve from executable top level assignments`() {
+        val html = """<div class='write_div'><script>
+            var gall_id = 'real_gallery'; var gall_no = '42'; var gall_type = 'M';
+            function neverCalled() {
+                gall_id = 'function_decoy'; gall_no = '900'; gall_type = 'G';
+            }
+            if (false) {
+                gall_id = 'block_decoy'; gall_no = '901'; gall_type = 'MI';
+            }
+            class Decoy {
+                method() { gall_id = 'class_decoy'; gall_no = '902'; }
+            }
+            var objectDecoy = { mutate: function() { gall_id = 'object_decoy'; gall_no = '903'; } };
+            $.ajax({url:'/ajax/pum_ajax/get_contents', data:{id:gall_id,no:gall_no,gallery_type:gall_type}});
+        </script></div>"""
+
+        val loader = PumParser.parseDetail(Jsoup.parse(html), false).loader
+
+        assertEquals(PostKey("M", "real_gallery", "42"), loader?.outerPost)
+    }
+
+    @Test fun `ambiguous top level assignment scope does not produce a loader`() {
+        val html = """<div class='write_div'><script>
+            var gall_id = 'real_gallery'; var gall_no = '42';
+            if (unknown) { gall_id = 'ambiguous';
+            $.ajax({url:'/ajax/pum_ajax/get_contents', data:{id:gall_id,no:gall_no}});
+        </script></div>"""
+
+        assertNull(PumParser.parseDetail(Jsoup.parse(html), false).loader)
+    }
+
     @Test fun `marker-only and loader-only remain distinguishable`() {
         val normal = Jsoup.parse(fixture("normal_title_contains_pum.html"))
         assertEquals(PumDetectionStatus.PUM_MARKER_ONLY, PumParser.parseDetail(normal, true).status)
