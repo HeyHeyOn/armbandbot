@@ -81,18 +81,65 @@ internal data class AiFilterCommentInput(
 )
 
 internal data class AiFilterPostInput(
-    val postNo: String,
+    val postKey: PostKey,
     val title: String,
     val authorIdOrIp: String,
     val nickname: String,
     val body: String,
     val mediaSources: List<String>,
     val comments: List<AiFilterCommentInput>,
-)
+) {
+    val postNo: String get() = postKey.postNo
+}
 
 internal data class AiFilterBatchRequest(
     val posts: List<AiFilterPostInput>,
 )
+
+internal data class AiWirePost(
+    val wirePostId: String,
+    val post: AiFilterPostInput,
+) {
+    val postKey: PostKey get() = post.postKey
+}
+
+internal data class AiWireComment(
+    val wireCommentKey: String,
+    val postKey: PostKey,
+    val comment: AiFilterCommentInput,
+)
+
+/** Per-request, non-reversible IDs are the only identities accepted from an AI provider. */
+internal class AiWireRegistry private constructor(
+    val posts: List<AiWirePost>,
+    private val postsByWireId: Map<String, AiWirePost>,
+    private val commentsByWireKey: Map<String, AiWireComment>,
+) {
+    fun resolvePost(wireId: String): AiWirePost? = postsByWireId[wireId]
+    fun resolveComment(wireKey: String): AiWireComment? = commentsByWireKey[wireKey]
+
+    fun commentsFor(post: AiWirePost): List<Pair<String, AiFilterCommentInput>> =
+        post.post.comments.mapIndexed { index, comment -> "${post.wirePostId}:c$index" to comment }
+
+    companion object {
+        fun create(request: AiFilterBatchRequest): AiWireRegistry {
+            require(request.posts.map { it.postKey }.distinct().size == request.posts.size) {
+                "Duplicate PostKey in AI request"
+            }
+            val wirePosts = request.posts.mapIndexed { index, post -> AiWirePost("p$index", post) }
+            val comments = wirePosts.flatMap { wirePost ->
+                wirePost.post.comments.mapIndexed { index, comment ->
+                    AiWireComment("${wirePost.wirePostId}:c$index", wirePost.postKey, comment)
+                }
+            }
+            return AiWireRegistry(
+                posts = wirePosts,
+                postsByWireId = wirePosts.associateBy { it.wirePostId },
+                commentsByWireKey = comments.associateBy { it.wireCommentKey },
+            )
+        }
+    }
+}
 
 internal enum class AiFilterDecisionType {
     ALLOW,
@@ -115,10 +162,12 @@ internal data class AiFilterCommentDecision(
 )
 
 internal data class AiFilterPostDecision(
-    val postNo: String,
+    val postKey: PostKey,
     val decision: AiFilterDecision,
     val commentDecisions: List<AiFilterCommentDecision> = emptyList(),
-)
+) {
+    val postNo: String get() = postKey.postNo
+}
 
 internal data class AiFilterBatchEvaluation(
     val postDecisions: List<AiFilterPostDecision> = emptyList(),
@@ -182,8 +231,9 @@ internal class AiFilterClient(
             if (config.debugLoggingEnabled) {
                 logger("MARKER_AI_ENTER_V2 posts=${request.posts.size}")
             }
-            val responseText = callApi(request)
-            parseBatchResponse(responseText, request).copy(debugSummary = debugSummary)
+            val registry = AiWireRegistry.create(request)
+            val responseText = callApi(request, registry)
+            parseBatchResponse(responseText, request, registry).copy(debugSummary = debugSummary)
         } catch (e: Exception) {
             val failureMessage = e.message ?: "AI 배치 호출 실패"
             logger("AI 배치 호출 실패 [MARKER_AI_CATCH_V2]: $failureMessage")
@@ -200,48 +250,56 @@ internal class AiFilterClient(
         return evaluation
     }
 
+    internal fun buildCacheKeyForTest(request: AiFilterBatchRequest): String = buildCacheKey(request)
+
     private fun buildCacheKey(request: AiFilterBatchRequest): String {
         return buildString {
-            appendLine(config.provider.name)
-            appendLine(config.endpoint)
-            appendLine(config.model)
-            appendLine(config.userPrompt)
-            appendLine(config.systemPrompt)
-            appendLine(config.reviewMode.toString())
+            fun field(value: String) { append(value.length).append(':').append(value).append('|') }
+            field(config.provider.name)
+            field(config.endpoint)
+            field(config.model)
+            field(config.userPrompt)
+            field(systemPrompt)
+            field(config.reviewMode.toString())
             request.posts.forEach { post ->
-                appendLine(post.postNo)
-                appendLine(post.title)
-                appendLine(post.authorIdOrIp)
-                appendLine(post.nickname)
-                appendLine(post.body)
-                appendLine(post.mediaSources.joinToString("|"))
+                field(post.postKey.gallType)
+                field(post.postKey.gallId)
+                field(post.postKey.postNo)
+                field(post.title)
+                field(post.authorIdOrIp)
+                field(post.nickname)
+                field(post.body)
+                field(post.mediaSources.size.toString())
+                post.mediaSources.forEach(::field)
+                field(post.comments.size.toString())
                 post.comments.forEach { comment ->
-                    appendLine(comment.commentId)
-                    appendLine(comment.authorIdOrIp)
-                    appendLine(comment.nickname)
-                    appendLine(comment.body)
+                    field(comment.commentId)
+                    field(comment.authorIdOrIp)
+                    field(comment.nickname)
+                    field(comment.body)
                 }
             }
         }
     }
 
-    private fun buildComposedUserPrompt(request: AiFilterBatchRequest): String {
+    private fun buildComposedUserPrompt(registry: AiWireRegistry): String {
         val payload = JSONObject().apply {
             put("user_prompt", config.userPrompt.ifBlank { "추가 사용자 지침 없음" })
             put("posts", JSONArray().apply {
-                request.posts.forEach { post ->
+                registry.posts.forEach { wirePost ->
+                    val post = wirePost.post
                     put(JSONObject().apply {
-                        put("post_no", post.postNo)
+                        put("post_no", wirePost.wirePostId)
                         put("title", post.title)
                         put("author_id_or_ip", post.authorIdOrIp)
                         put("nickname", post.nickname)
                         put("body", post.body)
                         put("media_sources", JSONArray(post.mediaSources))
                         put("comments", JSONArray().apply {
-                            post.comments.forEach { comment ->
+                            registry.commentsFor(wirePost).forEach { (wireCommentKey, comment) ->
                                 put(JSONObject().apply {
-                                    put("comment_key", "${post.postNo}:${comment.commentId}")
-                                    put("comment_id", comment.commentId)
+                                    put("comment_key", wireCommentKey)
+                                    put("comment_id", wireCommentKey)
                                     put("author_id_or_ip", comment.authorIdOrIp)
                                     put("nickname", comment.nickname)
                                     put("body", comment.body)
@@ -255,8 +313,8 @@ internal class AiFilterClient(
         return payload.toString()
     }
 
-    private fun buildOpenAiPayload(request: AiFilterBatchRequest): JSONObject {
-        val composedUserPrompt = buildComposedUserPrompt(request)
+    private fun buildOpenAiPayload(registry: AiWireRegistry): JSONObject {
+        val composedUserPrompt = buildComposedUserPrompt(registry)
         return JSONObject().apply {
             put("model", config.model)
             put("messages", JSONArray().apply {
@@ -312,8 +370,8 @@ internal class AiFilterClient(
         }
     }
 
-    private fun buildGeminiPayload(request: AiFilterBatchRequest): JSONObject {
-        val composedUserPrompt = buildComposedUserPrompt(request)
+    private fun buildGeminiPayload(registry: AiWireRegistry): JSONObject {
+        val composedUserPrompt = buildComposedUserPrompt(registry)
         return JSONObject().apply {
             put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", systemPrompt))))
             put(
@@ -359,11 +417,19 @@ internal class AiFilterClient(
         return "http://$hostAndPort/v1/chat/completions"
     }
 
-    private fun callApi(request: AiFilterBatchRequest): String {
+    internal fun buildProviderPayloadForTest(request: AiFilterBatchRequest): String {
+        val registry = AiWireRegistry.create(request)
+        return when (config.provider) {
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ, AiFilterProvider.LM_STUDIO -> buildOpenAiPayload(registry)
+            AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(registry)
+        }.toString()
+    }
+
+    private fun callApi(request: AiFilterBatchRequest, registry: AiWireRegistry): String {
         val requestUrl = buildRequestUrl()
         val payload = when (config.provider) {
-            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ, AiFilterProvider.LM_STUDIO -> buildOpenAiPayload(request)
-            AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(request)
+            AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ, AiFilterProvider.LM_STUDIO -> buildOpenAiPayload(registry)
+            AiFilterProvider.GEMINI_DIRECT -> buildGeminiPayload(registry)
         }
         val requestUri = runCatching { URI(requestUrl) }.getOrNull()
         val keyPreview = when {
@@ -457,7 +523,7 @@ internal class AiFilterClient(
         error(lastError ?: "AI call failed")
     }
 
-    private fun parseBatchResponse(responseText: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation {
+    private fun parseBatchResponse(responseText: String, request: AiFilterBatchRequest, registry: AiWireRegistry): AiFilterBatchEvaluation {
         val root = JSONObject(responseText)
         val content = when (config.provider) {
             AiFilterProvider.OPENAI_COMPATIBLE, AiFilterProvider.GROQ, AiFilterProvider.LM_STUDIO -> root.optJSONArray("choices")
@@ -486,15 +552,15 @@ internal class AiFilterClient(
             logger("AI raw content 미리보기=${content.take(500)}")
         }
 
-        parseStructuredJsonBatchResponse(content, request)?.let { parsed ->
+        parseStructuredJsonBatchResponse(content, request, registry)?.let { parsed ->
             return parsed.copy(rawResponseText = responseText, parsedContentText = content)
         }
 
-        parseLegacyJsonBatchResponse(content, request)?.let { parsed ->
+        parseLegacyJsonBatchResponse(content, request, registry)?.let { parsed ->
             return parsed.copy(rawResponseText = responseText, parsedContentText = content)
         }
 
-        parseCompactBatchResponse(content, request)?.let { parsed ->
+        parseCompactBatchResponse(content, request, registry)?.let { parsed ->
             return parsed.copy(rawResponseText = responseText, parsedContentText = content)
         }
 
@@ -502,21 +568,33 @@ internal class AiFilterClient(
         return AiFilterBatchEvaluation(failureReason = "AI 응답 파싱 실패", rawResponseText = responseText, parsedContentText = content)
     }
 
-    private fun parseStructuredJsonBatchResponse(content: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation? {
+    internal fun parseContentForTest(content: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation {
+        val registry = AiWireRegistry.create(request)
+        return parseStructuredJsonBatchResponse(content, request, registry)
+            ?: parseLegacyJsonBatchResponse(content, request, registry)
+            ?: parseCompactBatchResponse(content, request, registry)
+            ?: AiFilterBatchEvaluation(failureReason = "AI 응답 파싱 실패", parsedContentText = content)
+    }
+
+    private fun parseStructuredJsonBatchResponse(content: String, request: AiFilterBatchRequest, registry: AiWireRegistry): AiFilterBatchEvaluation? {
         val parsed = parseJsonObjectFromContent(content) ?: return null
         val resultsArray = parsed.optJSONArray("results") ?: return null
-        val requestPostMap = request.posts.associateBy { it.postNo }
-        val requestCommentMap = request.posts
-            .flatMap { post -> post.comments.map { comment -> "${post.postNo}:${comment.commentId}" to comment } }
-            .toMap()
-        val postDecisionMap = linkedMapOf<String, AiFilterDecision>()
-        val commentDecisionMap = linkedMapOf<String, MutableList<AiFilterCommentDecision>>()
+        val keyCounts = (0 until resultsArray.length())
+            .mapNotNull { resultsArray.optJSONObject(it)?.optString("key", "")?.takeIf(String::isNotBlank) }
+            .groupingBy { it }
+            .eachCount()
+        val postDecisionMap = linkedMapOf<PostKey, AiFilterDecision>()
+        val commentDecisionMap = linkedMapOf<PostKey, MutableList<AiFilterCommentDecision>>()
         var parsedCount = 0
 
         for (i in 0 until resultsArray.length()) {
             val item = resultsArray.optJSONObject(i) ?: continue
             val type = item.optString("type", "").trim().uppercase()
-            val key = item.optString("key", "").trim()
+            val key = item.optString("key", "")
+            if (keyCounts[key] != 1) {
+                logger("AI JSON 파싱 무시: 중복 response key=$key")
+                continue
+            }
             val action = when (val rawDecision = item.opt("decision")) {
                 is Number -> rawDecision.toInt().toString()
                 else -> item.optString("decision", "").trim()
@@ -525,11 +603,12 @@ internal class AiFilterClient(
             val evidence = item.optString("evidence", "-")
             when (type) {
                 "P" -> {
-                    val post = requestPostMap[key]
-                    if (post == null) {
+                    val wirePost = registry.resolvePost(key)
+                    if (wirePost == null) {
                         logger("AI JSON 파싱 무시: 요청에 없는 post key=$key")
                         continue
                     }
+                    val post = wirePost.post
                     val sourceText = listOf(post.title, post.body).joinToString("\n")
                     val decision = parseDecision(
                         actionRaw = action,
@@ -539,20 +618,16 @@ internal class AiFilterClient(
                         reviewMode = config.reviewMode,
                         rawText = item.toString()
                     ) ?: continue
-                    postDecisionMap[key] = decision
+                    postDecisionMap[post.postKey] = decision
                     parsedCount++
                 }
                 "C" -> {
-                    val keyParts = key.split(":", limit = 2)
-                    if (keyParts.size != 2) {
-                        logger("AI JSON 파싱 무시: 댓글 key 형식 오류=$key")
-                        continue
-                    }
-                    val comment = requestCommentMap[key]
-                    if (comment == null) {
+                    val wireComment = registry.resolveComment(key)
+                    if (wireComment == null) {
                         logger("AI JSON 파싱 무시: 요청에 없는 comment key=$key")
                         continue
                     }
+                    val comment = wireComment.comment
                     val decision = parseDecision(
                         actionRaw = action,
                         reason = reason,
@@ -561,7 +636,8 @@ internal class AiFilterClient(
                         reviewMode = config.reviewMode,
                         rawText = item.toString()
                     ) ?: continue
-                    commentDecisionMap.getOrPut(keyParts[0]) { mutableListOf() } += AiFilterCommentDecision(keyParts[1], decision)
+                    commentDecisionMap.getOrPut(wireComment.postKey) { mutableListOf() } +=
+                        AiFilterCommentDecision(comment.commentId, decision)
                     parsedCount++
                 }
             }
@@ -569,8 +645,8 @@ internal class AiFilterClient(
 
         if (parsedCount == 0) return null
         val postDecisions = request.posts.mapNotNull { post ->
-            val commentDecisions = commentDecisionMap[post.postNo].orEmpty()
-            val postDecision = postDecisionMap[post.postNo] ?: if (commentDecisions.isNotEmpty()) {
+            val commentDecisions = commentDecisionMap[post.postKey].orEmpty()
+            val postDecision = postDecisionMap[post.postKey] ?: if (commentDecisions.isNotEmpty()) {
                 AiFilterDecision(
                     type = AiFilterDecisionType.ALLOW,
                     reason = "댓글만판단",
@@ -581,23 +657,26 @@ internal class AiFilterClient(
             } else {
                 return@mapNotNull null
             }
-            AiFilterPostDecision(postNo = post.postNo, decision = postDecision, commentDecisions = commentDecisions)
+            AiFilterPostDecision(postKey = post.postKey, decision = postDecision, commentDecisions = commentDecisions)
         }
         logger("AI JSON 파싱 완료: items=$parsedCount / postDecisions=${postDecisions.size}")
         return AiFilterBatchEvaluation(postDecisions = postDecisions)
     }
 
-    private fun parseLegacyJsonBatchResponse(content: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation? {
+    private fun parseLegacyJsonBatchResponse(content: String, request: AiFilterBatchRequest, registry: AiWireRegistry): AiFilterBatchEvaluation? {
         val parsed = parseJsonObjectFromContent(content) ?: return null
         val resultsArray = parsed.optJSONArray("results") ?: return null
-        val requestPostMap = request.posts.associateBy { it.postNo }
+        val postKeyCounts = (0 until resultsArray.length())
+            .mapNotNull { resultsArray.optJSONObject(it)?.optString("post_no", "")?.takeIf(String::isNotBlank) }
+            .groupingBy { it }.eachCount()
         val postDecisions = mutableListOf<AiFilterPostDecision>()
 
         for (i in 0 until resultsArray.length()) {
             val item = resultsArray.optJSONObject(i) ?: continue
-            val postNo = item.optString("post_no", "").trim()
-            if (postNo.isBlank()) continue
-            val requestPost = requestPostMap[postNo] ?: continue
+            val wirePostId = item.optString("post_no", "")
+            if (wirePostId.isBlank() || postKeyCounts[wirePostId] != 1) continue
+            val wirePost = registry.resolvePost(wirePostId) ?: continue
+            val requestPost = wirePost.post
             val sourceText = listOf(requestPost.title, requestPost.body).joinToString("\n")
             val postDecision = parseDecision(
                 actionRaw = item.optString("post_decision", "REVIEW"),
@@ -608,13 +687,18 @@ internal class AiFilterClient(
                 rawText = item.toString()
             ) ?: continue
 
-            val requestCommentMap = requestPost.comments.associateBy { it.commentId }
             val commentDecisions = mutableListOf<AiFilterCommentDecision>()
             val commentsArray = item.optJSONArray("comments") ?: JSONArray()
+            val commentKeyCounts = (0 until commentsArray.length())
+                .mapNotNull { commentsArray.optJSONObject(it)?.optString("comment_id", "")?.takeIf(String::isNotBlank) }
+                .groupingBy { it }.eachCount()
             for (j in 0 until commentsArray.length()) {
                 val commentItem = commentsArray.optJSONObject(j) ?: continue
-                val commentId = commentItem.optString("comment_id", "").trim()
-                val comment = requestCommentMap[commentId] ?: continue
+                val wireCommentKey = commentItem.optString("comment_id", "")
+                if (commentKeyCounts[wireCommentKey] != 1) continue
+                val wireComment = registry.resolveComment(wireCommentKey)
+                    ?.takeIf { it.postKey == requestPost.postKey } ?: continue
+                val comment = wireComment.comment
                 val commentDecision = parseDecision(
                     actionRaw = commentItem.optString("decision", "REVIEW"),
                     reason = commentItem.optString("reason", "AI판단"),
@@ -623,9 +707,9 @@ internal class AiFilterClient(
                     reviewMode = config.reviewMode,
                     rawText = commentItem.toString()
                 ) ?: continue
-                commentDecisions += AiFilterCommentDecision(commentId = commentId, decision = commentDecision)
+                commentDecisions += AiFilterCommentDecision(commentId = comment.commentId, decision = commentDecision)
             }
-            postDecisions += AiFilterPostDecision(postNo = postNo, decision = postDecision, commentDecisions = commentDecisions)
+            postDecisions += AiFilterPostDecision(postKey = requestPost.postKey, decision = postDecision, commentDecisions = commentDecisions)
         }
         if (postDecisions.isEmpty()) return null
         logger("AI legacy JSON 파싱 완료: postDecisions=${postDecisions.size}")
@@ -641,39 +725,38 @@ internal class AiFilterClient(
         return runCatching { JSONObject(cleaned) }.getOrNull()
     }
 
-    private fun parseCompactBatchResponse(content: String, request: AiFilterBatchRequest): AiFilterBatchEvaluation? {
-        val requestPostMap = request.posts.associateBy { it.postNo }
-        val requestCommentMap = request.posts
-            .flatMap { post -> post.comments.map { comment -> "${post.postNo}:${comment.commentId}" to comment } }
-            .toMap()
-        val postDecisionMap = linkedMapOf<String, AiFilterDecision>()
-        val commentDecisionMap = linkedMapOf<String, MutableList<AiFilterCommentDecision>>()
+    private fun parseCompactBatchResponse(content: String, request: AiFilterBatchRequest, registry: AiWireRegistry): AiFilterBatchEvaluation? {
+        val parsedLines = content.lineSequence()
+            .map { it.trim().removePrefix("`").removeSuffix("`").trim() }
+            .filter { it.isNotBlank() }
+            .mapNotNull(::parseCompactLine)
+            .toList()
+        val keyCounts = parsedLines.groupingBy {
+            if (it.type == "P") it.postId else "${it.postId}:${it.commentId}"
+        }.eachCount()
+        val postDecisionMap = linkedMapOf<PostKey, AiFilterDecision>()
+        val commentDecisionMap = linkedMapOf<PostKey, MutableList<AiFilterCommentDecision>>()
         var parsedLineCount = 0
 
-        content.lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .forEach { line ->
-                val cleanLine = line.removePrefix("`").removeSuffix("`").trim()
-                val parsedLine = parseCompactLine(cleanLine)
-                if (parsedLine == null) {
-                    logger("AI compact 파싱 무시: beta17 5필드/comment_key 형식 아님 / line=${cleanLine.take(120)}")
-                    return@forEach
-                }
+        parsedLines.forEach { parsedLine ->
+                val cleanLine = parsedLine.toString()
                 val type = parsedLine.type
                 val postId = parsedLine.postId
                 val commentId = parsedLine.commentId
+                val responseKey = if (type == "P") postId else "$postId:$commentId"
+                if (keyCounts[responseKey] != 1) return@forEach
                 val action = parsedLine.action
                 val reason = parsedLine.reason
                 val evidence = parsedLine.evidence
 
                 when (type) {
                     "P" -> {
-                        val post = requestPostMap[postId]
-                        if (post == null) {
+                        val wirePost = registry.resolvePost(postId)
+                        if (wirePost == null) {
                             logger("AI compact 파싱 무시: 요청에 없는 post_no=$postId")
                             return@forEach
                         }
+                        val post = wirePost.post
                         if (commentId != "-" && commentId.isNotBlank()) {
                             logger("AI compact 파싱 무시: 게시글 줄 COMMENT_ID 오류 / post_no=$postId / comment_id=$commentId")
                             return@forEach
@@ -687,16 +770,17 @@ internal class AiFilterClient(
                             reviewMode = config.reviewMode,
                             rawText = cleanLine
                         ) ?: return@forEach
-                        postDecisionMap[postId] = decision
+                        postDecisionMap[post.postKey] = decision
                         parsedLineCount++
                     }
                     "C" -> {
                         val key = "$postId:$commentId"
-                        val comment = requestCommentMap[key]
-                        if (comment == null) {
+                        val wireComment = registry.resolveComment(key)
+                        if (wireComment == null) {
                             logger("AI compact 파싱 무시: 요청에 없는 comment_key=$key / raw=${cleanLine.take(120)}")
                             return@forEach
                         }
+                        val comment = wireComment.comment
                         val decision = parseDecision(
                             actionRaw = action,
                             reason = reason,
@@ -705,7 +789,8 @@ internal class AiFilterClient(
                             reviewMode = config.reviewMode,
                             rawText = cleanLine
                         ) ?: return@forEach
-                        commentDecisionMap.getOrPut(postId) { mutableListOf() } += AiFilterCommentDecision(commentId, decision)
+                        commentDecisionMap.getOrPut(wireComment.postKey) { mutableListOf() } +=
+                            AiFilterCommentDecision(comment.commentId, decision)
                         parsedLineCount++
                     }
                 }
@@ -714,8 +799,8 @@ internal class AiFilterClient(
         if (parsedLineCount == 0) return null
 
         val postDecisions = request.posts.mapNotNull { post ->
-            val commentDecisions = commentDecisionMap[post.postNo].orEmpty()
-            val postDecision = postDecisionMap[post.postNo] ?: if (commentDecisions.isNotEmpty()) {
+            val commentDecisions = commentDecisionMap[post.postKey].orEmpty()
+            val postDecision = postDecisionMap[post.postKey] ?: if (commentDecisions.isNotEmpty()) {
                 AiFilterDecision(
                     type = AiFilterDecisionType.ALLOW,
                     reason = "댓글만판단",
@@ -727,7 +812,7 @@ internal class AiFilterClient(
                 return@mapNotNull null
             }
             AiFilterPostDecision(
-                postNo = post.postNo,
+                postKey = post.postKey,
                 decision = postDecision,
                 commentDecisions = commentDecisions
             )
@@ -755,7 +840,7 @@ internal class AiFilterClient(
                     if (isCompactActionToken(action)) {
                         return ParsedCompactLine(
                             type = type,
-                            postId = newParts[1].trim(),
+                            postId = newParts[1],
                             commentId = "-",
                             action = action,
                             reason = newParts[3].trim(),
@@ -764,14 +849,14 @@ internal class AiFilterClient(
                     }
                 }
                 "C" -> {
-                    val commentKey = newParts[1].trim()
+                    val commentKey = newParts[1]
                     val action = newParts[2].trim()
                     val keyParts = commentKey.split(":", limit = 2)
                     if (keyParts.size == 2 && isCompactActionToken(action)) {
                         return ParsedCompactLine(
                             type = type,
-                            postId = keyParts[0].trim(),
-                            commentId = keyParts[1].trim(),
+                            postId = keyParts[0],
+                            commentId = keyParts[1],
                             action = action,
                             reason = newParts[3].trim(),
                             evidence = newParts[4].trim().removeSurrounding("\"")
@@ -788,8 +873,8 @@ internal class AiFilterClient(
             if ((type == "P" || type == "C") && isCompactActionToken(action)) {
                 return ParsedCompactLine(
                     type = type,
-                    postId = oldParts[1].trim(),
-                    commentId = oldParts[2].trim(),
+                    postId = oldParts[1],
+                    commentId = oldParts[2],
                     action = action,
                     reason = oldParts[4].trim(),
                     evidence = oldParts[5].trim().removeSurrounding("\"")
@@ -806,7 +891,7 @@ internal class AiFilterClient(
                 "P" -> if (isCompactActionToken(action)) {
                     return ParsedCompactLine(
                         type = type,
-                        postId = shortParts[1].trim(),
+                        postId = shortParts[1],
                         commentId = "-",
                         action = action,
                         reason = "형식보정",
@@ -814,12 +899,12 @@ internal class AiFilterClient(
                     )
                 }
                 "C" -> {
-                    val keyParts = shortParts[1].trim().split(":", limit = 2)
+                    val keyParts = shortParts[1].split(":", limit = 2)
                     if (keyParts.size == 2 && isCompactActionToken(action)) {
                         return ParsedCompactLine(
                             type = type,
-                            postId = keyParts[0].trim(),
-                            commentId = keyParts[1].trim(),
+                            postId = keyParts[0],
+                            commentId = keyParts[1],
                             action = action,
                             reason = "형식보정",
                             evidence = fallbackEvidence

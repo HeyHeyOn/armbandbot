@@ -1,10 +1,15 @@
 package com.heyheyon.armbandbot
 
 internal data class AiBatchQueueItem(
-    val postNo: String,
+    val postKey: PostKey,
     val postInput: AiFilterPostInput,
     val createdAtMs: Long = System.currentTimeMillis(),
 ) {
+    init {
+        require(postInput.postKey == postKey) { "Queue identity must match input identity" }
+    }
+
+    val postNo: String get() = postKey.postNo
     val estimatedWeight: Int
         get() {
             val mediaWeight = postInput.mediaSources.sumOf { it.length }
@@ -18,6 +23,25 @@ internal data class AiBatchQueueItem(
         }
 }
 
+internal data class AiPostExecutionPlan(
+    val postKey: PostKey,
+    val reason: String,
+    val category: String,
+    val confidence: Int,
+) {
+    val postNo: String get() = postKey.postNo
+}
+
+internal data class AiCommentExecutionPlan(
+    val postKey: PostKey,
+    val commentNo: String,
+    val reason: String,
+    val category: String,
+    val confidence: Int,
+) {
+    val postNo: String get() = postKey.postNo
+}
+
 internal class AiBatchQueue(
     private val maxPosts: Int,
     private val maxWaitMs: Long,
@@ -26,7 +50,7 @@ internal class AiBatchQueue(
     private val items = mutableListOf<AiBatchQueueItem>()
 
     fun addOrReplace(item: AiBatchQueueItem) {
-        val existingIndex = items.indexOfFirst { it.postNo == item.postNo }
+        val existingIndex = items.indexOfFirst { it.postKey == item.postKey }
         if (existingIndex >= 0) {
             items[existingIndex] = item
         } else {
