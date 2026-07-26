@@ -174,10 +174,9 @@ class PumSourceResolver(
         val loader = PumParser.parseDetail(outerDetail, listMarker).loader
             ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
         val deadline = ResolutionDeadline(nanoTime(), resolutionTimeoutMs * NANOS_PER_MILLISECOND)
-        val outerReferer = canonicalOuterPostUrl
+        val outerPost = canonicalOuterPostUrl
             ?.let { DcinsidePostUrls.parseSafeCanonicalPostUrl(it, null) }
-            ?.takeIf { it.key == loader.outerPost }
-            ?.url
+        val outerReferer = outerPost?.url
         val cardResult = try {
             fetch(
                 PumHttpRequest(
@@ -188,7 +187,7 @@ class PumSourceResolver(
                 ),
                 CARD_MAX_BYTES,
                 RedirectKind.CARD,
-                loader.outerPost,
+                outerPost?.key,
                 deadline,
             )
         } catch (_: UnsafeRedirectException) {
@@ -197,7 +196,7 @@ class PumSourceResolver(
             return PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
         }
         if (cardResult.statusCode !in 200..299) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
-        val card = PumParser.parseCard(cardResult.text, loader.outerPost)
+        val card = PumParser.parseCard(cardResult.text, outerPost?.key, loader.sourceHint)
         if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
         when (card.status) {
             PumCardStatus.MISSING -> return PumResolution(PumSourceStatus.MISSING)
@@ -223,8 +222,8 @@ class PumSourceResolver(
 
     /** Compatibility entry point for parser/resolver unit callers; production supplies the URL. */
     fun resolve(outerDetail: Document, listMarker: Boolean = PumParser.hasListMarker(outerDetail)): PumResolution {
-        val outerPost = PumParser.parseDetail(outerDetail, listMarker).loader?.outerPost
-        return resolve(outerDetail, outerPost?.let(DcinsidePostUrls::canonicalDetailUrl), listMarker)
+        val documentUrl = outerDetail.location().takeIf { it.isNotBlank() }
+        return resolve(outerDetail, documentUrl, listMarker)
     }
 
     private fun resolveSource(key: PostKey, sourceUrl: String, outerReferer: String?, deadline: ResolutionDeadline): PumResolution {
@@ -353,7 +352,7 @@ class PumSourceResolver(
         initial: PumHttpRequest,
         maxBytes: Int,
         kind: RedirectKind,
-        self: PostKey,
+        self: PostKey?,
         deadline: ResolutionDeadline,
     ): BufferedResponse {
         var request = initial
@@ -370,7 +369,7 @@ class PumSourceResolver(
                     val absolute = try { URI(request.url).resolve(location).toString() } catch (_: Exception) { throw UnsafeRedirectException() }
                     val safeUrl = when (kind) {
                         RedirectKind.SOURCE -> DcinsidePostUrls.parseSafeCanonicalPostUrl(absolute, null)
-                            ?.takeIf { it.key == self }
+                            ?.takeIf { self != null && it.key == self }
                             ?.url
                         RedirectKind.CARD -> safeCardEndpoint(absolute)
                     } ?: throw UnsafeRedirectException()

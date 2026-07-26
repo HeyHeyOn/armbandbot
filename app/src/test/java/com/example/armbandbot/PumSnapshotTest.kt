@@ -86,7 +86,8 @@ class PumSnapshotTest {
         val live = Jsoup.parse("""
             <html><head>
               <meta http-equiv='refresh' content='0;url=javascript:boom'>
-              <base href='https://evil.test/'><style>body{display:none}</style>
+              <base href='https://evil.test/'><style>.write_div{display:block}</style>
+              <link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'>
               <link rel='stylesheet' href='https://evil.test/x.css'>
             </head><body style='background:url(javascript:boom)' onload='boom()'>
               <svg><animate onbegin='boom()'/><a xlink:href='javascript:boom'>svg</a></svg>
@@ -106,7 +107,11 @@ class PumSnapshotTest {
         val snapshot = PumSnapshot.withStaticCard(live, source)
         val card = snapshot.selectFirst(".armbandbot-pum-card")!!
 
-        assertTrue(snapshot.select("meta, base, style, link, svg, math, script, form, iframe, object, embed, input").isEmpty())
+        assertTrue(snapshot.select("meta, base, svg, math, script, form, iframe, object, embed, input").isEmpty())
+        assertFalse(snapshot.select("style").isEmpty())
+        assertEquals(1, snapshot.select("link[rel=stylesheet]").size)
+        assertTrue(snapshot.selectFirst("link[rel=stylesheet]")!!.attr("href").startsWith("https://nstatic.dcinside.com/"))
+        assertFalse(snapshot.html().contains("evil.test/x.css"))
         assertTrue(snapshot.select("[style], [srcset], [cite], [background], [xlink\\:href], [action], [formaction], [data]").isEmpty())
         assertFalse(snapshot.html().contains("javascript:", true))
         assertFalse(snapshot.html().contains("data:text", true))
@@ -119,14 +124,76 @@ class PumSnapshotTest {
     }
 
     @Test
-    fun nullResolutionStillSanitizesClonedSnapshot() {
-        val live = Jsoup.parse("<div class='write_div' style='color:red' onclick='boom()'><script>boom()</script><p>ordinary</p></div>")
+    fun nullResolutionSanitizesOrdinaryPageWhilePreservingApprovedStylesheets() {
+        val live = Jsoup.parse("""
+            <html><head>
+              <meta http-equiv='refresh' content='0;url=https://evil.test'>
+              <base href='https://evil.test/'><style>.write_div{display:block}</style>
+              <link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'>
+              <link rel='stylesheet' href='https://evil.test/x.css'>
+            </head><body onload='boom()'><div class='write_div' style='color:red'>
+              <script>ordinaryLoader()</script><form><input autofocus></form>
+              <iframe src='https://evil.test/frame'></iframe>
+              <a href='javascript:boom' onclick='boom()' srcset='data:text/html,boom'>ordinary</a>
+            </div></body></html>
+        """.trimIndent())
 
         val snapshot = PumSnapshot.withStaticCard(live, null)
 
-        assertTrue(snapshot.select("script, [style], [onclick]").isEmpty())
+        assertEquals(1, snapshot.select("head style").size)
+        assertEquals(1, snapshot.select("link[rel=stylesheet]").size)
+        assertTrue(snapshot.selectFirst("link[rel=stylesheet]")!!.attr("href").startsWith("https://nstatic.dcinside.com/"))
+        assertTrue(snapshot.select("script, meta, base, form, iframe, input").isEmpty())
+        assertTrue(snapshot.select("[style], [onload], [onclick], [srcset], a[href]").isEmpty())
+        assertFalse(snapshot.html().contains("evil.test"))
         assertTrue(snapshot.text().contains("ordinary"))
-        assertTrue(live.select("script, [style], [onclick]").isNotEmpty())
+        assertTrue(snapshot.select(".armbandbot-pum-card").isEmpty())
+        assertTrue(live.select("style, link[rel=stylesheet], [style], script").isNotEmpty())
+    }
+
+    @Test
+    fun finalCleanupSanitizesGeneratedCommentsAddedAfterInitialSnapshotPass() {
+        val snapshot = PumSnapshot.withStaticCard(
+            Jsoup.parse("""
+                <html><head><style>.comment_box{display:block}</style>
+                <link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'></head>
+                <body><div class='write_div'>ordinary</div></body></html>
+            """.trimIndent()),
+            null,
+        )
+        snapshot.body().append("""
+            <div class='view_comment' onclick='boom()' style='display:block'>
+              <script>boom()</script><form><input autofocus></form>
+              <iframe src='javascript:boom'></iframe>
+              <a href='javascript:boom' onmouseover='boom()'>comment</a>
+              <img src='data:text/html,boom' onerror='boom()'>
+            </div>
+        """.trimIndent())
+
+        PumSnapshot.removeExecutableBehavior(snapshot)
+
+        assertTrue(snapshot.select("script, form, input, iframe").isEmpty())
+        assertTrue(snapshot.select("[style], [onclick], [onmouseover], [onerror], a[href], img[src]").isEmpty())
+        assertEquals(1, snapshot.select("head style").size)
+        assertEquals(1, snapshot.select("link[rel=stylesheet]").size)
+        assertTrue(snapshot.text().contains("comment"))
+    }
+
+    @Test
+    fun unparsedPumLoaderStoresFailureCardInsteadOfEmptyBody() {
+        val live = Jsoup.parse("""
+            <html><head><style>.write_div{display:block}</style></head><body>
+              <div class='write_div'><script>var u='/ajax/pum_ajax/get_contents'; brokenLoader(u);</script></div>
+            </body></html>
+        """.trimIndent())
+
+        val snapshot = PumSnapshot.withStaticCard(live, null, checkedAt = "2026-07-25T14:00:00Z")
+        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
+
+        assertEquals("INVALID_SOURCE", card.attr("data-status"))
+        assertTrue(card.text().contains("원문을 불러오지 못했습니다"))
+        assertTrue(snapshot.select("script").isEmpty())
+        assertFalse(snapshot.select("style").isEmpty())
     }
 
     @Test

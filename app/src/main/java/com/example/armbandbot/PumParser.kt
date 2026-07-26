@@ -8,10 +8,10 @@ import java.net.URI
 object PumParser {
     private const val CARD_ENDPOINT = "https://gall.dcinside.com/ajax/pum_ajax/get_contents"
 
-    /** The marker is emitted as a direct child of the detail link in a DC list-title cell. */
+    /** DC emits the marker either inside the detail link or as its direct sibling. */
     fun hasListMarker(document: Document): Boolean =
-        document.select("tr.ub-content > td.gall_tit.ub-word > a[href] > span.font_blue009")
-            .any { it.text() == "(펌)" }
+        document.select("tr.ub-content > td.gall_tit.ub-word > a[href]")
+            .any(::hasListMarker)
 
     /** Checks only the supplied list row's title link, never another post in the document. */
     fun hasListMarker(titleLink: Element): Boolean {
@@ -20,8 +20,9 @@ object PumParser {
         val row = titleCell.parent() ?: return false
         if (titleCell.tagName() != "td" || !titleCell.hasClass("gall_tit") || !titleCell.hasClass("ub-word")) return false
         if (row.tagName() != "tr" || !row.hasClass("ub-content")) return false
-        return titleLink.children().any {
-            it.tagName() == "span" && it.hasClass("font_blue009") && it.text() == "(펌)"
+        val directMarkers = titleLink.children() + titleCell.children().filter { it.parent() == titleCell && it !== titleLink }
+        return directMarkers.any {
+            it.tagName() in setOf("span", "b") && it.hasClass("font_blue009") && it.text() == "(펌)"
         }
     }
 
@@ -36,15 +37,23 @@ object PumParser {
         return PumDetection(status, loader)
     }
 
-    fun parseCard(html: String, outerPost: PostKey?): PumCard {
+    fun parseCard(html: String, outerPost: PostKey?, sourceHint: PumSourceHint? = null): PumCard {
         val document = Jsoup.parse(html, "https://gall.dcinside.com/")
         val body = document.selectFirst(".cloned_card_body") ?: return PumCard(PumCardStatus.INVALID)
-        // DCInside marks the original-post control explicitly. Other links are card content.
-        val links = body.select("a.source_link")
+        // Older cards use .source_link. Current cards expose the original as a direct child;
+        // the classless form is trusted only when it exactly matches the loader's source hint.
+        val explicitLinks = body.select("a.source_link[href]")
+        val links = if (explicitLinks.isNotEmpty()) {
+            explicitLinks
+        } else if (sourceHint != null) {
+            body.children().filter { it.tagName() == "a" && it.hasAttr("href") }
+        } else {
+            emptyList()
+        }
         val parsed = links.map { link ->
-            if (!link.hasAttr("href")) return@map null
             val raw = link.absUrl("href").ifBlank { link.attr("href") }
             DcinsidePostUrls.parseSafeCanonicalPostUrl(raw, outerPost)
+                ?.takeIf { sourceHint == null || sourceHint.matches(it.key) }
         }
         if (parsed.any { it == null }) return PumCard(PumCardStatus.INVALID)
         val candidates = parsed.filterNotNull().distinctBy { it.key }
@@ -69,35 +78,41 @@ object PumParser {
             val optionsClose = matchingDelimiter(code, optionsOpen, '{', '}') ?: continue
             if (optionsClose > closeParen) continue
             val options = objectProperties(code, optionsOpen, optionsClose) ?: continue
-            val endpointRaw = options.firstOrNull { it.key.equals("url", true) }
-                ?.let { stringValue(code, it.valueStart, it.valueEnd) } ?: continue
+
+            // Only top-level assignments visible before this AJAX invocation may be referenced.
+            val assignments = topLevelAssignments(code, ajaxStart) ?: continue
+            val endpointProperty = options.firstOrNull { it.key.equals("url", true) } ?: continue
+            val endpointRaw = resolveScalar(code, endpointProperty.valueStart, endpointProperty.valueEnd, assignments)
+                ?.takeIf { it.isNotBlank() } ?: continue
             val endpoint = canonicalCardEndpoint(endpointRaw) ?: continue
-            val data = options.firstOrNull { it.key.equals("data", true) } ?: continue
-            val dataOpen = skipTrivia(code, data.valueStart, data.valueEnd)
+
+            val dataProperty = options.firstOrNull { it.key.equals("data", true) } ?: continue
+            val dataExpression = resolveExpression(code, dataProperty.valueStart, dataProperty.valueEnd, assignments) ?: continue
+            val dataOpen = skipTrivia(code, dataExpression.start, dataExpression.end)
             if (code.getOrNull(dataOpen) != '{') continue
             val dataClose = matchingDelimiter(code, dataOpen, '{', '}') ?: continue
-            if (dataClose >= data.valueEnd) continue
+            if (dataClose >= dataExpression.end || skipTrivia(code, dataClose + 1, dataExpression.end) != dataExpression.end) continue
             val dataProperties = objectProperties(code, dataOpen, dataClose) ?: continue
 
-            // Only assignments visible before this AJAX invocation may supply literal values.
-            val assignments = literalAssignments(code, ajaxStart) ?: continue
             val values = linkedMapOf<String, String>()
             dataProperties.forEach { property ->
-                val literal = stringValue(code, property.valueStart, property.valueEnd)
-                val variable = identifierValue(code, property.valueStart, property.valueEnd)
-                val resolved = literal ?: variable?.let(assignments::get)
-                if (!resolved.isNullOrBlank()) values[property.key] = resolved
+                resolveScalar(code, property.valueStart, property.valueEnd, assignments)?.let { resolved ->
+                    values[property.key] = resolved
+                }
             }
             val id = values["gall_id"] ?: values["id"] ?: continue
             val no = values["gall_no"] ?: values["no"] ?: continue
-            val type = (values["gall_type"] ?: values["gallery_type"] ?: values["_GALLTYPE_"] ?: "G").uppercase()
-            if (type !in setOf("G", "M", "MI") || !id.matches(Regex("[A-Za-z0-9_-]+")) || !no.matches(Regex("[0-9]+"))) continue
-            return PumLoaderRequest(endpoint, PostKey(type, id, no), values.toMap())
+            val rawType = values["gall_type"] ?: values["gallery_type"] ?: values["_GALLTYPE_"]
+            val type = rawType?.takeIf { it.isNotBlank() }?.uppercase()
+            if ((type != null && type !in setOf("G", "M", "MI")) ||
+                !id.matches(Regex("[A-Za-z0-9_-]+")) || !no.matches(Regex("[0-9]+"))) continue
+            return PumLoaderRequest(endpoint, PumSourceHint(type, id, no), values.toMap())
         }
         return null
     }
 
     private data class JsProperty(val key: String, val valueStart: Int, val valueEnd: Int)
+    private data class JsExpression(val start: Int, val end: Int)
 
     /** Finds executable ajax(...) calls, skipping comments and all JS string literal forms. */
     private fun ajaxCalls(code: String): List<Pair<Int, Int>> {
@@ -122,25 +137,37 @@ object PumParser {
         return calls
     }
 
-    private fun literalAssignments(code: String, limit: Int): Map<String, String>? {
-        val result = linkedMapOf<String, String>()
+    private fun topLevelAssignments(code: String, limit: Int): Map<String, JsExpression>? {
+        val result = linkedMapOf<String, JsExpression>()
         var braceDepth = 0
+        var roundDepth = 0
+        var squareDepth = 0
+        var statementStart = 0
         var i = 0
         while (i < limit) {
             i = skipTrivia(code, i, limit)
             val c = code.getOrNull(i) ?: break
             if (c == '\'' || c == '"' || c == '`') {
-                i = stringEnd(code, i) ?: limit
+                i = stringEnd(code, i) ?: return null
                 continue
             }
-            if (c == '{') {
-                braceDepth++
-                i++
-                continue
-            }
+            if (c == '{') { braceDepth++; i++; continue }
             if (c == '}') {
                 if (braceDepth == 0) return null
-                braceDepth--
+                braceDepth--; i++; continue
+            }
+            if (c == '(') { roundDepth++; i++; continue }
+            if (c == ')') {
+                if (roundDepth == 0) return null
+                roundDepth--; i++; continue
+            }
+            if (c == '[') { squareDepth++; i++; continue }
+            if (c == ']') {
+                if (squareDepth == 0) return null
+                squareDepth--; i++; continue
+            }
+            if (c == ';') {
+                if (braceDepth == 0 && roundDepth == 0 && squareDepth == 0) statementStart = i + 1
                 i++
                 continue
             }
@@ -148,18 +175,94 @@ object PumParser {
             val nameEnd = identifierEnd(code, i)
             val equals = skipTrivia(code, nameEnd, limit)
             val valueStart = skipTrivia(code, equals + 1, limit)
-            if (braceDepth == 0 && code.getOrNull(equals) == '=' && code.getOrNull(equals + 1) != '=' &&
-                code.getOrNull(valueStart) in setOf('\'', '"')) {
-                val valueEnd = stringEnd(code, valueStart)
-                if (valueEnd != null && valueEnd <= limit) {
-                    result[code.substring(i, nameEnd)] = code.substring(valueStart + 1, valueEnd - 1)
-                    i = valueEnd
-                    continue
-                }
+            if (braceDepth == 0 && roundDepth == 0 && squareDepth == 0 &&
+                isAssignmentTargetContext(code, statementStart, i) && code.getOrNull(equals) == '=' &&
+                code.getOrNull(equals - 1) !in setOf('=', '!', '<', '>') && code.getOrNull(equals + 1) !in setOf('=', '>')) {
+                val valueEnd = assignmentValueEnd(code, valueStart, limit) ?: return null
+                result[code.substring(i, nameEnd)] = JsExpression(valueStart, valueEnd)
+                i = if (code.getOrNull(valueEnd) == ';') {
+                    statementStart = valueEnd + 1
+                    valueEnd + 1
+                } else valueEnd
+                continue
             }
             i = nameEnd
         }
-        return result.takeIf { braceDepth == 0 }
+        return result.takeIf { braceDepth == 0 && roundDepth == 0 && squareDepth == 0 }
+    }
+
+    /** Accepts declarations and standalone `name = ...` statements, never member or nested targets. */
+    private fun isAssignmentTargetContext(code: String, statementStart: Int, targetStart: Int): Boolean {
+        val prefixStart = skipTrivia(code, statementStart, targetStart)
+        if (prefixStart == targetStart) return true
+        if (!isIdentifierStart(code.getOrNull(prefixStart) ?: return false)) return false
+        val keywordEnd = identifierEnd(code, prefixStart)
+        val keyword = code.substring(prefixStart, keywordEnd)
+        return keyword in setOf("var", "let", "const") && skipTrivia(code, keywordEnd, targetStart) == targetStart
+    }
+
+    private fun assignmentValueEnd(code: String, start: Int, limit: Int): Int? {
+        var round = 0
+        var curly = 0
+        var square = 0
+        var i = start
+        while (i < limit) {
+            i = skipTrivia(code, i, limit)
+            if (i >= limit) break
+            when (code[i]) {
+                '\'', '"', '`' -> { i = stringEnd(code, i) ?: return null; continue }
+                '(' -> round++
+                ')' -> round--
+                '{' -> curly++
+                '}' -> curly--
+                '[' -> square++
+                ']' -> square--
+                ';' -> if (round == 0 && curly == 0 && square == 0) return i
+            }
+            if (round < 0 || curly < 0 || square < 0) return null
+            i++
+        }
+        return limit.takeIf { round == 0 && curly == 0 && square == 0 }
+    }
+
+    private fun resolveExpression(
+        code: String,
+        start: Int,
+        end: Int,
+        assignments: Map<String, JsExpression>,
+    ): JsExpression? {
+        val identifier = identifierValue(code, start, end)
+        return identifier?.let(assignments::get) ?: JsExpression(start, end)
+    }
+
+    private fun resolveScalar(
+        code: String,
+        start: Int,
+        end: Int,
+        assignments: Map<String, JsExpression>,
+    ): String? {
+        stringValue(code, start, end)?.let { return it }
+        numberValue(code, start, end)?.let { return it }
+        nullValue(code, start, end)?.let { return it }
+        val identifier = identifierValue(code, start, end) ?: return null
+        val expression = assignments[identifier] ?: return null
+        return stringValue(code, expression.start, expression.end)
+            ?: numberValue(code, expression.start, expression.end)
+            ?: nullValue(code, expression.start, expression.end)
+    }
+
+    private fun numberValue(code: String, start: Int, end: Int): String? {
+        val at = skipTrivia(code, start, end)
+        var after = at
+        while (after < end && code[after].isDigit()) after++
+        if (after == at || skipTrivia(code, after, end) != end) return null
+        return code.substring(at, after)
+    }
+
+    private fun nullValue(code: String, start: Int, end: Int): String? {
+        val at = skipTrivia(code, start, end)
+        val after = at + 4
+        return "".takeIf { after <= end && code.regionMatches(at, "null", 0, 4) && skipTrivia(code, after, end) == end }
     }
 
     private fun objectProperties(code: String, open: Int, close: Int): List<JsProperty>? {

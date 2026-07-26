@@ -25,18 +25,23 @@ object PumSnapshot {
         checkedAt: String = currentCheckedAt(),
     ): Document {
         val snapshot = liveDocument.clone()
+        val effectiveResolution = resolution ?: if (hasUnparsedPumLoader(snapshot)) {
+            PumResolution(PumSourceStatus.INVALID_SOURCE)
+        } else {
+            null
+        }
         removeExecutableBehavior(snapshot)
-        if (resolution == null) return snapshot
+        if (effectiveResolution == null) return snapshot
 
         snapshot.select(".armbandbot-pum-card").remove()
-        val card = buildCard(resolution, checkedAt)
+        val card = buildCard(effectiveResolution, checkedAt)
         val body = snapshot.selectFirst(".write_div") ?: snapshot.body()
         body?.appendChild(card)
         return snapshot
     }
 
     internal fun removeExecutableBehavior(document: Document) {
-        sanitizeTree(document)
+        sanitizeTree(document, preservePageStyles = true)
     }
 
     private fun buildCard(resolution: PumResolution, checkedAt: String): Element {
@@ -81,11 +86,11 @@ object PumSnapshot {
         val parsed = Jsoup.parseBodyFragment(html, "https://gall.dcinside.com/")
         val body = parsed.body()
         removeComments(body)
-        sanitizeTree(body)
+        sanitizeTree(body, preservePageStyles = false)
         return Element("div").also { container -> body.childNodes().toList().forEach(container::appendChild) }
     }
 
-    private fun sanitizeTree(root: Element) {
+    private fun sanitizeTree(root: Element, preservePageStyles: Boolean) {
         // Preserve voice evidence as inert text before deleting every browsing context.
         root.select("iframe").toList().forEach { iframe ->
             val safe = safeHttpUrl(iframe.attr("src"))
@@ -95,9 +100,14 @@ object PumSnapshot {
                 iframe.remove()
             }
         }
+        if (preservePageStyles) {
+            root.select("style").filter { it.parent()?.tagName() != "head" }.forEach(Element::remove)
+            root.select("link").filterNot(::isSafeStylesheet).forEach(Element::remove)
+        }
+        val styleSelector = if (preservePageStyles) "" else ", style, link"
         root.select(
-            "script, meta, base, style, link, form, iframe, object, embed, input, button, " +
-                "textarea, select, option, frame, canvas, template, noscript, svg, math"
+            "script, meta, base, form, iframe, object, embed, input, button, " +
+                "textarea, select, option, frame, canvas, template, noscript, svg, math$styleSelector"
         ).remove()
 
         val alwaysRemove = setOf(
@@ -118,6 +128,21 @@ object PumSnapshot {
                 }
             }
         }
+    }
+
+    private fun hasUnparsedPumLoader(document: Document): Boolean =
+        document.select(".write_div script").any {
+            val code = it.data().ifBlank { it.html() }
+            code.contains("/ajax/pum_ajax/get_contents")
+        }
+
+    private fun isSafeStylesheet(link: Element): Boolean {
+        if (!link.attr("rel").split(Regex("\\s+")).any { it.equals("stylesheet", true) }) return false
+        val raw = link.absUrl("href").ifBlank { link.attr("href") }
+        val uri = runCatching { URI(raw) }.getOrNull() ?: return false
+        val host = uri.host?.lowercase(Locale.ROOT) ?: return false
+        return uri.scheme.equals("https", true) && uri.port == -1 && uri.userInfo == null &&
+            (host == "dcinside.com" || host.endsWith(".dcinside.com"))
     }
 
     private fun safeSourceUrl(resolution: PumResolution): String? {

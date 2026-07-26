@@ -7,11 +7,13 @@ fun shouldRecheckPost(
     currentTitle: String,
     isPumSourceFilterMode: Boolean = false,
     pumRecheckEveryCycle: Boolean = false,
-    hasPumListMarker: Boolean = false
+    hasPumListMarker: Boolean = false,
+    snapshotBackfillRequired: Boolean = false,
 ): Boolean {
     if (savedCommentCount == -1) return true
     if (savedCommentCount != currentCommentCount) return true
     if (normalizePostTitle(savedTitle) != normalizePostTitle(currentTitle)) return true
+    if (snapshotBackfillRequired) return true
     return isPumSourceFilterMode && pumRecheckEveryCycle && hasPumListMarker
 }
 

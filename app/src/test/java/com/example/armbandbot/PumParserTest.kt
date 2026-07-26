@@ -35,10 +35,27 @@ class PumParserTest {
         assertTrue(PumParser.hasListMarker(document.selectFirst("a.second")!!))
     }
 
+    @Test fun `live sibling b marker is accepted only beside the current title link`() {
+        val document = Jsoup.parse("""
+            <table>
+              <tr class='ub-content'><td class='gall_tit ub-word'>
+                <a class='pum' href='/mgallery/board/view/?id=laboratory1&amp;no=2317'>펌 테스트2</a><b class='font_blue009'>(펌)</b>
+              </td></tr>
+              <tr class='ub-content'><td class='gall_tit ub-word'>
+                <a class='ordinary' href='/mgallery/board/view/?id=laboratory1&amp;no=2318'>일반 글</a><span>다른 요소</span>
+              </td></tr>
+            </table>
+        """.trimIndent())
+
+        assertTrue(PumParser.hasListMarker(document))
+        assertTrue(PumParser.hasListMarker(document.selectFirst("a.pum")!!))
+        assertFalse(PumParser.hasListMarker(document.selectFirst("a.ordinary")!!))
+    }
+
     @Test fun `detail loader and marker produce confirmed detection`() {
         val detection = PumParser.parseDetail(Jsoup.parse(fixture("pum_detail.html")), listMarker = true)
         assertEquals(PumDetectionStatus.PUM_CONFIRMED, detection.status)
-        assertEquals(PostKey("M", "laboratory1", "900"), detection.loader?.outerPost)
+        assertEquals(PostKey("MI", "tinygallery", "12345"), detection.loader?.outerPost)
         assertEquals("https://gall.dcinside.com/ajax/pum_ajax/get_contents", detection.loader?.endpoint)
     }
 
@@ -49,6 +66,24 @@ class PumParserTest {
         </script></div>"""
         val loader = PumParser.parseDetail(Jsoup.parse(html), false).loader
         assertEquals(PostKey("G", "variable_gall", "42"), loader?.outerPost)
+    }
+
+    @Test fun `live loader resolves url and data variables numeric no null token and blank type`() {
+        val html = """<div class='write_div'><script>
+            var u = "https://gall.dcinside.com/ajax/pum_ajax/get_contents";
+            var data = {"ci_t":null,"_GALLTYPE_":"","id":"laboratory1","no":2315};
+            ${'$'}.ajax({url:u,type:"POST",data:data});
+        </script></div>"""
+
+        val loader = PumParser.parseDetail(Jsoup.parse(html), false).loader
+
+        assertNotNull(loader)
+        assertEquals("laboratory1", loader?.sourceHint?.gallId)
+        assertEquals("2315", loader?.sourceHint?.postNo)
+        assertNull(loader?.sourceHint?.gallType)
+        assertEquals("", loader?.formData?.get("ci_t"))
+        assertEquals("", loader?.formData?.get("_GALLTYPE_"))
+        assertEquals("2315", loader?.formData?.get("no"))
     }
 
     @Test fun `loader variables only resolve from executable top level assignments`() {
@@ -82,6 +117,30 @@ class PumParserTest {
         assertNull(PumParser.parseDetail(Jsoup.parse(html), false).loader)
     }
 
+    @Test fun `member assignments are not treated as bare loader bindings`() {
+        val html = """<div class='write_div'><script>
+            var obj = {};
+            obj.url = '/ajax/pum_ajax/get_contents';
+            obj.data = {id:'member_gallery',no:'42'};
+            $.ajax({url:url, data:data});
+        </script></div>"""
+
+        assertNull(PumParser.parseDetail(Jsoup.parse(html), false).loader)
+    }
+
+    @Test fun `assignments nested in calls parentheses and arrays are not loader bindings`() {
+        val cases = listOf(
+            "configure(url = '/ajax/pum_ajax/get_contents', data = {id:'call_gallery',no:'1'});",
+            "(url = '/ajax/pum_ajax/get_contents'); (data = {id:'paren_gallery',no:'2'});",
+            "[url = '/ajax/pum_ajax/get_contents', data = {id:'array_gallery',no:'3'}];"
+        )
+
+        cases.forEach { assignments ->
+            val html = "<div class='write_div'><script>$assignments $.ajax({url:url,data:data});</script></div>"
+            assertNull(assignments, PumParser.parseDetail(Jsoup.parse(html), false).loader)
+        }
+    }
+
     @Test fun `marker-only and loader-only remain distinguishable`() {
         val normal = Jsoup.parse(fixture("normal_title_contains_pum.html"))
         assertEquals(PumDetectionStatus.PUM_MARKER_ONLY, PumParser.parseDetail(normal, true).status)
@@ -95,6 +154,18 @@ class PumParserTest {
         assertEquals(PostKey("MI", "tinygallery", "12345"), resolved.sourceKey)
         assertEquals("https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345", resolved.sourceUrl)
         assertEquals(PumCardStatus.MISSING, PumParser.parseCard(fixture("pum_card_missing.html"), null).status)
+    }
+
+    @Test fun `classless direct card link resolves only when it matches source hint`() {
+        val hint = PumSourceHint(null, "laboratory1", "2315")
+        val valid = "<div class='cloned_card_body'><a href='/mgallery/board/view/?id=laboratory1&no=2315'>원문</a></div>"
+        val mismatch = "<div class='cloned_card_body'><a href='/mgallery/board/view/?id=laboratory1&no=9999'>다른 글</a></div>"
+        val nested = "<div class='cloned_card_body'><div><a href='/mgallery/board/view/?id=laboratory1&no=2315'>중첩 링크</a></div></div>"
+
+        assertEquals(PumCardStatus.RESOLVED, PumParser.parseCard(valid, PostKey("M", "laboratory1", "2317"), hint).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard(mismatch, PostKey("M", "laboratory1", "2317"), hint).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard(nested, PostKey("M", "laboratory1", "2317"), hint).status)
+        assertEquals(PumCardStatus.INVALID, PumParser.parseCard(valid, PostKey("M", "laboratory1", "2317"), null).status)
     }
 
     @Test fun `regular minor mini urls normalize with correct referers`() {

@@ -7,11 +7,26 @@ enum class PumDetectionStatus {
     PUM_LOADER_ONLY,
 }
 
+data class PumSourceHint(
+    /** Null means DC's loader omitted the gallery type; the canonical card URL decides it. */
+    val gallType: String?,
+    val gallId: String,
+    val postNo: String,
+) {
+    fun matches(key: PostKey): Boolean =
+        gallId == key.gallId && postNo == key.postNo && (gallType == null || gallType == key.gallType)
+
+    fun toPostKeyOrNull(): PostKey? = gallType?.let { PostKey(it, gallId, postNo) }
+}
+
 data class PumLoaderRequest(
     val endpoint: String,
-    val outerPost: PostKey,
+    val sourceHint: PumSourceHint,
     val formData: Map<String, String>,
-)
+) {
+    /** Compatibility accessor for callers that only handled typed legacy loaders. */
+    val outerPost: PostKey? get() = sourceHint.toPostKeyOrNull()
+}
 
 data class PumDetection(
     val status: PumDetectionStatus,

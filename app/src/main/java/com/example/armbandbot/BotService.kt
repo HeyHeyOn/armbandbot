@@ -1471,6 +1471,8 @@ class BotService : Service() {
             val savedCommentCount = savedPost?.commentCount ?: -1
             val savedTitle = savedPost?.title
             val hasPumListMarker = PumParser.hasListMarker(titleElement)
+            val snapshotBackfillRequired = savedPost != null && config.isExpertMode && config.isSnapshotAll &&
+                savedPost.snapshotPath?.takeIf { it.isNotBlank() }?.let { File(it).isFile } != true
             if (!shouldRecheckPost(
                     savedCommentCount = savedCommentCount,
                     currentCommentCount = currentCommentCount,
@@ -1478,7 +1480,8 @@ class BotService : Service() {
                     currentTitle = text,
                     isPumSourceFilterMode = config.isPumSourceFilterMode,
                     pumRecheckEveryCycle = config.pumRecheckEveryCycle,
-                    hasPumListMarker = hasPumListMarker
+                    hasPumListMarker = hasPumListMarker,
+                    snapshotBackfillRequired = snapshotBackfillRequired,
                 )) {
                 if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
                 continue
@@ -1490,6 +1493,7 @@ class BotService : Service() {
                     savedCommentCount != currentCommentCount && titleChanged -> "댓글 수/제목 변경"
                     savedCommentCount != currentCommentCount -> "댓글 수 변경"
                     titleChanged -> "제목 변경"
+                    snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
                     config.isPumSourceFilterMode && config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
                     else -> "변경 감지"
                 }
@@ -2126,8 +2130,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 }
             }
 
-            // 6. PUM evidence is static even for comments appended above (including voice replies).
-            if (pumResolution != null) PumSnapshot.removeExecutableBehavior(doc)
+            // 6. Final inert cleanup runs after generated comments are appended, for every snapshot.
+            PumSnapshot.removeExecutableBehavior(doc)
 
             // 7. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
             return try {

@@ -11,7 +11,7 @@ class PumSourceResolverTest {
     private fun fixture(name: String) = javaClass.getResource("/pum/$name")!!.readText()
     private val outer = PostKey("M", "laboratory1", "900")
     private val outerUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=900"
-    private val loaderDoc get() = Jsoup.parse(fixture("pum_detail.html"))
+    private val loaderDoc get() = Jsoup.parse(fixture("pum_detail.html"), outerUrl)
 
     private class FakeClient : PumHttpClient {
         val requests = mutableListOf<PumHttpRequest>()
@@ -46,6 +46,25 @@ class PumSourceResolverTest {
         assertEquals("https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345", http.requests[1].url)
         assertEquals(outerUrl, http.requests[1].headers["Referer"])
         assertTrue(http.requests.all { !it.followRedirects })
+    }
+
+    @Test fun `live loader source hint stays separate from outer repost identity`() {
+        val live = Jsoup.parse("""
+            <div class='write_div'><script>
+              var u='https://gall.dcinside.com/ajax/pum_ajax/get_contents';
+              var data={ci_t:null,_GALLTYPE_:'',id:'tinygallery',no:12345};
+              ${'$'}.ajax({url:u,data:data});
+            </script></div>
+        """.trimIndent(), outerUrl)
+        val classlessCard = "<div class='cloned_card_body'><a href='/mini/board/view/?id=tinygallery&no=12345'>원문</a></div>"
+        val http = FakeClient().apply { body(classlessCard); body(fixture("source_detail.html")) }
+
+        val result = PumSourceResolver(http).resolve(live, outerUrl, true)
+
+        assertEquals(PumSourceStatus.RESOLVED, result.status)
+        assertEquals(outerUrl, http.requests[0].headers["Referer"])
+        assertEquals(outerUrl, http.requests[1].headers["Referer"])
+        assertEquals("https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345", http.requests[1].url)
     }
 
     @Test fun `outer repost is the fixed referer for card source and redirects`() {
@@ -115,7 +134,8 @@ class PumSourceResolverTest {
         }
         val resolver = PumSourceResolver(http)
         val first = resolver.resolve(loaderDoc, true)
-        val otherOuter = Jsoup.parse(fixture("pum_detail.html").replace("'900'", "'901'"))
+        val otherOuterUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=901"
+        val otherOuter = Jsoup.parse(fixture("pum_detail.html"), otherOuterUrl)
         val second = resolver.resolve(otherOuter, true)
         assertSame(first, second)
         assertEquals(3, http.requests.size) // two cards, one shared detail
@@ -156,9 +176,15 @@ class PumSourceResolverTest {
             "https://gall.dcinside.com/mini/board/view/?id=mini&no=3"
         )
         links.forEach { link ->
+            val source = DcinsidePostUrls.parseSafeCanonicalPostUrl(link, null)!!
+            val loader = Jsoup.parse("""
+                <div class='write_div'><script>
+                  ${'$'}.ajax({url:'/ajax/pum_ajax/get_contents',data:{gall_id:'${source.key.gallId}',gall_no:'${source.key.postNo}',gall_type:'${source.key.gallType}'}});
+                </script></div>
+            """.trimIndent(), outerUrl)
             val card = "<div class='cloned_card_body'><a class='source_link' href='$link'>원문</a></div>"
             val http = FakeClient().apply { body(card); body(fixture("source_detail.html")) }
-            assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(http).resolve(loaderDoc, true).status)
+            assertEquals(PumSourceStatus.RESOLVED, PumSourceResolver(http).resolve(loader, true).status)
             assertEquals(link, http.requests[1].url)
             assertEquals(outerUrl, http.requests[1].headers["Referer"])
         }

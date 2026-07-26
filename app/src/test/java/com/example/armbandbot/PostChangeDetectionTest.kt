@@ -123,4 +123,26 @@ class PostChangeDetectionTest {
             )
         )
     }
+
+    @Test
+    fun missingRequiredSnapshotForcesBackfillButExistingOrDisabledSnapshotDoesNot() {
+        assertTrue(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                snapshotBackfillRequired = true
+            )
+        )
+        assertFalse(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                snapshotBackfillRequired = false
+            )
+        )
+    }
 }
