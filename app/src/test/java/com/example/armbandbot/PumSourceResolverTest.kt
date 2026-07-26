@@ -97,6 +97,7 @@ class PumSourceResolverTest {
         assertEquals(PumSourceStatus.RESOLVED, result.status)
         assertEquals("laboratory1", http.requests[0].formData["id"])
         assertEquals("2315", http.requests[0].formData["no"])
+        assertEquals("XMLHttpRequest", http.requests[0].headers["X-Requested-With"])
         assertEquals(liveOuterUrl, http.requests[0].headers["Referer"])
         assertEquals("https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2315", http.requests[1].url)
         assertEquals(liveOuterUrl, http.requests[1].headers["Referer"])

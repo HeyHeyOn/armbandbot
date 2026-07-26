@@ -2132,13 +2132,14 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             // 6. Final inert cleanup runs after generated comments are appended, for every snapshot.
             PumSnapshot.removeExecutableBehavior(doc)
+            val viewerDoc = PumSnapshot.compactForViewer(doc)
 
-            // 7. doc.html()을 직접 저장 (buildSnapshotHtml 호출 없음, 이미지 src 원본 그대로)
+            // 7. Save the compact standalone evidence document, not DC's full interactive page shell.
             return try {
                 val cacheDir = File(cacheDir, "snapshots_$botId")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
 
-                val html = doc.html()
+                val html = viewerDoc.html()
 
                 if (blockedTs != null) {
                     val blockedFile = File(cacheDir, "${gallId}_${postNumStr}_blocked_${blockedTs}.html")

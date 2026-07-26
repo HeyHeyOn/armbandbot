@@ -152,6 +152,54 @@ class PumSnapshotTest {
     }
 
     @Test
+    fun compactViewerDocumentKeepsOnlySnapshotEvidenceAndViewerContract() {
+        val live = Jsoup.parse("""
+            <html><head><style>.popup{display:block}</style></head><body>
+              <header class='header'>사이트 헤더</header><aside class='right_content'>잡다한 창</aside>
+              <div id='blockLayer'>팝업 창</div>
+              <article class='gallview_contents'>
+                <div class='gallview_head'>
+                  <h3><span class='title_subject'>바깥 펌 글</span></h3>
+                  <div class='gall_writer' data-nick='작성자' data-uid='outer-id'>작성자</div>
+                  <span class='gall_date' title='2026-07-26 10:00:00'></span>
+                  <span class='gall_count'>조회 12</span>
+                </div>
+                <div class='write_div'><p>바깥 본문</p></div>
+                <div class='view_comment'><div class='comment_wrap show'><div class='comment_box'>
+                  <ul class='cmt_list'><li class='ub-content' id='comment_li_1'><div class='cmt_info'>
+                    <span class='gall_writer' data-nick='댓글러' data-ip='1.2.3.4'></span>
+                    <p class='usertxt'>댓글 본문</p><span class='date_time'>방금</span>
+                  </div></li></ul>
+                </div></div></div>
+              </article>
+              <section class='ad'>광고 창</section>
+            </body></html>
+        """.trimIndent())
+        val withCard = PumSnapshot.withStaticCard(live, resolved(sanitizedHtml = "<p>원문 금지어</p>"))
+
+        val compact = PumSnapshot.compactForViewer(withCard)
+        val file = Files.createTempFile("compact_snapshot", ".html").toFile().apply { writeText(compact.html()) }
+        val parsed = parseSnapshot(file.absolutePath)
+
+        assertEquals("바깥 펌 글", parsed.title)
+        assertEquals("작성자(outer-id)", parsed.author)
+        assertEquals("2026-07-26 10:00:00", parsed.date)
+        assertEquals("12", parsed.viewCount)
+        assertTrue(parsed.bodyElements.any { it is BodyElement.TextElement && it.text.contains("바깥 본문") })
+        assertEquals(PumSourceStatus.RESOLVED, parsed.pumPreview?.status)
+        assertTrue(parsed.pumPreview?.previewText?.contains("source preview") == true)
+        assertEquals(1, parsed.comments.size)
+        assertEquals("댓글 본문", parsed.comments.single().content)
+        assertFalse(compact.text().contains("사이트 헤더"))
+        assertFalse(compact.text().contains("잡다한 창"))
+        assertFalse(compact.text().contains("팝업 창"))
+        assertFalse(compact.text().contains("광고 창"))
+        assertTrue(compact.select("script, iframe, form, nav, aside, #blockLayer").isEmpty())
+        assertEquals(1, compact.select(".write_div").size)
+        assertEquals(1, compact.select(".armbandbot-pum-card").size)
+    }
+
+    @Test
     fun finalCleanupSanitizesGeneratedCommentsAddedAfterInitialSnapshotPass() {
         val snapshot = PumSnapshot.withStaticCard(
             Jsoup.parse("""

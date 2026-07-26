@@ -108,6 +108,48 @@ class PumParserTest {
         assertEquals("2315", detection.loader?.sourceHint?.postNo)
     }
 
+    @Test fun `live loader accepts the real jquery done callback chain`() {
+        val html = """<html><body>
+            <div class='gallview_head ub-content'><h3 class='title ub-word'>
+              <span class='title_subject'>ㅍ 테스트</span><b class='font_blue009'>(펌)</b>
+            </h3></div>
+            <div class='write_div'><script>
+              (function(I){var d=document,w;
+                var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+                var data={"ci_t":null,"_GALLTYPE_":"","id":"laboratory1","no":2315};
+                ${'$'}.ajax({url:u,type:"POST",data:data,dataType:"html"})
+                  .done(function(h){if(!h)return;var ${'$'}s=${'$'}("#"+I);if(${'$'}s.length){${'$'}s.html(h)}});
+              })("pum_container");
+            </script></div>
+        </body></html>""".trimIndent()
+
+        val detection = PumParser.parseDetail(Jsoup.parse(html))
+
+        assertEquals(PumDetectionStatus.PUM_CONFIRMED, detection.status)
+        assertEquals("laboratory1", detection.loader?.sourceHint?.gallId)
+        assertEquals("2315", detection.loader?.sourceHint?.postNo)
+    }
+
+    @Test fun `ajax callback tail remains limited to one terminal done call`() {
+        val prefix = """
+            (function(){
+              var u='https://gall.dcinside.com/ajax/pum_ajax/get_contents';
+              var data={id:'laboratory1',no:2315};
+              ${'$'}.ajax({url:u,data:data})
+        """.trimIndent()
+        val cases = listOf(
+            "$prefix.then(function(){})})();",
+            "$prefix.done(function(){}) .always(function(){})})();",
+            "$prefix.done(function(){})(); extraCall(); })();",
+            "$prefix.done(function(){}) trailing })();",
+        )
+
+        cases.forEach { code ->
+            val html = "<div class='write_div'><script>$code</script></div>"
+            assertNull(code, PumParser.parseDetail(Jsoup.parse(html), false).loader)
+        }
+    }
+
     @Test fun `non invoked and unreachable function loaders remain non executable`() {
         val cases = listOf(
             """function decoy() {

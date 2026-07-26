@@ -90,9 +90,7 @@ object PumParser {
         for ((ajaxStart, openParen) in ajaxCalls(code)) {
             if (!isTopLevelAjaxStatement(code, ajaxStart)) continue
             val closeParen = matchingDelimiter(code, openParen, '(', ')') ?: continue
-            var afterCall = skipTrivia(code, closeParen + 1, code.length)
-            if (code.getOrNull(afterCall) == ';') afterCall = skipTrivia(code, afterCall + 1, code.length)
-            if (afterCall != code.length) continue
+            if (!hasSupportedAjaxTail(code, closeParen + 1)) continue
             val optionsOpen = skipTrivia(code, openParen + 1, closeParen)
             if (code.getOrNull(optionsOpen) != '{') continue
             val optionsClose = matchingDelimiter(code, optionsOpen, '{', '}') ?: continue
@@ -129,6 +127,27 @@ object PumParser {
             return PumLoaderRequest(endpoint, PumSourceHint(type, id, no), values.toMap())
         }
         return null
+    }
+
+    /**
+     * DC's live loader consumes the card with one jQuery `.done(...)` callback. The callback is not
+     * interpreted; it only has to be one balanced call that terminates the top-level AJAX statement.
+     * Other chains and trailing statements remain unsupported so decoy prefixes still fail closed.
+     */
+    private fun hasSupportedAjaxTail(code: String, start: Int): Boolean {
+        var at = skipTrivia(code, start, code.length)
+        if (at == code.length) return true
+        if (code.getOrNull(at) == ';') return skipTrivia(code, at + 1, code.length) == code.length
+        if (code.getOrNull(at) != '.') return false
+        at = skipTrivia(code, at + 1, code.length)
+        val nameEnd = identifierEnd(code, at)
+        if (nameEnd == at || code.substring(at, nameEnd) != "done") return false
+        val open = skipTrivia(code, nameEnd, code.length)
+        if (code.getOrNull(open) != '(') return false
+        val close = matchingDelimiter(code, open, '(', ')') ?: return false
+        at = skipTrivia(code, close + 1, code.length)
+        if (code.getOrNull(at) == ';') at = skipTrivia(code, at + 1, code.length)
+        return at == code.length
     }
 
     private data class JsProperty(val key: String, val valueStart: Int, val valueEnd: Int)

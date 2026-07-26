@@ -19,6 +19,25 @@ internal fun matchingPumResolution(
 
 /** Builds a self-contained, inert PUM source card without ever changing the live detail document. */
 object PumSnapshot {
+    private const val COMPACT_SNAPSHOT_CSS = """
+        :root{color-scheme:light dark;font-family:system-ui,-apple-system,sans-serif}
+        body{margin:0;background:#f4f6fa;color:#1f2937}
+        .armbandbot-snapshot{box-sizing:border-box;max-width:900px;margin:24px auto;padding:24px;background:#fff;border-radius:16px}
+        .armbandbot-snapshot-header{padding-bottom:16px;border-bottom:1px solid #d8dee9}
+        .armbandbot-snapshot-header h1{margin:0 0 10px;font-size:24px}
+        .gall_writer,.gall_date,.gall_count{display:inline-block;margin-right:12px;color:#667085;font-size:13px}
+        .write_div{padding:24px 0;line-height:1.65;overflow-wrap:anywhere}
+        .write_div img,.write_div video{max-width:100%;height:auto}
+        .armbandbot-pum-card{margin-top:20px;padding:18px;border:1px solid #b9c8dc;border-radius:12px;background:#edf4fc}
+        .armbandbot-pum-heading,.armbandbot-pum-title{margin:0 0 8px}
+        .armbandbot-pum-preview{white-space:pre-wrap}
+        .view_comment{padding-top:20px;border-top:1px solid #d8dee9}
+        .cmt_list,.reply_list{list-style:none;margin:0;padding:0}
+        .cmt_list>li,.reply_list>li{padding:12px 0;border-bottom:1px solid #e5e7eb}
+        .reply_list{margin-left:24px}
+        @media(prefers-color-scheme:dark){body{background:#111827;color:#e5e7eb}.armbandbot-snapshot{background:#1f2937}.armbandbot-pum-card{background:#243449;border-color:#52657d}}
+    """
+
     fun withStaticCard(
         liveDocument: Document,
         resolution: PumResolution?,
@@ -38,6 +57,53 @@ object PumSnapshot {
         val body = snapshot.selectFirst(".write_div") ?: snapshot.body()
         body?.appendChild(card)
         return snapshot
+    }
+
+    /**
+     * Rebuilds a snapshot as a small standalone evidence document. DC's full page shell contains
+     * dormant overlays, adverts and navigation whose CSS can expand into a wall of panels offline;
+     * the Compose viewer only needs these stable metadata/body/comment selectors.
+     */
+    internal fun compactForViewer(snapshot: Document): Document {
+        val compact = Document.createShell(snapshot.location())
+        compact.outputSettings(snapshot.outputSettings().clone())
+        compact.title(snapshot.selectFirst(".title_subject")?.text().orEmpty().ifBlank { "완장봇 스냅샷" })
+        compact.head().appendElement("meta").attr("charset", "UTF-8")
+        compact.head().appendElement("meta").attr("name", "viewport").attr("content", "width=device-width, initial-scale=1")
+        compact.head().appendElement("style").appendText(COMPACT_SNAPSHOT_CSS)
+
+        val main = compact.body().appendElement("main").addClass("armbandbot-snapshot")
+        val header = main.appendElement("header").addClass("armbandbot-snapshot-header")
+        header.appendElement("h1").appendElement("span").addClass("title_subject")
+            .text(snapshot.selectFirst(".title_subject")?.text().orEmpty())
+
+        snapshot.selectFirst(".gallview_head .gall_writer, .gall_writer")?.let { source ->
+            header.appendElement("div").addClass("gall_writer")
+                .attr("data-nick", source.attr("data-nick"))
+                .attr("data-uid", source.attr("data-uid"))
+                .attr("data-ip", source.attr("data-ip"))
+                .text(source.attr("data-nick").ifBlank { source.text() })
+        }
+        snapshot.selectFirst(".gall_date")?.let { source ->
+            header.appendElement("span").addClass("gall_date")
+                .attr("title", source.attr("title"))
+                .text(source.text())
+        }
+        snapshot.selectFirst(".gall_count")?.let { source ->
+            header.appendElement("span").addClass("gall_count").text(source.text())
+        }
+
+        val body = snapshot.selectFirst(".write_div")?.clone()
+            ?: Element("div").addClass("write_div")
+        val detachedCard = snapshot.selectFirst(".armbandbot-pum-card")
+        if (body.select(".armbandbot-pum-card").isEmpty() && detachedCard != null) {
+            body.appendChild(detachedCard.clone())
+        }
+        main.appendChild(body)
+        snapshot.selectFirst(".view_comment")?.clone()?.let(main::appendChild)
+
+        removeExecutableBehavior(compact)
+        return compact
     }
 
     internal fun removeExecutableBehavior(document: Document) {

@@ -182,7 +182,8 @@ class PumSourceResolver(
                 PumHttpRequest(
                     loader.endpoint,
                     method = "POST",
-                    headers = credentialHeaders(loader.endpoint, outerReferer),
+                    headers = credentialHeaders(loader.endpoint, outerReferer) +
+                        ("X-Requested-With" to "XMLHttpRequest"),
                     formData = loader.formData,
                 ),
                 CARD_MAX_BYTES,
