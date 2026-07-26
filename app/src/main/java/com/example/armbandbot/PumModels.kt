@@ -57,6 +57,8 @@ data class PumResolution(
     val mediaSources: List<String> = emptyList(),
     val contentHash: String? = null,
     val author: String = "",
+    /** Raw current-outer DC card fragment used only to freeze the native snapshot card. Never source-cached. */
+    val dynamicCardHtml: String? = null,
 ) {
     /** Sanitized source-body HTML retained for moderation and later snapshot rendering. */
     val rawHtml: String get() = sanitizedHtml

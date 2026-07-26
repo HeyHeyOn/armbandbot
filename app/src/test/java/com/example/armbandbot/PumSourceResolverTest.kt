@@ -103,6 +103,48 @@ class PumSourceResolverTest {
         assertEquals(liveOuterUrl, http.requests[1].headers["Referer"])
     }
 
+    @Test fun `exact 2317 fixtures resolve card anchor and enrich outer moderation target`() {
+        val outerKey = PostKey("M", "laboratory1", "2317")
+        val liveOuterUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2317"
+        val live = Jsoup.parse("""
+            <div class='gallview_head ub-content'><h3 class='title ub-word'>
+              <span class='title_subject'>펌 테스트2</span><b class='font_blue009'>(펌)</b>
+            </h3></div>
+            <div class='write_div'><script>${fixture("2317-outer-loader.js")}</script></div>
+        """.trimIndent(), liveOuterUrl)
+        val source = """<html><body>
+            <div class='gallview_head'><span class='title_subject'>테스트</span></div>
+            ${fixture("2315-source-body.html")}
+        </body></html>"""
+        val http = FakeClient().apply {
+            body(fixture("2317-card-response.html"))
+            body(source)
+        }
+
+        val resolution = PumSourceResolver(http).resolve(live, liveOuterUrl)
+        val moderation = PumModerationContent.resolve(
+            enabled = true,
+            detection = PumParser.parseDetail(live),
+            originalPostKey = outerKey,
+            originalContent = "펌 테스트2",
+        ) { resolution }
+
+        assertEquals(PumSourceStatus.RESOLVED, resolution.status)
+        assertEquals(PostKey("M", "laboratory1", "2315"), resolution.sourceKey)
+        assertEquals("https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2315", resolution.sourceUrl)
+        assertTrue(resolution.bodyText.contains("А.Ᏼ-С_D"))
+        assertTrue(resolution.dynamicCardHtml.orEmpty().contains("class=\"cloned_card_body\""))
+        assertTrue(resolution.dynamicCardHtml.orEmpty().contains("-webkit-line-clamp:3"))
+        assertEquals(2, http.requests.size)
+        assertEquals("POST", http.requests[0].method)
+        assertEquals("XMLHttpRequest", http.requests[0].headers["X-Requested-With"])
+        assertEquals(liveOuterUrl, http.requests[0].headers["Referer"])
+        assertEquals("https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2315", http.requests[1].url)
+        assertTrue(moderation.moderationContent.contains("А.Ᏼ-С_D"))
+        assertTrue(moderation.aiBody.contains("А.Ᏼ-С_D"))
+        assertEquals(outerKey, moderation.targetPostKey)
+    }
+
     @Test fun `outer repost is the fixed referer for card source and redirects`() {
         val sourceUrl = "https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345"
         val http = FakeClient().apply {
@@ -141,7 +183,9 @@ class PumSourceResolverTest {
 
     @Test fun `maps missing invalid timeout and malformed source states`() {
         val missing = FakeClient().apply { body(fixture("pum_card_missing.html")) }
-        assertEquals(PumSourceStatus.MISSING, PumSourceResolver(missing).resolve(loaderDoc, true).status)
+        val missingResult = PumSourceResolver(missing).resolve(loaderDoc, true)
+        assertEquals(PumSourceStatus.MISSING, missingResult.status)
+        assertTrue(missingResult.dynamicCardHtml!!.contains("삭제되었거나 존재하지 않는 원문입니다"))
 
         val invalid = FakeClient().apply { body("<a href='https://evil.example/board/view/?id=x&no=1'>source</a>") }
         assertEquals(PumSourceStatus.INVALID_SOURCE, PumSourceResolver(invalid).resolve(loaderDoc, true).status)
@@ -164,16 +208,22 @@ class PumSourceResolverTest {
     }
 
     @Test fun `one-cycle cache is keyed by full source PostKey and shared by outer reposts`() {
+        val firstCard = fixture("pum_card_resolved.html")
+        val secondCard = "$firstCard<!-- outer-two -->"
         val http = FakeClient().apply {
-            body(fixture("pum_card_resolved.html")); body(fixture("source_detail.html"))
-            body(fixture("pum_card_resolved.html"))
+            body(firstCard); body(fixture("source_detail.html"))
+            body(secondCard)
         }
         val resolver = PumSourceResolver(http)
         val first = resolver.resolve(loaderDoc, true)
         val otherOuterUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=901"
         val otherOuter = Jsoup.parse(fixture("pum_detail.html"), otherOuterUrl)
         val second = resolver.resolve(otherOuter, true)
-        assertSame(first, second)
+        assertEquals(first.sourceKey, second.sourceKey)
+        assertEquals(first.contentHash, second.contentHash)
+        assertEquals(first.sanitizedHtml, second.sanitizedHtml)
+        assertEquals(firstCard, first.dynamicCardHtml)
+        assertEquals(secondCard, second.dynamicCardHtml)
         assertEquals(3, http.requests.size) // two cards, one shared detail
     }
 
@@ -442,7 +492,11 @@ class PumSourceResolverTest {
         assertEquals(PumSourceStatus.TEMPORARY_FAILURE, resolver.resolve(loaderDoc, true).status)
         val stable = resolver.resolve(loaderDoc, true)
         assertEquals(PumSourceStatus.RESOLVED, stable.status)
-        assertSame(stable, resolver.resolve(loaderDoc, true))
+        val cached = resolver.resolve(loaderDoc, true)
+        assertEquals(stable.sourceKey, cached.sourceKey)
+        assertEquals(stable.contentHash, cached.contentHash)
+        assertEquals(stable.sanitizedHtml, cached.sanitizedHtml)
+        assertNotNull(cached.dynamicCardHtml)
         assertEquals(5, http.requests.size)
     }
 }

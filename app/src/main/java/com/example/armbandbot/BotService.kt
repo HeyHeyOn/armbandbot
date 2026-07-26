@@ -1306,8 +1306,9 @@ class BotService : Service() {
             )
 
             // Resolver state (normalized-source cache and this bot's credentials) lives for one
-            // scan cycle only. Disabled mode creates no resolver and makes no PUM requests.
-            val pumSourceResolver = if (config.isPumSourceFilterMode) {
+            // scan cycle only. Expert mode also needs it to freeze native PUM cards in snapshots;
+            // source content is still excluded from moderation unless the filter option is enabled.
+            val pumSourceResolver = if (config.isPumSourceFilterMode || config.isExpertMode) {
                 PumSourceResolver(
                     http = UrlConnectionPumHttpClient(),
                     cookies = { currentCookie },
@@ -1694,7 +1695,7 @@ class BotService : Service() {
                 botId = botId,
                 gallId = gallId,
                 postNumStr = postNumStr,
-                liveDoc = Jsoup.parse(html),
+                liveDoc = Jsoup.parse(html, buildSnapshotUrl(gallType, gallId, postNumStr)),
                 comments = null,
                 blockedCommentNo = null,
                 blockedTs = System.currentTimeMillis().toString(),
@@ -2132,14 +2133,13 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             // 6. Final inert cleanup runs after generated comments are appended, for every snapshot.
             PumSnapshot.removeExecutableBehavior(doc)
-            val viewerDoc = PumSnapshot.compactForViewer(doc)
 
-            // 7. Save the compact standalone evidence document, not DC's full interactive page shell.
+            // 7. Preserve DC's original page DOM and styles; only the unnecessary shell was pruned above.
             return try {
                 val cacheDir = File(cacheDir, "snapshots_$botId")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
 
-                val html = viewerDoc.html()
+                val html = doc.html()
 
                 if (blockedTs != null) {
                     val blockedFile = File(cacheDir, "${gallId}_${postNumStr}_blocked_${blockedTs}.html")
@@ -2295,24 +2295,29 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
         val postKey = PostKey(gallType = gallType, gallId = gallId, postNo = postNumStr)
         val legacyPostText = "$text $contentText"
+        val shouldInspectPum = config.isPumSourceFilterMode || config.isExpertMode
+        val pumDetection = if (shouldInspectPum) PumParser.parseDetail(postDoc) else null
+        val snapshotPumResolution = if (pumDetection?.isPum == true) {
+            runCatching {
+                checkNotNull(pumSourceResolver) { "PUM resolver missing for snapshot/filter scan cycle" }
+                    .resolve(postDoc, pcPostDetailUrl)
+            }.getOrElse {
+                PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
+            }
+        } else {
+            null
+        }
         val pumModeration = if (config.isPumSourceFilterMode) {
-            val detection = PumParser.parseDetail(postDoc)
             PumModerationContent.resolve(
                 enabled = true,
-                detection = detection,
+                detection = checkNotNull(pumDetection),
                 originalPostKey = postKey,
                 originalContent = legacyPostText,
             ) {
-                runCatching {
-                    checkNotNull(pumSourceResolver) { "PUM resolver missing for enabled scan cycle" }
-                        .resolve(postDoc, pcPostDetailUrl)
-                }.getOrElse {
-                    // Resolver failures are fail-open; do not expose exception text or request data.
-                    PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
-                }
+                snapshotPumResolution ?: PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
             }
         } else {
-            // Do not even parse PUM structure while disabled: the legacy request path is unchanged.
+            // Keep moderation content strictly legacy while the source-filter option is disabled.
             PumModerationContent(
                 targetPostKey = postKey,
                 moderationContent = legacyPostText,
@@ -2355,7 +2360,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         liveDoc = postDoc,
                         comments = commentsArray,
                         existingSnapshotPath = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath,
-                        pumResolution = pumModeration.sourceResolution,
+                        pumResolution = snapshotPumResolution,
                     )
                     if (!result.isNullOrBlank()) {
                         sendLog("[스냅샷][전체] 저장 완료: $result", botId)
@@ -2819,7 +2824,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         pumResolution = matchingPumResolution(
                                             targetKey,
                                             postKey,
-                                            pumModeration.sourceResolution,
+                                            snapshotPumResolution,
                                         ),
                                     )
                                 },
@@ -2951,7 +2956,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                                 pumResolution = matchingPumResolution(
                                                     targetKey,
                                                     postKey,
-                                                    pumModeration.sourceResolution,
+                                                    snapshotPumResolution,
                                                 ),
                                             )
                                         }
@@ -3084,7 +3089,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 } else {
                     null
                 },
-                pumResolution = pumModeration.sourceResolution,
+                pumResolution = snapshotPumResolution,
             )
             if (config.isDebugMode) {
                 sendLog("[디버그][성능] 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)

@@ -333,7 +333,10 @@ object PumParser {
             if (c == '{') { braceDepth++; i++; continue }
             if (c == '}') {
                 if (braceDepth == 0) return null
-                braceDepth--; i++; continue
+                braceDepth--
+                i++
+                if (braceDepth == 0 && roundDepth == 0 && squareDepth == 0) statementStart = i
+                continue
             }
             if (c == '(') { roundDepth++; i++; continue }
             if (c == ')') {

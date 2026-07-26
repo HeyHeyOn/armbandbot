@@ -1,5 +1,6 @@
 package com.heyheyon.armbandbot
 
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -111,9 +112,34 @@ private fun resolveImgSrc(img: Element): String? {
     }
 }
 
+internal fun snapshotWebViewBaseUrl(html: String, fileName: String): String {
+    val stored = runCatching {
+        Jsoup.parse(html).selectFirst("meta[name=armbandbot-base-url]")?.attr("content")
+    }.getOrNull().orEmpty()
+    DcinsidePostUrls.parseSafeCanonicalPostUrl(stored, null)?.url?.let { return it }
+
+    val stem = fileName.removeSuffix(".html")
+    val versioned = Regex("^(.+)_([0-9]+)_(?:initial|latest)(?:_[0-9]+)?$").matchEntire(stem)
+    val blocked = Regex("^(.+)_([0-9]+)_blocked_[0-9]+$").matchEntire(stem)
+    val match = versioned ?: blocked
+    val gallId: String
+    val postNum: String
+    if (match != null) {
+        gallId = match.groupValues[1]
+        postNum = match.groupValues[2]
+    } else {
+        val lastUnderscore = stem.lastIndexOf('_')
+        gallId = if (lastUnderscore > 0) stem.substring(0, lastUnderscore) else stem
+        postNum = if (lastUnderscore > 0) stem.substring(lastUnderscore + 1) else ""
+    }
+    val safeGallId = gallId.takeIf { it.matches(Regex("[A-Za-z0-9_-]+")) }.orEmpty()
+    val safePostNum = postNum.takeIf { it.matches(Regex("[0-9]+")) }.orEmpty()
+    return "https://gall.dcinside.com/board/view/?id=$safeGallId&no=$safePostNum"
+}
+
 fun parseSnapshot(htmlPath: String): SnapshotData {
     val doc = Jsoup.parse(File(htmlPath), "UTF-8")
-    val pumCard = doc.selectFirst(".armbandbot-pum-card")
+    val pumCard = doc.selectFirst("#pum_container.cloned_card, .armbandbot-pum-card")
     val pumPreview = parseSnapshotPumPreview(pumCard)
 
     val title = doc.select(".title_subject").text()
@@ -134,7 +160,7 @@ fun parseSnapshot(htmlPath: String): SnapshotData {
     val bodyEl = doc.select(".write_div").first()
     // The source card is rendered separately and must not contaminate outer post text/media.
     val bodyElements = SnapshotBodyParser.parseChildren(bodyEl?.clone()?.also {
-        it.select(".armbandbot-pum-card").remove()
+        it.select("#pum_container.cloned_card, .armbandbot-pum-card").remove()
     })
 
     var lastDepth0Index: Int? = null
@@ -562,14 +588,14 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                             settings.setSupportZoom(true)
                             settings.builtInZoomControls = true
                             settings.displayZoomControls = false
-                            webViewClient = WebViewClient()
+                            settings.javaScriptEnabled = false
+                            webViewClient = object : WebViewClient() {
+                                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
+                                @Suppress("DEPRECATION")
+                                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean = true
+                            }
                             val html = try { File(currentPath).readText() } catch (e: Exception) { "<html><body>파일을 읽을 수 없습니다.</body></html>" }
-                            val fileName = File(currentPath).name
-                            val noSuffix = fileName.removeSuffix("_initial.html").removeSuffix("_latest.html")
-                            val lastUnderscore = noSuffix.lastIndexOf('_')
-                            val extractedGallId = if (lastUnderscore > 0) noSuffix.substring(0, lastUnderscore) else noSuffix
-                            val extractedPostNum = if (lastUnderscore > 0) noSuffix.substring(lastUnderscore + 1) else ""
-                            val baseUrl = "https://gall.dcinside.com/board/view/?id=$extractedGallId&no=$extractedPostNum"
+                            val baseUrl = snapshotWebViewBaseUrl(html, File(currentPath).name)
                             loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
                         }
                     },

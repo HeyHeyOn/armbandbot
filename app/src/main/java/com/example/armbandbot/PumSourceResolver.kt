@@ -200,7 +200,10 @@ class PumSourceResolver(
         val card = PumParser.parseCard(cardResult.text, outerPost?.key, loader.sourceHint)
         if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
         when (card.status) {
-            PumCardStatus.MISSING -> return PumResolution(PumSourceStatus.MISSING)
+            PumCardStatus.MISSING -> return PumResolution(
+                status = PumSourceStatus.MISSING,
+                dynamicCardHtml = cardResult.text,
+            )
             PumCardStatus.INVALID -> return PumResolution(PumSourceStatus.INVALID_SOURCE)
             PumCardStatus.RESOLVED -> Unit
         }
@@ -208,17 +211,19 @@ class PumSourceResolver(
         val sourceUrl = card.sourceUrl ?: return PumResolution(PumSourceStatus.INVALID_SOURCE)
         sourceCache[key]?.let {
             return if (deadline.expired()) {
-                PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
+                PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl, dynamicCardHtml = cardResult.text)
             } else {
-                it
+                it.copy(dynamicCardHtml = cardResult.text)
             }
         }
         val resolved = resolveSource(key, sourceUrl, outerReferer, deadline)
         if (resolved.status != PumSourceStatus.TEMPORARY_FAILURE) {
-            if (deadline.expired()) return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
-            sourceCache[key] = resolved
+            if (deadline.expired()) {
+                return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl, dynamicCardHtml = cardResult.text)
+            }
+            sourceCache[key] = resolved.copy(dynamicCardHtml = null)
         }
-        return resolved
+        return resolved.copy(dynamicCardHtml = cardResult.text)
     }
 
     /** Compatibility entry point for parser/resolver unit callers; production supplies the URL. */

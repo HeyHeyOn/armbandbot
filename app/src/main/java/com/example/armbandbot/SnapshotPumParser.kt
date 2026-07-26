@@ -31,6 +31,9 @@ internal data class BoundedSnapshotBody(
 
 internal fun parseSnapshotPumPreview(card: Element?): SnapshotPumPreview? {
     card ?: return null
+    if (card.id() == "pum_container" && card.hasClass("cloned_card")) {
+        return parseNativeDcPumPreview(card)
+    }
     val status = runCatching {
         PumSourceStatus.valueOf(card.attr("data-status").trim().uppercase(Locale.ROOT))
     }.getOrNull() ?: return null
@@ -65,6 +68,43 @@ internal fun parseSnapshotPumPreview(card: Element?): SnapshotPumPreview? {
         },
         bodyElements = bodyElements,
         bodyTruncated = boundedBody.truncated,
+    )
+}
+
+private fun parseNativeDcPumPreview(card: Element): SnapshotPumPreview? {
+    val sourceAnchor = card.selectFirst(".cloned_card_body > a[href]") ?: return null
+    val rawHref = sourceAnchor.attr("href").trim()
+    val absoluteHref = when {
+        rawHref.startsWith("/") && !rawHref.startsWith("//") -> "https://gall.dcinside.com$rawHref"
+        rawHref.startsWith("//") -> "https:$rawHref"
+        else -> rawHref
+    }
+    val canonical = DcinsidePostUrls.parseSafeCanonicalPostUrl(absoluteHref, null) ?: return null
+
+    val galleryLabel = card.selectFirst("header.gallview_head h3.title")?.clone()?.also {
+        it.select(".blind, .pagehead_titicon").remove()
+    }?.text().orEmpty()
+    val title = sourceAnchor.selectFirst(".cloned_subject h4")?.clone()?.also {
+        it.select("span").remove()
+    }?.text().orEmpty()
+    val writer = card.selectFirst("header.gallview_head .gall_writer")
+    val nickname = writer?.selectFirst(".nickname em")?.text().orEmpty()
+    val identity = writer?.selectFirst(".nickname .ip")?.text().orEmpty()
+    val author = if (identity.isNotBlank()) "$nickname$identity" else nickname
+    val previewText = sourceAnchor.children().firstOrNull { it.tagName() == "p" }?.text().orEmpty()
+    val thumbnailUrl = sourceAnchor.selectFirst(".cloned_media img")
+        ?.let { image -> image.attr("src").ifBlank { image.attr("data-original") }.ifBlank { image.attr("data-src") } }
+        ?.let(::safeSnapshotMediaUrl)
+
+    return SnapshotPumPreview(
+        status = PumSourceStatus.RESOLVED,
+        galleryLabel = galleryLabel,
+        sourceKey = canonical.key,
+        sourceUrl = canonical.url,
+        title = title,
+        author = author,
+        previewText = previewText,
+        thumbnailUrl = thumbnailUrl,
     )
 }
 

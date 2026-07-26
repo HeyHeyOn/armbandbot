@@ -8,6 +8,45 @@ import org.junit.Test
 import java.io.File
 
 class SnapshotViewerTest {
+    private fun fixture(name: String) = javaClass.getResource("/pum/$name")!!.readText()
+
+    @Test
+    fun nativeDcPumCardParsesItsClickableSourceAndDoesNotContaminateOuterBody() {
+        val html = snapshotHtml(
+            outerBody = "<p>바깥 본문</p>",
+            card = "<div id='pum_container' class='cloned_card'>${fixture("2317-card-response.html")}</div>",
+        )
+
+        val parsed = parseSnapshot(writeSnapshot(html).path)
+        val preview = parsed.pumPreview!!
+
+        assertEquals(PumSourceStatus.RESOLVED, preview.status)
+        assertEquals(PostKey("M", "laboratory1", "2315"), preview.sourceKey)
+        assertEquals("https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2315", preview.sourceUrl)
+        assertEquals("실험실", preview.galleryLabel)
+        assertEquals("테스트", preview.title)
+        assertEquals("실갤러(222.104)", preview.author)
+        assertTrue(preview.previewText.contains("А.Ᏼ-С_D"))
+        assertNull(preview.thumbnailUrl)
+        assertTrue(preview.bodyElements.isEmpty())
+        assertEquals(listOf(BodyElement.TextElement("바깥 본문")), parsed.bodyElements)
+    }
+
+    @Test
+    fun webViewBaseUrlUsesValidatedStoredGalleryTypeAndRejectsMaliciousMetadata() {
+        val stored = """<html><head><meta name='armbandbot-base-url' content='https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&amp;no=2317'></head></html>"""
+        val malicious = """<html><head><meta name='armbandbot-base-url' content='https://evil.example/view?id=x&amp;no=1'></head></html>"""
+
+        assertEquals(
+            "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2317",
+            snapshotWebViewBaseUrl(stored, "laboratory1_2317_latest.html"),
+        )
+        assertEquals(
+            "https://gall.dcinside.com/board/view/?id=laboratory1&no=2317",
+            snapshotWebViewBaseUrl(malicious, "laboratory1_2317_latest.html"),
+        )
+    }
+
     @Test
     fun resolvedPumCardParsesMetadataBodyMediaVoiceAndRepresentativeImage() {
         val html = snapshotHtml(

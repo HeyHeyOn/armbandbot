@@ -4,340 +4,174 @@ import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
 class PumSnapshotTest {
+    private fun fixture(name: String) = javaClass.getResource("/pum/$name")!!.readText()
+
     @Test
     fun immediateBlockOnlyReceivesPumResolutionForMatchingPost() {
-        val resolution = resolved(sanitizedHtml = "<p>source</p>")
-        val current = PostKey("MI", "test", "10")
+        val resolution = resolved(fixture("2317-card-response.html"))
+        val current = PostKey("M", "laboratory1", "2317")
 
         assertEquals(resolution, matchingPumResolution(current, current, resolution))
-        assertEquals(null, matchingPumResolution(PostKey("MI", "test", "11"), current, resolution))
+        assertNull(matchingPumResolution(PostKey("M", "laboratory1", "2318"), current, resolution))
     }
 
     @Test
-    fun resolvedCardIsStaticStoredAndDoesNotMutateLiveDocument() {
-        val live = Jsoup.parse("<html><body><article><div class='write_div'><script>loadPum()</script><p>outer</p></div></article></body></html>")
+    fun nativeDcCardResponseIsFrozenAtLoaderPositionWithoutCustomMarkup() {
+        val live = dcPage()
         val before = live.html()
-        val resolution = resolved(
-            sanitizedHtml = """
-                <p onclick='steal()'>source body</p>
-                <!-- private source comment -->
-                <img class='written_dccon' src='//dcimg.example/con.gif' alt='콘'>
-                <img src='https://images.example/a.jpg' onerror='steal()'>
-                <iframe src='https://gall.dcinside.com/voice/player?vr=7'></iframe>
-                <script>alert(1)</script>
-            """.trimIndent(),
-            mediaSources = listOf("https://images.example/a.jpg")
-        )
 
-        val snapshot = PumSnapshot.withStaticCard(live, resolution, checkedAt = "2026-07-25T12:00:00Z")
-        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
+        val snapshot = PumSnapshot.withStaticCard(live, resolved(fixture("2317-card-response.html")))
+        val native = snapshot.selectFirst("#pum_container.cloned_card")!!
 
         assertNotSame(live, snapshot)
         assertEquals(before, live.html())
-        assertEquals("RESOLVED", card.attr("data-status"))
-        assertEquals("MI/test/10", card.attr("data-source-key"))
-        assertEquals("https://gall.dcinside.com/mini/board/view/?id=test&no=10", card.attr("data-source-url"))
-        assertEquals("2026-07-25T12:00:00Z", card.attr("data-checked-at"))
-        assertEquals("abc123", card.attr("data-content-hash"))
-        assertTrue(card.text().contains("펌 원문"))
-        assertTrue(card.text().contains("test 갤러리"))
-        assertTrue(card.text().contains("source title"))
-        assertTrue(card.text().contains("source author"))
-        assertTrue(card.text().contains("source preview"))
-        assertTrue(card.text().contains("source body"))
-        assertEquals(2, card.select("img").size)
-        assertEquals("https://dcimg.example/con.gif", card.selectFirst("img.written_dccon")!!.attr("src"))
-        assertTrue(card.selectFirst(".armbandbot-pum-voice")!!.text().contains("보이스"))
-        assertTrue(card.select("script, form, iframe, object, embed, input").isEmpty())
-        assertFalse(card.html().contains("onclick", true))
-        assertFalse(card.html().contains("onerror", true))
-        assertFalse(card.html().contains("private source comment"))
-        assertFalse(snapshot.html().contains("loadPum()"))
+        assertEquals(1, snapshot.select("#pum_container.cloned_card").size)
+        assertEquals(1, native.select(".cloned_card_body > a[href]").size)
+        assertEquals("/mgallery/board/view/?id=laboratory1&no=2315", native.selectFirst(".cloned_card_body > a")!!.attr("href"))
+        assertTrue(native.selectFirst(".cloned_card_body > a > p")!!.attr("style").contains("-webkit-line-clamp:3"))
+        assertTrue(native.selectFirst("header.gallview_head")!!.text().contains("실험실"))
+        assertTrue(snapshot.select(".armbandbot-pum-card, .armbandbot-snapshot").isEmpty())
+        assertTrue(snapshot.select("script, form, iframe, object, embed").isEmpty())
+        assertEquals(1, snapshot.select("link[rel=stylesheet]").size)
+        assertEquals("overflow:hidden;width:900px", snapshot.selectFirst(".write_div")!!.attr("style"))
+        assertEquals(
+            "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2317",
+            snapshot.selectFirst("meta[name=armbandbot-base-url]")!!.attr("content"),
+        )
+        assertTrue(snapshot.selectFirst(".view_comment")!!.text().contains("댓글창"))
     }
 
     @Test
-    fun dangerousUrlsAndExecutableElementsAreRemoved() {
-        val resolution = resolved(
-            sourceUrl = "javascript:alert(1)",
-            sanitizedHtml = """
-                <a href='javascript:alert(1)'>bad</a>
-                <img src='data:text/html,boom'>
-                <video poster='vbscript:boom'><source src='file:///secret'></video>
-                <form><input autofocus onfocus='steal()'></form><object data='https://evil.test/x'></object>
-            """.trimIndent()
+    fun nativeFreezeIsIdempotentAndReplacesTheExistingDynamicContainer() {
+        val first = PumSnapshot.withStaticCard(dcPage(), resolved(fixture("2317-card-response.html")))
+        val changed = fixture("2317-card-response.html").replace("테스트 А.Ᏼ-С_D", "변경된 카드")
+
+        val second = PumSnapshot.withStaticCard(first, resolved(changed))
+
+        assertEquals(1, second.select("#pum_container.cloned_card").size)
+        assertTrue(second.selectFirst("#pum_container")!!.text().contains("변경된 카드"))
+        assertFalse(second.selectFirst("#pum_container")!!.text().contains("테스트 А.Ᏼ-С_D"))
+        assertTrue(second.select(".armbandbot-pum-card").isEmpty())
+    }
+
+    @Test
+    fun missingCardResponseFreezesTheRecognizedDcResponseWithoutCustomWarning() {
+        val missingHtml = fixture("pum_card_missing.html")
+        val snapshot = PumSnapshot.withStaticCard(
+            dcPage(),
+            PumResolution(PumSourceStatus.MISSING, dynamicCardHtml = missingHtml),
         )
 
-        val card = PumSnapshot.withStaticCard(Jsoup.parse("<div class=write_div>outer</div>"), resolution).selectFirst(".armbandbot-pum-card")!!
-
-        assertFalse(card.hasAttr("data-source-url"))
-        assertTrue(card.select("form, input, object, script, iframe, embed").isEmpty())
-        assertTrue(card.select("[src], [href], [poster]").isEmpty())
-        assertFalse(card.html().contains("onfocus", true))
+        assertTrue(snapshot.select("script").isEmpty())
+        assertEquals(1, snapshot.select("#pum_container.cloned_card").size)
+        assertTrue(snapshot.selectFirst("#pum_container")!!.text().contains("삭제되었거나 존재하지 않는 원문입니다"))
+        assertTrue(snapshot.select(".armbandbot-pum-card").isEmpty())
+        assertTrue(snapshot.selectFirst(".write_div")!!.text().contains("바깥 본문"))
     }
 
     @Test
-    fun adversarialBehaviorIsRemovedFromWholeSnapshotAndSourceCard() {
+    fun cleanupPreservesDcVisualClassesStylesAndStylesheetButRemovesExecutableBehavior() {
         val live = Jsoup.parse("""
             <html><head>
-              <meta http-equiv='refresh' content='0;url=javascript:boom'>
-              <base href='https://evil.test/'><style>.write_div{display:block}</style>
+              <meta charset='utf-8'><meta http-equiv='refresh' content='0;url=https://evil.test'>
+              <base href='https://evil.test/'><style>.write_div{display:block}.cloned_card{border:1px solid #ddd}</style>
               <link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'>
               <link rel='stylesheet' href='https://evil.test/x.css'>
-            </head><body style='background:url(javascript:boom)' onload='boom()'>
-              <svg><animate onbegin='boom()'/><a xlink:href='javascript:boom'>svg</a></svg>
-              <math href='javascript:boom'><mtext>math</mtext></math>
-              <div class='write_div'><img srcset='javascript:boom 1x' background='javascript:boom'></div>
+            </head><body class='dc_body' onload='boom()' style='background:url(javascript:boom)'>
+              <div class='write_div' style='overflow:hidden;width:900px' onclick='boom()'>
+                <a class='safe' href='/mgallery/board/view/?id=laboratory1&amp;no=2315'>원문</a>
+                <a class='bad' href='javascript:boom'>위험</a>
+                <script>boom()</script><form><input autofocus></form><iframe src='https://evil.test/frame'></iframe>
+              </div>
             </body></html>
-        """.trimIndent())
-        val source = resolved(sanitizedHtml = """
-            <p style='color:red' onclick='boom()'>safe text</p>
-            <a href='#safe'>anchor</a><a href='blob:https://evil.test/id' cite='javascript:boom'>bad</a>
-            <img src='http://images.example/safe.jpg' srcset='data:text/html,boom 2x' data-src='file:///secret'>
-            <video poster='https://media.example/poster.jpg'><source src='https://media.example/a.mp4'></video>
-            <form action='https://evil.test/'><input formaction='javascript:boom'></form>
-            <object data='https://evil.test/gadget'></object><svg><script>boom()</script></svg><math>gadget</math>
-        """.trimIndent())
-
-        val snapshot = PumSnapshot.withStaticCard(live, source)
-        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
-
-        assertTrue(snapshot.select("meta, base, svg, math, script, form, iframe, object, embed, input").isEmpty())
-        assertFalse(snapshot.select("style").isEmpty())
-        assertEquals(1, snapshot.select("link[rel=stylesheet]").size)
-        assertTrue(snapshot.selectFirst("link[rel=stylesheet]")!!.attr("href").startsWith("https://nstatic.dcinside.com/"))
-        assertFalse(snapshot.html().contains("evil.test/x.css"))
-        assertTrue(snapshot.select("[style], [srcset], [cite], [background], [xlink\\:href], [action], [formaction], [data]").isEmpty())
-        assertFalse(snapshot.html().contains("javascript:", true))
-        assertFalse(snapshot.html().contains("data:text", true))
-        assertFalse(snapshot.html().contains("file:", true))
-        assertFalse(snapshot.html().contains("blob:", true))
-        assertEquals("#safe", card.selectFirst("a[href]")!!.attr("href"))
-        assertEquals("http://images.example/safe.jpg", card.selectFirst("img")!!.attr("src"))
-        assertEquals("https://media.example/a.mp4", card.selectFirst("source")!!.attr("src"))
-        assertTrue(card.text().contains("safe text"))
-    }
-
-    @Test
-    fun nullResolutionSanitizesOrdinaryPageWhilePreservingApprovedStylesheets() {
-        val live = Jsoup.parse("""
-            <html><head>
-              <meta http-equiv='refresh' content='0;url=https://evil.test'>
-              <base href='https://evil.test/'><style>.write_div{display:block}</style>
-              <link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'>
-              <link rel='stylesheet' href='https://evil.test/x.css'>
-            </head><body onload='boom()'><div class='write_div' style='color:red'>
-              <script>ordinaryLoader()</script><form><input autofocus></form>
-              <iframe src='https://evil.test/frame'></iframe>
-              <a href='javascript:boom' onclick='boom()' srcset='data:text/html,boom'>ordinary</a>
-            </div></body></html>
         """.trimIndent())
 
         val snapshot = PumSnapshot.withStaticCard(live, null)
 
+        assertEquals("dc_body", snapshot.body().className())
+        assertEquals("overflow:hidden;width:900px", snapshot.selectFirst(".write_div")!!.attr("style"))
+        assertEquals("/mgallery/board/view/?id=laboratory1&no=2315", snapshot.selectFirst("a.safe")!!.attr("href"))
+        assertFalse(snapshot.selectFirst("a.bad")!!.hasAttr("href"))
         assertEquals(1, snapshot.select("head style").size)
         assertEquals(1, snapshot.select("link[rel=stylesheet]").size)
-        assertTrue(snapshot.selectFirst("link[rel=stylesheet]")!!.attr("href").startsWith("https://nstatic.dcinside.com/"))
-        assertTrue(snapshot.select("script, meta, base, form, iframe, input").isEmpty())
-        assertTrue(snapshot.select("[style], [onload], [onclick], [srcset], a[href]").isEmpty())
-        assertFalse(snapshot.html().contains("evil.test"))
-        assertTrue(snapshot.text().contains("ordinary"))
-        assertTrue(snapshot.select(".armbandbot-pum-card").isEmpty())
-        assertTrue(live.select("style, link[rel=stylesheet], [style], script").isNotEmpty())
+        assertEquals(1, snapshot.select("meta[charset]").size)
+        assertTrue(snapshot.select("script, base, meta[http-equiv=refresh], form, input, iframe, object, embed").isEmpty())
+        assertTrue(snapshot.select("[onload], [onclick]").isEmpty())
+        assertFalse(snapshot.body().hasAttr("style"))
+        assertFalse(snapshot.html().contains("evil.test/x.css"))
+        assertFalse(snapshot.html().contains("javascript:", ignoreCase = true))
     }
 
     @Test
-    fun compactViewerDocumentKeepsOnlySnapshotEvidenceAndViewerContract() {
-        val live = Jsoup.parse("""
-            <html><head><style>.popup{display:block}</style></head><body>
-              <header class='header'>사이트 헤더</header><aside class='right_content'>잡다한 창</aside>
-              <div id='blockLayer'>팝업 창</div>
-              <article class='gallview_contents'>
-                <div class='gallview_head'>
-                  <h3><span class='title_subject'>바깥 펌 글</span></h3>
-                  <div class='gall_writer' data-nick='작성자' data-uid='outer-id'>작성자</div>
-                  <span class='gall_date' title='2026-07-26 10:00:00'></span>
-                  <span class='gall_count'>조회 12</span>
-                </div>
-                <div class='write_div'><p>바깥 본문</p></div>
-                <div class='view_comment'><div class='comment_wrap show'><div class='comment_box'>
-                  <ul class='cmt_list'><li class='ub-content' id='comment_li_1'><div class='cmt_info'>
-                    <span class='gall_writer' data-nick='댓글러' data-ip='1.2.3.4'></span>
-                    <p class='usertxt'>댓글 본문</p><span class='date_time'>방금</span>
-                  </div></li></ul>
-                </div></div></div>
-              </article>
-              <section class='ad'>광고 창</section>
-            </body></html>
-        """.trimIndent())
-        val withCard = PumSnapshot.withStaticCard(live, resolved(sanitizedHtml = "<p>원문 금지어</p>"))
-
-        val compact = PumSnapshot.compactForViewer(withCard)
-        val file = Files.createTempFile("compact_snapshot", ".html").toFile().apply { writeText(compact.html()) }
-        val parsed = parseSnapshot(file.absolutePath)
-
-        assertEquals("바깥 펌 글", parsed.title)
-        assertEquals("작성자(outer-id)", parsed.author)
-        assertEquals("2026-07-26 10:00:00", parsed.date)
-        assertEquals("12", parsed.viewCount)
-        assertTrue(parsed.bodyElements.any { it is BodyElement.TextElement && it.text.contains("바깥 본문") })
-        assertEquals(PumSourceStatus.RESOLVED, parsed.pumPreview?.status)
-        assertTrue(parsed.pumPreview?.previewText?.contains("source preview") == true)
-        assertEquals(1, parsed.comments.size)
-        assertEquals("댓글 본문", parsed.comments.single().content)
-        assertFalse(compact.text().contains("사이트 헤더"))
-        assertFalse(compact.text().contains("잡다한 창"))
-        assertFalse(compact.text().contains("팝업 창"))
-        assertFalse(compact.text().contains("광고 창"))
-        assertTrue(compact.select("script, iframe, form, nav, aside, #blockLayer").isEmpty())
-        assertEquals(1, compact.select(".write_div").size)
-        assertEquals(1, compact.select(".armbandbot-pum-card").size)
-    }
-
-    @Test
-    fun finalCleanupSanitizesGeneratedCommentsAddedAfterInitialSnapshotPass() {
-        val snapshot = PumSnapshot.withStaticCard(
-            Jsoup.parse("""
-                <html><head><style>.comment_box{display:block}</style>
-                <link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'></head>
-                <body><div class='write_div'>ordinary</div></body></html>
-            """.trimIndent()),
-            null,
-        )
-        snapshot.body().append("""
-            <div class='view_comment' onclick='boom()' style='display:block'>
-              <script>boom()</script><form><input autofocus></form>
-              <iframe src='javascript:boom'></iframe>
-              <a href='javascript:boom' onmouseover='boom()'>comment</a>
-              <img src='data:text/html,boom' onerror='boom()'>
-            </div>
+    fun finalCleanupPreservesGeneratedCommentDisplayStylesAndRemovesHandlers() {
+        val snapshot = PumSnapshot.withStaticCard(dcPage(), null)
+        snapshot.selectFirst(".view_comment")!!.append("""
+            <ul class='cmt_list' style='display:block' onclick='boom()'>
+              <li class='ub-content' style='display:block'><p class='usertxt'>댓글 본문</p><script>boom()</script></li>
+            </ul>
         """.trimIndent())
 
         PumSnapshot.removeExecutableBehavior(snapshot)
 
-        assertTrue(snapshot.select("script, form, input, iframe").isEmpty())
-        assertTrue(snapshot.select("[style], [onclick], [onmouseover], [onerror], a[href], img[src]").isEmpty())
-        assertEquals(1, snapshot.select("head style").size)
-        assertEquals(1, snapshot.select("link[rel=stylesheet]").size)
-        assertTrue(snapshot.text().contains("comment"))
+        assertEquals("display:block", snapshot.selectFirst(".cmt_list")!!.attr("style"))
+        assertEquals("display:block", snapshot.selectFirst(".cmt_list > li")!!.attr("style"))
+        assertTrue(snapshot.select("script, [onclick]").isEmpty())
+        assertTrue(snapshot.text().contains("댓글 본문"))
     }
 
     @Test
-    fun unparsedPumLoaderStoresFailureCardInsteadOfEmptyBody() {
-        val live = Jsoup.parse("""
-            <html><head><style>.write_div{display:block}</style></head><body>
-              <div class='write_div'><script>var u='/ajax/pum_ajax/get_contents'; brokenLoader(u);</script></div>
-            </body></html>
-        """.trimIndent())
-
-        val snapshot = PumSnapshot.withStaticCard(live, null, checkedAt = "2026-07-25T14:00:00Z")
-        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
-
-        assertEquals("INVALID_SOURCE", card.attr("data-status"))
-        assertTrue(card.text().contains("원문을 불러오지 못했습니다"))
-        assertTrue(snapshot.select("script").isEmpty())
-        assertFalse(snapshot.select("style").isEmpty())
-    }
-
-    @Test
-    fun escapedRealPumLoaderStillStoresFailureCardWhenResolutionIsUnavailable() {
-        val live = Jsoup.parse("""
-            <html><head><style>.write_div{display:block}</style></head><body>
-              <div class='gallview_head ub-content'><h3 class='title ub-word'>
-                <span class='title_subject'>ㅍ 테스트</span><b class='font_blue009'>(펌)</b>
-              </h3></div>
-              <div class='write_div'><script>
-                var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
-                var data={"ci_t":null,"_GALLTYPE_":"","id":"laboratory1","no":2315};
-                ${'$'}.ajax({url:u,type:"POST",data:data});
-              </script></div>
-            </body></html>
-        """.trimIndent())
-
-        val snapshot = PumSnapshot.withStaticCard(live, null, checkedAt = "2026-07-26T00:00:00Z")
-        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
-
-        assertEquals("INVALID_SOURCE", card.attr("data-status"))
-        assertTrue(card.text().contains("원문을 불러오지 못했습니다"))
-        assertTrue(snapshot.select("script").isEmpty())
-    }
-
-    @Test
-    fun unresolvedCardStoresAvailableMetadataAndWarning() {
-        val resolution = PumResolution(
-            status = PumSourceStatus.TEMPORARY_FAILURE,
-            sourceKey = PostKey("M", "warn", "77"),
-            sourceUrl = "https://gall.dcinside.com/mgallery/board/view/?id=warn&no=77"
-        )
-
-        val card = PumSnapshot.withStaticCard(
-            Jsoup.parse("<div class=write_div>outer</div>"),
-            resolution,
-            checkedAt = "2026-07-25T13:00:00Z"
-        ).selectFirst(".armbandbot-pum-card")!!
-
-        assertEquals("TEMPORARY_FAILURE", card.attr("data-status"))
-        assertEquals("M/warn/77", card.attr("data-source-key"))
-        assertEquals("2026-07-25T13:00:00Z", card.attr("data-checked-at"))
-        assertTrue(card.text().contains("원문을 불러오지 못했습니다"))
-        assertTrue(card.select("script, iframe").isEmpty())
-    }
-
-    @Test
-    fun initialAndLatestKeepIndependentPumSourceVersionsAndBlockCardIsStatic() {
-        val root = Files.createTempDirectory("pum_snapshot_versions").toFile()
+    fun initialAndLatestKeepIndependentNativeDcCardVersions() {
+        val root = Files.createTempDirectory("pum_native_snapshot_versions").toFile()
         val dir = File(root, "snapshots_bot").apply { mkdirs() }
-        val initial = File(dir, "test_10_initial.html")
-        val latest = File(dir, "test_10_latest.html")
-        val live = Jsoup.parse("<div class='write_div'><script>loader()</script>outer</div>")
-        val sourceA = resolved(sanitizedHtml = "<p>source A</p>")
-        val sourceB = resolved(sanitizedHtml = "<p>source B</p>")
+        val initial = File(dir, "laboratory1_2317_initial.html")
+        val latest = File(dir, "laboratory1_2317_latest.html")
+        val cardA = fixture("2317-card-response.html").replace("테스트 А.Ᏼ-С_D", "카드 A")
+        val cardB = fixture("2317-card-response.html").replace("테스트 А.Ᏼ-С_D", "카드 B")
 
         val initialPath = saveGeneralSnapshotPreservingExistingInitial(
-            initial, latest, null, PumSnapshot.withStaticCard(live, sourceA).html(), listOf(root)
+            initial, latest, null, PumSnapshot.withStaticCard(dcPage(), resolved(cardA)).html(), listOf(root)
         )
         val baselineBytes = initial.readBytes()
         val preservedPath = saveGeneralSnapshotPreservingExistingInitial(
-            initial, latest, initialPath, PumSnapshot.withStaticCard(live, sourceB).html(), listOf(root)
+            initial, latest, initialPath, PumSnapshot.withStaticCard(dcPage(), resolved(cardB)).html(), listOf(root)
         )
-        val blockedHtml = PumSnapshot.withStaticCard(live, sourceB).html()
 
         assertEquals(initial.canonicalPath, preservedPath)
         assertTrue(baselineBytes.contentEquals(initial.readBytes()))
-        assertTrue(Jsoup.parse(initial.readText()).selectFirst(".armbandbot-pum-body")!!.text().contains("source A"))
-        assertTrue(Jsoup.parse(latest.readText()).selectFirst(".armbandbot-pum-body")!!.text().contains("source B"))
-        assertTrue(Jsoup.parse(blockedHtml).selectFirst(".armbandbot-pum-card")!!.text().contains("source B"))
-        assertFalse(blockedHtml.contains("loader()"))
+        assertTrue(Jsoup.parse(initial.readText()).selectFirst("#pum_container")!!.text().contains("카드 A"))
+        assertTrue(Jsoup.parse(latest.readText()).selectFirst("#pum_container")!!.text().contains("카드 B"))
+        assertTrue(Jsoup.parse(latest.readText()).select(".armbandbot-pum-card, .armbandbot-snapshot").isEmpty())
         root.deleteRecursively()
     }
 
-    @Test
-    fun nullResolutionKeepsOrdinarySnapshotContentApartFromSafetyCleanup() {
-        val live = Jsoup.parse("<html><body><div class='write_div'><p>ordinary</p></div></body></html>")
-        val snapshot = PumSnapshot.withStaticCard(live, null)
+    private fun dcPage() = Jsoup.parse("""
+        <html><head>
+          <meta charset='utf-8'>
+          <link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'>
+        </head><body><article class='gallview_contents'><div class='view_content_wrap'>
+          <div class='gallview_head'><h3><span class='title_subject'>펌 테스트2</span><b class='font_blue009'>(펌)</b></h3></div>
+          <div class='write_div' style='overflow:hidden;width:900px'>
+            <p>바깥 본문</p><div id='pum_card'></div><script>${fixture("2317-outer-loader.js")}</script>
+          </div>
+          <div class='view_comment' id='focus_cmt'>댓글창</div>
+        </div></article></body></html>
+    """.trimIndent(), "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2317")
 
-        assertEquals(live.text(), snapshot.text())
-        assertTrue(snapshot.select(".armbandbot-pum-card").isEmpty())
-    }
-
-    private fun resolved(
-        sourceUrl: String = "https://gall.dcinside.com/mini/board/view/?id=test&no=10",
-        sanitizedHtml: String,
-        mediaSources: List<String> = emptyList()
-    ) = PumResolution(
+    private fun resolved(cardHtml: String) = PumResolution(
         status = PumSourceStatus.RESOLVED,
-        sourceKey = PostKey("MI", "test", "10"),
-        sourceUrl = sourceUrl,
-        title = "source title",
-        bodyText = "source preview",
-        sanitizedHtml = sanitizedHtml,
-        mediaSources = mediaSources,
+        sourceKey = PostKey("M", "laboratory1", "2315"),
+        sourceUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2315",
+        title = "테스트",
+        bodyText = "테스트 А.Ᏼ-С_D",
+        sanitizedHtml = "<p>테스트 А.Ᏼ-С_D</p>",
         contentHash = "abc123",
-        author = "source author"
+        dynamicCardHtml = cardHtml,
     )
 }
