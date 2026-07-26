@@ -67,6 +67,41 @@ class PumSourceResolverTest {
         assertEquals("https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345", http.requests[1].url)
     }
 
+    @Test fun `real escaped iife loader resolves laboratory repost to exact source detail`() {
+        val liveOuterUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2316"
+        val live = Jsoup.parse("""
+            <div class='gallview_head ub-content'><h3 class='title ub-word'>
+              <span class='title_subject'>ㅍ 테스트</span><b class='font_blue009'>(펌)</b>
+            </h3></div>
+            <div class='write_div'><script>(function(I){
+              var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+              var data={"ci_t":null,"_GALLTYPE_":"","id":"laboratory1","no":2315};
+              ${'$'}.ajax({url:u,type:"POST",data:data,dataType:"html"});
+            })("pum_container");</script></div>
+        """.trimIndent(), liveOuterUrl)
+        val liveCard = """
+            <header class='gallview_head'>
+              <a href='/mgallery/board/lists/?id=laboratory1'>실험실</a>
+              <a href='/mgallery/board/view/?id=laboratory1&amp;no=2315#comment_wrap_2315'>댓글 0</a>
+            </header>
+            <div class='cloned_card_body'>
+              <a href='/mgallery/board/view/?id=laboratory1&amp;no=2315'>
+                <div class='cloned_subject'><h4>테스트</h4></div><p>원문 미리보기</p>
+              </a>
+            </div>
+        """.trimIndent()
+        val http = FakeClient().apply { body(liveCard); body(fixture("source_detail.html")) }
+
+        val result = PumSourceResolver(http).resolve(live, liveOuterUrl)
+
+        assertEquals(PumSourceStatus.RESOLVED, result.status)
+        assertEquals("laboratory1", http.requests[0].formData["id"])
+        assertEquals("2315", http.requests[0].formData["no"])
+        assertEquals(liveOuterUrl, http.requests[0].headers["Referer"])
+        assertEquals("https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2315", http.requests[1].url)
+        assertEquals(liveOuterUrl, http.requests[1].headers["Referer"])
+    }
+
     @Test fun `outer repost is the fixed referer for card source and redirects`() {
         val sourceUrl = "https://gall.dcinside.com/mini/board/view/?id=tinygallery&no=12345"
         val http = FakeClient().apply {

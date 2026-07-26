@@ -26,7 +26,15 @@ object PumParser {
         }
     }
 
-    fun parseDetail(document: Document, listMarker: Boolean = hasListMarker(document)): PumDetection {
+    /** Detail pages expose the same exact marker as a direct child of the scoped title. */
+    fun hasDetailMarker(document: Document): Boolean =
+        document.select(".gallview_head h3.title > span.font_blue009, .gallview_head h3.title > b.font_blue009")
+            .any { it.text() == "(펌)" }
+
+    fun parseDetail(
+        document: Document,
+        listMarker: Boolean = hasListMarker(document) || hasDetailMarker(document),
+    ): PumDetection {
         val loader = document.select(".write_div script").asSequence().mapNotNull(::parseLoader).firstOrNull()
         val status = when {
             listMarker && loader != null -> PumDetectionStatus.PUM_CONFIRMED
@@ -71,8 +79,20 @@ object PumParser {
 
     private fun parseLoader(script: Element): PumLoaderRequest? {
         val code = script.data().ifBlank { script.html() }
+        if (!isLexicallyWellFormed(code)) return null
+        return (listOf(code) + immediatelyInvokedFunctionBodies(code))
+            .asSequence()
+            .mapNotNull(::parseLoaderCode)
+            .firstOrNull()
+    }
+
+    private fun parseLoaderCode(code: String): PumLoaderRequest? {
         for ((ajaxStart, openParen) in ajaxCalls(code)) {
+            if (!isTopLevelAjaxStatement(code, ajaxStart)) continue
             val closeParen = matchingDelimiter(code, openParen, '(', ')') ?: continue
+            var afterCall = skipTrivia(code, closeParen + 1, code.length)
+            if (code.getOrNull(afterCall) == ';') afterCall = skipTrivia(code, afterCall + 1, code.length)
+            if (afterCall != code.length) continue
             val optionsOpen = skipTrivia(code, openParen + 1, closeParen)
             if (code.getOrNull(optionsOpen) != '{') continue
             val optionsClose = matchingDelimiter(code, optionsOpen, '{', '}') ?: continue
@@ -114,6 +134,77 @@ object PumParser {
     private data class JsProperty(val key: String, val valueStart: Int, val valueEnd: Int)
     private data class JsExpression(val start: Int, val end: Int)
 
+    /** Extracts only anonymous `(function(...) { ... })(...)` bodies used by DC's live loader. */
+    private fun immediatelyInvokedFunctionBodies(code: String): List<String> {
+        val bodies = mutableListOf<String>()
+        val roundOpens = mutableListOf<Int>()
+        var i = 0
+        var statementStart = 0
+        var braceDepth = 0
+        var squareDepth = 0
+        while (i < code.length) {
+            i = skipTrivia(code, i, code.length)
+            val current = code.getOrNull(i) ?: break
+            if (current == '\'' || current == '"' || current == '`') {
+                i = stringEnd(code, i) ?: return emptyList()
+                continue
+            }
+            if (!isIdentifierStart(current)) {
+                when (current) {
+                    '{' -> braceDepth++
+                    '}' -> if (--braceDepth < 0) return emptyList()
+                    '(' -> roundOpens += i
+                    ')' -> if (roundOpens.isEmpty()) return emptyList() else roundOpens.removeAt(roundOpens.lastIndex)
+                    '[' -> squareDepth++
+                    ']' -> if (--squareDepth < 0) return emptyList()
+                    ';' -> if (braceDepth == 0 && roundOpens.isEmpty() && squareDepth == 0) statementStart = i + 1
+                }
+                i++
+                continue
+            }
+            val identifierEnd = identifierEnd(code, i)
+            if (code.substring(i, identifierEnd) != "function") {
+                i = identifierEnd
+                continue
+            }
+            val wrapperOpen = roundOpens.singleOrNull()
+            val parametersOpen = skipTrivia(code, identifierEnd, code.length)
+            if (braceDepth != 0 || squareDepth != 0 || wrapperOpen == null ||
+                skipTrivia(code, 0, wrapperOpen) != wrapperOpen ||
+                skipTrivia(code, wrapperOpen + 1, i) != i || code.getOrNull(parametersOpen) != '(') {
+                i = identifierEnd
+                continue
+            }
+            val parametersClose = matchingDelimiter(code, parametersOpen, '(', ')') ?: return emptyList()
+            val bodyOpen = skipTrivia(code, parametersClose + 1, code.length)
+            if (code.getOrNull(bodyOpen) != '{') {
+                i = parametersClose + 1
+                continue
+            }
+            val bodyClose = matchingDelimiter(code, bodyOpen, '{', '}') ?: return emptyList()
+            val wrapperClose = skipTrivia(code, bodyClose + 1, code.length)
+            val invocationOpen = skipTrivia(code, wrapperClose + 1, code.length)
+            val invocationClose = if (code.getOrNull(invocationOpen) == '(') {
+                matchingDelimiter(code, invocationOpen, '(', ')')
+            } else null
+            if (code.getOrNull(wrapperClose) != ')' || invocationClose == null) {
+                i = bodyClose + 1
+                continue
+            }
+            var afterInvocation = skipTrivia(code, invocationClose + 1, code.length)
+            if (code.getOrNull(afterInvocation) == ';') {
+                afterInvocation = skipTrivia(code, afterInvocation + 1, code.length)
+            }
+            if (afterInvocation != code.length) {
+                i = bodyClose + 1
+                continue
+            }
+            bodies += code.substring(bodyOpen + 1, bodyClose)
+            i = bodyClose + 1
+        }
+        return bodies.takeIf { braceDepth == 0 && squareDepth == 0 && roundOpens.isEmpty() }.orEmpty()
+    }
+
     /** Finds executable ajax(...) calls, skipping comments and all JS string literal forms. */
     private fun ajaxCalls(code: String): List<Pair<Int, Int>> {
         val calls = mutableListOf<Pair<Int, Int>>()
@@ -135,6 +226,75 @@ object PumParser {
             } else i++
         }
         return calls
+    }
+
+    /** Allows only a standalone top-level `ajax(...)` or `$.ajax(...)` statement. */
+    private fun isTopLevelAjaxStatement(code: String, ajaxStart: Int): Boolean {
+        var braceDepth = 0
+        var roundDepth = 0
+        var squareDepth = 0
+        var statementStart = 0
+        var i = 0
+        while (i < ajaxStart) {
+            i = skipTrivia(code, i, ajaxStart)
+            if (i >= ajaxStart) break
+            when (code[i]) {
+                '\'', '"', '`' -> {
+                    i = stringEnd(code, i) ?: return false
+                    continue
+                }
+                '{' -> braceDepth++
+                '}' -> if (--braceDepth < 0) return false
+                '(' -> roundDepth++
+                ')' -> if (--roundDepth < 0) return false
+                '[' -> squareDepth++
+                ']' -> if (--squareDepth < 0) return false
+                ';' -> if (braceDepth == 0 && roundDepth == 0 && squareDepth == 0) statementStart = i + 1
+            }
+            i++
+        }
+        if (braceDepth != 0 || roundDepth != 0 || squareDepth != 0) return false
+
+        val start = skipTrivia(code, statementStart, ajaxStart)
+        if (start == ajaxStart) return true
+        if (code.getOrNull(start) != '$') return false
+        val dot = skipTrivia(code, start + 1, ajaxStart)
+        return code.getOrNull(dot) == '.' && skipTrivia(code, dot + 1, ajaxStart) == ajaxStart
+    }
+
+    /** Rejects a valid-looking loader prefix inside a syntactically truncated script. */
+    private fun isLexicallyWellFormed(code: String): Boolean {
+        val expectedClosers = mutableListOf<Char>()
+        var i = 0
+        while (i < code.length) {
+            if (code[i] == '*' && code.getOrNull(i + 1) == '/') return false
+            if (code[i] == '/' && code.getOrNull(i + 1) == '/') {
+                i += 2
+                while (i < code.length && code[i] != '\n' && code[i] != '\r') i++
+                continue
+            }
+            if (code[i] == '/' && code.getOrNull(i + 1) == '*') {
+                val end = code.indexOf("*/", i + 2)
+                if (end < 0) return false
+                i = end + 2
+                continue
+            }
+            if (code[i] == '\'' || code[i] == '"' || code[i] == '`') {
+                i = stringEnd(code, i) ?: return false
+                continue
+            }
+            when (code[i]) {
+                '(' -> expectedClosers += ')'
+                '{' -> expectedClosers += '}'
+                '[' -> expectedClosers += ']'
+                ')', '}', ']' -> {
+                    if (expectedClosers.lastOrNull() != code[i]) return false
+                    expectedClosers.removeAt(expectedClosers.lastIndex)
+                }
+            }
+            i++
+        }
+        return expectedClosers.isEmpty()
     }
 
     private fun topLevelAssignments(code: String, limit: Int): Map<String, JsExpression>? {
@@ -321,8 +481,48 @@ object PumParser {
         if (code.getOrNull(at) !in setOf('\'', '"')) return null
         val after = stringEnd(code, at) ?: return null
         if (skipTrivia(code, after, end) != end) return null
-        return code.substring(at + 1, after - 1)
+        return decodeJavascriptString(code.substring(at + 1, after - 1))
     }
+
+    /** Decodes literal escapes only; arbitrary JavaScript expressions are never evaluated. */
+    private fun decodeJavascriptString(raw: String): String? {
+        val decoded = StringBuilder(raw.length)
+        var i = 0
+        while (i < raw.length) {
+            val current = raw[i++]
+            if (current != '\\') {
+                decoded.append(current)
+                continue
+            }
+            val escaped = raw.getOrNull(i++) ?: return null
+            when (escaped) {
+                '\\', '/', '\'', '"' -> decoded.append(escaped)
+                'b' -> decoded.append('\b')
+                'f' -> decoded.append('\u000C')
+                'n' -> decoded.append('\n')
+                'r' -> decoded.append('\r')
+                't' -> decoded.append('\t')
+                'v' -> decoded.append('\u000B')
+                '\n' -> Unit
+                '\r' -> if (raw.getOrNull(i) == '\n') i++
+                'x' -> {
+                    val hex = raw.substringOrNull(i, i + 2) ?: return null
+                    decoded.append(hex.toIntOrNull(16)?.toChar() ?: return null)
+                    i += 2
+                }
+                'u' -> {
+                    val hex = raw.substringOrNull(i, i + 4) ?: return null
+                    decoded.append(hex.toIntOrNull(16)?.toChar() ?: return null)
+                    i += 4
+                }
+                else -> return null
+            }
+        }
+        return decoded.toString()
+    }
+
+    private fun String.substringOrNull(start: Int, end: Int): String? =
+        takeIf { start >= 0 && end >= start && end <= length }?.substring(start, end)
 
     private fun identifierValue(code: String, start: Int, end: Int): String? {
         val at = skipTrivia(code, start, end)

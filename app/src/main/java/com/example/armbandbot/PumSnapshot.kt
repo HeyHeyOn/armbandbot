@@ -130,11 +130,13 @@ object PumSnapshot {
         }
     }
 
-    private fun hasUnparsedPumLoader(document: Document): Boolean =
-        document.select(".write_div script").any {
+    private fun hasUnparsedPumLoader(document: Document): Boolean {
+        if (PumParser.parseDetail(document).status != PumDetectionStatus.NOT_PUM) return true
+        return document.select(".write_div script").any {
             val code = it.data().ifBlank { it.html() }
-            code.contains("/ajax/pum_ajax/get_contents")
+            code.replace("\\/", "/").contains("/ajax/pum_ajax/get_contents")
         }
+    }
 
     private fun isSafeStylesheet(link: Element): Boolean {
         if (!link.attr("rel").split(Regex("\\s+")).any { it.equals("stylesheet", true) }) return false

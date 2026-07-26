@@ -197,6 +197,29 @@ class PumSnapshotTest {
     }
 
     @Test
+    fun escapedRealPumLoaderStillStoresFailureCardWhenResolutionIsUnavailable() {
+        val live = Jsoup.parse("""
+            <html><head><style>.write_div{display:block}</style></head><body>
+              <div class='gallview_head ub-content'><h3 class='title ub-word'>
+                <span class='title_subject'>ㅍ 테스트</span><b class='font_blue009'>(펌)</b>
+              </h3></div>
+              <div class='write_div'><script>
+                var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+                var data={"ci_t":null,"_GALLTYPE_":"","id":"laboratory1","no":2315};
+                ${'$'}.ajax({url:u,type:"POST",data:data});
+              </script></div>
+            </body></html>
+        """.trimIndent())
+
+        val snapshot = PumSnapshot.withStaticCard(live, null, checkedAt = "2026-07-26T00:00:00Z")
+        val card = snapshot.selectFirst(".armbandbot-pum-card")!!
+
+        assertEquals("INVALID_SOURCE", card.attr("data-status"))
+        assertTrue(card.text().contains("원문을 불러오지 못했습니다"))
+        assertTrue(snapshot.select("script").isEmpty())
+    }
+
+    @Test
     fun unresolvedCardStoresAvailableMetadataAndWarning() {
         val resolution = PumResolution(
             status = PumSourceStatus.TEMPORARY_FAILURE,

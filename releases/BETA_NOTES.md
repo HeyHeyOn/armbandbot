@@ -1,3 +1,39 @@
+# 완장봇 1.5.0-beta4
+
+## 1.5.0-beta4 배포 완료
+
+### 수정 사항
+- 실제 DCInside 펌 로더가 익명 즉시실행 함수(IIFE) 안에서 동작하는 형식을 정적으로 해석합니다.
+- `https:\/\/...`처럼 JavaScript에서 슬래시를 이스케이프한 로더 URL을 안전하게 복원한 뒤, 기존의 정확한 HTTPS 호스트·경로 검증을 그대로 적용합니다.
+- 상세 페이지 제목의 구조적 `(펌)` 표식을 인식해 목록 표식이 전달되지 않은 경우에도 펌 글을 놓치지 않습니다.
+- 원문 로더 해석에 실패하면 스냅샷에 빈 본문 대신 명시적인 실패 카드를 남깁니다.
+- 호출되지 않은 함수나 조건부 블록 안의 IIFE는 실행 가능한 로더로 취급하지 않습니다.
+
+### 실제 사례 검증
+- 첨부 스냅샷의 바깥 글 `laboratory1/2316`을 기준으로 실제 카드 API 응답을 확인했습니다.
+- 원문 후보는 `laboratory1/2315`로 확인했으며, 갤러리 목록·댓글 앵커 링크를 제외하고 카드 본문의 직접 원문 링크만 선택합니다.
+- JavaScript는 실행하지 않고 제한된 문자열·객체 리터럴만 정적으로 해석합니다.
+
+### 검증
+- debug/release 단위 테스트 각각 199개 통과
+- `lintDebug` 오류 0
+- `assembleRelease` 및 APK v2 서명 검증 통과
+- DEX `invoke-*/range` 최대 입력 `246/255` — 여유 9워드
+- 독립 보안·정확성 리뷰 승인
+- Room DB 버전 8 유지, 마이그레이션 없음
+
+### 배포 정보
+- versionName: `1.5.0`
+- versionCode: `153`
+- APK: `완장봇_v1.5.0-beta4.apk`
+- 크기: `12,912,334 bytes`
+- SHA-256: `904f27e58df20fe2159cf288e6945e5e70b4e0f4ab30b84e1d5fd31f6085d525`
+- Drive 파일 ID: `1rJAZuhxhsuk-8aiy5eeP1iu8tJ0i5miv`
+- Drive 링크: https://drive.google.com/file/d/1rJAZuhxhsuk-8aiy5eeP1iu8tJ0i5miv/view?usp=drivesdk
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
+---
+
 # 완장봇 1.5.0-beta3
 
 ## 1.5.0-beta3 배포 완료

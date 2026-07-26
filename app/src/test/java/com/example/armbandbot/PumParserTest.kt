@@ -86,6 +86,103 @@ class PumParserTest {
         assertEquals("2315", loader?.formData?.get("no"))
     }
 
+    @Test fun `real detail loader decodes escaped slashes and uses the detail title marker`() {
+        val html = """<html><body>
+            <div class='gallview_head ub-content'>
+              <h3 class='title ub-word'><span class='title_subject'>ㅍ 테스트</span><b class='font_blue009'>(펌)</b></h3>
+            </div>
+            <div class='write_div'><script>
+              (function(I){
+                var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+                var data={"ci_t":null,"_GALLTYPE_":"","id":"laboratory1","no":2315};
+                ${'$'}.ajax({url:u,type:"POST",data:data,dataType:"html"});
+              })("pum_container");
+            </script></div>
+        </body></html>""".trimIndent()
+
+        val detection = PumParser.parseDetail(Jsoup.parse(html))
+
+        assertEquals(PumDetectionStatus.PUM_CONFIRMED, detection.status)
+        assertEquals("https://gall.dcinside.com/ajax/pum_ajax/get_contents", detection.loader?.endpoint)
+        assertEquals("laboratory1", detection.loader?.sourceHint?.gallId)
+        assertEquals("2315", detection.loader?.sourceHint?.postNo)
+    }
+
+    @Test fun `non invoked and unreachable function loaders remain non executable`() {
+        val cases = listOf(
+            """function decoy() {
+              var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+              var data={id:'direct_decoy',no:999};
+              ${'$'}.ajax({url:u,data:data});
+            }""",
+            """function decoy() {
+              (function() {
+                var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+                var data={id:'nested_decoy',no:998};
+                ${'$'}.ajax({url:u,data:data});
+              })();
+            }""",
+            """if (false) {
+              (function() {
+                var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+                var data={id:'conditional_decoy',no:997};
+                ${'$'}.ajax({url:u,data:data});
+              })();
+            }""",
+            """if (false) (function() {
+              var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+              var data={id:'unbraced_decoy',no:996};
+              ${'$'}.ajax({url:u,data:data});
+            })();""",
+            """if (false) ${'$'}.ajax({
+              url:"https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents",
+              data:{id:'direct_conditional_decoy',no:995}
+            });""",
+        )
+
+        cases.forEach { code ->
+            val html = "<div class='write_div'><script>$code</script></div>"
+            assertNull(code, PumParser.parseDetail(Jsoup.parse(html), false).loader)
+        }
+    }
+
+    @Test fun `iife loader fails closed when the surrounding script is malformed`() {
+        val valid = """(function() {
+            var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+            var data={id:'laboratory1',no:2315};
+            ${'$'}.ajax({url:u,data:data});
+        })();""".trimIndent()
+
+        listOf("$valid {", "$valid }", "$valid \"", "$valid /*", "$valid var = ;").forEach { malformed ->
+            val html = "<div class='write_div'><script>$malformed</script></div>"
+            assertNull(malformed, PumParser.parseDetail(Jsoup.parse(html), false).loader)
+        }
+    }
+
+    @Test fun `top level loader rejects surrounding invalid statements`() {
+        val valid = """var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+            var data={id:'laboratory1',no:2315};
+            ${'$'}.ajax({url:u,data:data});
+        """.trimIndent()
+
+        listOf("$valid var = ;", "*/; $valid").forEach { code ->
+            val html = "<div class='write_div'><script>$code</script></div>"
+            assertNull(code, PumParser.parseDetail(Jsoup.parse(html), false).loader)
+        }
+    }
+
+    @Test fun `top level iife allows block comment between wrapper and function`() {
+        val html = """<div class='write_div'><script>
+            ( /* DC wrapper comment */ function() {
+              var u="https:\/\/gall.dcinside.com\/ajax\/pum_ajax\/get_contents";
+              var data={id:'laboratory1',no:2315};
+              ${'$'}.ajax({url:u,data:data});
+            })();
+        </script></div>""".trimIndent()
+
+        assertEquals("2315", PumParser.parseDetail(Jsoup.parse(html), false).loader?.sourceHint?.postNo)
+    }
+
     @Test fun `loader variables only resolve from executable top level assignments`() {
         val html = """<div class='write_div'><script>
             var gall_id = 'real_gallery'; var gall_no = '42'; var gall_type = 'M';
