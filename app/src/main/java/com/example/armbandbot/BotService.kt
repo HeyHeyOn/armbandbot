@@ -156,6 +156,7 @@ class BotService : Service() {
         val voiceBlacklist: List<String>,
 
         val isPumSourceFilterMode: Boolean,
+        val pumBlockAllPosts: Boolean,
         val pumRecheckEveryCycle: Boolean,
 
         val isAiFilterMode: Boolean,
@@ -204,6 +205,7 @@ class BotService : Service() {
         IMAGE,
         DCCON,
         VOICE,
+        PUM,
         AI,
         UNKNOWN
     }
@@ -1480,11 +1482,40 @@ class BotService : Service() {
                     savedTitle = savedTitle,
                     currentTitle = text,
                     isPumSourceFilterMode = config.isPumSourceFilterMode,
+                    pumBlockAllPosts = config.pumBlockAllPosts,
                     pumRecheckEveryCycle = config.pumRecheckEveryCycle,
                     hasPumListMarker = hasPumListMarker,
                     snapshotBackfillRequired = snapshotBackfillRequired,
                 )) {
                 if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
+                continue
+            }
+            val rowUnchanged = savedPost != null &&
+                savedCommentCount == currentCommentCount &&
+                savedTitle?.trim().orEmpty() == text.trim() &&
+                !snapshotBackfillRequired
+            val pumBlockAllAction = if (config.isPumSourceFilterMode && config.pumBlockAllPosts && hasPumListMarker) {
+                val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                resolveModerationActionConfig(
+                    baseConfig = resolveDefaultModerationActionConfig(config),
+                    override = loadModerationActionOverride(prefs, "pum"),
+                    sourceLabel = "pum_override",
+                )
+            } else {
+                null
+            }
+            if (shouldSkipPumHoldPreflight(
+                    isPumSourceFilterMode = config.isPumSourceFilterMode,
+                    pumBlockAllPosts = config.pumBlockAllPosts,
+                    hasPumListMarker = hasPumListMarker,
+                    rowUnchanged = rowUnchanged,
+                    effectiveActionIsHold = pumBlockAllAction?.mode == ModerationActionMode.HOLD,
+                    alreadyHeld = pumBlockAllAction?.mode == ModerationActionMode.HOLD &&
+                        GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
+                )) {
+                if (config.isDebugMode) {
+                    sendLog("[디버그][PUM][보류중복] 변경 없는 펌 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
+                }
                 continue
             }
             if (config.isDebugMode) {
@@ -1495,6 +1526,7 @@ class BotService : Service() {
                     savedCommentCount != currentCommentCount -> "댓글 수 변경"
                     titleChanged -> "제목 변경"
                     snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
+                    config.isPumSourceFilterMode && config.pumBlockAllPosts && hasPumListMarker -> "펌 게시글 모두 차단 확인"
                     config.isPumSourceFilterMode && config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
                     else -> "변경 감지"
                 }
@@ -2296,42 +2328,50 @@ img.written_dccon{max-width:80px;max-height:80px}
         val postKey = PostKey(gallType = gallType, gallId = gallId, postNo = postNumStr)
         val legacyPostText = "$text $contentText"
         val shouldInspectPum = config.isPumSourceFilterMode || config.isExpertMode
-        val pumDetection = if (shouldInspectPum) PumParser.parseDetail(postDoc) else null
-        val snapshotPumResolution = if (pumDetection?.isPum == true) {
-            runCatching {
-                checkNotNull(pumSourceResolver) { "PUM resolver missing for snapshot/filter scan cycle" }
-                    .resolve(postDoc, pcPostDetailUrl)
-            }.getOrElse {
-                PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
+        val pumParse = parsePumStructure(
+            shouldInspect = shouldInspectPum,
+            parse = { PumParser.parseDetail(postDoc) },
+            onFailure = { logPumParseFailure(botId, postKey) },
+        )
+        val pumDetection = pumParse.detection
+        val suppressPumSourceForBlockAll = config.isPumSourceFilterMode &&
+            config.pumBlockAllPosts &&
+            pumParse.structuralState == PumStructuralState.DETECTED
+        var pumResolutionAttempted = false
+        var cachedPumResolution: PumResolution? = null
+        fun resolvePumSourceOnce(): PumResolution? {
+            if (pumDetection?.isPum != true) return null
+            if (!pumResolutionAttempted) {
+                pumResolutionAttempted = true
+                cachedPumResolution = runCatching {
+                    checkNotNull(pumSourceResolver) { "PUM resolver missing for snapshot/filter scan cycle" }
+                        .resolve(postDoc, pcPostDetailUrl)
+                }.getOrElse {
+                    PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
+                }
+                cachedPumResolution
+                    ?.takeIf { it.status != PumSourceStatus.RESOLVED }
+                    ?.let { resolution -> logPumResolutionFailure(botId, postKey, resolution.status) }
             }
-        } else {
-            null
+            return cachedPumResolution
         }
-        val pumModeration = if (config.isPumSourceFilterMode) {
-            PumModerationContent.resolve(
+        fun buildPumModeration(resolveSource: Boolean): PumModerationContent {
+            if (!config.isPumSourceFilterMode || pumDetection?.isPum != true || !resolveSource) {
+                return PumModerationContent(postKey, legacyPostText)
+            }
+            return PumModerationContent.resolve(
                 enabled = true,
-                detection = checkNotNull(pumDetection),
+                detection = pumDetection,
                 originalPostKey = postKey,
                 originalContent = legacyPostText,
+                originalImageAlts = postImageAlts,
+                originalRawHtml = postRawHtml,
+                originalMediaSources = postImageAlts,
             ) {
-                snapshotPumResolution ?: PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
+                resolvePumSourceOnce() ?: PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
             }
-        } else {
-            // Keep moderation content strictly legacy while the source-filter option is disabled.
-            PumModerationContent(
-                targetPostKey = postKey,
-                moderationContent = legacyPostText,
-            )
         }
-        val postText = pumModeration.moderationContent
-        val moderationImageAlts = pumModeration.composeImageAlts(postImageAlts)
-        val moderationRawHtml = pumModeration.composeRawHtml(postRawHtml)
-        pumModeration.sourceResolution
-            ?.takeIf { it.status != PumSourceStatus.RESOLVED }
-            ?.let { resolution -> logPumResolutionFailure(botId, postKey, resolution.status) }
-        if (config.isDebugMode && pumModeration.hasResolvedSource) {
-            sendLog("[PUM_SOURCE] status=RESOLVED target=${postKey.gallType}/${postKey.gallId}/${postKey.postNo}", botId)
-        }
+        var pumModeration = buildPumModeration(resolveSource = false)
         val postProcessStartedAt = System.currentTimeMillis()
         val botPrefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
         val overrideCache = mutableMapOf<String, ModerationActionOverride>()
@@ -2360,7 +2400,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                         liveDoc = postDoc,
                         comments = commentsArray,
                         existingSnapshotPath = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath,
-                        pumResolution = snapshotPumResolution,
+                        pumResolution = PumSnapshotSourcePolicy.resolve(
+                            blockAllActive = suppressPumSourceForBlockAll,
+                            resolver = ::resolvePumSourceOnce,
+                        ),
                     )
                     if (!result.isNullOrBlank()) {
                         sendLog("[스냅샷][전체] 저장 완료: $result", botId)
@@ -2400,21 +2443,120 @@ img.written_dccon{max-width:80px;max-height:80px}
         val aiCommentPlans = pendingAiCommentPlans.getOrPut(botId) { mutableListOf() }
         val aiCommentPlanKeys = aiCommentPlans.mapTo(mutableSetOf()) { it.postKey to it.commentNo }
 
-        val postAnalysis = analyzePost(
+        val outerAnalysis = analyzePost(
             config = config,
             botId = botId,
             postAuthor = postAuthor,
             postNick = postNick,
             postUid = postUid,
             postTitle = text,
-            postText = postText,
-            postImageAlts = moderationImageAlts,
-            postRawHtml = moderationRawHtml,
+            postText = legacyPostText,
+            postImageAlts = postImageAlts,
+            postRawHtml = postRawHtml,
             postWriterHtml = postWriterHtml,
             gallogCache = gallogCache,
             tokenToUse = tokenToUse,
             cookie = cookie
         )
+        val structuralState = pumParse.structuralState
+        val pumPolicyEnabled = config.isPumSourceFilterMode && !outerAnalysis.isWhitelistedUser
+        var sourceAnalysis: PostAnalysisResult? = null
+        val initialPumDecision = PumFilterPolicy.decide(
+            masterEnabled = pumPolicyEnabled,
+            structuralState = structuralState,
+            blockAllPumPosts = config.pumBlockAllPosts,
+            outerBlocked = outerAnalysis.action == PostModerationAction.BLOCK_EXECUTE,
+            sourceFilter = PumSourceFilterState.NotResolved,
+        )
+        if (initialPumDecision.origin == PumFilterOrigin.ALLOW &&
+            pumPolicyEnabled && structuralState == PumStructuralState.DETECTED
+        ) {
+            pumModeration = buildPumModeration(resolveSource = true)
+            sourceAnalysis = pumModeration.resolvedSourceOnly?.let { source ->
+                if (config.isDebugMode) {
+                    sendLog("[PUM_SOURCE][디버그] source-only 필터 분석 시작 / target=${postKey.gallType}/${postKey.gallId}/${postKey.postNo}", botId)
+                }
+                analyzePost(
+                    config = config,
+                    botId = botId,
+                    postAuthor = postAuthor,
+                    postNick = postNick,
+                    postUid = postUid,
+                    postTitle = "",
+                    postText = source.text,
+                    postImageAlts = source.imageAlts,
+                    postRawHtml = source.rawHtml,
+                    postWriterHtml = postWriterHtml,
+                    gallogCache = gallogCache,
+                    tokenToUse = tokenToUse,
+                    cookie = cookie,
+                    contentOnly = true,
+                )
+            }
+        }
+        val pumDecision = PumFilterPolicy.decide(
+            masterEnabled = pumPolicyEnabled,
+            structuralState = structuralState,
+            blockAllPumPosts = config.pumBlockAllPosts,
+            outerBlocked = outerAnalysis.action == PostModerationAction.BLOCK_EXECUTE,
+            sourceFilter = sourceAnalysis?.let {
+                PumSourceFilterState.Resolved(it.action == PostModerationAction.BLOCK_EXECUTE)
+            } ?: PumSourceFilterState.NotResolved,
+        )
+        fun resolvePumSourceForSnapshot(): PumResolution? = PumSnapshotSourcePolicy.resolve(
+            blockAllActive = suppressPumSourceForBlockAll,
+            resolver = ::resolvePumSourceOnce,
+        )
+        val runtimeRoute = PumRuntimeRouting.route(
+            origin = pumDecision.origin,
+            targetPostKey = postKey,
+            outerFilterSource = outerAnalysis.filterSource.name.lowercase(Locale.ROOT),
+            outerReason = outerAnalysis.debugDetail,
+            sourceReason = sourceAnalysis?.debugDetail,
+            sourceFilterSource = sourceAnalysis?.filterSource?.name?.lowercase(Locale.ROOT),
+        )
+        check(runtimeRoute.targetPostKey == postKey)
+        var postAnalysis = when (pumDecision.origin) {
+            PumFilterOrigin.OUTER_FILTER, PumFilterOrigin.ALLOW -> outerAnalysis
+            PumFilterOrigin.PUM_BLOCK_ALL -> outerAnalysis.copy(
+                action = PostModerationAction.BLOCK_EXECUTE,
+                blockReasonPrefix = runtimeRoute.reason,
+                notiType = runtimeRoute.notificationType,
+                debugDetail = runtimeRoute.reason,
+                filterSource = ModerationFilterSource.PUM,
+            )
+            PumFilterOrigin.PUM_SOURCE_FILTER -> checkNotNull(sourceAnalysis).copy(
+                isWhitelistedUser = false,
+                isBlacklistedUserId = outerAnalysis.isBlacklistedUserId,
+                isBlacklistedUserNick = outerAnalysis.isBlacklistedUserNick,
+                blockReasonPrefix = runtimeRoute.reason,
+                notiType = runtimeRoute.notificationType,
+                debugDetail = runtimeRoute.reason,
+                filterSource = ModerationFilterSource.PUM,
+            )
+        }
+        val shouldRunAiStage = config.isAiFilterMode &&
+            ModerationWinnerPolicy.decide(pumDecision.origin, AiStageOutcome.SKIPPED) == ModerationWinner.ALLOW
+        // AI needs the typed outer+source body independently of local-filter routing. Resolve through
+        // the same per-cycle lazy cache, but only when AI will actually consume source evidence.
+        if (shouldRunAiStage && config.isPumSourceFilterMode &&
+            structuralState == PumStructuralState.DETECTED && !pumModeration.hasResolvedSource
+        ) {
+            pumModeration = buildPumModeration(resolveSource = true)
+        }
+        if (!shouldRunAiStage) {
+            // A local/PUM winner terminates routing for this post. Remove any AI work retained from
+            // an earlier pass so it cannot be consumed later as a competing blocking origin.
+            aiBatchQueues[botId]?.remove(postKey)
+            aiBatchResults[botId]?.remove(postKey)
+            aiPostPlans.removeAll { it.postKey == postKey }
+            aiPostPlanKeys.remove(postKey)
+            aiCommentPlans.removeAll { it.postKey == postKey }
+            aiCommentPlanKeys.removeAll { it.first == postKey }
+        }
+        if (config.isDebugMode && pumModeration.hasResolvedSource) {
+            sendLog("[PUM_SOURCE] status=RESOLVED target=${postKey.gallType}/${postKey.gallId}/${postKey.postNo}", botId)
+        }
         if (config.isDebugMode) {
             if (postAnalysis.action == PostModerationAction.BLOCK_EXECUTE) {
                 sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 차단 대상 → ${postAnalysis.debugDetail}", botId)
@@ -2543,7 +2685,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             authorIdOrIp = postAuthor,
             nickname = postNick,
             body = pumModeration.aiBody,
-            mediaSources = pumModeration.composeMediaSources(postImageAlts),
+            mediaSources = (pumModeration.outerOriginal.mediaSources +
+                pumModeration.resolvedSourceOnly?.mediaSources.orEmpty()).distinct(),
             comments = currentAiComments,
         )
         val stalePostPlans = aiPostPlans.filter { it.postKey == postKey && !it.matches(currentAiPostInput) }
@@ -2556,12 +2699,12 @@ img.written_dccon{max-width:80px;max-height:80px}
             aiCommentPlans.remove(it)
             aiCommentPlanKeys.remove(it.postKey to it.commentNo)
         }
-        var aiDecision = postAnalysis.aiDecision
-        var aiReviewReason = postAnalysis.aiReviewReason
+        var aiDecision = postAnalysis.aiDecision.takeIf { shouldRunAiStage }
+        var aiReviewReason = postAnalysis.aiReviewReason.takeIf { shouldRunAiStage }
         var blockReasonPrefix = postAnalysis.blockReasonPrefix
         var notiType = postAnalysis.notiType
 
-        val cachedAiBatchResult = aiBatchResults[botId]?.remove(postKey)
+        val cachedAiBatchResult = if (shouldRunAiStage) aiBatchResults[botId]?.remove(postKey) else null
         var consumedAiBatchResult = cachedAiBatchResult
             ?.takeIf { it.matches(postKey, currentAiPostInput) }
         val cachedAiPostDecision = consumedAiBatchResult?.decision
@@ -2611,7 +2754,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
-        if (config.isAiFilterMode) {
+        if (shouldRunAiStage) {
             if (config.isDebugMode && botId.isNotEmpty()) {
                 sendLog("[AI 배치] AI 필터 활성 / 글 번호: $postNumStr / 댓글 수: ${commentsArray?.length() ?: 0}", botId)
             }
@@ -2770,7 +2913,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 .get()
                             val resolvedPostDate = extractCreationDateFromPostDoc(immediatePostDoc)
                             val aiPrefs = botPrefs
-                            val aiOverride = getActionOverride("ai")
+                            val aiOverride = getActionOverride(PumRuntimeRouting.AI_ACTION_OVERRIDE_PREFIX)
                             val baseConfig = resolveDefaultModerationActionConfig(config)
                             val resolvedConfig = resolveModerationActionConfig(
                                 baseConfig = baseConfig,
@@ -2824,7 +2967,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         pumResolution = matchingPumResolution(
                                             targetKey,
                                             postKey,
-                                            snapshotPumResolution,
+                                            resolvePumSourceForSnapshot(),
                                         ),
                                     )
                                 },
@@ -2956,7 +3099,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                                 pumResolution = matchingPumResolution(
                                                     targetKey,
                                                     postKey,
-                                                    snapshotPumResolution,
+                                                    resolvePumSourceForSnapshot(),
                                                 ),
                                             )
                                         }
@@ -3036,7 +3179,11 @@ img.written_dccon{max-width:80px;max-height:80px}
         var moderationFailed = false
         var deletedCommentCount = 0
 
-        val aiPostExecutionPlan = aiPostPlans.firstOrNull { it.postKey == postKey }
+        val aiPostExecutionPlan = if (shouldRunAiStage) {
+            aiPostPlans.firstOrNull { it.postKey == postKey }
+        } else {
+            null
+        }
         if (aiPostExecutionPlan != null) {
             aiPostPlans.remove(aiPostExecutionPlan)
             aiPostPlanKeys.remove(aiPostExecutionPlan.postKey)
@@ -3089,7 +3236,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 } else {
                     null
                 },
-                pumResolution = snapshotPumResolution,
+                pumResolution = resolvePumSourceForSnapshot(),
             )
             if (config.isDebugMode && SnapshotLogPolicy.shouldLogPerformance(blockedTs, blockedCommentNo)) {
                 sendLog("[디버그][성능] 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)
@@ -3144,10 +3291,27 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
 
-        if (postAnalysis.action == PostModerationAction.BLOCK_EXECUTE || aiDecision?.type == AiFilterDecisionType.BLOCK) {
+        val moderationWinner = ModerationWinnerPolicy.decide(
+            localOrigin = pumDecision.origin,
+            aiOutcome = when (aiDecision?.type) {
+                AiFilterDecisionType.BLOCK -> AiStageOutcome.BLOCK
+                AiFilterDecisionType.ALLOW, AiFilterDecisionType.REVIEW -> AiStageOutcome.ALLOW
+                null -> if (shouldRunAiStage) AiStageOutcome.ERROR else AiStageOutcome.SKIPPED
+            },
+        )
+        if (moderationWinner != ModerationWinner.ALLOW) {
             if (config.isDebugMode && !postAnalysis.debugDetail.isNullOrBlank()) {
                 sendLog("[디버그][게시글 차단 상세] 번호: $postNumStr / ${postAnalysis.debugDetail}", botId)
             }
+            val actionPrefix = PumRuntimeRouting.actionPrefix(moderationWinner, runtimeRoute)
+            val baseActionConfig = resolveDefaultModerationActionConfig(config)
+            val routedActionConfig = actionPrefix?.let { prefix ->
+                resolveModerationActionConfig(
+                    baseConfig = baseActionConfig,
+                    override = getActionOverride(prefix),
+                    sourceLabel = "${prefix}_override",
+                )
+            } ?: baseActionConfig
 
             val postBlockResult = handleBadPost(
                 config = config,
@@ -3163,84 +3327,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
                 tokenToUse = tokenToUse,
-                actionConfig = when {
-                    aiDecision?.type == AiFilterDecisionType.BLOCK -> {
-                        val aiPrefs = botPrefs
-                        val aiOverride = getActionOverride("ai")
-                        val baseConfig = resolveDefaultModerationActionConfig(config)
-                        val resolvedConfig = resolveModerationActionConfig(
-                            baseConfig = baseConfig,
-                            override = aiOverride,
-                            sourceLabel = "ai_override"
-                        )
-                        if (config.isDebugMode) {
-                            val aiDeleteOnlyRaw = if (aiPrefs.contains("ai_delete_only_mode")) aiPrefs.getBoolean("ai_delete_only_mode", false).toString() else "<missing>"
-                            val aiDurationRaw = if (aiPrefs.contains("ai_block_duration_hours")) aiPrefs.getInt("ai_block_duration_hours", -1).toString() else "<missing>"
-                            val aiDeletePostRaw = if (aiPrefs.contains("ai_delete_post_on_block")) aiPrefs.getBoolean("ai_delete_post_on_block", false).toString() else "<missing>"
-                            val aiReasonRaw = aiPrefs.getString("ai_block_reason_text", null) ?: "<null>"
-                            sendLog(
-                                "[디버그][AI설정읽기] ai_post / botId=$botId / enabledRaw=${aiPrefs.getBoolean("ai_use_custom_action_config", false)} / deleteOnlyRaw=$aiDeleteOnlyRaw / durationRaw=$aiDurationRaw / deletePostRaw=$aiDeletePostRaw / reasonRaw=$aiReasonRaw / base=${baseConfig.sourceLabel}:${baseConfig.mode.name}:${baseConfig.blockDurationHours}:${baseConfig.deletePostOnBlock}:${baseConfig.blockReasonText}",
-                                botId
-                            )
-                            logModerationActionResolution(botId, "ai_post", aiOverride, resolvedConfig)
-                        }
-                        resolvedConfig
-                    }
-                    else -> when (postAnalysis.filterSource) {
-                    ModerationFilterSource.KEYWORD -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("keyword"),
-                        sourceLabel = "keyword_override"
-                    )
-                    ModerationFilterSource.USER -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("user"),
-                        sourceLabel = "user_override"
-                    )
-                    ModerationFilterSource.NICKNAME -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("nickname"),
-                        sourceLabel = "nickname_override"
-                    )
-                    ModerationFilterSource.URL -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("url"),
-                        sourceLabel = "url_override"
-                    )
-                    ModerationFilterSource.VOICE -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("voice"),
-                        sourceLabel = "voice_override"
-                    )
-                    ModerationFilterSource.IMAGE -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("image"),
-                        sourceLabel = "image_override"
-                    )
-                    ModerationFilterSource.SPAM -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("spam"),
-                        sourceLabel = "spam_override"
-                    )
-                    ModerationFilterSource.SPECIAL_CHAR -> resolveDefaultModerationActionConfig(config)
-                    ModerationFilterSource.YUDONG -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("yudong"),
-                        sourceLabel = "yudong_override"
-                    )
-                    ModerationFilterSource.KKANG -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("kkang"),
-                        sourceLabel = "kkang_override"
-                    )
-                    ModerationFilterSource.OVERSEAS_IP -> resolveModerationActionConfig(
-                        baseConfig = resolveDefaultModerationActionConfig(config),
-                        override = getActionOverride("overseas_ip"),
-                        sourceLabel = "overseas_ip_override"
-                    )
-                    else -> resolveDefaultModerationActionConfig(config)
-                }
-                },
+                actionConfig = routedActionConfig,
                 isBlacklistedUserId = isBlacklistedUserId,
                 isBlacklistedUserNick = isBlacklistedUserNick,
                 blockReasonPrefix = blockReasonPrefix,
@@ -3248,8 +3335,8 @@ img.written_dccon{max-width:80px;max-height:80px}
                 matchedVoiceIdPost = matchedVoiceIdPost,
                 matchedImageAlt = matchedImageAlt,
                 matchedDcconToken = postAnalysis.matchedDcconToken,
-                aiDecision = aiDecision,
-                aiReviewReason = aiReviewReason,
+                aiDecision = aiDecision.takeIf { moderationWinner == ModerationWinner.AI },
+                aiReviewReason = aiReviewReason.takeIf { moderationWinner == ModerationWinner.AI },
                 suspiciousUrlInPost = suspiciousUrlInPost,
                 spamCodeMatchPost = spamCodeMatchPost,
                 notifyIfEnabled = notifyIfEnabled,
@@ -3797,13 +3884,37 @@ img.written_dccon{max-width:80px;max-height:80px}
         botPref: android.content.SharedPreferences,
         prefix: String
     ): ModerationActionOverride {
+        val isPum = prefix == "pum"
+        val rawDuration = if (!isPum && botPref.contains("${prefix}_block_duration_hours")) {
+            botPref.getInt("${prefix}_block_duration_hours", 6)
+        } else {
+            null
+        }
+        val deleteOnlyMode = if (isPum) {
+            botPref.all["pum_delete_only_mode"] as? Boolean
+        } else if (botPref.contains("${prefix}_delete_only_mode")) {
+            botPref.getBoolean("${prefix}_delete_only_mode", false)
+        } else {
+            null
+        }
+        val rawProcessMode = if (isPum) null else botPref.getString("${prefix}_block_process_mode", null)
+        val normalizedPum = if (isPum) {
+            normalizePumSettings(
+                processMode = botPref.all["pum_block_process_mode"],
+                blockDurationHours = botPref.all["pum_block_duration_hours"],
+                legacyDeleteOnly = deleteOnlyMode == true,
+                processModePresent = botPref.contains("pum_block_process_mode"),
+            )
+        } else {
+            null
+        }
         return ModerationActionOverride(
             enabled = botPref.getBoolean("${prefix}_use_custom_action_config", false),
-            blockDurationHours = if (botPref.contains("${prefix}_block_duration_hours")) botPref.getInt("${prefix}_block_duration_hours", 6) else null,
+            blockDurationHours = normalizedPum?.blockDurationHours ?: rawDuration,
             blockReasonText = botPref.getString("${prefix}_block_reason_text", null),
             deletePostOnBlock = if (botPref.contains("${prefix}_delete_post_on_block")) botPref.getBoolean("${prefix}_delete_post_on_block", true) else null,
-            deleteOnlyMode = if (botPref.contains("${prefix}_delete_only_mode")) botPref.getBoolean("${prefix}_delete_only_mode", false) else null,
-            processMode = botPref.getString("${prefix}_block_process_mode", null)
+            deleteOnlyMode = deleteOnlyMode,
+            processMode = normalizedPum?.processMode ?: rawProcessMode,
         )
     }
 
@@ -4373,6 +4484,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?: emptyList(),
 
             isPumSourceFilterMode = botPref.getBoolean("is_pum_source_filter_mode", false),
+            pumBlockAllPosts = botPref.getBoolean("pum_block_all_posts", false),
             pumRecheckEveryCycle = botPref.getBoolean("pum_recheck_every_cycle", false),
 
             isAiFilterMode = botPref.getBoolean("is_ai_filter_mode", false),
@@ -4441,6 +4553,26 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
+    private fun logPumParseFailure(botId: String, target: PostKey) {
+        val now = System.currentTimeMillis()
+        val rateLimitKey = "$botId:PARSE_FAILED"
+        val shouldLog = synchronized(recentPumResolutionFailures) {
+            val previous = recentPumResolutionFailures[rateLimitKey]
+            if (previous != null && now - previous < pumResolutionFailureLogIntervalMs) {
+                false
+            } else {
+                recentPumResolutionFailures[rateLimitKey] = now
+                true
+            }
+        }
+        if (shouldLog) {
+            sendLog(
+                "[PUM_SOURCE] status=PARSE_FAILED fallback=OUTER_ONLY target=${target.gallType}/${target.gallId}/${target.postNo}",
+                botId,
+            )
+        }
+    }
+
     private fun isKeywordTargetAllowed(
         config: BotConfig,
         botId: String,
@@ -4493,10 +4625,11 @@ img.written_dccon{max-width:80px;max-height:80px}
         postWriterHtml: String,
         gallogCache: MutableMap<String, Pair<Int, Int>>,
         tokenToUse: String,
-        cookie: String
+        cookie: String,
+        contentOnly: Boolean = false,
     ): PostAnalysisResult {
         val toggles = buildFilterToggleState(config)
-        val userFilter = if (toggles.anyUserFilterEnabled) {
+        val userFilter = if (!contentOnly && toggles.anyUserFilterEnabled) {
             evaluateUserFilter(config, postAuthor, postNick)
         } else {
             UserFilterResult(
@@ -4548,7 +4681,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         if (!shouldBlockExecute && !isWhitelistedUser) {
-            if (toggles.overseasIpPostEnabled && postUid.isBlank() && isOverseasVisibleIpv4(postAuthor)) {
+            if (!contentOnly && toggles.overseasIpPostEnabled && postUid.isBlank() && isOverseasVisibleIpv4(postAuthor)) {
                 blockReasonPrefix = "해외 IP 게시글 차단"
                 notiType = "user"
                 debugDetail = "해외 IP 대역 감지: $postAuthor"
@@ -4558,7 +4691,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         if (!shouldBlockExecute && !isWhitelistedUser) {
-            val shouldCheckYudong = toggles.anyYudongPostEnabled
+            val shouldCheckYudong = !contentOnly && toggles.anyYudongPostEnabled
             val isYudong = if (shouldCheckYudong) postUid.isEmpty() else false
             if (config.isDebugMode && botId.isNotEmpty() && shouldCheckYudong) {
                 sendLog("[디버그][필터/유동] 유동 여부: $isYudong", botId)
@@ -4584,7 +4717,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     debugDetail = "유동 작성자 + 보이스 첨부 감지"
                     filterSource = ModerationFilterSource.YUDONG
                 }
-            } else if (toggles.anyKkangPostEnabled) {
+            } else if (!contentOnly && toggles.anyKkangPostEnabled) {
                 val (isKkang, kkangDetail) = isKkangByConfiguredMode(
                     config = config,
                     uid = postUid,
@@ -4659,16 +4792,18 @@ img.written_dccon{max-width:80px;max-height:80px}
 
                 val keywordMatched = matchedNormalWord != null || matchedBypassWord != null
                 val keywordTargetAllowed = if (keywordMatched) {
-                    isKeywordTargetAllowed(
-                        config = config,
-                        botId = botId,
-                        uid = postUid,
-                        dcNewNicknameMarked = isDcNewNicknameMarked(postWriterHtml),
-                        gallogCache = gallogCache,
-                        tokenToUse = tokenToUse,
-                        cookie = cookie,
-                        isComment = false
-                    )
+                    KeywordAudiencePolicy.shouldApply(contentOnly = contentOnly) {
+                        isKeywordTargetAllowed(
+                            config = config,
+                            botId = botId,
+                            uid = postUid,
+                            dcNewNicknameMarked = isDcNewNicknameMarked(postWriterHtml),
+                            gallogCache = gallogCache,
+                            tokenToUse = tokenToUse,
+                            cookie = cookie,
+                            isComment = false
+                        )
+                    }
                 } else {
                     false
                 }
@@ -5139,6 +5274,18 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         val dbBlockReason = presentation.detailedBlockReason
 
+        if (actionConfig.mode == ModerationActionMode.HOLD && GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr)) {
+            if (config.isDebugMode) sendLog("[디버그][보류중복] 게시글 보류 기록이 이미 있어 건너뜀 → 번호: $postNumStr", botId)
+            return BlockExecutionResult(
+                blockReason = dbBlockReason,
+                snapshotPath = null,
+                success = true,
+                response = "{\"result\":\"skipped\",\"reason\":\"duplicate_hold\"}",
+                deletesTarget = false,
+                mode = ModerationActionMode.HOLD
+            )
+        }
+
         if (config.isExpertMode && config.isSnapshotBlocked) {
             if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
                 try {
@@ -5151,18 +5298,6 @@ img.written_dccon{max-width:80px;max-height:80px}
                     GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
                 }
             }
-        }
-
-        if (actionConfig.mode == ModerationActionMode.HOLD && GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr)) {
-            if (config.isDebugMode) sendLog("[디버그][보류중복] 게시글 보류 기록이 이미 있어 건너뜀 → 번호: $postNumStr", botId)
-            return BlockExecutionResult(
-                blockReason = dbBlockReason,
-                snapshotPath = null,
-                success = true,
-                response = "{\"result\":\"skipped\",\"reason\":\"duplicate_hold\"}",
-                deletesTarget = false,
-                mode = ModerationActionMode.HOLD
-            )
         }
 
         if (config.isDebugMode) {

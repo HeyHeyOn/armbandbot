@@ -52,6 +52,13 @@ class BotSettingsRuntimeMigrationTest {
         assertFalse(migrated["is_ai_filter_mode"] as Boolean)
         assertFalse(migrated["is_pum_source_filter_mode"] as Boolean)
         assertFalse(migrated["pum_recheck_every_cycle"] as Boolean)
+        assertFalse(migrated["pum_block_all_posts"] as Boolean)
+        assertFalse(migrated["pum_use_custom_action_config"] as Boolean)
+        assertFalse(migrated["pum_delete_only_mode"] as Boolean)
+        assertTrue(migrated["pum_delete_post_on_block"] as Boolean)
+        assertEquals("BLOCK", migrated["pum_block_process_mode"])
+        assertEquals(6, migrated["pum_block_duration_hours"])
+        assertFalse(migrated.containsKey("pum_block_reason_text"))
         assertTrue(migrated["noti_master"] as Boolean)
     }
 
@@ -60,14 +67,66 @@ class BotSettingsRuntimeMigrationTest {
         val migrated = migrateBotSettingsSnapshot(
             mapOf(
                 "is_pum_source_filter_mode" to true,
-                "pum_recheck_every_cycle" to true
+                "pum_recheck_every_cycle" to true,
+                "pum_block_all_posts" to true,
+                "pum_use_custom_action_config" to true,
+                "pum_delete_only_mode" to true,
+                "pum_delete_post_on_block" to false,
+                "pum_block_process_mode" to "HOLD",
+                "pum_block_reason_text" to "펌 출처 위반",
+                "pum_block_duration_hours" to 24,
             )
         )
 
         assertTrue(migrated["is_pum_source_filter_mode"] as Boolean)
         assertTrue(migrated["pum_recheck_every_cycle"] as Boolean)
+        assertTrue(migrated["pum_block_all_posts"] as Boolean)
+        assertTrue(migrated["pum_use_custom_action_config"] as Boolean)
+        assertTrue(migrated["pum_delete_only_mode"] as Boolean)
+        assertFalse(migrated["pum_delete_post_on_block"] as Boolean)
+        assertEquals("HOLD", migrated["pum_block_process_mode"])
+        assertEquals("펌 출처 위반", migrated["pum_block_reason_text"])
+        assertEquals(24, migrated["pum_block_duration_hours"])
         assertTrue("is_pum_source_filter_mode" in EXPORTABLE_BOOLEAN_KEYS)
         assertTrue("pum_recheck_every_cycle" in EXPORTABLE_BOOLEAN_KEYS)
+    }
+
+    @Test
+    fun migrationNormalizesUnsafePumActionSettings() {
+        val unsafe = migrateBotSettingsSnapshot(
+            mapOf(
+                "pum_block_process_mode" to "delete",
+                "pum_block_duration_hours" to 50_000,
+            )
+        )
+        val numericLow = migrateBotSettingsSnapshot(
+            mapOf("pum_block_process_mode" to "HOLD", "pum_block_duration_hours" to "-3")
+        )
+
+        assertEquals("BLOCK", unsafe["pum_block_process_mode"])
+        assertEquals(744, unsafe["pum_block_duration_hours"])
+        assertEquals("HOLD", numericLow["pum_block_process_mode"])
+        assertEquals(1, numericLow["pum_block_duration_hours"])
+    }
+
+    @Test
+    fun migrationUsesExplicitLegacyDeleteOnlyWhenProcessModeIsMissing() {
+        val migrated = migrateBotSettingsSnapshot(mapOf("pum_delete_only_mode" to true))
+
+        assertEquals("DELETE", migrated["pum_block_process_mode"])
+        assertEquals(6, migrated["pum_block_duration_hours"])
+    }
+
+    @Test
+    fun migrationFailsSafeWhenExplicitProcessModeIsInvalidDespiteLegacyDeleteOnly() {
+        val migrated = migrateBotSettingsSnapshot(
+            mapOf(
+                "pum_block_process_mode" to "invalid",
+                "pum_delete_only_mode" to true,
+            )
+        )
+
+        assertEquals("BLOCK", migrated["pum_block_process_mode"])
     }
 
     @Test

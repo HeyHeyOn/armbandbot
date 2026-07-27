@@ -18,7 +18,9 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
     "target_urls",
     "search_type",
     "block_reason_text",
-    "kkang_detection_mode"
+    "kkang_detection_mode",
+    "pum_block_process_mode",
+    "pum_block_reason_text"
 )
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
@@ -29,13 +31,14 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_kkang_filter_mode", "is_kkang_post_block", "is_kkang_comment_block", "is_kkang_image_block", "is_kkang_voice_block",
     "is_url_filter_mode", "is_image_filter_mode", "is_dccon_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode", "is_special_char_filter_mode",
     "is_pum_source_filter_mode", "pum_recheck_every_cycle",
+    "pum_block_all_posts", "pum_use_custom_action_config", "pum_delete_only_mode", "pum_delete_post_on_block",
     "bypass_ignore_case_enabled", "bypass_unicode_normalization_enabled",
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
 
 internal val EXPORTABLE_INT_KEYS = listOf(
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
-    "image_filter_threshold", "scan_page_count", "snapshot_keep_days"
+    "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours"
 )
 
 internal val EXPORTABLE_FLOAT_KEYS = listOf(
@@ -160,10 +163,13 @@ private fun validateBotSettingsFileType(json: JSONObject) {
 
 internal fun JSONObject?.toStringMap(keys: List<String>): Map<String, String> =
     keys.mapNotNull { key ->
-        val obj = this ?: return@mapNotNull null
-        if (!obj.has(key) || obj.isNull(key)) return@mapNotNull null
-        val value = obj.optString(key).trim()
-        if (value.isEmpty()) null else key to value
+        val obj = this
+        val value = if (obj != null && obj.has(key) && !obj.isNull(key)) {
+            obj.optString(key).trim().ifEmpty { null }
+        } else {
+            null
+        }
+        value?.let { key to it } ?: defaultStringValue(key)?.let { key to it }
     }.toMap()
 
 internal fun JSONObject?.toBooleanMap(keys: List<String>): Map<String, Boolean> =
@@ -200,8 +206,14 @@ private inline fun <T> Iterable<String>.associateWithNotNull(valueSelector: (Str
 
 internal fun defaultBooleanValue(key: String): Boolean = when (key) {
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
-    "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block", "is_snapshot_blocked" -> true
+    "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block", "is_snapshot_blocked",
+    "pum_delete_post_on_block" -> true
     else -> false
+}
+
+internal fun defaultStringValue(key: String): String? = when (key) {
+    "pum_block_process_mode" -> "BLOCK"
+    else -> null
 }
 
 internal fun defaultIntValue(key: String): Int = when (key) {
@@ -211,6 +223,7 @@ internal fun defaultIntValue(key: String): Int = when (key) {
     "kkang_total_min" -> 15
     "spam_code_length" -> 6
     "image_filter_threshold" -> 80
+    "pum_block_duration_hours" -> 6
     "scan_page_count" -> 1
     "snapshot_keep_days" -> 7
     else -> 0

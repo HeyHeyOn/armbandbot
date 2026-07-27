@@ -86,7 +86,11 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "overseas_ip_delete_only_mode" to false,
     "overseas_ip_delete_post_on_block" to true,
     "overseas_ip_use_custom_action_config" to false,
+    "pum_block_all_posts" to false,
+    "pum_delete_only_mode" to false,
+    "pum_delete_post_on_block" to true,
     "pum_recheck_every_cycle" to false,
+    "pum_use_custom_action_config" to false,
     "session_webview_fallback_pending" to false,
     "should_restore_after_restart" to false,
     "spam_burst_target_kkang" to true,
@@ -127,6 +131,7 @@ private val INT_PREF_DEFAULTS: Map<String, Int> = mapOf(
     "kkang_total_min" to 15,
     "nickname_block_duration_hours" to 6,
     "overseas_ip_block_duration_hours" to 6,
+    "pum_block_duration_hours" to 6,
     "scan_page_count" to 1,
     "snapshot_keep_days" to 7,
     "spam_block_duration_hours" to 6,
@@ -157,6 +162,7 @@ private val STRING_PREF_DEFAULTS: Map<String, String> = mapOf(
     "block_reason_text" to "커뮤니티 규칙 위반",
     "dccon_block_process_mode" to "BLOCK",
     "kkang_detection_mode" to "separate",
+    "pum_block_process_mode" to "BLOCK",
     "search_type" to "search_subject_memo",
     "target_urls" to ""
 )
@@ -230,6 +236,16 @@ internal fun migrateBotSettingsSnapshot(values: Map<String, Any?>): Map<String, 
     STRING_SET_PREF_DEFAULTS.forEach { (key, default) ->
         migrated[key] = coerceStringSet(migrated[key], default)
     }
+
+    val normalizedPum = normalizePumSettings(
+        processMode = values["pum_block_process_mode"],
+        blockDurationHours = values["pum_block_duration_hours"],
+        legacyDeleteOnly = values.containsKey("pum_delete_only_mode") &&
+            coerceBoolean(values["pum_delete_only_mode"], false),
+        processModePresent = values.containsKey("pum_block_process_mode"),
+    )
+    migrated["pum_block_process_mode"] = normalizedPum.processMode
+    migrated["pum_block_duration_hours"] = normalizedPum.blockDurationHours
 
     migrated[BOT_PREF_SCHEMA_VERSION_KEY] = BOT_SETTINGS_CURRENT_SCHEMA_VERSION
     migrated[BOT_PREF_APP_VERSION_KEY] = ARMBANDBOT_APP_VERSION

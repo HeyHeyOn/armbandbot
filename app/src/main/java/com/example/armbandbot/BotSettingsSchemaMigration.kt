@@ -14,7 +14,8 @@ internal data class BotSettingsImportEnvelope(
     val booleans: Map<String, Boolean>,
     val ints: Map<String, Int>,
     val floats: Map<String, Float>,
-    val stringSets: Map<String, List<String>>
+    val stringSets: Map<String, List<String>>,
+    val pumProcessModePresent: Boolean,
 )
 
 internal fun parseAndMigrateBotSettingsExport(json: JSONObject): BotSettingsExport {
@@ -32,16 +33,18 @@ private fun parseBotSettingsImportEnvelope(json: JSONObject): BotSettingsImportE
 
     require(rawSchemaVersion > 0) { "설정 파일 schemaVersion 값이 올바르지 않습니다." }
 
+    val stringsJson = json.optJSONObject("strings")
     return BotSettingsImportEnvelope(
         schemaVersion = rawSchemaVersion,
         exportVersion = json.optInt("exportVersion", 1),
         exportedByAppVersion = json.optString("exportedByAppVersion", json.optString("appVersion", "")),
         botName = json.optString("botName", "가져온 봇"),
-        strings = json.optJSONObject("strings").toStringMap(EXPORTABLE_STRING_KEYS),
+        strings = stringsJson.toStringMap(EXPORTABLE_STRING_KEYS),
         booleans = json.optJSONObject("booleans").toBooleanMap(EXPORTABLE_BOOLEAN_KEYS),
         ints = json.optJSONObject("ints").toIntMap(EXPORTABLE_INT_KEYS),
         floats = json.optJSONObject("floats").toFloatMap(EXPORTABLE_FLOAT_KEYS),
-        stringSets = json.optJSONObject("stringSets").toStringListMap(EXPORTABLE_STRING_SET_KEYS)
+        stringSets = json.optJSONObject("stringSets").toStringListMap(EXPORTABLE_STRING_SET_KEYS),
+        pumProcessModePresent = stringsJson?.has("pum_block_process_mode") == true,
     )
 }
 
@@ -59,14 +62,22 @@ private fun migrateBotSettingsEnvelopeToCurrent(envelope: BotSettingsImportEnvel
     else -> error("schemaVersion ${envelope.schemaVersion} 마이그레이션이 아직 구현되지 않았습니다.")
 }
 
-private fun migrateSchemaV1ToCurrent(envelope: BotSettingsImportEnvelope): BotSettingsExport = BotSettingsExport(
-    schemaVersion = BOT_SETTINGS_CURRENT_SCHEMA_VERSION,
-    exportVersion = envelope.exportVersion,
-    exportedByAppVersion = envelope.exportedByAppVersion.ifBlank { "unknown" },
-    botName = envelope.botName,
-    strings = envelope.strings,
-    booleans = envelope.booleans,
-    ints = envelope.ints,
-    floats = envelope.floats,
-    stringSets = envelope.stringSets
-)
+private fun migrateSchemaV1ToCurrent(envelope: BotSettingsImportEnvelope): BotSettingsExport {
+    val normalizedPum = normalizePumSettings(
+        processMode = envelope.strings["pum_block_process_mode"].takeIf { envelope.pumProcessModePresent },
+        blockDurationHours = envelope.ints["pum_block_duration_hours"],
+        legacyDeleteOnly = envelope.booleans["pum_delete_only_mode"] == true,
+        processModePresent = envelope.pumProcessModePresent,
+    )
+    return BotSettingsExport(
+        schemaVersion = BOT_SETTINGS_CURRENT_SCHEMA_VERSION,
+        exportVersion = envelope.exportVersion,
+        exportedByAppVersion = envelope.exportedByAppVersion.ifBlank { "unknown" },
+        botName = envelope.botName,
+        strings = envelope.strings + ("pum_block_process_mode" to normalizedPum.processMode),
+        booleans = envelope.booleans,
+        ints = envelope.ints + ("pum_block_duration_hours" to normalizedPum.blockDurationHours),
+        floats = envelope.floats,
+        stringSets = envelope.stringSets,
+    )
+}
