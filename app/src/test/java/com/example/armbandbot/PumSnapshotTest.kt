@@ -110,6 +110,150 @@ class PumSnapshotTest {
     }
 
     @Test
+    fun cleanupPreservesDcButtonsVisuallyWhileMakingThemInert() {
+        val live = Jsoup.parse("""
+            <html><body>
+              <main id='container'><section><article><div class='view_content_wrap'><div class='gallview_contents'><div class='positionr'>
+              <div class='btn_recommend_box'>
+                <button class='btn_recom_up visual-control' title='추천' aria-label='추천하기'
+                    data-visual-state='ready' style='display:inline-block;color:#555'
+                    onclick='boom()' action='https://evil.test/submit' method='post'
+                    enctype='text/plain' target='_blank' popover disabled form='evil-form'
+                    formaction='javascript:boom()' formmethod='post' formenctype='text/plain' formtarget='_blank'
+                    name='vote' value='up' autofocus popovertarget='evil-popover' popovertargetaction='show'
+                    command='show-modal' commandfor='evil-dialog' formnovalidate
+                    interestfor='evil-interest' interesttarget='evil-target'><span class='sp_img icon_recom_up'></span></button>
+                <button class='btn_recom_down' onfocus='boom()'><span class='sp_img icon_recom_down'></span></button>
+                <span class='button-wrapper'><button class='btn_snsmore' onmouseover='boom()'><span class='sp_img icon_snsmore'></span></button></span>
+                <button class='btn_snscrap' onpointerdown='boom()'><span class='sp_img icon_snscrap'></span></button>
+                <button class='btn_report' onblur='boom()'><span class='sp_img icon_report'></span></button>
+                <button type="button" class="btn_silbechu" data-no="2317"><em class="sp_img icon_silbechu"></em>실베추</button>
+                <button type="button" class="btn_cloned btn_svc" onclick="Pum.write_open()"><em class="sp_img icon_cloned_b"></em>펌 0</button>
+              </div>
+              </div></div></div></article></section></main>
+              <button class='rogue'><a href='https://evil.example/'>navigate</a></button>
+              <form id='evil-form'><input name='payload' value='run'></form>
+            </body></html>
+        """.trimIndent())
+
+        val snapshot = PumSnapshot.withStaticCard(live, null)
+        val buttons = snapshot.select(".btn_recommend_box button")
+        val upButton = snapshot.selectFirst("button.btn_recom_up")!!
+        val silbechuButton = snapshot.selectFirst("button.btn_silbechu")!!
+        val clonedButton = snapshot.selectFirst("button.btn_cloned")!!
+
+        assertEquals(7, buttons.size)
+        assertEquals(1, snapshot.select("button.btn_recom_up > .sp_img.icon_recom_up").size)
+        assertEquals(1, snapshot.select("button.btn_recom_down > .sp_img.icon_recom_down").size)
+        assertEquals(1, snapshot.select("button.btn_snsmore > .sp_img.icon_snsmore").size)
+        assertEquals(1, snapshot.select("button.btn_snscrap > .sp_img.icon_snscrap").size)
+        assertEquals(1, snapshot.select("button.btn_report > .sp_img.icon_report").size)
+        assertEquals("btn_silbechu", silbechuButton.className())
+        assertEquals(1, silbechuButton.select(":root > em.sp_img.icon_silbechu").size)
+        assertEquals("실베추", silbechuButton.text())
+        assertEquals("btn_cloned btn_svc", clonedButton.className())
+        assertEquals(1, clonedButton.select(":root > em.sp_img.icon_cloned_b").size)
+        assertEquals("펌 0", clonedButton.text())
+        assertFalse(clonedButton.hasAttr("onclick"))
+        assertTrue(buttons.all { it.attr("type") == "button" })
+        assertEquals("btn_recom_up visual-control", upButton.className())
+        assertEquals("추천", upButton.attr("title"))
+        assertEquals("추천하기", upButton.attr("aria-label"))
+        assertEquals("ready", upButton.attr("data-visual-state"))
+        assertEquals("display:inline-block;color:#555", upButton.attr("style"))
+        assertTrue(snapshot.select("button[action], button[method], button[enctype], button[target], button[popover], button[disabled]").isEmpty())
+        assertTrue(snapshot.select("button[onclick], button[onfocus], button[onmouseover], button[onpointerdown], button[onblur]").isEmpty())
+        assertTrue(snapshot.select("button[form], button[formaction], button[formmethod], button[formenctype], button[formtarget], button[name], button[value], button[autofocus], button[popovertarget], button[popovertargetaction], button[command], button[commandfor], button[formnovalidate], button[interestfor], button[interesttarget]").isEmpty())
+        assertTrue(snapshot.select("button.rogue, button.rogue a, a[href='https://evil.example/']").isEmpty())
+        assertTrue(snapshot.select("form, input").isEmpty())
+    }
+
+    @Test
+    fun cleanupKeepsExactlySevenControlsOnlyInTheAuthoritativeBoxAndSanitizesTheirDescendants() {
+        val live = Jsoup.parse("""
+            <html><head><link rel='stylesheet' href='https://nstatic.dcinside.com/dc/w/css/common.css'></head><body>
+              <div class='btn_recommend_box decoy'>
+                <button class='btn_recom_up'>decoy up</button>
+                <button class='btn_report'>decoy report</button>
+              </div>
+              <main id='container'><section><article><div class='view_content_wrap'><div class='gallview_contents'>
+              <div class='write_div'><div class='positionr'><div class='btn_recommend_box nested-decoy'>
+                <button class='btn_recom_up'>injected</button><button class='btn_recom_down'>injected</button>
+                <button class='btn_silbechu'>injected</button><button class='btn_cloned'>injected</button>
+                <button class='btn_snsmore'>injected</button><button class='btn_snscrap'>injected</button>
+                <button class='btn_report'>injected</button>
+              </div></div></div>
+              <div class='positionr'>
+                <div class='btn_recommend_box authoritative'>
+                  <button class='btn_recom_up'><span class='blind'>추천</span><em class='sp_img icon_recom_up'></em></button>
+                  <button class='btn_recom_up duplicate'>duplicate</button>
+                  <button class='btn_recom_down'><span class='blind'>비추천</span><em class='sp_img icon_recom_down'></em></button>
+                  <button class='btn_silbechu'><a href='https://evil.test/vote'><span class='visual'>실베추</span></a><img src='https://evil.test/pixel.png'><em class='sp_img icon_silbechu'></em></button>
+                  <button class='btn_cloned'><video src='https://evil.test/movie.mp4' poster='https://evil.test/poster.jpg'></video><em class='sp_img icon_cloned_b'></em>펌 0</button>
+                  <button class='btn_snsmore'><details open><summary><span>공유</span></summary></details><em class='sp_img icon_snsmore'></em></button>
+                  <button class='btn_snscrap'><label tabindex='0'><em class='sp_img icon_scrap'></em>스크랩</label></button>
+                  <button class='btn_report'><picture><source srcset='https://evil.test/report.webp'><img src='https://evil.test/report.png'></picture><span>신고</span><em class='sp_img icon_report'></em></button>
+                  <button class='btn_report duplicate'>duplicate</button>
+                  <button class='btn_recom_up btn_report ambiguous'>ambiguous</button>
+                  <button class='other'>other</button>
+                </div>
+                <div class='btn_recommend_box sibling-decoy'><button class='btn_cloned'>decoy cloned</button></div>
+              </div></div></div></article></section></main>
+              <button class='btn_recom_down outside'>outside</button>
+            </body></html>
+        """.trimIndent())
+
+        val snapshot = PumSnapshot.withStaticCard(live, null)
+        val box = snapshot.selectFirst(".btn_recommend_box.authoritative")!!
+        val classes = listOf(
+            "btn_recom_up", "btn_recom_down", "btn_silbechu", "btn_cloned",
+            "btn_snsmore", "btn_snscrap", "btn_report",
+        )
+
+        assertEquals(1, snapshot.select(".btn_recommend_box").size)
+        assertEquals(7, snapshot.select("button").size)
+        classes.forEach { assertEquals(it, 1, box.select("button.$it").size) }
+        assertTrue(snapshot.select("button.duplicate, button.ambiguous, button.other, button.outside").isEmpty())
+        assertTrue(box.select("a, img, picture, source, video, audio, track, details, summary, label, button button, link, style").isEmpty())
+        assertTrue(box.select("[href], [src], [srcset], [poster], [tabindex], [contenteditable]").isEmpty())
+        assertEquals("실베추", box.selectFirst("button.btn_silbechu span.visual")!!.text())
+        assertEquals(1, box.select("button.btn_silbechu > em.sp_img.icon_silbechu").size)
+        assertEquals("펌 0", box.selectFirst("button.btn_cloned")!!.text())
+        assertEquals("공유", box.selectFirst("button.btn_snsmore span")!!.text())
+        assertEquals("스크랩", box.selectFirst("button.btn_snscrap")!!.text())
+        assertEquals("신고", box.selectFirst("button.btn_report span")!!.text())
+        assertFalse(snapshot.html().contains("evil.test"))
+      }
+
+    @Test
+    fun cleanupRemovesOnlyTheGaejukDecorationAndPreservesPostImagesAndHiddenTimg10() {
+        val live = Jsoup.parse("""
+            <html><head><style id='styleGaejuki'>#gaejukimg { position: fixed }</style></head><body>
+              <div class='write_div'><img class='post-image' src='https://images.example.test/post.png'></div>
+              <div id='gaejukimg' class='moveimg_off'>
+                <img src='https://nstatic.dcinside.com/dc/w/images/moveimg.png'>
+              </div>
+              <div id='timg10' class='moveimg_off' style='display:none'>hidden utility</div>
+            </body></html>
+        """.trimIndent())
+
+        val snapshot = PumSnapshot.withStaticCard(live, null)
+
+        assertTrue(snapshot.select("#gaejukimg, style#styleGaejuki").isEmpty())
+        assertEquals("https://images.example.test/post.png", snapshot.selectFirst(".write_div img.post-image")!!.attr("src"))
+        assertEquals("hidden utility", snapshot.selectFirst("#timg10.moveimg_off")!!.text())
+    }
+
+    @Test
+    fun gaejukCleanupDoesNotRemoveANonStyleElementWithTheDecorationStyleId() {
+        val document = Jsoup.parse("<div id='styleGaejuki'>keep collision</div>")
+
+        PumSnapshot.removeGaejukDecoration(document)
+
+        assertEquals("keep collision", document.selectFirst("div#styleGaejuki")!!.text())
+    }
+
+    @Test
     fun finalCleanupPreservesGeneratedCommentDisplayStylesAndRemovesHandlers() {
         val snapshot = PumSnapshot.withStaticCard(dcPage(), null)
         snapshot.selectFirst(".view_comment")!!.append("""

@@ -1,3 +1,35 @@
+# 완장봇 1.5.0-beta7
+
+## 1.5.0-beta7 배포 완료
+
+### 수정 사항
+- 저장 성공 로그는 한 번만 표시되도록 정리하되, 일반 스냅샷과 차단 증거 스냅샷의 기존 저장 생명주기는 그대로 유지합니다.
+- DCInside 원본 스냅샷에서 추천·비추천·실베추·펌·공유·스크랩·신고 버튼의 실제 DOM과 외형을 보존합니다.
+- 보존 버튼은 종류별 한 개씩 정확히 7개만 남기고 실행 속성·중첩 링크·원격 미디어를 제거해 정적으로 표시합니다.
+- 게시글 본문과 이미지는 유지하면서 움직이는 강아지 장식과 해당 전용 스타일만 제거합니다.
+
+### 검증
+- 첨부된 실제 `laboratory1/2317` 원본 HTML에서 버튼 7개, 펌 카드, 본문, 댓글, 원본 DC 구조 보존 확인
+- debug/release 단위 테스트 각각 208개 통과
+- `lintDebug` 오류 0
+- `assembleRelease` 및 APK v2 서명 검증 통과
+- DEX `invoke-*/range` 최대 입력 `246/255` — 여유 9워드
+- 적대적 중복 버튼·위조 추천 박스·중첩 실행 요소 회귀 테스트 통과
+- 최종 독립 보안·정확성 리뷰 승인
+- Room DB 버전 8 유지, 마이그레이션 없음
+
+### 배포 정보
+- versionName: `1.5.0`
+- versionCode: `155`
+- APK: `완장봇_v1.5.0-beta7.apk`
+- 크기: `12,912,334 bytes`
+- SHA-256: `6510f89c07d6f419bfc06cae9a8e52b267f950355d3897a037ef9e41176fac98`
+- Drive 파일 ID: `1aOcDxe1S4sF71kFijDilx1BGgddExD9N`
+- Drive 링크: https://drive.google.com/file/d/1aOcDxe1S4sF71kFijDilx1BGgddExD9N/view?usp=drivesdk
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
+---
+
 # 완장봇 1.5.0-beta4
 
 ## 1.5.0-beta4 배포 완료

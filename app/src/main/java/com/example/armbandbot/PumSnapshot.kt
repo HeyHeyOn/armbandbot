@@ -46,6 +46,30 @@ object PumSnapshot {
     }
 
     internal fun removeExecutableBehavior(document: Document) {
+        removeGaejukDecoration(document)
+
+        val controlClasses = listOf(
+            "btn_recom_up", "btn_recom_down", "btn_silbechu", "btn_cloned",
+            "btn_snsmore", "btn_snscrap", "btn_report",
+        )
+        val authoritativeBox = document.selectFirst(
+            "#container article > .view_content_wrap > .gallview_contents > .positionr > .btn_recommend_box"
+        )
+        val retainedButtons = authoritativeBox?.let { box ->
+            val candidates = box.select("button").filter { button ->
+                controlClasses.count(button::hasClass) == 1
+            }
+            controlClasses.mapNotNull { controlClass ->
+                candidates.firstOrNull { it.hasClass(controlClass) }
+            }.takeIf { it.size == controlClasses.size }?.toSet()
+        }.orEmpty()
+
+        document.select(".btn_recommend_box")
+            .filterNot { it === authoritativeBox && retainedButtons.size == controlClasses.size }
+            .forEach(Element::remove)
+        document.select("button").filterNot(retainedButtons::contains).forEach(Element::remove)
+        retainedButtons.forEach(::sanitizeButtonDescendants)
+
         document.select("iframe").toList().forEach { iframe ->
             val source = safeUrl(iframe.attr("src"), allowFragment = false)
             if (source != null && runCatching { URI(source).path.orEmpty().contains("/voice/player") }.getOrDefault(false)) {
@@ -58,20 +82,28 @@ object PumSnapshot {
         document.select("link").filterNot(::isSafeStylesheet).forEach(Element::remove)
         document.select("style").filter { it.parent()?.tagName() != "head" }.forEach(Element::remove)
         document.select(
-            "script, base, meta[http-equiv=refresh], form, iframe, object, embed, input, button, " +
+            "script, base, meta[http-equiv=refresh], form, iframe, object, embed, input, " +
                 "textarea, select, option, frame, canvas, template, svg, math"
         ).remove()
 
+        val inertButtonAttributes = setOf(
+            "action", "method", "enctype", "target", "popover", "disabled",
+            "form", "formaction", "formmethod", "formenctype", "formtarget", "name", "value",
+            "autofocus", "popovertarget", "popovertargetaction", "command", "commandfor",
+            "formnovalidate", "interestfor", "interesttarget"
+        )
         val alwaysRemove = setOf(
             "srcdoc", "srcset", "cite", "background", "xlink:href", "action", "formaction",
             "data", "ping", "manifest", "usemap", "codebase", "archive"
         )
         val validatedUrls = setOf("href", "src", "poster", "data-original", "data-src")
         document.allElements.forEach { element ->
+            if (element.tagName() == "button") element.attr("type", "button")
             element.attributes().asList().toList().forEach { attribute ->
                 val name = attribute.key.lowercase(Locale.ROOT)
                 when {
-                    name.startsWith("on") || name in alwaysRemove -> element.removeAttr(attribute.key)
+                    name.startsWith("on") || name in alwaysRemove ||
+                        (element.tagName() == "button" && name in inertButtonAttributes) -> element.removeAttr(attribute.key)
                     name == "style" && !isSafeInlineStyle(attribute.value) -> element.removeAttr(attribute.key)
                     name in validatedUrls -> {
                         val safe = safeUrl(attribute.value, allowFragment = name == "href")
@@ -80,6 +112,37 @@ object PumSnapshot {
                 }
             }
         }
+    }
+
+    private fun sanitizeButtonDescendants(button: Element) {
+        button.select(
+            "script, base, meta, link, style, iframe, frame, object, embed, img, picture, source, " +
+                "video, audio, track, canvas, template, svg, math"
+        ).remove()
+
+        button.getAllElements().drop(1).asReversed().forEach { descendant ->
+            if (descendant.tagName() != "span" && descendant.tagName() != "em") descendant.unwrap()
+        }
+
+        val unsafeDescendantAttributes = setOf(
+            "href", "src", "srcset", "poster", "data-original", "data-src", "srcdoc", "cite",
+            "background", "xlink:href", "action", "formaction", "data", "ping", "manifest",
+            "usemap", "codebase", "archive", "form", "tabindex", "contenteditable", "draggable",
+            "autofocus", "popover", "popovertarget", "popovertargetaction", "command", "commandfor",
+            "interestfor", "interesttarget",
+        )
+        button.getAllElements().drop(1).forEach { descendant ->
+            descendant.attributes().asList().toList().forEach { attribute ->
+                val name = attribute.key.lowercase(Locale.ROOT)
+                if (name.startsWith("on") || name in unsafeDescendantAttributes) {
+                    descendant.removeAttr(attribute.key)
+                }
+            }
+        }
+    }
+
+    internal fun removeGaejukDecoration(document: Document) {
+        document.select("#gaejukimg, style#styleGaejuki").remove()
     }
 
     private fun isSafeStylesheet(link: Element): Boolean {

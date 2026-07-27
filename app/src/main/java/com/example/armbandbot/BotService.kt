@@ -3091,7 +3091,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 },
                 pumResolution = snapshotPumResolution,
             )
-            if (config.isDebugMode) {
+            if (config.isDebugMode && SnapshotLogPolicy.shouldLogPerformance(blockedTs, blockedCommentNo)) {
                 sendLog("[디버그][성능] 스냅샷 저장 / 글번호: $postNumStr / ${System.currentTimeMillis() - snapshotStartedAt}ms", botId)
             }
             return result
