@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -42,6 +43,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -380,6 +382,53 @@ private fun KeywordActionSettingsSection(
     }
 }
 
+@Composable
+private fun PumRecheckEveryCycleSetting(
+    botId: String,
+    botPref: SharedPreferences,
+    textColor: Color,
+    subTextColor: Color,
+    dividerColor: Color,
+    isDarkMode: Boolean,
+) {
+    var recheckEveryCycle by remember(botId) {
+        mutableStateOf(botPref.getBoolean("pum_recheck_every_cycle", false))
+    }
+    HorizontalDivider(color = dividerColor, modifier = Modifier.padding(vertical = 8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth().toggleable(
+            value = recheckEveryCycle,
+            role = Role.Switch,
+            onValueChange = { enabled ->
+                recheckEveryCycle = enabled
+                botPref.edit().putBoolean("pum_recheck_every_cycle", enabled).apply()
+            },
+        ).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("펌 게시물을 매 사이클마다 검사", fontWeight = FontWeight.Bold, color = textColor)
+            Text(
+                "변경이 없어도 현재 탐색 범위의 펌 게시물을 매번 다시 검사합니다.",
+                fontSize = 12.sp,
+                color = subTextColor,
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Switch(
+            checked = recheckEveryCycle,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = PastelNavy,
+                uncheckedThumbColor = if (isDarkMode) Color.LightGray else Color.White,
+                uncheckedTrackColor = if (isDarkMode) Color(0xFF555555) else Color.LightGray,
+            ),
+        )
+    }
+}
+
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsumed: () -> Unit, onBack: () -> Unit) {
@@ -433,8 +482,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
     var isSnapshotAll by remember { mutableStateOf(botPref.getBoolean("is_snapshot_all", false)) }
     var htmlSnapshotPathToView by remember { mutableStateOf<String?>(null) }
 
-    var devModeClickCount by remember { mutableStateOf(0) }
-    var lastDevModeClickTime by remember { mutableStateOf(0L) }
     var isDevModeUnlocked by remember { mutableStateOf(masterPref.getBoolean("dev_mode_unlocked", false)) }
     var botName by remember { mutableStateOf(botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇") }
     var myCookie by remember { mutableStateOf(botPref.getString("saved_cookie", null)) }
@@ -1709,6 +1756,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             DelayInputRow("게시물 사이 간격", postMinText, postMaxText, "초", { postMinText = it; botPref.edit().putFloat("delay_post_min_sec", it.toFloatOrNull() ?: 1.0f).apply() }, { postMaxText = it; botPref.edit().putFloat("delay_post_max_sec", it.toFloatOrNull() ?: 2.5f).apply() }, colors)
                                             DelayInputRow("페이지 전환 간격", pageMinText, pageMaxText, "초", { pageMinText = it; botPref.edit().putFloat("delay_page_min_sec", it.toFloatOrNull() ?: 2.0f).apply() }, { pageMaxText = it; botPref.edit().putFloat("delay_page_max_sec", it.toFloatOrNull() ?: 4.0f).apply() }, colors)
                                             DelayInputRow("1사이클 종료 후 대기", cycleMinText, cycleMaxText, "초", { cycleMinText = it; botPref.edit().putFloat("delay_cycle_min_sec", it.toFloatOrNull() ?: 45.0f).apply() }, { cycleMaxText = it; botPref.edit().putFloat("delay_cycle_max_sec", it.toFloatOrNull() ?: 90.0f).apply() }, colors)
+                                            PumRecheckEveryCycleSetting(
+                                                botId = botId,
+                                                botPref = botPref,
+                                                textColor = textColor,
+                                                subTextColor = subTextColor,
+                                                dividerColor = dividerColor,
+                                                isDarkMode = isDarkMode,
+                                            )
                                         }
                                     }
                                 }
@@ -1853,29 +1908,35 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     ModernSettingItem("AI 필터", "게시글 2차 AI 검토", Icons.Filled.AutoAwesome, colors, isAiFilterMode, { isAiFilterMode = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }) { currentSubScreen = "AI" }
                                 }
                                 ModernSettingItem("스팸코드 필터", "대문자+숫자 조합 문자열 차단", Icons.Filled.Warning, colors, isSpamCodeFilterMode, { isSpamCodeFilterMode = it; botPref.edit().putBoolean("is_spam_code_filter_mode", it).apply() }) { currentSubScreen = "SPAM" }
-                                ModernSettingItem("특수문자 필터", "일반 허용 문자 외 특수문자 차단", Icons.Filled.Warning, colors, isSpecialCharFilterMode, { isSpecialCharFilterMode = it; botPref.edit().putBoolean("is_special_char_filter_mode", it).apply() }) { currentSubScreen = "SPECIAL_CHAR" }
+                                ModernSettingItem("특수문자 필터", "일반 허용 문자 외 특수문자 차단", Icons.Filled.AlternateEmail, colors, isSpecialCharFilterMode, { isSpecialCharFilterMode = it; botPref.edit().putBoolean("is_special_char_filter_mode", it).apply() }) { currentSubScreen = "SPECIAL_CHAR" }
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("시스템 관리", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
                                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = cardColor)) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth().clickable(
-                                            onClick = {
-                                                val now = System.currentTimeMillis()
-                                                if (now - lastDevModeClickTime > 3000) devModeClickCount = 0
-                                                devModeClickCount++
-                                                lastDevModeClickTime = now
-                                                if (devModeClickCount >= 5 && !isDevModeUnlocked) {
-                                                    isDevModeUnlocked = true
-                                                    masterPref.edit().putBoolean("dev_mode_unlocked", true).apply()
-                                                    Toast.makeText(context, "개발자 설정을 표시합니다.", Toast.LENGTH_SHORT).show()
-                                                }
-                                                isDebugMode = !isDebugMode
-                                                botPref.edit().putBoolean("is_debug_mode", isDebugMode).apply()
-                                            }
-                                        ).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Row(modifier = Modifier.fillMaxWidth().clickable {
+                                            isDebugMode = !isDebugMode
+                                            botPref.edit().putBoolean("is_debug_mode", isDebugMode).apply()
+                                        }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                             Text("디버그 로그 출력", fontWeight = FontWeight.Bold, color = textColor)
                                             Switch(checked = isDebugMode, onCheckedChange = null, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray, uncheckedBorderColor = Color.Transparent), modifier = Modifier.scale(0.8f))
+                                        }
+
+                                        if (!isDevModeUnlocked) {
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Divider(color = dividerColor)
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            OutlinedButton(
+                                                onClick = {
+                                                    isDevModeUnlocked = true
+                                                    masterPref.edit().putBoolean("dev_mode_unlocked", true).apply()
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                            ) {
+                                                Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("개발자 설정 열기")
+                                            }
                                         }
 
                                         if (isDevModeUnlocked) {
@@ -1939,7 +2000,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                             Button(
                                                 onClick = {
                                                     isDevModeUnlocked = false
-                                                    devModeClickCount = 0
                                                     masterPref.edit().putBoolean("dev_mode_unlocked", false).apply()
                                                 },
                                                 colors = ButtonDefaults.buttonColors(

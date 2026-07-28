@@ -80,9 +80,7 @@ fun PumFilterSettingsPanel(
     var blockAllPosts by remember(botId) {
         mutableStateOf(botPref.getBoolean("pum_block_all_posts", false))
     }
-    var recheckEveryCycle by remember(botId) {
-        mutableStateOf(botPref.getBoolean("pum_recheck_every_cycle", false))
-    }
+
     var useCustomAction by remember(botId) {
         mutableStateOf(botPref.getBoolean("pum_use_custom_action_config", false))
     }
@@ -135,20 +133,7 @@ fun PumFilterSettingsPanel(
                         onFilterEnabledChange(enabled)
                     },
                 )
-                HorizontalDivider(color = dividerColor)
-                PumSwitchRow(
-                    title = "펌 글을 매 사이클마다 검사",
-                    description = null,
-                    checked = recheckEveryCycle,
-                    enabled = true,
-                    textColor = textColor,
-                    subTextColor = subTextColor,
-                    switchColors = switchColors,
-                    onCheckedChange = { enabled ->
-                        recheckEveryCycle = enabled
-                        botPref.edit().putBoolean("pum_recheck_every_cycle", enabled).apply()
-                    },
-                )
+
             }
         }
 
