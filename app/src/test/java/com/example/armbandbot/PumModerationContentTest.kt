@@ -75,8 +75,10 @@ class PumModerationContentTest {
         assertTrue(source.text.contains("source title"))
         assertTrue(source.text.contains("source body"))
         assertTrue(source.text.contains("source image text"))
-        assertTrue(source.text.contains(checkNotNull(resolved.sourceUrl)))
+        assertFalse(source.text.contains(checkNotNull(resolved.sourceUrl)))
         assertTrue(source.text.contains("https://source.example/path?q=1"))
+        assertFalse(source.text.contains("https://cdn.example/source.jpg"))
+        assertFalse(source.text.contains("https://gall.dcinside.com/voice/player?id=voice-42"))
         assertEquals(listOf("source image text"), source.imageAlts)
         assertEquals(resolved.sanitizedHtml, source.rawHtml)
         assertEquals(resolved.mediaSources, source.mediaSources)
@@ -107,7 +109,7 @@ class PumModerationContentTest {
         ) { splitSource }
 
         assertEquals("ab", result.outerOriginal.text)
-        assertEquals("c123\n${resolved.sourceUrl}\nhttps://source.example/path?q=1\nhttps://cdn.example/source.jpg\nhttps://gall.dcinside.com/voice/player?id=voice-42", result.resolvedSourceOnly?.text)
+        assertEquals("c123\nhttps://source.example/path?q=1", result.resolvedSourceOnly?.text)
         assertFalse(result.outerOriginal.text.contains("abc123"))
         assertFalse(checkNotNull(result.resolvedSourceOnly).text.contains("abc123"))
         // Current callers still receive legacy combined values. Origin-aware filtering must use the

@@ -154,8 +154,8 @@ class PostChangeDetectionTest {
     }
 
     @Test
-    fun everyCycleDoesNotForcePumRowsWhenSourceFilteringIsDisabled() {
-        assertFalse(
+    fun everyCycleRecheckIsIndependentOfLegacySourceToggle() {
+        assertTrue(
             shouldRecheckPost(
                 savedCommentCount = 3,
                 currentCommentCount = 3,
@@ -211,8 +211,8 @@ class PostChangeDetectionTest {
     }
 
     @Test
-    fun blockAllDoesNotRecheckWhenMasterIsDisabled() {
-        assertFalse(
+    fun blockAllRechecksWithoutLegacySourceToggle() {
+        assertTrue(
             shouldRecheckPost(
                 savedCommentCount = 3,
                 currentCommentCount = 3,

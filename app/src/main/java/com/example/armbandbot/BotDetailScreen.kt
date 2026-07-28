@@ -732,6 +732,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var kkangBlockReasonText by remember { mutableStateOf(botPref.getString("kkang_block_reason_text", null) ?: blockReasonText) }
         var kkangDeletePostOnBlock by remember { mutableStateOf(if (botPref.contains("kkang_delete_post_on_block")) botPref.getBoolean("kkang_delete_post_on_block", true) else isDeletePostOnBlock) }
         var kkangDeleteOnlyMode by remember { mutableStateOf(if (botPref.contains("kkang_delete_only_mode")) botPref.getBoolean("kkang_delete_only_mode", false) else isDeleteOnlyMode) }
+        var pumBlockReasonText by remember { mutableStateOf(botPref.getString("pum_block_reason_text", null) ?: blockReasonText) }
 
         var isNotiMaster by remember { mutableStateOf(botPref.getBoolean("noti_master", true)) }
         var isNotiKeyword by remember { mutableStateOf(botPref.getBoolean("noti_keyword", true)) }
@@ -804,7 +805,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val isAiFilterVisible = true
         var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
         var notiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
-        var isPumSourceFilterMode by remember { mutableStateOf(botPref.getBoolean("is_pum_source_filter_mode", false)) }
+        var isPumFilterMode by remember { mutableStateOf(botPref.getBoolean("pum_block_all_posts", false)) }
 
         var isSpamCodeFilterMode by remember { mutableStateOf(botPref.getBoolean("is_spam_code_filter_mode", false)) }
         var spamCodeLengthText by remember { mutableStateOf(botPref.getInt("spam_code_length", 6).toString()) }
@@ -926,7 +927,12 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 "PUM" -> {
                                     PumFilterSettingsPanel(
                                         botId = botId,
-                                        onMasterEnabledChange = { isPumSourceFilterMode = it },
+                                        blockReason = pumBlockReasonText,
+                                        onFilterEnabledChange = { isPumFilterMode = it },
+                                        onEditBlockReason = {
+                                            tempEditText = pumBlockReasonText
+                                            editDialogType = "pum_block_reason"
+                                        },
                                     )
                                 }
                                 "GALLERY_REFRESH" -> {
@@ -1828,8 +1834,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("게시물 차단 필터", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
-                                ModernSettingItem("펌 필터", "펌 게시글 원문 검사 및 선택적 전체 차단 설정", PumFilterIcon, colors, isPumSourceFilterMode, { isPumSourceFilterMode = it; botPref.edit().putBoolean("is_pum_source_filter_mode", it).apply() }) { currentSubScreen = "PUM" }
                                 ModernSettingItem("금지어 필터", "금지어 기반 차단 설정", Icons.Filled.Create, colors) { currentSubScreen = "WORD" }
+                                ModernSettingItem("펌 필터", "펌 게시글 전체 차단 설정", PumFilterIcon, colors, isPumFilterMode, { isPumFilterMode = it; botPref.edit().putBoolean("pum_block_all_posts", it).apply() }) { currentSubScreen = "PUM" }
                                 ModernSettingItem("유저 ID/IP 필터", "식별코드/IP 기반 차단 설정", Icons.Filled.Person, colors, isUserFilterMode, { isUserFilterMode = it; botPref.edit().putBoolean("is_user_filter_mode", it).apply() }) { currentSubScreen = "USER" }
                                 ModernSettingItem("닉네임 필터", "닉네임 기반 차단 설정", Icons.Filled.Face, colors, isNicknameFilterMode, { isNicknameFilterMode = it; botPref.edit().putBoolean("is_nickname_filter_mode", it).apply() }) { currentSubScreen = "NICKNAME" }
                                 ModernSettingItem("유동 필터", "비로그인 유저 이용 제한", Icons.Filled.Lock, colors) { currentSubScreen = "YUDONG" }
@@ -2148,9 +2154,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         if (editDialogType != null) {
-            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "dccon_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason" || editDialogType == "overseas_ip_block_reason"
+            val isSingleLine = editDialogType == "bot_name" || editDialogType == "block_reason" || editDialogType == "ai_block_reason" || editDialogType == "keyword_block_reason" || editDialogType == "user_block_reason" || editDialogType == "nickname_block_reason" || editDialogType == "url_block_reason" || editDialogType == "voice_block_reason" || editDialogType == "image_block_reason" || editDialogType == "dccon_block_reason" || editDialogType == "spam_block_reason" || editDialogType == "yudong_block_reason" || editDialogType == "kkang_block_reason" || editDialogType == "overseas_ip_block_reason" || editDialogType == "pum_block_reason"
             val title = when(editDialogType) {
-                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "dccon_block_reason" -> "디시콘 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "block_exempt_post_numbers" -> "차단 예외 글 번호 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_bypass_blacklist" -> "우회 방지 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "special_char_whitelist" -> "특수문자 화이트리스트 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "dccon_blacklist" -> "차단할 디시콘 URL/토큰 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
+                "bot_name" -> "봇 이름 수정"; "block_reason" -> "차단 사유 설정"; "ai_block_reason" -> "AI 필터 차단 사유 설정"; "keyword_block_reason" -> "금지어 필터 차단 사유 설정"; "user_block_reason" -> "유저 필터 차단 사유 설정"; "nickname_block_reason" -> "닉네임 필터 차단 사유 설정"; "url_block_reason" -> "URL 필터 차단 사유 설정"; "voice_block_reason" -> "보이스 필터 차단 사유 설정"; "image_block_reason" -> "이미지 필터 차단 사유 설정"; "dccon_block_reason" -> "디시콘 필터 차단 사유 설정"; "spam_block_reason" -> "스팸코드 필터 차단 사유 설정"; "yudong_block_reason" -> "유동 필터 차단 사유 설정"; "kkang_block_reason" -> "깡계 필터 차단 사유 설정"; "overseas_ip_block_reason" -> "해외 IP 필터 차단 사유 설정"; "pum_block_reason" -> "펌 필터 차단 사유 설정"; "block_exempt_post_numbers" -> "차단 예외 글 번호 설정"; "normal" -> "일반 금지어 설정"; "bypass" -> "우회 금지어 설정"; "search" -> "검색어 설정"; "url" -> "관리할 갤러리 URL 설정"; "url_whitelist" -> "허용할 URL 도메인 설정"; "user_blacklist" -> "차단할 유저 ID/IP 설정"; "user_whitelist" -> "보호할 유저 ID/IP 설정"; "nickname_blacklist" -> "차단할 닉네임 설정"; "nickname_bypass_blacklist" -> "우회 방지 닉네임 설정"; "nickname_whitelist" -> "보호할 닉네임 설정"; "special_char_whitelist" -> "특수문자 화이트리스트 설정"; "image_alt_blacklist" -> "차단할 이미지 alt값 설정"; "dccon_blacklist" -> "차단할 디시콘 URL/토큰 설정"; "voice_blacklist" -> "차단할 보이스 ID 설정"; else -> ""
             }
             val placeholderMsg = when(editDialogType) {
                 "bot_name" -> "새로운 봇 이름을 입력하세요"
@@ -2167,6 +2173,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "yudong_block_reason" -> "예: 유동 필터 위반"
                 "kkang_block_reason" -> "예: 깡계 필터 위반"
                 "overseas_ip_block_reason" -> "예: 해외 IP 작성 제한"
+                "pum_block_reason" -> "예: 펌 게시글 작성 제한"
                 "block_exempt_post_numbers" -> "줄바꿈으로 글 번호를 입력합니다. (# ← 뒷부분은 무시됨)\n[예시]\n12345 #신문고\n67890"
                 "url" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\nhttps://gall.dcinside.com/..."
                 "user_blacklist", "user_whitelist" -> "줄바꿈으로 구분합니다. (# ← 뒷부분은 무시됨)\n[예시]\ngonick1234 #김고닉\n123.456 #박유동"
@@ -2206,6 +2213,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "yudong_block_reason" -> { yudongBlockReasonText = tempEditText; botPref.edit().putString("yudong_block_reason_text", tempEditText).apply() }
                         "kkang_block_reason" -> { kkangBlockReasonText = tempEditText; botPref.edit().putString("kkang_block_reason_text", tempEditText).apply() }
                         "overseas_ip_block_reason" -> { overseasIpBlockReasonText = tempEditText; botPref.edit().putString("overseas_ip_block_reason_text", tempEditText).apply() }
+                        "pum_block_reason" -> { pumBlockReasonText = tempEditText; botPref.edit().putString("pum_block_reason_text", tempEditText).apply() }
                         "normal" -> { normalWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("normal", tempEditText) }
                         "bypass" -> { bypassWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("bypass", tempEditText) }
                         "search" -> { searchWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("search_keywords", tempEditText) }

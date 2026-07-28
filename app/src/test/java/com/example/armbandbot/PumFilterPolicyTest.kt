@@ -96,22 +96,16 @@ class PumFilterPolicyTest {
         )
     }
 
-    @Test fun `block all snapshot policy never invokes source resolver regardless of moderation winner`() {
+    @Test fun `block all snapshot policy still resolves source for mandatory inspection`() {
         var calls = 0
 
-        listOf(
-            PumFilterOrigin.PUM_BLOCK_ALL,
-            PumFilterOrigin.OUTER_FILTER,
-            PumFilterOrigin.ALLOW,
-        ).forEach {
-            val result = PumSnapshotSourcePolicy.resolve(blockAllActive = true) {
-                calls++
-                "unexpected"
-            }
-            assertEquals(null, result)
+        val result = PumSnapshotSourcePolicy.resolve(blockAllActive = true) {
+            calls++
+            "resolved"
         }
 
-        assertEquals(0, calls)
+        assertEquals("resolved", result)
+        assertEquals(1, calls)
     }
 
     @Test fun `inactive block-all snapshot policy retains source decoration`() {
@@ -136,9 +130,34 @@ class PumFilterPolicyTest {
         )
     }
 
-    @Test fun `master off non PUM parse failure and skipped ignore source decisions`() {
+    @Test fun `whitelisted posts never enter AI stage`() {
+        assertFalse(PostAiStagePolicy.shouldRun(
+            aiEnabled = true,
+            localOrigin = PumFilterOrigin.ALLOW,
+            whitelisted = true,
+        ))
+        assertTrue(PostAiStagePolicy.shouldRun(
+            aiEnabled = true,
+            localOrigin = PumFilterOrigin.ALLOW,
+            whitelisted = false,
+        ))
+        assertFalse(PostAiStagePolicy.shouldRun(
+            aiEnabled = true,
+            localOrigin = PumFilterOrigin.PUM_BLOCK_ALL,
+            whitelisted = false,
+        ))
+    }
+
+    @Test fun `legacy source toggle does not gate confirmed PUM moderation`() {
+        assertEquals(
+            PumFilterOrigin.PUM_BLOCK_ALL,
+            decision(false, PumStructuralState.DETECTED, true, false, true).origin,
+        )
+        assertEquals(
+            PumFilterOrigin.PUM_SOURCE_FILTER,
+            decision(false, PumStructuralState.DETECTED, false, false, true).origin,
+        )
         listOf(
-            decision(false, PumStructuralState.DETECTED, true, false, true),
             decision(true, PumStructuralState.NOT_PUM, true, false, true),
             decision(true, PumStructuralState.PARSE_FAILED, true, false, true),
             decision(true, PumStructuralState.SKIPPED, true, false, true),
@@ -179,7 +198,7 @@ class PumFilterPolicyTest {
         ).forEach { assertTrue(PumFilterResult(it).isBlocked) }
     }
 
-    @Test fun `runtime routing retains outer detector but routes PUM origins to pum override`() {
+    @Test fun `runtime routing uses pum override only for block all`() {
         val target = PostKey("M", "outer-gallery", "901")
         val outer = PumRuntimeRouting.route(
             origin = PumFilterOrigin.OUTER_FILTER,
@@ -212,23 +231,23 @@ class PumFilterPolicyTest {
             sourceFilterSource = "voice",
         )
         assertEquals(target, source.targetPostKey)
-        assertEquals("pum", source.actionOverridePrefix)
+        assertEquals("voice", source.actionOverridePrefix)
         assertEquals("voice", source.notificationType)
-        assertEquals("펌 원문 금지 보이스 ID 감지 (voice-7)", source.reason)
+        assertEquals("금지 보이스 ID 감지 (voice-7)", source.reason)
     }
 
-    @Test fun `source notification uses detector category while PUM action override stays independent`() {
+    @Test fun `source matches retain detector action notification and reason`() {
         val target = PostKey("M", "g", "1")
-        val cases = mapOf(
-            "keyword" to "keyword",
-            "url" to "url",
-            "image" to "image",
-            "dccon" to "image",
-            "voice" to "voice",
-            "spam" to "spam",
-            "special_char" to "spam",
+        val cases = listOf(
+            Triple("keyword", "keyword", "keyword"),
+            Triple("url", "url", "url"),
+            Triple("image", "image", "image"),
+            Triple("dccon", "dccon", "image"),
+            Triple("voice", "voice", "voice"),
+            Triple("spam", "spam", "spam"),
+            Triple("special_char", null, "spam"),
         )
-        cases.forEach { (detector, expectedNotification) ->
+        cases.forEach { (detector, expectedAction, expectedNotification) ->
             val route = PumRuntimeRouting.route(
                 origin = PumFilterOrigin.PUM_SOURCE_FILTER,
                 targetPostKey = target,
@@ -237,9 +256,9 @@ class PumFilterPolicyTest {
                 sourceReason = null,
                 sourceFilterSource = detector,
             )
-            assertEquals("pum", route.actionOverridePrefix)
+            assertEquals(expectedAction, route.actionOverridePrefix)
             assertEquals(expectedNotification, route.notificationType)
-            assertEquals("펌 원문 필터 규칙 감지", route.reason)
+            assertEquals("필터 규칙 감지", route.reason)
         }
     }
 
@@ -251,10 +270,13 @@ class PumFilterPolicyTest {
             )
             assertEquals(detector, PumRuntimeRouting.actionPrefix(ModerationWinner.OUTER_FILTER, route))
         }
-        listOf(PumFilterOrigin.PUM_BLOCK_ALL, PumFilterOrigin.PUM_SOURCE_FILTER).forEach { origin ->
-            val route = PumRuntimeRouting.route(origin, target, "dccon", null)
-            assertEquals("pum", PumRuntimeRouting.actionPrefix(ModerationWinner.PUM, route))
-        }
+        val blockAll = PumRuntimeRouting.route(PumFilterOrigin.PUM_BLOCK_ALL, target, "dccon", null)
+        assertEquals("pum", PumRuntimeRouting.actionPrefix(ModerationWinner.PUM, blockAll))
+        val source = PumRuntimeRouting.route(
+            PumFilterOrigin.PUM_SOURCE_FILTER, target, null, null,
+            sourceReason = "금지 디시콘 감지", sourceFilterSource = "dccon",
+        )
+        assertEquals("dccon", PumRuntimeRouting.actionPrefix(ModerationWinner.PUM, source))
         val allow = PumRuntimeRouting.route(PumFilterOrigin.ALLOW, target, null, null)
         assertEquals("ai", PumRuntimeRouting.actionPrefix(ModerationWinner.AI, allow))
         assertEquals(null, PumRuntimeRouting.actionPrefix(ModerationWinner.ALLOW, allow))
@@ -278,8 +300,7 @@ class PumFilterPolicyTest {
                 outerReason = null,
                 sourceReason = detectorReason,
             )
-            assertEquals("pum", routed.actionOverridePrefix)
-            assertEquals("펌 원문 $detectorReason", routed.reason)
+            assertEquals(detectorReason, routed.reason)
             assertEquals(target, routed.targetPostKey)
         }
     }

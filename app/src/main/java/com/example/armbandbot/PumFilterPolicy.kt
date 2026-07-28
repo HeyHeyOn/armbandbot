@@ -92,9 +92,9 @@ object PumRuntimeRouting {
         )
         PumFilterOrigin.PUM_SOURCE_FILTER -> PumRuntimeRoute(
             targetPostKey = targetPostKey,
-            actionOverridePrefix = "pum",
+            actionOverridePrefix = actionOverridePrefixFor(sourceFilterSource),
             notificationType = notificationTypeFor(sourceFilterSource),
-            reason = "펌 원문 ${sourceReason?.trim().takeUnless { it.isNullOrEmpty() } ?: "필터 규칙 감지"}",
+            reason = sourceReason ?: "필터 규칙 감지",
         )
         PumFilterOrigin.ALLOW -> PumRuntimeRoute(targetPostKey, null, null, null)
     }
@@ -120,10 +120,12 @@ object PumRuntimeRouting {
     }
 }
 
-/** Prevents snapshot decoration from bypassing the block-all source-fetch short circuit. */
+/** Snapshot decoration retains mandatory source inspection even in block-all mode. */
 object PumSnapshotSourcePolicy {
-    inline fun <T> resolve(blockAllActive: Boolean, resolver: () -> T?): T? =
-        if (blockAllActive) null else resolver()
+    inline fun <T> resolve(
+        @Suppress("UNUSED_PARAMETER") blockAllActive: Boolean,
+        resolver: () -> T?,
+    ): T? = resolver()
 }
 
 enum class AiStageOutcome {
@@ -156,9 +158,20 @@ object ModerationWinnerPolicy {
         }
 }
 
+/** A protected author is exempt from every AI post-moderation path. */
+object PostAiStagePolicy {
+    fun shouldRun(
+        aiEnabled: Boolean,
+        localOrigin: PumFilterOrigin,
+        whitelisted: Boolean,
+    ): Boolean = aiEnabled && !whitelisted &&
+        ModerationWinnerPolicy.decide(localOrigin, AiStageOutcome.SKIPPED) == ModerationWinner.ALLOW
+}
+
 /** Pure priority policy; callers remain responsible for evaluating the two origin-specific inputs. */
 object PumFilterPolicy {
     fun decide(
+        @Suppress("UNUSED_PARAMETER")
         masterEnabled: Boolean,
         structuralState: PumStructuralState,
         blockAllPumPosts: Boolean,
@@ -166,7 +179,7 @@ object PumFilterPolicy {
         sourceFilter: PumSourceFilterState,
     ): PumFilterResult {
         if (outerBlocked) return PumFilterResult(PumFilterOrigin.OUTER_FILTER)
-        if (!masterEnabled || structuralState != PumStructuralState.DETECTED) {
+        if (structuralState != PumStructuralState.DETECTED) {
             return PumFilterResult(PumFilterOrigin.ALLOW)
         }
         if (blockAllPumPosts) return PumFilterResult(PumFilterOrigin.PUM_BLOCK_ALL)

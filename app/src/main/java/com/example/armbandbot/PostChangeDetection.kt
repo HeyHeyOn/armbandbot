@@ -15,7 +15,7 @@ fun shouldRecheckPost(
     if (savedCommentCount != currentCommentCount) return true
     if (normalizePostTitle(savedTitle) != normalizePostTitle(currentTitle)) return true
     if (snapshotBackfillRequired) return true
-    return isPumSourceFilterMode && hasPumListMarker &&
+    return hasPumListMarker &&
         (pumBlockAllPosts || pumRecheckEveryCycle)
 }
 
@@ -27,7 +27,7 @@ fun shouldSkipPumHoldPreflight(
     rowUnchanged: Boolean,
     effectiveActionIsHold: Boolean,
     alreadyHeld: Boolean,
-): Boolean = isPumSourceFilterMode && pumBlockAllPosts && hasPumListMarker && rowUnchanged &&
+): Boolean = pumBlockAllPosts && hasPumListMarker && rowUnchanged &&
     effectiveActionIsHold && alreadyHeld
 
 private fun normalizePostTitle(title: String?): String = title.orEmpty().trim()

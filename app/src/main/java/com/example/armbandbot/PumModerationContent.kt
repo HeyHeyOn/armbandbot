@@ -156,17 +156,16 @@ class PumModerationContent private constructor(
 
             val normalizedImageAlts = normalizeValues(resolution.imageAlts)
             val normalizedMediaSources = normalizeValues(resolution.mediaSources)
-            // Source rules receive a separate plain-text input. Include sanitized link/media URLs
-            // as well as visible source fields so URL, DCCon and voice rules retain their inputs.
+            // Source rules receive visible content plus authored links. The canonical source URL and
+            // attachment transport URLs are metadata, not authored content; adding them here makes
+            // an empty URL whitelist falsely classify every resolved repost as suspicious.
             val sourceText = normalizeValues(buildList {
                 add(resolution.title)
                 add(resolution.bodyText)
                 addAll(normalizedImageAlts)
-                resolution.sourceUrl?.let(::add)
                 addAll(Jsoup.parseBodyFragment(resolution.sanitizedHtml)
                     .select("[href]")
                     .map { it.attr("href") })
-                addAll(normalizedMediaSources)
             }).joinToString("\n")
             val sourceOnly = PumModerationInput(
                 text = sourceText,

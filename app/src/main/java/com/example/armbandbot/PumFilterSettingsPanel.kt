@@ -23,8 +23,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -44,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
+import com.heyheyon.armbandbot.ui.ReadOnlyTextCard
+import com.heyheyon.armbandbot.ui.botColors
 
 private fun SharedPreferences.readNormalizedPumSettings(): NormalizedPumSettings = normalizePumSettings(
     processMode = all["pum_block_process_mode"],
@@ -55,7 +56,9 @@ private fun SharedPreferences.readNormalizedPumSettings(): NormalizedPumSettings
 @Composable
 fun PumFilterSettingsPanel(
     botId: String,
-    onMasterEnabledChange: (Boolean) -> Unit = {},
+    blockReason: String,
+    onFilterEnabledChange: (Boolean) -> Unit = {},
+    onEditBlockReason: () -> Unit,
 ) {
     val context = LocalContext.current
     val botPref = remember(botId) {
@@ -74,9 +77,6 @@ fun PumFilterSettingsPanel(
         uncheckedTrackColor = if (isDarkMode) Color(0xFF555555) else Color.LightGray,
     )
 
-    var masterEnabled by remember(botId) {
-        mutableStateOf(botPref.getBoolean("is_pum_source_filter_mode", false))
-    }
     var blockAllPosts by remember(botId) {
         mutableStateOf(botPref.getBoolean("pum_block_all_posts", false))
     }
@@ -100,9 +100,7 @@ fun PumFilterSettingsPanel(
             }
         )
     }
-    var blockReason by remember(botId) {
-        mutableStateOf(botPref.getString("pum_block_reason_text", "") ?: "")
-    }
+
     var processMenuExpanded by remember { mutableStateOf(false) }
     var durationMenuExpanded by remember { mutableStateOf(false) }
 
@@ -114,7 +112,7 @@ fun PumFilterSettingsPanel(
         336 to "336시간 (14일)",
         744 to "744시간 (31일)",
     )
-    val childAlpha = if (masterEnabled) 1f else 0.4f
+    val childAlpha = if (blockAllPosts) 1f else 0.4f
 
     Column {
         Card(
@@ -122,54 +120,27 @@ fun PumFilterSettingsPanel(
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
         ) {
-            PumSwitchRow(
-                title = "펌 필터 기능 사용",
-                description = "펌 게시글의 원문까지 검사합니다. 원문을 추가로 불러오므로 외부·원문 요청이 늘 수 있습니다. 기능을 꺼도 '펌 게시글 모두 차단'과 개별 차단 설정은 유지되며, 다시 켜면 그대로 적용됩니다.",
-                checked = masterEnabled,
-                enabled = true,
-                textColor = textColor,
-                subTextColor = subTextColor,
-                switchColors = switchColors,
-                onCheckedChange = { enabled ->
-                    masterEnabled = enabled
-                    botPref.edit().putBoolean("is_pum_source_filter_mode", enabled).apply()
-                    onMasterEnabledChange(enabled)
-                },
-            )
-        }
-
-        Text(
-            "펌 게시글 검사",
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            color = PastelNavy,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp).alpha(childAlpha),
-        )
-        Card(
-            colors = CardDefaults.cardColors(containerColor = cardColor),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp).alpha(childAlpha),
-        ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 PumSwitchRow(
-                    title = "펌 게시글 모두 차단 (선택)",
-                    description = "필요할 때만 켜는 선택 설정입니다. 현재 목록의 구조적으로 확인된 펌 글은 내용이 바뀌지 않아도 다시 검사해 모두 차단합니다. 제목에 펌 표시를 직접 입력한 것만으로는 펌 글로 판정하지 않습니다.",
+                    title = "펌 게시글 모두 차단",
+                    description = "구조적으로 확인된 펌 게시글을 내용과 관계없이 차단합니다.",
                     checked = blockAllPosts,
-                    enabled = masterEnabled,
+                    enabled = true,
                     textColor = textColor,
                     subTextColor = subTextColor,
                     switchColors = switchColors,
                     onCheckedChange = { enabled ->
                         blockAllPosts = enabled
                         botPref.edit().putBoolean("pum_block_all_posts", enabled).apply()
+                        onFilterEnabledChange(enabled)
                     },
                 )
                 HorizontalDivider(color = dividerColor)
                 PumSwitchRow(
                     title = "펌 글을 매 사이클마다 검사",
-                    description = "설정한 현재 목록 범위 안의 펌 글만 추적하며, 매 사이클 원문을 다시 검사합니다.",
+                    description = null,
                     checked = recheckEveryCycle,
-                    enabled = masterEnabled,
+                    enabled = true,
                     textColor = textColor,
                     subTextColor = subTextColor,
                     switchColors = switchColors,
@@ -195,9 +166,9 @@ fun PumFilterSettingsPanel(
         ) {
             PumSwitchRow(
                 title = "개별 차단 설정 사용",
-                description = "끄면 차단 기본 설정을 따릅니다.",
+                description = null,
                 checked = useCustomAction,
-                enabled = masterEnabled,
+                enabled = blockAllPosts,
                 textColor = textColor,
                 subTextColor = subTextColor,
                 switchColors = switchColors,
@@ -208,7 +179,7 @@ fun PumFilterSettingsPanel(
             )
         }
 
-        val actionSettingsEnabled = masterEnabled && useCustomAction
+        val actionSettingsEnabled = blockAllPosts && useCustomAction
         Card(
             colors = CardDefaults.cardColors(containerColor = cardColor),
             shape = RoundedCornerShape(12.dp),
@@ -316,36 +287,13 @@ fun PumFilterSettingsPanel(
         }
 
         if (processMode == PUM_PROCESS_MODE_BLOCK) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = cardColor),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    .alpha(if (actionSettingsEnabled) 1f else 0.4f),
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("차단 사유 (유저에게 표시됨)", fontWeight = FontWeight.Bold, color = textColor)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("비워 두면 차단 기본 설정의 사유를 사용합니다.", fontSize = 12.sp, color = subTextColor)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = blockReason,
-                        onValueChange = { value ->
-                            blockReason = value
-                            val editor = botPref.edit()
-                            if (value.isBlank()) editor.remove("pum_block_reason_text")
-                            else editor.putString("pum_block_reason_text", value)
-                            editor.apply()
-                        },
-                        enabled = actionSettingsEnabled,
-                        placeholder = { Text("차단 기본 설정 사유 사용") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = textColor,
-                            unfocusedTextColor = textColor,
-                            disabledTextColor = textColor,
-                        ),
-                    )
+            Box(modifier = Modifier.alpha(if (actionSettingsEnabled) 1f else 0.4f)) {
+                ReadOnlyTextCard(
+                    "차단 사유 (유저에게 표시됨)",
+                    blockReason,
+                    botColors(isDarkMode),
+                ) {
+                    if (actionSettingsEnabled) onEditBlockReason()
                 }
             }
         }

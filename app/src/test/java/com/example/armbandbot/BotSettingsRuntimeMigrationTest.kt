@@ -92,6 +92,18 @@ class BotSettingsRuntimeMigrationTest {
     }
 
     @Test
+    fun legacySourceInspectionToggleNeverEnablesPumBlockAll() {
+        val migrated = migrateBotSettingsSnapshot(
+            mapOf(
+                "is_pum_source_filter_mode" to true,
+            )
+        )
+
+        assertTrue(migrated["is_pum_source_filter_mode"] as Boolean)
+        assertFalse(migrated["pum_block_all_posts"] as Boolean)
+    }
+
+    @Test
     fun migrationNormalizesUnsafePumActionSettings() {
         val unsafe = migrateBotSettingsSnapshot(
             mapOf(

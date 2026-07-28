@@ -1307,18 +1307,13 @@ class BotService : Service() {
                 urlList = urlList
             )
 
-            // Resolver state (normalized-source cache and this bot's credentials) lives for one
-            // scan cycle only. Expert mode also needs it to freeze native PUM cards in snapshots;
-            // source content is still excluded from moderation unless the filter option is enabled.
-            val pumSourceResolver = if (config.isPumSourceFilterMode || config.isExpertMode) {
-                PumSourceResolver(
-                    http = UrlConnectionPumHttpClient(),
-                    cookies = { currentCookie },
-                    userAgent = dcUserAgent,
-                )
-            } else {
-                null
-            }
+            // PUM source inspection is a base moderation capability. Resolver state and its
+            // normalized-source cache intentionally live for one scan cycle only.
+            val pumSourceResolver = PumSourceResolver(
+                http = UrlConnectionPumHttpClient(),
+                cookies = { currentCookie },
+                userAgent = dcUserAgent,
+            )
 
             val gallogCache = mutableMapOf<String, Pair<Int, Int>>()
             val pageMinMs = config.pageMinMs
@@ -1494,7 +1489,7 @@ class BotService : Service() {
                 savedCommentCount == currentCommentCount &&
                 savedTitle?.trim().orEmpty() == text.trim() &&
                 !snapshotBackfillRequired
-            val pumBlockAllAction = if (config.isPumSourceFilterMode && config.pumBlockAllPosts && hasPumListMarker) {
+            val pumBlockAllAction = if (config.pumBlockAllPosts && hasPumListMarker) {
                 val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
                 resolveModerationActionConfig(
                     baseConfig = resolveDefaultModerationActionConfig(config),
@@ -1526,8 +1521,8 @@ class BotService : Service() {
                     savedCommentCount != currentCommentCount -> "댓글 수 변경"
                     titleChanged -> "제목 변경"
                     snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
-                    config.isPumSourceFilterMode && config.pumBlockAllPosts && hasPumListMarker -> "펌 게시글 모두 차단 확인"
-                    config.isPumSourceFilterMode && config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
+                    config.pumBlockAllPosts && hasPumListMarker -> "펌 게시글 모두 차단 확인"
+                    config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
                     else -> "변경 감지"
                 }
                 sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
@@ -2327,16 +2322,12 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
         val postKey = PostKey(gallType = gallType, gallId = gallId, postNo = postNumStr)
         val legacyPostText = "$text $contentText"
-        val shouldInspectPum = config.isPumSourceFilterMode || config.isExpertMode
         val pumParse = parsePumStructure(
-            shouldInspect = shouldInspectPum,
+            shouldInspect = true,
             parse = { PumParser.parseDetail(postDoc) },
             onFailure = { logPumParseFailure(botId, postKey) },
         )
         val pumDetection = pumParse.detection
-        val suppressPumSourceForBlockAll = config.isPumSourceFilterMode &&
-            config.pumBlockAllPosts &&
-            pumParse.structuralState == PumStructuralState.DETECTED
         var pumResolutionAttempted = false
         var cachedPumResolution: PumResolution? = null
         fun resolvePumSourceOnce(): PumResolution? {
@@ -2356,7 +2347,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             return cachedPumResolution
         }
         fun buildPumModeration(resolveSource: Boolean): PumModerationContent {
-            if (!config.isPumSourceFilterMode || pumDetection?.isPum != true || !resolveSource) {
+            if (pumDetection?.isPum != true || !resolveSource) {
                 return PumModerationContent(postKey, legacyPostText)
             }
             return PumModerationContent.resolve(
@@ -2401,7 +2392,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         comments = commentsArray,
                         existingSnapshotPath = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath,
                         pumResolution = PumSnapshotSourcePolicy.resolve(
-                            blockAllActive = suppressPumSourceForBlockAll,
+                            blockAllActive = false,
                             resolver = ::resolvePumSourceOnce,
                         ),
                     )
@@ -2459,18 +2450,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             cookie = cookie
         )
         val structuralState = pumParse.structuralState
-        val pumPolicyEnabled = config.isPumSourceFilterMode && !outerAnalysis.isWhitelistedUser
+        val effectivePumStructuralState = if (outerAnalysis.isWhitelistedUser) {
+            PumStructuralState.SKIPPED
+        } else {
+            structuralState
+        }
         var sourceAnalysis: PostAnalysisResult? = null
-        val initialPumDecision = PumFilterPolicy.decide(
-            masterEnabled = pumPolicyEnabled,
-            structuralState = structuralState,
-            blockAllPumPosts = config.pumBlockAllPosts,
-            outerBlocked = outerAnalysis.action == PostModerationAction.BLOCK_EXECUTE,
-            sourceFilter = PumSourceFilterState.NotResolved,
-        )
-        if (initialPumDecision.origin == PumFilterOrigin.ALLOW &&
-            pumPolicyEnabled && structuralState == PumStructuralState.DETECTED
-        ) {
+        if (effectivePumStructuralState == PumStructuralState.DETECTED) {
             pumModeration = buildPumModeration(resolveSource = true)
             sourceAnalysis = pumModeration.resolvedSourceOnly?.let { source ->
                 if (config.isDebugMode) {
@@ -2495,8 +2481,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
         val pumDecision = PumFilterPolicy.decide(
-            masterEnabled = pumPolicyEnabled,
-            structuralState = structuralState,
+            masterEnabled = true,
+            structuralState = effectivePumStructuralState,
             blockAllPumPosts = config.pumBlockAllPosts,
             outerBlocked = outerAnalysis.action == PostModerationAction.BLOCK_EXECUTE,
             sourceFilter = sourceAnalysis?.let {
@@ -2504,7 +2490,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             } ?: PumSourceFilterState.NotResolved,
         )
         fun resolvePumSourceForSnapshot(): PumResolution? = PumSnapshotSourcePolicy.resolve(
-            blockAllActive = suppressPumSourceForBlockAll,
+            blockAllActive = false,
             resolver = ::resolvePumSourceOnce,
         )
         val runtimeRoute = PumRuntimeRouting.route(
@@ -2529,17 +2515,16 @@ img.written_dccon{max-width:80px;max-height:80px}
                 isWhitelistedUser = false,
                 isBlacklistedUserId = outerAnalysis.isBlacklistedUserId,
                 isBlacklistedUserNick = outerAnalysis.isBlacklistedUserNick,
-                blockReasonPrefix = runtimeRoute.reason,
-                notiType = runtimeRoute.notificationType,
-                debugDetail = runtimeRoute.reason,
-                filterSource = ModerationFilterSource.PUM,
             )
         }
-        val shouldRunAiStage = config.isAiFilterMode &&
-            ModerationWinnerPolicy.decide(pumDecision.origin, AiStageOutcome.SKIPPED) == ModerationWinner.ALLOW
+        val shouldRunAiStage = PostAiStagePolicy.shouldRun(
+            aiEnabled = config.isAiFilterMode,
+            localOrigin = pumDecision.origin,
+            whitelisted = outerAnalysis.isWhitelistedUser,
+        )
         // AI needs the typed outer+source body independently of local-filter routing. Resolve through
         // the same per-cycle lazy cache, but only when AI will actually consume source evidence.
-        if (shouldRunAiStage && config.isPumSourceFilterMode &&
+        if (shouldRunAiStage &&
             structuralState == PumStructuralState.DETECTED && !pumModeration.hasResolvedSource
         ) {
             pumModeration = buildPumModeration(resolveSource = true)
