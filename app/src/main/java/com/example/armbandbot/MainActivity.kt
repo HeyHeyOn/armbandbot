@@ -427,15 +427,29 @@ fun getRestorableBotIds(context: Context): List<String> {
     return botIdsStr.split(",").filter { it.isNotBlank() }
 }
 
-fun hasRestorableBots(context: Context): Boolean {
-    return getRestorableBotIds(context).any { botId ->
-        context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-            .getBoolean("should_restore_after_restart", false)
+fun getEligibleRestorableBotIds(context: Context): List<String> {
+    return getRestorableBotIds(context).filter { botId ->
+        val pref = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+        pref.getBoolean("should_restore_after_restart", false) &&
+            pref.getBoolean("is_running", false) &&
+            !pref.getString("saved_cookie", "").isNullOrBlank()
     }
 }
 
+fun hasRestorableBots(context: Context): Boolean {
+    return getEligibleRestorableBotIds(context).isNotEmpty()
+}
+
+fun clearPendingRestoreState(context: Context) {
+    context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean("pending_restore_after_boot", false)
+        .apply()
+    AutoRestartReceiver.cancelRecoveryNotification(context)
+}
+
 fun restoreRunningBots(context: Context) {
-    val botIds = getRestorableBotIds(context)
+    val botIds = getEligibleRestorableBotIds(context)
 
     Log.d("RestoreBots", "restoreRunningBots 시작 / botIds=$botIds")
 
@@ -488,18 +502,24 @@ fun requestRestoreRunningBots(
 
     if (!allowImmediateStart) {
         AutoRestartReceiver.scheduleWatchdog(context)
+        ProcessExitDiagnostics.recordLifecycleEvent(context, "restore_deferred", trigger)
         Log.d("RestoreBots", "[$trigger] 즉시 복구를 건너뛰고 pending/watchdog만 유지")
         return false
     }
 
     return try {
         restoreRunningBots(context)
-        masterPref.edit().putBoolean("pending_restore_after_boot", false).apply()
+        ProcessExitDiagnostics.recordLifecycleEvent(context, "restore_requested", trigger)
         Log.d("RestoreBots", "[$trigger] 즉시 복구 요청 완료")
         true
     } catch (e: Exception) {
         AutoRestartReceiver.scheduleWatchdog(context)
         masterPref.edit().putBoolean("pending_restore_after_boot", true).apply()
+        ProcessExitDiagnostics.recordLifecycleEvent(
+            context,
+            "restore_failed",
+            "$trigger / ${e.javaClass.simpleName}: ${e.message.orEmpty()}"
+        )
         Log.e("RestoreBots", "[$trigger] 즉시 복구 실패, pending/watchdog 유지", e)
         false
     }

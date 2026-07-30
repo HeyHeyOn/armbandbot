@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -32,6 +33,7 @@ import kotlin.random.Random
 class BotService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private val activeBots = ConcurrentHashMap<String, Job>()
+    private val runLoopEnteredJobs = ConcurrentHashMap<String, Job>()
     private val aiBatchQueues = ConcurrentHashMap<String, AiBatchQueue>()
     private val aiBatchResults = ConcurrentHashMap<String, ConcurrentHashMap<PostKey, AiBatchResult>>()
     private val aiBatchFailureBackoffUntil = ConcurrentHashMap<String, Long>()
@@ -327,6 +329,26 @@ class BotService : Service() {
     )
 
     companion object {
+        @Volatile
+        private var serviceCreated: Boolean = false
+
+        @Volatile
+        private var currentInstance: BotService? = null
+
+        fun isServiceCreated(): Boolean = serviceCreated
+
+        fun hasAllRestorableBotsEnteredRunLoop(context: Context): Boolean {
+            val instance = currentInstance ?: return false
+            val expectedBotIds = getEligibleRestorableBotIds(context).toSet()
+            val enteredBotIds = instance.runLoopEnteredJobs
+                .filter { (botId, job) -> instance.activeBots[botId] === job && job.isActive }
+                .keys
+            return shouldAcknowledgeRestore(
+                expectedBotIds = expectedBotIds,
+                activeBotIds = enteredBotIds,
+            )
+        }
+
         private val URL_REGEX = Regex("(?i)(?:https?://|www\\.)[-a-zA-Z0-9@:%._+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*)")
         private val SEARCH_PARAM_CLEANER_REGEX = Regex("&s_type=[^&]*|&s_keyword=[^&]*|&search_pos=[^&]*")
     }
@@ -351,6 +373,10 @@ class BotService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        serviceCreated = true
+        currentInstance = this
+        ProcessExitDiagnostics.captureLatestHistoricalExit(this)
+        ProcessExitDiagnostics.recordLifecycleEvent(this, "service_created")
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WanjangBot::BackgroundLock")
@@ -388,6 +414,28 @@ class BotService : Service() {
         sendBroadcast(intent)
     }
 
+
+    private fun acknowledgeRestoreSuccess(botId: String) {
+        val expectedBotIds = getEligibleRestorableBotIds(this).toSet()
+        val enteredBotIds = runLoopEnteredJobs
+            .filter { (enteredBotId, job) -> activeBots[enteredBotId] === job && job.isActive }
+            .keys
+        if (!shouldAcknowledgeRestore(expectedBotIds, enteredBotIds)) {
+            ProcessExitDiagnostics.recordLifecycleEvent(
+                this,
+                "restore_partial",
+                "ackBot=$botId / entered=${enteredBotIds.size} / expected=${expectedBotIds.size}",
+            )
+            return
+        }
+
+        getSharedPreferences("bot_master", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("pending_restore_after_boot", false)
+            .apply()
+        ProcessExitDiagnostics.recordLifecycleEvent(this, "restore_acknowledged", "botId=$botId")
+        AutoRestartReceiver.cancelRecoveryNotification(this)
+    }
 
     private fun markStartupPhase(botId: String, phase: String, detail: String? = null) {
         val pref = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
@@ -480,29 +528,38 @@ class BotService : Service() {
 
     private fun cancelAutoRestart() {
         AutoRestartReceiver.cancelWatchdog(this)
+        clearPendingRestoreState(this)
         Log.d("BotService", "[복구 예약] watchdog 예약 취소")
+    }
+
+    private fun stopServiceWhenNoActiveBots(botId: String) {
+        if (activeBots.isNotEmpty()) return
+        sendLog("[복구 점검] 남은 활성 Job 없음, 서비스 종료 절차 진행", botId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            stopForeground(true)
+        }
+        stopSelf()
     }
 
     private fun finalizeBot(
         botId: String,
         botPref: android.content.SharedPreferences,
         botName: String,
-        reason: String
+        reason: String,
+        completedJob: Job,
     ) {
-        val removedJob = activeBots.remove(botId)
-        cleanupRuntimeState(botId, aggressive = true)
-        sendLog("[복구 점검] finalizeBot에서 Job 제거: ${removedJob != null}", botId)
-        sendLog("[$botName] 종료: $reason", botId)
-
-        if (activeBots.isEmpty()) {
-            sendLog("[복구 점검] 남은 활성 Job 없음, 서비스 종료 절차 진행", botId)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                stopForeground(true)
-            }
-            stopSelf()
+        val removedCurrentJob = removeIfCurrentGeneration(activeBots, botId, completedJob)
+        removeIfCurrentGeneration(runLoopEnteredJobs, botId, completedJob)
+        if (!removedCurrentJob) {
+            Log.d("BotService", "[$botId] 이전 Job 세대 종료를 무시합니다.")
+            return
         }
+        cleanupRuntimeState(botId, aggressive = true)
+        sendLog("[복구 점검] finalizeBot에서 현재 Job 제거 완료", botId)
+        sendLog("[$botName] 종료: $reason", botId)
+        stopServiceWhenNoActiveBots(botId)
     }
 
     private fun isDeletedCommentMemo(memo: String): Boolean {
@@ -597,7 +654,16 @@ class BotService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
-            startForeground(1, buildForegroundNotification())
+            val notification = buildForegroundNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    1,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(1, notification)
+            }
         } catch (e: Exception) {
             val botIdForCrash = intent?.getStringExtra("BOT_ID") ?: "SYSTEM"
             markStartupPhase(botIdForCrash, "startForeground_failed", e.javaClass.simpleName + ": " + (e.message ?: ""))
@@ -632,34 +698,44 @@ class BotService : Service() {
                 .putBoolean("is_running", false)
                 .apply()
 
-            activeBots[botId]?.cancel()
-            activeBots.remove(botId)
+            val stoppedJob = activeBots.remove(botId)
+            if (stoppedJob != null) {
+                removeIfCurrentGeneration(runLoopEnteredJobs, botId, stoppedJob)
+                stoppedJob.cancel()
+            }
             cleanupRuntimeState(botId, aggressive = true)
 
-            val masterPref = getSharedPreferences("bot_master", Context.MODE_PRIVATE)
-            val botIds = (masterPref.getString("bot_ids_list", "") ?: "")
-                .split(",")
-                .filter { it.isNotBlank() }
-
-            val hasRestorableBot = botIds.any { id ->
-                getSharedPreferences("bot_prefs_$id", Context.MODE_PRIVATE)
-                    .getBoolean("should_restore_after_restart", false)
+            if (activeBots.isEmpty()) {
+                stopServiceWhenNoActiveBots(botId)
             }
-
-            if (!hasRestorableBot) {
+            if (!hasRestorableBots(this)) {
                 cancelAutoRestart()
             }
 
             return START_STICKY
         }
 
+        ProcessExitDiagnostics.latestSummary(this)?.let { (exitTimestamp, summary) ->
+            val lastReportedTimestamp = botPref.getLong("last_reported_exit_timestamp", 0L)
+            if (exitTimestamp > lastReportedTimestamp) {
+                sendLog("[종료 진단] 이전 프로세스 종료: $summary", botId)
+                botPref.edit()
+                    .putLong("last_reported_exit_timestamp", exitTimestamp)
+                    .apply()
+            }
+        }
+
         val existingJob = activeBots[botId]
         if (existingJob != null && existingJob.isActive && !existingJob.isCancelled) {
+            acknowledgeRestoreSuccess(botId)
             sendLog("[복구 점검] 이미 실행 중인 Job이 있어 START를 건너뜁니다.", botId)
             return START_STICKY
         }
         // 취소됐거나 완료된 잡은 정리 후 새 Job 생성
-        activeBots.remove(botId)
+        val staleJob = activeBots.remove(botId)
+        if (staleJob != null) {
+            removeIfCurrentGeneration(runLoopEnteredJobs, botId, staleJob)
+        }
 
         botPref.edit()
             .putBoolean("is_running", true)
@@ -673,10 +749,8 @@ class BotService : Service() {
         markStartupPhase(botId, "job_creating")
         scheduleAutoRestart(botId)
 
-        val job = serviceScope.launch {
+        val job = serviceScope.launch(start = CoroutineStart.LAZY) {
             try {
-                sendLog("[복구 점검] runBotLoop 진입", botId)
-                markStartupPhase(botId, "run_loop_entered")
                 runBotLoop(botId, botName, cookie, botPref)
             } catch (e: CancellationException) {
                 throw e
@@ -685,12 +759,32 @@ class BotService : Service() {
                 Log.e("BotService", "[$botId] runBotLoop 치명적 오류", e)
                 sendLog("[치명적 오류] ${e.javaClass.simpleName} / ${e.message ?: "알 수 없는 오류"}", botId)
             } finally {
-                finalizeBot(botId, botPref, botName, "봇 루프 종료")
+                val completedJob = coroutineContext[Job]
+                if (completedJob != null) {
+                    withContext(NonCancellable + Dispatchers.Main.immediate) {
+                        finalizeBot(botId, botPref, botName, "봇 루프 종료", completedJob)
+                    }
+                } else {
+                    ProcessExitDiagnostics.recordLifecycleEvent(
+                        this@BotService,
+                        "bot_job_identity_missing",
+                        "botId=$botId",
+                    )
+                }
             }
         }
 
         activeBots[botId] = job
-        sendLog("[복구 점검] activeBots에 Job 등록 완료", botId)
+        val started = job.start()
+        if (started && job.isActive && !job.isCancelled) {
+            sendLog("[복구 점검] activeBots에 Job 등록 및 시작 완료", botId)
+        } else {
+            removeIfCurrentGeneration(activeBots, botId, job)
+            removeIfCurrentGeneration(runLoopEnteredJobs, botId, job)
+            ProcessExitDiagnostics.recordLifecycleEvent(this, "bot_job_start_failed", "botId=$botId")
+            scheduleAutoRestart(botId)
+            sendLog("[복구 점검] Job이 활성화되지 않아 복구 대기를 유지합니다.", botId)
+        }
         return START_STICKY
     }
 
@@ -1224,6 +1318,14 @@ class BotService : Service() {
         GlobalBotState.initDb(this@BotService)
         GlobalBotState.startSnapshotWorker(this)
         sendLog("[복구 점검] runBotLoop 시작 완료", botId)
+        val currentJob = coroutineContext[Job]
+            ?: throw IllegalStateException("runBotLoop Job을 확인할 수 없습니다.")
+        if (activeBots[botId] !== currentJob) {
+            throw CancellationException("교체된 봇 Job 세대입니다.")
+        }
+        markStartupPhase(botId, "run_loop_entered")
+        runLoopEnteredJobs[botId] = currentJob
+        acknowledgeRestoreSuccess(botId)
 
         while (isActive) {
             val config = loadBotConfig(botPref)
@@ -3632,7 +3734,21 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        ProcessExitDiagnostics.recordLifecycleEvent(this, "task_removed")
+        if (hasRestorableBots(this)) {
+            scheduleAutoRestart()
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        ProcessExitDiagnostics.recordLifecycleEvent(this, "service_destroyed")
+        serviceCreated = false
+        if (currentInstance === this) {
+            currentInstance = null
+        }
+        runLoopEnteredJobs.clear()
         super.onDestroy()
         serviceScope.cancel()
 
@@ -3640,17 +3756,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             wakeLock?.release()
         }
 
-        val masterPref = getSharedPreferences("bot_master", Context.MODE_PRIVATE)
-        val botIds = (masterPref.getString("bot_ids_list", "") ?: "")
-            .split(",")
-            .filter { it.isNotBlank() }
-
-        val hasRestorableBot = botIds.any { id ->
-            getSharedPreferences("bot_prefs_$id", Context.MODE_PRIVATE)
-                .getBoolean("should_restore_after_restart", false)
-        }
-
-        if (hasRestorableBot) {
+        if (hasRestorableBots(this)) {
             scheduleAutoRestart()
         } else {
             cancelAutoRestart()
