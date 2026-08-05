@@ -7,6 +7,11 @@ import org.junit.Test
 
 class BotSettingsRuntimeMigrationTest {
     @Test
+    fun orderedMultilineMigrationUsesNewSchemaVersion() {
+        assertEquals(2, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
+    }
+
+    @Test
     fun appVersionComesFromGradleVersionName() {
         assertEquals(BuildConfig.VERSION_NAME, ARMBANDBOT_APP_VERSION)
     }
@@ -31,6 +36,51 @@ class BotSettingsRuntimeMigrationTest {
         assertEquals("ci_c=keep_me", migrated["saved_cookie"])
         assertEquals(BOT_SETTINGS_CURRENT_SCHEMA_VERSION, migrated[BOT_PREF_SCHEMA_VERSION_KEY])
         assertEquals(ARMBANDBOT_APP_VERSION, migrated[BOT_PREF_APP_VERSION_KEY])
+    }
+
+    @Test
+    fun migrationDistinguishesMissingAndExplicitEmptyUrlWhitelist() {
+        val missing = migrateBotSettingsSnapshot(emptyMap())
+        assertEquals(defaultBotUrlWhitelist(), missing["url_whitelist"])
+        assertEquals(defaultBotUrlWhitelist().joinToString("\n"), missing["url_whitelist_text"])
+
+        val explicitEmpty = migrateBotSettingsSnapshot(
+            mapOf("url_whitelist" to emptySet<String>()),
+        )
+        assertEquals(emptySet<String>(), explicitEmpty["url_whitelist"])
+        assertEquals("", explicitEmpty["url_whitelist_text"])
+    }
+
+    @Test
+    fun migrationBackfillsOrderedTextFromLegacySets() {
+        val legacyUserList = linkedSetOf("second # memo", "first")
+        val migrated = migrateBotSettingsSnapshot(
+            mapOf(
+                "user_blacklist" to legacyUserList,
+                "bypass" to linkedSetOf("beta", "alpha"),
+            )
+        )
+
+        assertEquals("second # memo\nfirst", migrated["user_blacklist_text"])
+        assertEquals("beta\nalpha", migrated["bypass_text"])
+        assertEquals(legacyUserList, migrated["user_blacklist"])
+    }
+
+    @Test
+    fun migrationNormalizesExistingOrderedTextAndKeepsSetInSync() {
+        val migrated = migrateBotSettingsSnapshot(
+            mapOf(
+                "user_blacklist" to setOf("stale"),
+                "user_blacklist_text" to "  second # memo\nfirst\nsecond # memo\n\n",
+                "bypass" to setOf("stale"),
+                "bypass_text" to "word\nword\nWord",
+            )
+        )
+
+        assertEquals("second # memo\nfirst", migrated["user_blacklist_text"])
+        assertEquals(linkedSetOf("second # memo", "first"), migrated["user_blacklist"])
+        assertEquals("word\nWord", migrated["bypass_text"])
+        assertEquals(linkedSetOf("word", "Word"), migrated["bypass"])
     }
 
     @Test

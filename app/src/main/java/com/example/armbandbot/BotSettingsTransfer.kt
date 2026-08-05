@@ -21,7 +21,7 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
     "kkang_detection_mode",
     "pum_block_process_mode",
     "pum_block_reason_text"
-)
+) + ORDERED_MULTILINE_SETTING_KEYS.map(::orderedMultilineTextKey)
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
@@ -65,6 +65,14 @@ data class BotSettingsExport(
 
 fun defaultBotUrlWhitelist(): Set<String> = DEFAULT_URL_WHITELIST
 
+internal fun exportStringSetValues(key: String, storedValues: Set<String>?): List<String> {
+    val values = storedValues ?: if (key == "url_whitelist") DEFAULT_URL_WHITELIST else emptySet()
+    return values
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+}
+
 fun exportBotSettings(context: Context, botId: String): BotSettingsExport {
     val botPref = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
     migrateBotSettingsToCurrentVersion(botPref)
@@ -75,13 +83,7 @@ fun exportBotSettings(context: Context, botId: String): BotSettingsExport {
         ints = EXPORTABLE_INT_KEYS.associateWith { key -> botPref.getInt(key, defaultIntValue(key)) },
         floats = EXPORTABLE_FLOAT_KEYS.associateWith { key -> botPref.getFloat(key, defaultFloatValue(key)) },
         stringSets = EXPORTABLE_STRING_SET_KEYS.associateWith { key ->
-            val fallback = if (key == "url_whitelist") DEFAULT_URL_WHITELIST else emptySet()
-            val values = botPref.getStringSet(key, fallback)
-                ?.map { it.trim() }
-                ?.filter { it.isNotEmpty() }
-                ?.distinct()
-                ?: emptyList()
-            if (key == "url_whitelist" && values.isEmpty()) DEFAULT_URL_WHITELIST.toList() else values
+            exportStringSetValues(key, botPref.getStringSet(key, null))
         }
     )
 }
@@ -131,10 +133,6 @@ private fun applyImportedSettings(botPref: SharedPreferences, imported: BotSetti
         editor.putStringSet(key, value.map { it.trim() }.filter { it.isNotEmpty() }.toSet())
     }
 
-    if ((imported.stringSets["url_whitelist"] ?: emptyList()).isEmpty()) {
-        editor.putStringSet("url_whitelist", DEFAULT_URL_WHITELIST)
-    }
-
     editor.putBoolean("is_running", false)
     editor.putBoolean("should_restore_after_restart", false)
     editor.putInt(BOT_PREF_SCHEMA_VERSION_KEY, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
@@ -165,7 +163,11 @@ internal fun JSONObject?.toStringMap(keys: List<String>): Map<String, String> =
     keys.mapNotNull { key ->
         val obj = this
         val value = if (obj != null && obj.has(key) && !obj.isNull(key)) {
-            obj.optString(key).trim().ifEmpty { null }
+            val trimmed = obj.optString(key).trim()
+            val isOrderedTextKey = ORDERED_MULTILINE_SETTING_KEYS.any {
+                orderedMultilineTextKey(it) == key
+            }
+            trimmed.takeIf { it.isNotEmpty() || isOrderedTextKey }
         } else {
             null
         }

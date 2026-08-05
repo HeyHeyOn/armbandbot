@@ -2,7 +2,7 @@ package com.heyheyon.armbandbot
 
 import org.json.JSONObject
 
-internal const val BOT_SETTINGS_CURRENT_SCHEMA_VERSION = 1
+internal const val BOT_SETTINGS_CURRENT_SCHEMA_VERSION = 2
 private const val BOT_SETTINGS_MIN_SUPPORTED_SCHEMA_VERSION = 1
 
 internal data class BotSettingsImportEnvelope(
@@ -58,11 +58,22 @@ private fun validateSupportedSchemaVersion(schemaVersion: Int) {
 }
 
 private fun migrateBotSettingsEnvelopeToCurrent(envelope: BotSettingsImportEnvelope): BotSettingsExport = when (envelope.schemaVersion) {
-    1 -> migrateSchemaV1ToCurrent(envelope)
+    1, BOT_SETTINGS_CURRENT_SCHEMA_VERSION -> migrateSupportedSchemaToCurrent(envelope)
     else -> error("schemaVersion ${envelope.schemaVersion} 마이그레이션이 아직 구현되지 않았습니다.")
 }
 
-private fun migrateSchemaV1ToCurrent(envelope: BotSettingsImportEnvelope): BotSettingsExport {
+private fun migrateSupportedSchemaToCurrent(envelope: BotSettingsImportEnvelope): BotSettingsExport {
+    val normalizedStrings = envelope.strings.toMutableMap()
+    val normalizedStringSets = envelope.stringSets.toMutableMap()
+    ORDERED_MULTILINE_SETTING_KEYS.forEach { key ->
+        val resolved = resolveOrderedMultilineText(
+            savedText = envelope.strings[orderedMultilineTextKey(key)],
+            legacyValues = LinkedHashSet(envelope.stringSets[key].orEmpty()),
+        )
+        normalizedStrings[orderedMultilineTextKey(key)] = resolved.text
+        normalizedStringSets[key] = resolved.lines
+    }
+
     val normalizedPum = normalizePumSettings(
         processMode = envelope.strings["pum_block_process_mode"].takeIf { envelope.pumProcessModePresent },
         blockDurationHours = envelope.ints["pum_block_duration_hours"],
@@ -74,10 +85,10 @@ private fun migrateSchemaV1ToCurrent(envelope: BotSettingsImportEnvelope): BotSe
         exportVersion = envelope.exportVersion,
         exportedByAppVersion = envelope.exportedByAppVersion.ifBlank { "unknown" },
         botName = envelope.botName,
-        strings = envelope.strings + ("pum_block_process_mode" to normalizedPum.processMode),
+        strings = normalizedStrings + ("pum_block_process_mode" to normalizedPum.processMode),
         booleans = envelope.booleans,
         ints = envelope.ints + ("pum_block_duration_hours" to normalizedPum.blockDurationHours),
         floats = envelope.floats,
-        stringSets = envelope.stringSets,
+        stringSets = normalizedStringSets,
     )
 }

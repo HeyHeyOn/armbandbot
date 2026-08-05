@@ -2,9 +2,94 @@ package com.heyheyon.armbandbot
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BotSettingsTransferTest {
+    @Test
+    fun legacySchemaOneImportBackfillsOrderedTextFromJsonArrayOrder() {
+        val legacy = BotSettingsExport(
+            schemaVersion = 1,
+            botName = "구형 순서 봇",
+            strings = emptyMap(),
+            booleans = emptyMap(),
+            ints = emptyMap(),
+            floats = emptyMap(),
+            stringSets = mapOf(
+                "user_blacklist" to listOf("second # memo", "first", "second # memo"),
+            ),
+        )
+
+        val imported = parseAndMigrateBotSettingsExport(legacy.toJson())
+
+        assertEquals("second # memo\nfirst", imported.strings["user_blacklist_text"])
+        assertEquals(listOf("second # memo", "first"), imported.stringSets["user_blacklist"])
+        assertEquals(BOT_SETTINGS_CURRENT_SCHEMA_VERSION, imported.schemaVersion)
+    }
+
+    @Test
+    fun orderedMultilineTextSurvivesJsonRoundTrip() {
+        ORDERED_MULTILINE_SETTING_KEYS.forEach { key ->
+            assertTrue(orderedMultilineTextKey(key) in EXPORTABLE_STRING_KEYS)
+        }
+        val original = BotSettingsExport(
+            botName = "순서 보존 봇",
+            strings = mapOf("user_blacklist_text" to "second # memo\nfirst"),
+            booleans = emptyMap(),
+            ints = emptyMap(),
+            floats = emptyMap(),
+            stringSets = mapOf("user_blacklist" to listOf("first", "second # memo")),
+        )
+
+        val imported = parseAndMigrateBotSettingsExport(original.toJson())
+
+        assertEquals("second # memo\nfirst", imported.strings["user_blacklist_text"])
+        assertEquals(listOf("second # memo", "first"), imported.stringSets["user_blacklist"])
+    }
+
+    @Test
+    fun explicitEmptyOrderedTextClearsStaleSetOnImport() {
+        val original = BotSettingsExport(
+            botName = "비운 목록 봇",
+            strings = mapOf("user_blacklist_text" to ""),
+            booleans = emptyMap(),
+            ints = emptyMap(),
+            floats = emptyMap(),
+            stringSets = mapOf("user_blacklist" to listOf("stale-user")),
+        )
+
+        val imported = parseAndMigrateBotSettingsExport(original.toJson())
+
+        assertTrue(imported.strings.containsKey("user_blacklist_text"))
+        assertEquals("", imported.strings["user_blacklist_text"])
+        assertEquals(emptyList<String>(), imported.stringSets["user_blacklist"])
+    }
+
+    @Test
+    fun explicitEmptyUrlWhitelistRemainsEmptyAcrossTransferNormalization() {
+        assertEquals(
+            defaultBotUrlWhitelist().toList(),
+            exportStringSetValues("url_whitelist", storedValues = null),
+        )
+        assertEquals(
+            emptyList<String>(),
+            exportStringSetValues("url_whitelist", storedValues = emptySet()),
+        )
+
+        val original = BotSettingsExport(
+            botName = "URL 목록을 비운 봇",
+            strings = mapOf("url_whitelist_text" to ""),
+            booleans = emptyMap(),
+            ints = emptyMap(),
+            floats = emptyMap(),
+            stringSets = mapOf("url_whitelist" to emptyList()),
+        )
+        val imported = parseAndMigrateBotSettingsExport(original.toJson())
+
+        assertEquals("", imported.strings["url_whitelist_text"])
+        assertEquals(emptyList<String>(), imported.stringSets["url_whitelist"])
+    }
+
     @Test
     fun pumSettingsRoundTripWithBothValues() {
         listOf(false, true).forEach { sourceEnabled ->

@@ -44,8 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -491,7 +493,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
 
     var editDialogType by remember { mutableStateOf<String?>(null) }
     var tempEditText by remember { mutableStateOf("") }
+    var tempEditValue by remember { mutableStateOf(TextFieldValue()) }
     var showConfirmDialog by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(editDialogType) {
+        if (editDialogType != null) {
+            tempEditValue = TextFieldValue(tempEditText, selection = TextRange(tempEditText.length))
+        }
+    }
 
     var imageAltExtractUrlText by remember { mutableStateOf("") }
     var dcconExtractUrlText by remember { mutableStateOf("") }
@@ -685,7 +694,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var blockReasonText by remember { mutableStateOf(botPref.getString("block_reason_text", "커뮤니티 규칙 위반") ?: "커뮤니티 규칙 위반") }
         var isDeletePostOnBlock by remember { mutableStateOf(botPref.getBoolean("delete_post_on_block", true)) }
         var isDeleteOnlyMode by remember { mutableStateOf(botPref.getBoolean("delete_only_mode", false)) }
-        var blockExemptPostNumbersText by remember { mutableStateOf(botPref.getStringSet("block_exempt_post_numbers", setOf())?.joinToString("\n") ?: "") }
+        var blockExemptPostNumbersText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "block_exempt_post_numbers")) }
 
         // 금지어 필터 개별 차단 설정
         var keywordBlockReasonText by remember { mutableStateOf(botPref.getString("keyword_block_reason_text", null) ?: blockReasonText) }
@@ -792,41 +801,21 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isNotiSpam by remember { mutableStateOf(botPref.getBoolean("noti_spam", true)) }
         var isNotiAi by remember { mutableStateOf(botPref.getBoolean("noti_ai", true)) }
 
-        fun loadMultilineText(key: String): String {
-            return botPref.getString("${key}_text", null)
-                ?: botPref.getStringSet(key, emptySet())?.joinToString("\n")
-                ?: ""
-        }
-
-        fun persistMultilineText(key: String, rawText: String) {
-            val normalizedLines = rawText
-                .lines()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-            val normalizedText = normalizedLines.joinToString("\n")
-            val normalizedSet = LinkedHashSet(normalizedLines)
-
-            botPref.edit()
-                .putString("${key}_text", normalizedText)
-                .putStringSet(key, normalizedSet)
-                .commit()
-        }
-
         var targetUrlsText by remember { mutableStateOf(botPref.getString("target_urls", "") ?: "") }
         var isSearchMode by remember { mutableStateOf(botPref.getBoolean("is_search_mode", false)) }
         var searchType by remember { mutableStateOf(botPref.getString("search_type", "search_subject_memo") ?: "search_subject_memo") }
         var isSearchTypeDropdownExpanded by remember { mutableStateOf(false) }
         val searchTypeMap = mapOf("search_subject_memo" to "제목+내용", "search_subject" to "제목", "search_memo" to "내용", "search_name" to "글쓴이", "search_comment" to "댓글")
-        var searchWordsText by remember { mutableStateOf(loadMultilineText("search_keywords")) }
+        var searchWordsText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "search_keywords")) }
 
         var isUserFilterMode by remember { mutableStateOf(botPref.getBoolean("is_user_filter_mode", false)) }
-        var userBlacklistText by remember { mutableStateOf(botPref.getStringSet("user_blacklist", setOf())?.joinToString("\n") ?: "") }
-        var userWhitelistText by remember { mutableStateOf(botPref.getStringSet("user_whitelist", setOf())?.joinToString("\n") ?: "") }
+        var userBlacklistText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "user_blacklist")) }
+        var userWhitelistText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "user_whitelist")) }
 
         var isNicknameFilterMode by remember { mutableStateOf(botPref.getBoolean("is_nickname_filter_mode", false)) }
-        var nicknameBlacklistText by remember { mutableStateOf(botPref.getStringSet("nickname_blacklist", setOf())?.joinToString("\n") ?: "") }
-        var nicknameBypassBlacklistText by remember { mutableStateOf(botPref.getStringSet("nickname_bypass_blacklist", setOf())?.joinToString("\n") ?: "") }
-        var nicknameWhitelistText by remember { mutableStateOf(botPref.getStringSet("nickname_whitelist", setOf())?.joinToString("\n") ?: "") }
+        var nicknameBlacklistText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "nickname_blacklist")) }
+        var nicknameBypassBlacklistText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "nickname_bypass_blacklist")) }
+        var nicknameWhitelistText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "nickname_whitelist")) }
 
         var isYudongPostBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_post_block", false)) }
         var isYudongCommentBlock by remember { mutableStateOf(botPref.getBoolean("is_yudong_comment_block", false)) }
@@ -838,7 +827,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isOverseasIpCommentBlock by remember { mutableStateOf(botPref.getBoolean("is_overseas_ip_comment_block", true)) }
 
         var isUrlFilterMode by remember { mutableStateOf(botPref.getBoolean("is_url_filter_mode", false)) }
-        var urlWhitelistText by remember { mutableStateOf(botPref.getStringSet("url_whitelist", setOf())?.joinToString("\n") ?: "") }
+        var urlWhitelistText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "url_whitelist")) }
 
         var isImageFilterMode by remember { mutableStateOf(botPref.getBoolean("is_image_filter_mode", false)) }
         var imageFilterThresholdText by remember { mutableStateOf(botPref.getInt("image_filter_threshold", 80).toString()) }
@@ -847,7 +836,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var dcconBlacklistText by remember { mutableStateOf(botPref.getStringSet("dccon_blacklist", setOf())?.joinToString("\n") ?: "") }
 
         var isVoiceFilterMode by remember { mutableStateOf(botPref.getBoolean("is_voice_filter_mode", false)) }
-        var voiceBlacklistText by remember { mutableStateOf(botPref.getStringSet("voice_blacklist", setOf())?.joinToString("\n") ?: "") }
+        var voiceBlacklistText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "voice_blacklist")) }
 
         val isAiFilterVisible = true
         var isAiFilterMode by remember { mutableStateOf(botPref.getBoolean("is_ai_filter_mode", false)) }
@@ -859,8 +848,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         var isSpecialCharFilterMode by remember { mutableStateOf(botPref.getBoolean("is_special_char_filter_mode", false)) }
         var specialCharWhitelistText by remember { mutableStateOf(botPref.getStringSet("special_char_whitelist", setOf())?.joinToString("") ?: "") }
 
-        var normalWordsText by remember { mutableStateOf(loadMultilineText("normal")) }
-        var bypassWordsText by remember { mutableStateOf(loadMultilineText("bypass")) }
+        var normalWordsText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "normal")) }
+        var bypassWordsText by remember { mutableStateOf(loadOrderedMultilineText(botPref, "bypass")) }
 
         var scanPageText by remember { mutableStateOf(botPref.getInt("scan_page_count", 1).toString()) }
         var postMinText by remember { mutableStateOf(botPref.getFloat("delay_post_min_sec", 1.0f).toString()) }
@@ -2255,9 +2244,38 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             }
 
             AlertDialog(
+                properties = if (isSingleLine) {
+                    DialogProperties()
+                } else {
+                    DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+                },
+                modifier = if (isSingleLine) {
+                    Modifier
+                } else {
+                    Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.88f).imePadding()
+                },
                 containerColor = dialogBgColor, titleContentColor = textColor, textContentColor = textColor,
                 onDismissRequest = { editDialogType = null }, title = { Text(title, fontWeight = FontWeight.Bold) },
-                text = { OutlinedTextField(value = tempEditText, onValueChange = { tempEditText = it }, placeholder = { Text(placeholderMsg) }, singleLine = isSingleLine, modifier = if (isSingleLine) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().height(250.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)) },
+                text = {
+                    OutlinedTextField(
+                        value = tempEditValue,
+                        onValueChange = { updatedValue ->
+                            tempEditValue = updatedValue
+                            tempEditText = updatedValue.text
+                        },
+                        placeholder = { Text(placeholderMsg) },
+                        singleLine = isSingleLine,
+                        modifier = if (isSingleLine) {
+                            Modifier.fillMaxWidth()
+                        } else {
+                            Modifier.fillMaxWidth().fillMaxHeight(0.72f)
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = textColor,
+                            unfocusedTextColor = textColor,
+                        ),
+                    )
+                },
                 confirmButton = { Button(onClick = {
                     when(editDialogType) {
                         "bot_name" -> { botName = tempEditText; botPref.edit().putString("bot_name", tempEditText).apply() }
@@ -2274,17 +2292,17 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         "kkang_block_reason" -> { kkangBlockReasonText = tempEditText; botPref.edit().putString("kkang_block_reason_text", tempEditText).apply() }
                         "overseas_ip_block_reason" -> { overseasIpBlockReasonText = tempEditText; botPref.edit().putString("overseas_ip_block_reason_text", tempEditText).apply() }
                         "pum_block_reason" -> { pumBlockReasonText = tempEditText; botPref.edit().putString("pum_block_reason_text", tempEditText).apply() }
-                        "normal" -> { normalWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("normal", tempEditText) }
-                        "bypass" -> { bypassWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("bypass", tempEditText) }
-                        "search" -> { searchWordsText = tempEditText.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n"); persistMultilineText("search_keywords", tempEditText) }
+                        "normal" -> { normalWordsText = persistOrderedMultilineText(botPref, "normal", tempEditText).text }
+                        "bypass" -> { bypassWordsText = persistOrderedMultilineText(botPref, "bypass", tempEditText).text }
+                        "search" -> { searchWordsText = persistOrderedMultilineText(botPref, "search_keywords", tempEditText).text }
                         "url" -> { targetUrlsText = tempEditText; botPref.edit().putString("target_urls", tempEditText).apply() }
-                        "url_whitelist" -> { urlWhitelistText = tempEditText; botPref.edit().putStringSet("url_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "block_exempt_post_numbers" -> { blockExemptPostNumbersText = tempEditText; botPref.edit().putStringSet("block_exempt_post_numbers", tempEditText.split("\n").map{it.substringBefore("#").trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "user_blacklist" -> { userBlacklistText = tempEditText; botPref.edit().putStringSet("user_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "user_whitelist" -> { userWhitelistText = tempEditText; botPref.edit().putStringSet("user_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "nickname_blacklist" -> { nicknameBlacklistText = tempEditText; botPref.edit().putStringSet("nickname_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "nickname_bypass_blacklist" -> { nicknameBypassBlacklistText = tempEditText; botPref.edit().putStringSet("nickname_bypass_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
-                        "nickname_whitelist" -> { nicknameWhitelistText = tempEditText; botPref.edit().putStringSet("nickname_whitelist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "url_whitelist" -> { urlWhitelistText = persistOrderedMultilineText(botPref, "url_whitelist", tempEditText).text }
+                        "block_exempt_post_numbers" -> { blockExemptPostNumbersText = persistOrderedMultilineText(botPref, "block_exempt_post_numbers", tempEditText).text }
+                        "user_blacklist" -> { userBlacklistText = persistOrderedMultilineText(botPref, "user_blacklist", tempEditText).text }
+                        "user_whitelist" -> { userWhitelistText = persistOrderedMultilineText(botPref, "user_whitelist", tempEditText).text }
+                        "nickname_blacklist" -> { nicknameBlacklistText = persistOrderedMultilineText(botPref, "nickname_blacklist", tempEditText).text }
+                        "nickname_bypass_blacklist" -> { nicknameBypassBlacklistText = persistOrderedMultilineText(botPref, "nickname_bypass_blacklist", tempEditText).text }
+                        "nickname_whitelist" -> { nicknameWhitelistText = persistOrderedMultilineText(botPref, "nickname_whitelist", tempEditText).text }
                         "special_char_whitelist" -> { val normalized = tempEditText.lines().map { it.substringBefore("#").trim() }.joinToString("").trim(); specialCharWhitelistText = normalized; botPref.edit().putStringSet("special_char_whitelist", normalized.map { it.toString() }.toSet()).apply() }
                         "image_alt_blacklist" -> {
                             val normalized = DcconFilter.normalizeImageAltBlacklistText(tempEditText)
@@ -2296,7 +2314,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                             dcconBlacklistText = normalized
                             botPref.edit().putStringSet("dccon_blacklist", normalized.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply()
                         }
-                        "voice_blacklist" -> { voiceBlacklistText = tempEditText; botPref.edit().putStringSet("voice_blacklist", tempEditText.split("\n").map{it.trim()}.filter{it.isNotEmpty()}.toSet()).apply() }
+                        "voice_blacklist" -> { voiceBlacklistText = persistOrderedMultilineText(botPref, "voice_blacklist", tempEditText).text }
                     }
                     editDialogType = null; Toast.makeText(context, "저장되었습니다.", Toast.LENGTH_SHORT).show()
                 }, colors = ButtonDefaults.buttonColors(containerColor = PastelNavy)) { Text("저장", color = Color.White) } },

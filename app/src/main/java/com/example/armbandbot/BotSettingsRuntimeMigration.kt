@@ -236,6 +236,16 @@ internal fun migrateBotSettingsSnapshot(values: Map<String, Any?>): Map<String, 
     STRING_SET_PREF_DEFAULTS.forEach { (key, default) ->
         migrated[key] = coerceStringSet(migrated[key], default)
     }
+    ORDERED_MULTILINE_SETTING_KEYS.forEach { key ->
+        @Suppress("UNCHECKED_CAST")
+        val legacyValues = migrated[key] as? Set<String> ?: emptySet()
+        val resolved = resolveOrderedMultilineText(
+            savedText = values[orderedMultilineTextKey(key)] as? String,
+            legacyValues = legacyValues,
+        )
+        migrated[orderedMultilineTextKey(key)] = resolved.text
+        migrated[key] = LinkedHashSet(resolved.values)
+    }
 
     val normalizedPum = normalizePumSettings(
         processMode = values["pum_block_process_mode"],
@@ -307,4 +317,4 @@ private fun coerceStringSet(value: Any?, default: Set<String>): Set<String> = wh
     is String -> value.split('\n', ',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
     is Iterable<*> -> value.mapNotNull { it?.toString()?.trim() }.filter { it.isNotEmpty() }.toSet()
     else -> default
-}.let { if (it.isEmpty() && default.isNotEmpty()) default else it }
+}
