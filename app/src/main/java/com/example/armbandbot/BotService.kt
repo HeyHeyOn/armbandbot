@@ -93,6 +93,8 @@ class BotService : Service() {
         val isKkangPostBlock: Boolean,
         val isKkangCommentBlock: Boolean,
         val isKkangImageBlock: Boolean,
+        val isKkangDcMediaBlock: Boolean,
+        val kkangDcMediaActivationRecheckPending: Boolean,
         val isKkangVoiceBlock: Boolean,
 
         val isSearchMode: Boolean,
@@ -231,7 +233,8 @@ class BotService : Service() {
         val blockReasonPrefix: String? = null,
         val notiType: String? = null,
         val debugDetail: String? = null,
-        val filterSource: ModerationFilterSource = ModerationFilterSource.UNKNOWN
+        val filterSource: ModerationFilterSource = ModerationFilterSource.UNKNOWN,
+        val kkangEvaluationComplete: Boolean = true,
     )
 
     private data class CommentAnalysisResult(
@@ -281,6 +284,7 @@ class BotService : Service() {
         val kkangPostEnabled: Boolean,
         val kkangCommentEnabled: Boolean,
         val kkangImageEnabled: Boolean,
+        val kkangDcMediaEnabled: Boolean,
         val kkangVoiceEnabled: Boolean,
         val anyKkangPostEnabled: Boolean,
         val anyKkangCommentEnabled: Boolean
@@ -1500,6 +1504,12 @@ class BotService : Service() {
                     sendLog("[디버그][유동 디시 동영상] 활성화 후 기존 목록 1회 재검사 완료", botId)
                 }
             }
+            if (completedAllTargets && isActive && config.kkangDcMediaActivationRecheckPending) {
+                botPref.edit().putBoolean("kkang_dc_media_recheck_pending", false).apply()
+                if (config.isDebugMode) {
+                    sendLog("[디버그][깡계 디시 동영상] 활성화 후 기존 목록 1회 재검사 완료", botId)
+                }
+            }
             GlobalBotState.saveDb(this@BotService)
             cleanupRuntimeState(botId)
             maybeLogRuntimeHealth(botId)
@@ -1567,7 +1577,7 @@ class BotService : Service() {
             val titleElement = row.selectFirst(".gall_tit a:not(.reply_numbox)")
             if (titleElement == null) {
                 if (shouldMarkDcMediaActivationRowIncomplete(
-                        config.yudongDcMediaActivationRecheckPending,
+                        config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending,
                         hasDcMediaListMarker,
                         rowParsed = false,
                     )) activationRecheckComplete = false
@@ -1579,7 +1589,7 @@ class BotService : Service() {
             val postNumber = postNumStr?.toIntOrNull()
             if (text.isBlank() || postNumStr == null || postNumber == null || postNumber <= 0) {
                 if (shouldMarkDcMediaActivationRowIncomplete(
-                        config.yudongDcMediaActivationRecheckPending,
+                        config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending,
                         hasDcMediaListMarker,
                         rowParsed = false,
                     )) activationRecheckComplete = false
@@ -1616,6 +1626,7 @@ class BotService : Service() {
                     hasPumListMarker = hasPumListMarker,
                     snapshotBackfillRequired = snapshotBackfillRequired,
                     yudongDcMediaActivationRecheckPending = config.yudongDcMediaActivationRecheckPending,
+                    kkangDcMediaActivationRecheckPending = config.kkangDcMediaActivationRecheckPending,
                     hasDcMediaListMarker = hasDcMediaListMarker,
                 )) {
                 if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
@@ -1636,7 +1647,7 @@ class BotService : Service() {
                 null
             }
             val yudongDcMediaAction = if (
-                config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker
+                config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker && postUid.isBlank()
             ) {
                 val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
                 resolveModerationActionConfig(
@@ -1669,7 +1680,7 @@ class BotService : Service() {
                     effectiveActionIsHold = pumBlockAllAction?.mode == ModerationActionMode.HOLD,
                     alreadyHeld = pumBlockAllAction?.mode == ModerationActionMode.HOLD &&
                         GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
-                    otherForcedRecheck = config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker,
+                    otherForcedRecheck = (config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker,
                 )) {
                 if (config.isDebugMode) {
                     sendLog("[디버그][PUM][보류중복] 변경 없는 펌 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
@@ -1685,6 +1696,7 @@ class BotService : Service() {
                     titleChanged -> "제목 변경"
                     snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
                     config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker -> "유동 디시 동영상 필터 활성화 1회 재검사"
+                    config.kkangDcMediaActivationRecheckPending && hasDcMediaListMarker -> "깡계 디시 동영상 필터 활성화 1회 재검사"
                     config.pumBlockAllPosts && hasPumListMarker -> "펌 게시글 모두 차단 확인"
                     config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
                     else -> "변경 감지"
@@ -1693,7 +1705,7 @@ class BotService : Service() {
             }
             try {
                 val postHandled = processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
-                if (config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker && !postHandled) {
+                if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker && !postHandled) {
                     activationRecheckComplete = false
                 }
             } catch (e: Exception) {
@@ -1714,7 +1726,7 @@ class BotService : Service() {
                         sendLog("[디버그][삭제/접근불가 글] 번호: $postNumStr / 상세 404 → 댓글 수 기준 저장 후 재처리 억제", botId)
                     }
                 } else {
-                    if (config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker) {
+                    if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker) {
                         activationRecheckComplete = false
                     }
                     sendLog("[처리 오류] 번호: $postNumStr / ${e.javaClass.simpleName}: ${e.message ?: "원인 불명"}", botId)
@@ -1770,7 +1782,11 @@ class BotService : Service() {
         pumSourceResolver: PumSourceResolver?,
         notifyIfEnabled: (String, String, String) -> Unit
     ): UrlProcessOutcome {
-        val parsedTarget = parseTargetUrl(rawUrl) ?: return if (config.yudongDcMediaActivationRecheckPending) {
+        val parsedTarget = parseTargetUrl(rawUrl) ?: return if (shouldMarkDcMediaActivationTargetIncomplete(
+                config.yudongDcMediaActivationRecheckPending,
+                config.kkangDcMediaActivationRecheckPending,
+                activationRecheckComplete = false,
+            )) {
             UrlProcessOutcome.INCOMPLETE
         } else {
             UrlProcessOutcome.CONTINUE
@@ -1876,7 +1892,11 @@ class BotService : Service() {
 
             if (config.isSearchMode && keywordIndex < activeKeywords.size - 1) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
         }
-        return if (config.yudongDcMediaActivationRecheckPending && !activationRecheckComplete) {
+        return if (shouldMarkDcMediaActivationTargetIncomplete(
+                config.yudongDcMediaActivationRecheckPending,
+                config.kkangDcMediaActivationRecheckPending,
+                activationRecheckComplete,
+            )) {
             UrlProcessOutcome.INCOMPLETE
         } else {
             UrlProcessOutcome.CONTINUE
@@ -3819,7 +3839,16 @@ img.written_dccon{max-width:80px;max-height:80px}
         if (config.isDebugMode) {
             sendLog("[디버그][성능] 게시글 처리 전체 / 글번호: $postNumStr / ${System.currentTimeMillis() - postProcessStartedAt}ms", botId)
         }
-        return true
+        val keepKkangDcMediaActivationPending = shouldKeepKkangDcMediaActivationPending(
+            activationRecheckPending = config.kkangDcMediaActivationRecheckPending,
+            hasDcMediaListMarker = hasDcMovie,
+            kkangEvaluationComplete = outerAnalysis.kkangEvaluationComplete,
+            moderationActionTaken = postAnalysis.action != PostModerationAction.ALLOW || isPostBlocked,
+        )
+        if (keepKkangDcMediaActivationPending && config.isDebugMode) {
+            sendLog("[디버그][깡계 디시 동영상][재시도] 갤로그 판정 실패로 활성화 재검사를 다음 사이클에 유지 / 글번호: $postNumStr", botId)
+        }
+        return !keepKkangDcMediaActivationPending
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -3970,23 +3999,28 @@ img.written_dccon{max-width:80px;max-height:80px}
                 .ignoreContentType(true)
                 .execute()
 
-            val parts = res.body().split(",")
-            val postCount = parts.getOrNull(0)?.toIntOrNull() ?: 100
-            val commentCount = parts.getOrNull(1)?.toIntOrNull() ?: 100
+            val counts = parseGallogCounts(res.body())
+            if (counts == null) {
+                if (isDebugMode && botId.isNotEmpty()) {
+                    sendLog("[디버그][갤로그] userId: $userId / API 응답 형식 오류 → 다음 검사에서 재시도", botId)
+                }
+                GallogStats(postCount = 100, commentCount = 100, lookupSucceeded = false)
+            } else {
+                val (postCount, commentCount) = counts
+                gallogCache[userId] = counts
 
-            gallogCache[userId] = Pair(postCount, commentCount)
+                if (isDebugMode && botId.isNotEmpty()) {
+                    sendLog("[디버그][갤로그] userId: $userId / API 결과 → 글: $postCount, 댓글: $commentCount", botId)
+                }
 
-            if (isDebugMode && botId.isNotEmpty()) {
-                sendLog("[디버그][갤로그] userId: $userId / API 결과 → 글: $postCount, 댓글: $commentCount", botId)
+                GallogStats(
+                    postCount = postCount,
+                    commentCount = commentCount
+                )
             }
-
-            GallogStats(
-                postCount = postCount,
-                commentCount = commentCount
-            )
         } catch (e: Exception) {
             Log.e("BotService", logTag, e)
-            GallogStats(postCount = 100, commentCount = 100)
+            GallogStats(postCount = 100, commentCount = 100, lookupSucceeded = false)
         }
     }
 
@@ -4163,10 +4197,13 @@ img.written_dccon{max-width:80px;max-height:80px}
         cookie: String,
         botId: String,
         logTag: String
-    ): Pair<Boolean, String> {
-        if (uid.isBlank()) return false to "UID 없음"
+    ): KkangEvaluation {
+        if (uid.isBlank()) return KkangEvaluation(false, "UID 없음")
         if (config.kkangDetectionMode == "dc_mark") {
-            return dcNewNicknameMarked to "신규 고정닉 표시=${if (dcNewNicknameMarked) "감지" else "없음"}"
+            return KkangEvaluation(
+                dcNewNicknameMarked,
+                "신규 고정닉 표시=${if (dcNewNicknameMarked) "감지" else "없음"}",
+            )
         }
         val gallogStats = getGallogStats(
             userId = uid,
@@ -4179,11 +4216,17 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
         val pCount = gallogStats.postCount
         val cCount = gallogStats.commentCount
+        if (!gallogStats.lookupSucceeded) {
+            return KkangEvaluation(false, "갤로그 조회 실패", complete = false)
+        }
         return if (config.kkangDetectionMode == "total") {
             val total = pCount + cCount
-            (total < config.kkangTotalMin) to "글댓합=$total/${config.kkangTotalMin}"
+            KkangEvaluation(total < config.kkangTotalMin, "글댓합=$total/${config.kkangTotalMin}")
         } else {
-            (pCount < config.kkangPostMin || cCount < config.kkangCommentMin) to "글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}"
+            KkangEvaluation(
+                pCount < config.kkangPostMin || cCount < config.kkangCommentMin,
+                "글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}",
+            )
         }
     }
 
@@ -4564,6 +4607,10 @@ img.written_dccon{max-width:80px;max-height:80px}
             isKkangPostBlock = botPref.getBoolean("is_kkang_post_block", false),
             isKkangCommentBlock = botPref.getBoolean("is_kkang_comment_block", false),
             isKkangImageBlock = botPref.getBoolean("is_kkang_image_block", false),
+            isKkangDcMediaBlock = botPref.getBoolean("is_kkang_dc_media_block", false),
+            kkangDcMediaActivationRecheckPending = botPref.getBoolean("is_kkang_filter_mode", false) &&
+                botPref.getBoolean("is_kkang_dc_media_block", false) &&
+                botPref.getBoolean("kkang_dc_media_recheck_pending", true),
             isKkangVoiceBlock = botPref.getBoolean("is_kkang_voice_block", false),
 
             isSearchMode = botPref.getBoolean("is_search_mode", false),
@@ -4844,6 +4891,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         var notiType: String? = null
         var debugDetail: String? = null
         var filterSource = ModerationFilterSource.UNKNOWN
+        var kkangEvaluationComplete = true
 
         if (isBlacklistedUserId) {
             debugDetail = "ID/IP 블랙리스트 일치 ($postAuthor)"
@@ -4906,7 +4954,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     filterSource = ModerationFilterSource.YUDONG
                 }
             } else if (!contentOnly && toggles.anyKkangPostEnabled) {
-                val (isKkang, kkangDetail) = isKkangByConfiguredMode(
+                val kkangEvaluation = isKkangByConfiguredMode(
                     config = config,
                     uid = postUid,
                     dcNewNicknameMarked = isDcNewNicknameMarked(postWriterHtml),
@@ -4916,6 +4964,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                     botId = botId,
                     logTag = "깡계 판별용 gallog 조회 실패"
                 )
+                val isKkang = kkangEvaluation.isKkang
+                val kkangDetail = kkangEvaluation.detail
+                kkangEvaluationComplete = kkangEvaluation.complete
 
                 if (isKkang) {
                     if (toggles.kkangPostEnabled) {
@@ -4927,6 +4978,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                         blockReasonPrefix = "깡계 이미지 첨부 금지"
                         notiType = "kkang"
                         debugDetail = "깡계 기준 감지 + 이미지 첨부: $kkangDetail"
+                        filterSource = ModerationFilterSource.KKANG
+                    } else if (shouldBlockKkangDcMedia(toggles.kkangDcMediaEnabled, isKkang, hasDcMovie, contentOnly)) {
+                        blockReasonPrefix = "깡계 디시 동영상 첨부 금지"
+                        notiType = "kkang"
+                        debugDetail = "깡계 기준 감지 + 디시 동영상 첨부: $kkangDetail"
                         filterSource = ModerationFilterSource.KKANG
                     } else if (
                         toggles.kkangVoiceEnabled &&
@@ -5098,7 +5154,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             blockReasonPrefix = blockReasonPrefix,
             notiType = notiType,
             debugDetail = debugDetail,
-            filterSource = filterSource
+            filterSource = filterSource,
+            kkangEvaluationComplete = kkangEvaluationComplete,
         )
     }
 
@@ -5377,8 +5434,9 @@ img.written_dccon{max-width:80px;max-height:80px}
         val kkangPostEnabled = config.isKkangFilterMode && config.isKkangPostBlock
         val kkangCommentEnabled = config.isKkangFilterMode && config.isKkangCommentBlock
         val kkangImageEnabled = config.isKkangFilterMode && config.isKkangImageBlock
+        val kkangDcMediaEnabled = config.isKkangFilterMode && config.isKkangDcMediaBlock
         val kkangVoiceEnabled = config.isKkangFilterMode && config.isKkangVoiceBlock
-        val anyKkangPostEnabled = kkangPostEnabled || kkangImageEnabled || kkangVoiceEnabled
+        val anyKkangPostEnabled = kkangPostEnabled || kkangImageEnabled || kkangDcMediaEnabled || kkangVoiceEnabled
         val anyKkangCommentEnabled = kkangCommentEnabled || kkangVoiceEnabled
 
         return FilterToggleState(
@@ -5404,6 +5462,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             kkangPostEnabled = kkangPostEnabled,
             kkangCommentEnabled = kkangCommentEnabled,
             kkangImageEnabled = kkangImageEnabled,
+            kkangDcMediaEnabled = kkangDcMediaEnabled,
             kkangVoiceEnabled = kkangVoiceEnabled,
             anyKkangPostEnabled = anyKkangPostEnabled,
             anyKkangCommentEnabled = anyKkangCommentEnabled
@@ -5653,7 +5712,14 @@ img.written_dccon{max-width:80px;max-height:80px}
 
     private data class GallogStats(
         val postCount: Int,
-        val commentCount: Int
+        val commentCount: Int,
+        val lookupSucceeded: Boolean = true,
+    )
+
+    private data class KkangEvaluation(
+        val isKkang: Boolean,
+        val detail: String,
+        val complete: Boolean = true,
     )
 
     private enum class UrlProcessOutcome {

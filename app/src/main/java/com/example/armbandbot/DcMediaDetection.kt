@@ -43,3 +43,10 @@ fun shouldBlockYudongDcMedia(
     hasDcMovie: Boolean,
     contentOnly: Boolean,
 ): Boolean = enabled && !contentOnly && postUid.isBlank() && hasDcMovie
+
+fun shouldBlockKkangDcMedia(
+    enabled: Boolean,
+    isKkang: Boolean,
+    hasDcMovie: Boolean,
+    contentOnly: Boolean,
+): Boolean = enabled && !contentOnly && isKkang && hasDcMovie

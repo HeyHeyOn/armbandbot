@@ -96,6 +96,34 @@ class DcMediaDetectionTest {
     }
 
     @Test
+    fun kkangSettingsDefaultOffAndSurviveTransfer() {
+        assertFalse(defaultBooleanValue("is_kkang_dc_media_block"))
+        assertTrue("is_kkang_dc_media_block" in EXPORTABLE_BOOLEAN_KEYS)
+        assertFalse(migrateBotSettingsSnapshot(emptyMap())["is_kkang_dc_media_block"] as Boolean)
+
+        val imported = parseAndMigrateBotSettingsExport(
+            BotSettingsExport(
+                botName = "깡계 동영상 필터 봇",
+                strings = emptyMap(),
+                booleans = mapOf("is_kkang_dc_media_block" to true),
+                ints = emptyMap(),
+                floats = emptyMap(),
+                stringSets = emptyMap(),
+            ).toJson()
+        )
+        assertTrue(imported.booleans["is_kkang_dc_media_block"] == true)
+    }
+
+    @Test
+    fun kkangPolicyRequiresEnabledKkangOuterPostWithAttachedMovie() {
+        assertTrue(shouldBlockKkangDcMedia(true, isKkang = true, hasDcMovie = true, contentOnly = false))
+        assertFalse(shouldBlockKkangDcMedia(false, isKkang = true, hasDcMovie = true, contentOnly = false))
+        assertFalse(shouldBlockKkangDcMedia(true, isKkang = false, hasDcMovie = true, contentOnly = false))
+        assertFalse(shouldBlockKkangDcMedia(true, isKkang = true, hasDcMovie = false, contentOnly = false))
+        assertFalse(shouldBlockKkangDcMedia(true, isKkang = true, hasDcMovie = true, contentOnly = true))
+    }
+
+    @Test
     fun policyBlocksOnlyEnabledAnonymousOuterPostWithAttachedMovie() {
         assertTrue(shouldBlockYudongDcMedia(true, postUid = "", hasDcMovie = true, contentOnly = false))
         assertFalse(shouldBlockYudongDcMedia(false, postUid = "", hasDcMovie = true, contentOnly = false))

@@ -38,6 +38,7 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "is_expert_mode" to false,
     "is_image_filter_mode" to false,
     "is_kkang_comment_block" to false,
+    "is_kkang_dc_media_block" to false,
     "is_kkang_filter_mode" to false,
     "is_kkang_image_block" to false,
     "is_kkang_post_block" to false,

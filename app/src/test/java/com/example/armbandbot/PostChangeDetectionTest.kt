@@ -362,6 +362,48 @@ class PostChangeDetectionTest {
     }
 
     @Test
+    fun pendingKkangDcMovieActivationRechecksMarkedRows() {
+        assertTrue(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                kkangDcMediaActivationRecheckPending = true,
+                hasDcMediaListMarker = true,
+            )
+        )
+        assertFalse(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                kkangDcMediaActivationRecheckPending = true,
+                hasDcMediaListMarker = false,
+            )
+        )
+    }
+
+    @Test
+    fun failedKkangLookupKeepsMovieActivationPendingUntilHandled() {
+        assertTrue(shouldKeepKkangDcMediaActivationPending(true, true, false, false))
+        assertFalse(shouldKeepKkangDcMediaActivationPending(true, true, true, false))
+        assertFalse(shouldKeepKkangDcMediaActivationPending(true, true, false, true))
+        assertFalse(shouldKeepKkangDcMediaActivationPending(true, false, false, false))
+        assertFalse(shouldKeepKkangDcMediaActivationPending(false, true, false, false))
+    }
+
+    @Test
+    fun eitherDcMovieActivationPropagatesIncompleteTargetToCycle() {
+        assertTrue(shouldMarkDcMediaActivationTargetIncomplete(true, false, false))
+        assertTrue(shouldMarkDcMediaActivationTargetIncomplete(false, true, false))
+        assertTrue(shouldMarkDcMediaActivationTargetIncomplete(true, true, false))
+        assertFalse(shouldMarkDcMediaActivationTargetIncomplete(false, false, false))
+        assertFalse(shouldMarkDcMediaActivationTargetIncomplete(true, true, true))
+    }
+
+    @Test
     fun pendingDcMovieActivationRechecksOnlyMarkedRowsOnce() {
         assertTrue(
             shouldRecheckPost(
