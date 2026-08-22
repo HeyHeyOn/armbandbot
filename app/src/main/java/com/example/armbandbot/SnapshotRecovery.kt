@@ -240,7 +240,7 @@ private fun File.hasSymbolicLinkBelowAllowedRoot(
  * Uses lstat, available since API 21, so dangling links are rejected without following them.
  * The canonical-path fallback keeps local JVM tests useful when Android's Os stub is unavailable.
  */
-private fun isSymbolicLinkWithoutFollowing(file: File): Boolean {
+internal fun isSymbolicLinkWithoutFollowing(file: File): Boolean {
     try {
         return OsConstants.S_ISLNK(Os.lstat(file.absolutePath).st_mode)
     } catch (error: ErrnoException) {
@@ -252,8 +252,16 @@ private fun isSymbolicLinkWithoutFollowing(file: File): Boolean {
                 (error.message == "Stub!" || error.message?.contains("not mocked") == true))
         if (!androidOsUnavailable) return true
     }
-    if (File.separatorChar == '\\') return false
-    return runCatching { file.absoluteFile.path != file.canonicalFile.path }.getOrDefault(true)
+    // java.nio.file is unavailable on Android API 24-25, so use reflection only as a local-JVM
+    // fallback after Android's API-21 lstat path proved unavailable.
+    return runCatching {
+        val path = File::class.java.getMethod("toPath").invoke(file)
+        val filesClass = Class.forName("java.nio.file.Files")
+        val pathClass = Class.forName("java.nio.file.Path")
+        filesClass.getMethod("isSymbolicLink", pathClass).invoke(null, path) as Boolean
+    }.getOrElse {
+        runCatching { file.absoluteFile.path != file.canonicalFile.path }.getOrDefault(true)
+    }
 }
 
 private fun validateSnapshotWriteTarget(
