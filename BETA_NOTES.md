@@ -1,3 +1,26 @@
+## 1.5.1-beta5 배포 준비
+
+### 주요 변화
+- 디시의 갤로그 응답 형식 변경으로 깡계 판정이 일시적으로 실패하던 문제를 수정했습니다.
+  - 글·댓글 수 뒤에 추가 숫자 항목이 붙는 현재 응답과 기존 응답을 모두 인식합니다.
+  - 깡계 작성자의 디시 동영상 첨부 글이 갤로그 응답 형식 오류로 정상 통과하던 문제를 해결했습니다.
+  - 응답에 숫자가 아닌 값이나 비정상 항목이 섞이면 기존처럼 조치하지 않고 다음 검사에서 다시 시도합니다.
+
+### 검증
+- `clean testDebugUnitTest testReleaseUnitTest lintDebug lintVitalRelease assembleRelease`: 통과
+- 단위 테스트: Debug 332개 + Release 332개, 실패 0개
+- 독립 코드 리뷰: 유니코드 숫자 허용 범위를 ASCII 숫자로 제한하고 범위 초과 회귀 테스트를 보강한 뒤 Critical/High 차단 이슈 없음
+- APK manifest: `versionCode 164`, `versionName 1.5.1`
+- APK 서명: v2 검증 통과, beta4와 같은 Android Debug 인증서
+- DEX: 3개, 최대 method ID 65,349개(여유 187개), 최대 명시적 호출 인자 248개(한도 255)
+
+### 개발 배포
+- 파일: `완장봇_v1.5.1-beta5.apk`
+- 크기: 12,961,838 bytes
+- SHA-256: `1417f0c83e8ebb05dfdefd5255e3b1481259b99e5ad5b38218cb756a386a5af1`
+- Drive 파일 ID: `1B5NUCo0dsz0ehMlFe_ECsYEJX5K44uWU`
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
 ## 1.5.1-beta4 배포 준비
 
 ### 주요 변화
