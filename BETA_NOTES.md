@@ -1,3 +1,33 @@
+## 1.5.1-beta7 배포 준비
+
+### 주요 변화
+- DB 대시보드의 `전체 목록`, `차단 내역`, `보류 내역`에서 저장된 글을 통합 검색할 수 있습니다.
+  - 글 번호, 글 작성자, 글 제목, 글 내용, 댓글 작성자, 댓글 내용을 대소문자 구분 없이 검색합니다.
+  - 각 결과에 `일치: 글 번호 · 글 작성자 · 글 제목 · 글 내용 · 댓글 작성자 · 댓글 내용` 중 실제로 일치한 항목만 표시합니다.
+- DB에 바로 저장된 정보뿐 아니라 최초·최신 스냅샷의 제목·작성자·본문·댓글도 함께 검색합니다.
+  - 과거 단일 스냅샷과 백업에서 복원한 스냅샷도 지원합니다.
+  - 검색할 때는 앱 캐시 안의 정상적인 스냅샷 HTML만 읽도록 경로를 제한했습니다.
+- 검색어 입력을 잠시 기다린 뒤 검색하고, 새 검색이나 새로고침이 시작되면 이전 작업 결과가 뒤늦게 화면을 덮지 않도록 했습니다.
+- 검색 문서와 스냅샷을 제한된 크기로 재사용해 같은 검색 범위를 반복해서 읽는 부담을 줄였습니다.
+- 검색 입력창 안내 문구가 밝은 테마에서도 잘 보이도록 색상을 수정했습니다.
+- Room DB 버전과 구조는 그대로 유지하며 마이그레이션은 없습니다.
+
+### 검증
+- `clean testDebugUnitTest testReleaseUnitTest lintDebug lintVitalRelease assembleRelease`: 통과
+- 단위 테스트: Debug 377개 + Release 377개, 실패·오류·건너뜀 0개
+- 독립 코드 리뷰: 검색 정확성·취소 경쟁·캐시 상한·스냅샷 경로 보안을 보강한 뒤 Critical/Important 차단 이슈 없음
+- APK manifest: `versionCode 166`, `versionName 1.5.1` (beta6의 165보다 증가)
+- APK 서명: v2 검증 통과, Android Debug 인증서 SHA-256 `06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f`
+- DEX: 3개, 최소 method ID 여유 187개, 최소 field ID 여유 30,527개, invoke-range 보수 상한 여유 7개
+
+### 개발 배포
+- 파일: `완장봇_v1.5.1-beta7.apk`
+- 크기: 12,994,606 bytes
+- SHA-256: `272835840aeabcd4cb628b003088ab824243a90eef953779c7b37b79644dcd0f`
+- Drive 파일 ID: `1QVFUNJwMDdTr0IhTrMCdybSshzvtV7Df`
+- Drive 링크: https://drive.google.com/file/d/1QVFUNJwMDdTr0IhTrMCdybSshzvtV7Df/view?usp=drivesdk
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
 ## 1.5.1-beta6 배포 준비
 
 ### 주요 변화
