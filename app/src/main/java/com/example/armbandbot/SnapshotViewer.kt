@@ -46,7 +46,11 @@ sealed class BodyElement {
     data class TextElement(val text: String) : BodyElement()
     data class ImageElement(val url: String, val isDccon: Boolean = false) : BodyElement()
     data class DcconRowElement(val urls: List<String>) : BodyElement()
+    data class DcMovieElement(val movieUrl: String, val postUrl: String) : BodyElement()
 }
+
+internal fun snapshotMovieRequestHeaders(movie: BodyElement.DcMovieElement): Map<String, String> =
+    mapOf("Referer" to movie.postUrl)
 
 data class SnapshotComment(
     val author: String,
@@ -283,6 +287,7 @@ private fun SnapshotDcconImage(url: String, modifier: Modifier = Modifier) {
 fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
     val context = LocalContext.current
     var showWebView by remember { mutableStateOf(false) }
+    var activeMovie by remember { mutableStateOf<BodyElement.DcMovieElement?>(null) }
 
     val versionPaths = remember(snapshotPath) { deriveSnapshotVersionPaths(snapshotPath) }
     val initialPath = versionPaths?.initialPath
@@ -306,6 +311,7 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
 
     BackHandler(enabled = true) { onBack() }
     BackHandler(enabled = showWebView) { showWebView = false }
+    BackHandler(enabled = activeMovie != null) { activeMovie = null }
 
     val isDarkMode = LocalIsDarkMode.current
     val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF1F3F5)
@@ -449,6 +455,12 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                                     SnapshotDcconImage(url = url, modifier = Modifier.size(80.dp))
                                 }
                             }
+                            is BodyElement.DcMovieElement -> SnapshotDcMovieCard(
+                                movie = element,
+                                textColor = textColor,
+                                subTextColor = subTextColor,
+                                onPlay = { activeMovie = it },
+                            )
                         }
                     }
 
@@ -602,6 +614,16 @@ fun SnapshotViewerScreen(snapshotPath: String, onBack: () -> Unit) {
                     modifier = Modifier.fillMaxSize().weight(1f)
                 )
             }
+        }
+
+        activeMovie?.let { movie ->
+            SnapshotDcMoviePlayer(
+                movie = movie,
+                topBarColor = topBarColor,
+                textColor = textColor,
+                subTextColor = subTextColor,
+                onBack = { activeMovie = null },
+            )
         }
     }
 }

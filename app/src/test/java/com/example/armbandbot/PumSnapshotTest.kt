@@ -271,20 +271,34 @@ class PumSnapshotTest {
     }
 
     @Test
-    fun cleanupReplacesDcMovieIframeWithStaticEvidence() {
+    fun cleanupReplacesDcMovieIframeWithStaticPlayerEvidence() {
         val live = Jsoup.parse(
             """
             <div class='write_div'>
               <iframe src='https://gall.dcinside.com/board/movie/movie_view?no=7016978'></iframe>
             </div>
             """.trimIndent(),
+            "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2336",
         )
 
         val snapshot = PumSnapshot.withStaticCard(live, null)
 
         assertTrue(snapshot.select("iframe").isEmpty())
         assertEquals(1, snapshot.select(".armbandbot-dc-movie").size)
-        assertEquals("디시 동영상 첨부 (정적 표시)", snapshot.selectFirst(".armbandbot-dc-movie")!!.text())
+        val movie = snapshot.selectFirst(".armbandbot-dc-movie")!!
+        assertEquals(
+            "https://gall.dcinside.com/board/movie/movie_view?no=7016978",
+            movie.attr("data-movie-url"),
+        )
+        assertEquals(
+            "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2336",
+            movie.attr("data-post-url"),
+        )
+        assertEquals(1, movie.select(".armbandbot-dc-movie-screen").size)
+        assertEquals("▶", movie.selectFirst(".armbandbot-dc-movie-play")!!.text())
+        assertTrue(movie.text().contains("디시 동영상"))
+        assertEquals(1, snapshot.select("style#armbandbot-dc-movie-style").size)
+        assertTrue(snapshot.select("script, [onclick], iframe").isEmpty())
     }
 
     @Test

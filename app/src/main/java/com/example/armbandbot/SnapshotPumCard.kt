@@ -53,6 +53,7 @@ internal fun pumExpandedBodyElements(preview: SnapshotPumPreview): List<BodyElem
                     else -> add(BodyElement.DcconRowElement(remaining))
                 }
             }
+            is BodyElement.DcMovieElement -> Unit
         }
     }
 }
@@ -200,6 +201,11 @@ private fun SnapshotPumBodyElement(element: BodyElement, referer: String, textCo
                 SnapshotPumImage(url, referer, "펌 원문 디시콘", Modifier.size(80.dp))
             }
         }
+        is BodyElement.DcMovieElement -> Text(
+            "동영상 첨부는 원본 링크에서 확인해 주세요.",
+            color = textColor,
+            fontSize = 12.sp,
+        )
     }
 }
 

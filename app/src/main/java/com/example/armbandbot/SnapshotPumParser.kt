@@ -63,6 +63,7 @@ internal fun parseSnapshotPumPreview(card: Element?): SnapshotPumPreview? {
             when (element) {
                 is BodyElement.ImageElement -> element.url
                 is BodyElement.DcconRowElement -> element.urls.firstOrNull()
+                is BodyElement.DcMovieElement -> null
                 is BodyElement.TextElement -> null
             }
         },
@@ -252,6 +253,20 @@ internal object SnapshotBodyParser {
     }
 
     private fun MutableList<BodyElement>.addChild(child: Element) {
+        if (child.hasClass("armbandbot-dc-movie")) {
+            parseDcMovieElement(child)?.let(::add)
+            return
+        }
+        if (child.select(".armbandbot-dc-movie").isNotEmpty()) {
+            child.childNodes().forEach { node ->
+                when (node) {
+                    is Element -> addChild(node)
+                    is org.jsoup.nodes.TextNode -> node.text().trim().takeIf(String::isNotEmpty)
+                        ?.let { add(BodyElement.TextElement(it)) }
+                }
+            }
+            return
+        }
         if (isVoice(child)) {
             add(BodyElement.TextElement("[보이스리플]"))
             return
@@ -293,6 +308,15 @@ internal object SnapshotBodyParser {
             element.hasClass("voice_wrap") || element.hasClass("armbandbot-pum-voice") ||
             element.select(".vr_player, .vr_player_tag, div.voice_wrap, .armbandbot-pum-voice, iframe[src*=voice/player]").isNotEmpty() ||
             element.html().contains("voice/player")
+
+    private fun parseDcMovieElement(element: Element): BodyElement.DcMovieElement? {
+        val movieUrl = DcMediaDetection.canonicalMovieUrl(element.attr("data-movie-url")) ?: return null
+        val postUrl = DcinsidePostUrls.parseSafeCanonicalPostUrl(
+            element.attr("data-post-url"),
+            null,
+        )?.url ?: return null
+        return BodyElement.DcMovieElement(movieUrl = movieUrl, postUrl = postUrl)
+    }
 }
 
 internal fun safeSnapshotMediaUrl(raw: String): String? {

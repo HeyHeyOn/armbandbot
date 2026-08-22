@@ -8,6 +8,7 @@ import java.util.Locale
 /** Narrow structural detection for DC's own attached-movie player. */
 object DcMediaDetection {
     private const val MOVIE_VIEW_PATH = "/board/movie/movie_view"
+    private const val MOVIE_HOST = "gall.dcinside.com"
 
     fun hasListMarker(row: Element): Boolean = row.select(".icon_movie").isNotEmpty()
 
@@ -17,18 +18,24 @@ object DcMediaDetection {
 
     internal fun isDcMovieIframe(iframe: Element): Boolean {
         if (!iframe.tagName().equals("iframe", ignoreCase = true)) return false
-        val rawSource = iframe.attr("src").trim()
-        if (rawSource.isEmpty()) return false
-        val resolvedSource = iframe.absUrl("src").ifBlank { rawSource }
-        val normalizedSource = if (resolvedSource.startsWith("//")) "https:$resolvedSource" else resolvedSource
-        val uri = runCatching { URI(normalizedSource) }.getOrNull() ?: return false
-        if (uri.path.orEmpty().trimEnd('/') != MOVIE_VIEW_PATH) return false
+        return canonicalMovieUrl(iframe.attr("src"), iframe.baseUri()) != null
+    }
 
-        val host = uri.host?.lowercase(Locale.ROOT)
-        if (host == null) {
-            return rawSource.startsWith("/") && !rawSource.startsWith("//")
+    internal fun canonicalMovieUrl(rawSource: String, baseUrl: String? = null): String? {
+        val raw = rawSource.trim()
+        if (raw.isEmpty()) return null
+        val normalized = if (raw.startsWith("//")) "https:$raw" else raw
+        val uri = runCatching {
+            val parsed = URI(normalized)
+            if (parsed.isAbsolute) parsed else URI(baseUrl?.trim().orEmpty()).resolve(parsed)
+        }.getOrNull() ?: return null
+        if (!uri.scheme.equals("https", true) || uri.host?.lowercase(Locale.ROOT) != MOVIE_HOST ||
+            uri.port != -1 || uri.userInfo != null || uri.fragment != null || uri.path != MOVIE_VIEW_PATH) {
+            return null
         }
-        return host == "dcinside.com" || host.endsWith(".dcinside.com")
+        val movieNo = Regex("^no=([1-9][0-9]*)$").matchEntire(uri.rawQuery.orEmpty())
+            ?.groupValues?.get(1) ?: return null
+        return "https://$MOVIE_HOST$MOVIE_VIEW_PATH?no=$movieNo"
     }
 
     private fun isInsidePumCard(iframe: Element): Boolean = iframe.parents().any { parent ->

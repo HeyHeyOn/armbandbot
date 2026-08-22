@@ -1,3 +1,32 @@
+## 1.5.1-beta6 배포 준비
+
+### 주요 변화
+- 저장 HTML에서 실제 iframe은 제거하되 원래 동영상 위치에 검은 화면·재생 아이콘·안내 문구가 있는 정적 디시 플레이어 모양을 남깁니다.
+- 기본 스냅샷 뷰어에서 저장된 동영상 카드를 누르면 앱 내부 전용 플레이어로 재생합니다.
+  - 저장 당시 원문 글 주소를 디시 플레이어 요청에 함께 전달합니다.
+  - 앱이 백그라운드로 가거나 재생 화면을 닫으면 플레이어를 일시정지·종료합니다.
+- 주소 정보가 없는 과거 스냅샷은 기존 정적 문구만 표시하고 재생 버튼을 임의로 만들지 않습니다.
+- 최초·최신 스냅샷은 각 파일에 저장된 당시 동영상 정보를 독립적으로 표시합니다.
+- 동영상과 텍스트·이미지가 같은 영역에 있어도 원래 순서를 유지합니다.
+- 정확한 디시 동영상 플레이어 주소와 숫자 동영상 번호만 허용하며, 복원할 때 동영상 주소와 원문 글 주소를 다시 검사합니다.
+
+### 검증
+- `clean testDebugUnitTest testReleaseUnitTest lintDebug lintVitalRelease assembleRelease`: 통과
+- 단위 테스트: Debug 337개 + Release 337개, 실패 0개
+- 독립 코드 리뷰: 생명주기 일시정지와 혼합 본문 순서 보존을 보강한 뒤 Critical/High 차단 이슈 없음
+- 실제 디시 플레이어 응답에서 JavaScript 없이 재생 가능한 HTML5 `<video>` 요소 확인
+- APK manifest: `versionCode 165`, `versionName 1.5.1` (beta5의 164보다 증가)
+- APK 서명: v2 검증 통과, beta5와 같은 Android Debug 인증서
+- DEX: 3개, 최소 method ID 여유 187개, 최소 field ID 여유 30,527개, invoke-range 보수 상한 여유 7개
+- 현재 빌드 환경에는 실행 가능한 Android 기기가 없어 실제 기기 터치 재생 E2E는 미실시
+
+### 개발 배포
+- 파일: `완장봇_v1.5.1-beta6.apk`
+- 크기: 12,978,222 bytes
+- SHA-256: `333dcbc02f959b5d846467eae7cbfaadf6d3f9885e9f4197da59949c1eb9f170`
+- Drive 파일 ID: `1QQRifFRz8AhRGaKLix5UlawRWa4h_0mf`
+- 업로드 후 재다운로드 SHA-256: 일치 확인
+
 ## 1.5.1-beta5 배포 준비
 
 ### 주요 변화

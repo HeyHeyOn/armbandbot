@@ -1,5 +1,6 @@
 package com.heyheyon.armbandbot
 
+import androidx.lifecycle.Lifecycle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -9,6 +10,114 @@ import java.io.File
 
 class SnapshotViewerTest {
     private fun fixture(name: String) = javaClass.getResource("/pum/$name")!!.readText()
+
+    @Test
+    fun staticDcMovieEvidenceParsesAsPlayableBodyElementWithReferer() {
+        val html = snapshotHtml(
+            outerBody = """
+                <p>동영상 앞</p>
+                <div class="armbandbot-dc-movie"
+                    data-movie-url="https://gall.dcinside.com/board/movie/movie_view?no=7016978"
+                    data-post-url="https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&amp;no=2336">
+                  <div class="armbandbot-dc-movie-screen"><span class="armbandbot-dc-movie-play">▶</span></div>
+                </div>
+                <p>동영상 뒤</p>
+            """.trimIndent(),
+        )
+
+        val parsed = parseSnapshot(writeSnapshot(html).path)
+
+        assertEquals(
+            listOf(
+                BodyElement.TextElement("동영상 앞"),
+                BodyElement.DcMovieElement(
+                    movieUrl = "https://gall.dcinside.com/board/movie/movie_view?no=7016978",
+                    postUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2336",
+                ),
+                BodyElement.TextElement("동영상 뒤"),
+            ),
+            parsed.bodyElements,
+        )
+        assertEquals(
+            mapOf("Referer" to "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2336"),
+            snapshotMovieRequestHeaders(parsed.bodyElements.filterIsInstance<BodyElement.DcMovieElement>().single()),
+        )
+        assertEquals(
+            SnapshotMovieWebPolicy(
+                javaScriptEnabled = false,
+                allowFileAccess = false,
+                allowContentAccess = false,
+                mediaPlaybackRequiresUserGesture = true,
+            ),
+            snapshotMovieWebPolicy(),
+        )
+    }
+
+    @Test
+    fun nestedMoviePreservesMixedSiblingContentInDocumentOrder() {
+        val html = snapshotHtml(
+            outerBody = """
+                <div class="video-and-caption">
+                  <p>영상 앞 설명</p>
+                  <div class="armbandbot-dc-movie"
+                      data-movie-url="https://gall.dcinside.com/board/movie/movie_view?no=7016978"
+                      data-post-url="https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&amp;no=2336"></div>
+                  <img src="https://images.dcinside.com/after.jpg">
+                  <p>영상 뒤 설명</p>
+                </div>
+                <div class="invalid-and-caption">
+                  <p>유효한 형제 본문</p>
+                  <div class="armbandbot-dc-movie"
+                      data-movie-url="https://evil.example/movie?no=1"
+                      data-post-url="https://gall.dcinside.com/board/view/?id=safe&amp;no=1"></div>
+                  <p>유효한 뒤 본문</p>
+                </div>
+            """.trimIndent(),
+        )
+
+        val parsed = parseSnapshot(writeSnapshot(html).path)
+
+        assertEquals(
+            listOf(
+                BodyElement.TextElement("영상 앞 설명"),
+                BodyElement.DcMovieElement(
+                    movieUrl = "https://gall.dcinside.com/board/movie/movie_view?no=7016978",
+                    postUrl = "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2336",
+                ),
+                BodyElement.ImageElement("https://images.dcinside.com/after.jpg"),
+                BodyElement.TextElement("영상 뒤 설명"),
+                BodyElement.TextElement("유효한 형제 본문"),
+                BodyElement.TextElement("유효한 뒤 본문"),
+            ),
+            parsed.bodyElements,
+        )
+    }
+
+    @Test
+    fun movieLifecycleEventsMapToPauseAndResumeOnly() {
+        assertEquals(SnapshotMovieLifecycleAction.RESUME, snapshotMovieLifecycleAction(Lifecycle.Event.ON_RESUME))
+        assertEquals(SnapshotMovieLifecycleAction.PAUSE, snapshotMovieLifecycleAction(Lifecycle.Event.ON_PAUSE))
+        assertEquals(SnapshotMovieLifecycleAction.PAUSE, snapshotMovieLifecycleAction(Lifecycle.Event.ON_STOP))
+        assertEquals(SnapshotMovieLifecycleAction.NONE, snapshotMovieLifecycleAction(Lifecycle.Event.ON_CREATE))
+    }
+
+    @Test
+    fun restoredMovieEvidenceRejectsUnsafePlayerOrRefererMetadata() {
+        val html = snapshotHtml(
+            outerBody = """
+                <div class="armbandbot-dc-movie"
+                    data-movie-url="https://evil.example/board/movie/movie_view?no=1"
+                    data-post-url="https://gall.dcinside.com/board/view/?id=safe&amp;no=1"></div>
+                <div class="armbandbot-dc-movie"
+                    data-movie-url="https://gall.dcinside.com/board/movie/movie_view?no=1"
+                    data-post-url="https://evil.example/view?id=safe&amp;no=1"></div>
+            """.trimIndent(),
+        )
+
+        val parsed = parseSnapshot(writeSnapshot(html).path)
+
+        assertTrue(parsed.bodyElements.none { it is BodyElement.DcMovieElement })
+    }
 
     @Test
     fun nativeDcPumCardParsesItsClickableSourceAndDoesNotContaminateOuterBody() {
@@ -202,6 +311,7 @@ class SnapshotViewerTest {
             when (it) {
                 is BodyElement.ImageElement -> 1
                 is BodyElement.DcconRowElement -> it.urls.size
+                is BodyElement.DcMovieElement -> 0
                 is BodyElement.TextElement -> 0
             }
         }

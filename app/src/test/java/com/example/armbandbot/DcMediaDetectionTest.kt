@@ -1,11 +1,47 @@
 package com.heyheyon.armbandbot
 
 import org.jsoup.Jsoup
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DcMediaDetectionTest {
+    @Test
+    fun canonicalMovieUrlAcceptsOnlyExactHttpsDcPlayerWithNumericNumber() {
+        assertEquals(
+            "https://gall.dcinside.com/board/movie/movie_view?no=7016978",
+            DcMediaDetection.canonicalMovieUrl(
+                "https://gall.dcinside.com/board/movie/movie_view?no=7016978",
+            ),
+        )
+        assertEquals(
+            "https://gall.dcinside.com/board/movie/movie_view?no=7016978",
+            DcMediaDetection.canonicalMovieUrl(
+                "//gall.dcinside.com/board/movie/movie_view?no=7016978",
+            ),
+        )
+        assertEquals(
+            "https://gall.dcinside.com/board/movie/movie_view?no=7016978",
+            DcMediaDetection.canonicalMovieUrl(
+                "/board/movie/movie_view?no=7016978",
+                "https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2336",
+            ),
+        )
+
+        listOf(
+            "http://gall.dcinside.com/board/movie/movie_view?no=7016978",
+            "https://m.dcinside.com/board/movie/movie_view?no=7016978",
+            "https://gall.dcinside.com:443/board/movie/movie_view?no=7016978",
+            "https://gall.dcinside.com/board/movie/movie_view?no=abc",
+            "https://gall.dcinside.com/board/movie/movie_view?no=0",
+            "https://gall.dcinside.com/board/movie/movie_view?no=1&next=https://evil.example",
+            "https://gall.dcinside.com/board/movie/movie_view?no=1#fragment",
+            "https://gall.dcinside.com.evil.example/board/movie/movie_view?no=1",
+        ).forEach { assertNull(it, DcMediaDetection.canonicalMovieUrl(it)) }
+    }
+
     @Test
     fun detectsDcMovieIframeOnlyInsideOuterPostBody() {
         val document = Jsoup.parse(

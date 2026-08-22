@@ -47,6 +47,9 @@ object PumSnapshot {
 
     internal fun removeExecutableBehavior(document: Document) {
         removeGaejukDecoration(document)
+        val postUrl = document.selectFirst("meta[name=armbandbot-base-url]")
+            ?.attr("content")
+            ?.let { DcinsidePostUrls.parseSafeCanonicalPostUrl(it, null)?.url }
 
         val controlClasses = listOf(
             "btn_recom_up", "btn_recom_down", "btn_silbechu", "btn_cloned",
@@ -73,16 +76,21 @@ object PumSnapshot {
         document.select("iframe").toList().forEach { iframe ->
             val source = safeUrl(iframe.attr("src"), allowFragment = false)
             when {
-                DcMediaDetection.isDcMovieIframe(iframe) -> iframe.replaceWith(
-                    Element("span")
-                        .addClass("armbandbot-dc-movie")
-                        .text("디시 동영상 첨부 (정적 표시)")
-                )
+                DcMediaDetection.isDcMovieIframe(iframe) -> {
+                    val movieUrl = DcMediaDetection.canonicalMovieUrl(iframe.attr("src"), iframe.baseUri())
+                    if (movieUrl != null) iframe.replaceWith(staticMovieEvidence(movieUrl, postUrl)) else iframe.remove()
+                }
                 source != null && runCatching { URI(source).path.orEmpty().contains("/voice/player") }.getOrDefault(false) -> {
                     iframe.replaceWith(Element("span").addClass("armbandbot-pum-voice").text("보이스 원문 (정적 표시)"))
                 }
                 else -> iframe.remove()
             }
+        }
+        document.select("style#armbandbot-dc-movie-style").remove()
+        if (document.select(".armbandbot-dc-movie").isNotEmpty()) {
+            document.head()?.appendElement("style")
+                ?.attr("id", "armbandbot-dc-movie-style")
+                ?.text(MOVIE_EVIDENCE_CSS)
         }
 
         document.select("link").filterNot(::isSafeStylesheet).forEach(Element::remove)
@@ -119,6 +127,32 @@ object PumSnapshot {
             }
         }
     }
+
+    private fun staticMovieEvidence(movieUrl: String, postUrl: String?): Element {
+        val container = Element("div")
+            .addClass("armbandbot-dc-movie")
+            .attr("data-movie-url", movieUrl)
+        postUrl?.let { container.attr("data-post-url", it) }
+
+        val screen = Element("div").addClass("armbandbot-dc-movie-screen")
+        screen.appendChild(Element("span").addClass("armbandbot-dc-movie-play").text("▶"))
+        screen.appendChild(Element("span").addClass("armbandbot-dc-movie-label").text("디시 동영상"))
+        container.appendChild(screen)
+        container.appendChild(
+            Element("p")
+                .addClass("armbandbot-dc-movie-note")
+                .text("완장봇 스냅샷 뷰어에서 온라인으로 재생할 수 있습니다.")
+        )
+        return container
+    }
+
+    private const val MOVIE_EVIDENCE_CSS = """
+.armbandbot-dc-movie{max-width:720px;margin:12px 0;color:#fff;font-family:Arial,sans-serif}
+.armbandbot-dc-movie-screen{box-sizing:border-box;min-height:220px;aspect-ratio:16/9;background:#111;border:1px solid #333;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.armbandbot-dc-movie-play{box-sizing:border-box;width:64px;height:64px;padding-left:5px;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;line-height:1;color:#fff}
+.armbandbot-dc-movie-label{font-size:15px;font-weight:bold;color:#fff}
+.armbandbot-dc-movie-note{box-sizing:border-box;margin:0;padding:9px 12px;background:#202020;color:#ccc;font-size:12px}
+"""
 
     private fun sanitizeButtonDescendants(button: Element) {
         button.select(
