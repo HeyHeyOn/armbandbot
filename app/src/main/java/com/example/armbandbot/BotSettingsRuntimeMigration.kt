@@ -59,6 +59,7 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "is_voice_filter_mode" to false,
     "is_yudong_comment_block" to false,
     "is_yudong_image_block" to false,
+    "is_yudong_dc_media_block" to false,
     "is_yudong_post_block" to false,
     "is_yudong_voice_block" to false,
     "keyword_apply_kkang_only" to false,

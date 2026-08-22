@@ -271,6 +271,23 @@ class PumSnapshotTest {
     }
 
     @Test
+    fun cleanupReplacesDcMovieIframeWithStaticEvidence() {
+        val live = Jsoup.parse(
+            """
+            <div class='write_div'>
+              <iframe src='https://gall.dcinside.com/board/movie/movie_view?no=7016978'></iframe>
+            </div>
+            """.trimIndent(),
+        )
+
+        val snapshot = PumSnapshot.withStaticCard(live, null)
+
+        assertTrue(snapshot.select("iframe").isEmpty())
+        assertEquals(1, snapshot.select(".armbandbot-dc-movie").size)
+        assertEquals("디시 동영상 첨부 (정적 표시)", snapshot.selectFirst(".armbandbot-dc-movie")!!.text())
+    }
+
+    @Test
     fun initialAndLatestKeepIndependentNativeDcCardVersions() {
         val root = Files.createTempDirectory("pum_native_snapshot_versions").toFile()
         val dir = File(root, "snapshots_bot").apply { mkdirs() }

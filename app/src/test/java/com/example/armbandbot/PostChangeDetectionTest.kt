@@ -330,4 +330,68 @@ class PostChangeDetectionTest {
             )
         )
     }
+
+    @Test
+    fun pumHoldPreflightDoesNotSkipOtherForcedDcMovieWork() {
+        assertFalse(
+            shouldSkipPumHoldPreflight(
+                isPumSourceFilterMode = true,
+                pumBlockAllPosts = true,
+                hasPumListMarker = true,
+                rowUnchanged = true,
+                effectiveActionIsHold = true,
+                alreadyHeld = true,
+                otherForcedRecheck = true,
+            )
+        )
+    }
+
+    @Test
+    fun markedUnparseableMovieRowKeepsActivationSweepPending() {
+        assertTrue(shouldMarkDcMediaActivationRowIncomplete(true, true, false))
+        assertFalse(shouldMarkDcMediaActivationRowIncomplete(true, false, false))
+        assertFalse(shouldMarkDcMediaActivationRowIncomplete(true, true, true))
+        assertFalse(shouldMarkDcMediaActivationRowIncomplete(false, true, false))
+    }
+
+    @Test
+    fun dcMovieActivationHoldPreflightAvoidsDuplicatesButKeepsOtherForcedWork() {
+        assertTrue(shouldSkipYudongDcMediaHoldPreflight(true, true, true, true, true, false))
+        assertFalse(shouldSkipYudongDcMediaHoldPreflight(true, true, true, true, false, false))
+        assertFalse(shouldSkipYudongDcMediaHoldPreflight(true, true, true, true, true, true))
+    }
+
+    @Test
+    fun pendingDcMovieActivationRechecksOnlyMarkedRowsOnce() {
+        assertTrue(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                yudongDcMediaActivationRecheckPending = true,
+                hasDcMediaListMarker = true,
+            )
+        )
+        assertFalse(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                yudongDcMediaActivationRecheckPending = true,
+                hasDcMediaListMarker = false,
+            )
+        )
+        assertFalse(
+            shouldRecheckPost(
+                savedCommentCount = 3,
+                currentCommentCount = 3,
+                savedTitle = "같은 제목",
+                currentTitle = "같은 제목",
+                yudongDcMediaActivationRecheckPending = false,
+                hasDcMediaListMarker = true,
+            )
+        )
+    }
 }

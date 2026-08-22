@@ -72,10 +72,16 @@ object PumSnapshot {
 
         document.select("iframe").toList().forEach { iframe ->
             val source = safeUrl(iframe.attr("src"), allowFragment = false)
-            if (source != null && runCatching { URI(source).path.orEmpty().contains("/voice/player") }.getOrDefault(false)) {
-                iframe.replaceWith(Element("span").addClass("armbandbot-pum-voice").text("보이스 원문 (정적 표시)"))
-            } else {
-                iframe.remove()
+            when {
+                DcMediaDetection.isDcMovieIframe(iframe) -> iframe.replaceWith(
+                    Element("span")
+                        .addClass("armbandbot-dc-movie")
+                        .text("디시 동영상 첨부 (정적 표시)")
+                )
+                source != null && runCatching { URI(source).path.orEmpty().contains("/voice/player") }.getOrDefault(false) -> {
+                    iframe.replaceWith(Element("span").addClass("armbandbot-pum-voice").text("보이스 원문 (정적 표시)"))
+                }
+                else -> iframe.remove()
             }
         }
 

@@ -111,6 +111,8 @@ class BotService : Service() {
         val isYudongPostBlock: Boolean,
         val isYudongCommentBlock: Boolean,
         val isYudongImageBlock: Boolean,
+        val isYudongDcMediaBlock: Boolean,
+        val yudongDcMediaActivationRecheckPending: Boolean,
         val isYudongVoiceBlock: Boolean,
 
         val isOverseasIpFilterMode: Boolean,
@@ -270,6 +272,7 @@ class BotService : Service() {
         val yudongPostEnabled: Boolean,
         val yudongCommentEnabled: Boolean,
         val yudongImageEnabled: Boolean,
+        val yudongDcMediaEnabled: Boolean,
         val yudongVoiceEnabled: Boolean,
         val anyYudongPostEnabled: Boolean,
         val anyYudongCommentEnabled: Boolean,
@@ -1423,8 +1426,12 @@ class BotService : Service() {
             val cycleMinMs = config.cycleMinMs
             val cycleMaxMs = config.cycleMaxMs
 
+            var completedAllTargets = true
             for ((urlIndex, rawUrl) in urlList.withIndex()) {
-                if (!isActive) break
+                if (!isActive) {
+                    completedAllTargets = false
+                    break
+                }
                 if (config.isDebugMode) {
                     sendLog("[디버그][사이클] URL 처리 시작 (${urlIndex + 1}/${urlList.size}): $rawUrl", botId)
                 }
@@ -1444,6 +1451,7 @@ class BotService : Service() {
 
                 when (processOutcome) {
                     UrlProcessOutcome.CONTINUE -> Unit
+                    UrlProcessOutcome.INCOMPLETE -> completedAllTargets = false
                     UrlProcessOutcome.LOGIN_REQUIRED -> {
                         val recoveredCookie = tryRecoverSession(
                             botId = botId,
@@ -1453,6 +1461,7 @@ class BotService : Service() {
                         )
                         if (recoveredCookie != null) {
                             currentCookie = recoveredCookie
+                            completedAllTargets = false
                             break
                         }
                         botPref.edit()
@@ -1483,6 +1492,12 @@ class BotService : Service() {
 
                 if (urlIndex < urlList.size - 1) {
                     delay(randomDelay(pageMinMs, pageMaxMs))
+                }
+            }
+            if (completedAllTargets && isActive && config.yudongDcMediaActivationRecheckPending) {
+                botPref.edit().putBoolean("yudong_dc_media_recheck_pending", false).apply()
+                if (config.isDebugMode) {
+                    sendLog("[디버그][유동 디시 동영상] 활성화 후 기존 목록 1회 재검사 완료", botId)
                 }
             }
             GlobalBotState.saveDb(this@BotService)
@@ -1545,15 +1560,32 @@ class BotService : Service() {
 
         var firstPostNumOfThisPage = ""
         var isPageEmpty = true
+        var activationRecheckComplete = true
 
         for (row in postRows) {
-            val titleElement = row.selectFirst(".gall_tit a:not(.reply_numbox)") ?: continue
+            val hasDcMediaListMarker = DcMediaDetection.hasListMarker(row)
+            val titleElement = row.selectFirst(".gall_tit a:not(.reply_numbox)")
+            if (titleElement == null) {
+                if (shouldMarkDcMediaActivationRowIncomplete(
+                        config.yudongDcMediaActivationRecheckPending,
+                        hasDcMediaListMarker,
+                        rowParsed = false,
+                    )) activationRecheckComplete = false
+                continue
+            }
             val text = titleElement.text()
             val link = titleElement.attr("href")
-            if (text.isBlank() || !link.contains("no=")) continue
+            val postNumStr = Regex("no=([0-9]+)").find(link)?.groupValues?.get(1)
+            val postNumber = postNumStr?.toIntOrNull()
+            if (text.isBlank() || postNumStr == null || postNumber == null || postNumber <= 0) {
+                if (shouldMarkDcMediaActivationRowIncomplete(
+                        config.yudongDcMediaActivationRecheckPending,
+                        hasDcMediaListMarker,
+                        rowParsed = false,
+                    )) activationRecheckComplete = false
+                continue
+            }
             isPageEmpty = false
-            val postNumStr = Regex("no=([0-9]+)").find(link)?.groupValues?.get(1) ?: "0"
-            val postNumber = postNumStr.toIntOrNull() ?: 0
             val writerElement = row.selectFirst(".gall_writer")
             val postWriterHtml = writerElement?.outerHtml() ?: ""
             val postUid = writerElement?.attr("data-uid") ?: ""
@@ -1583,6 +1615,8 @@ class BotService : Service() {
                     pumRecheckEveryCycle = config.pumRecheckEveryCycle,
                     hasPumListMarker = hasPumListMarker,
                     snapshotBackfillRequired = snapshotBackfillRequired,
+                    yudongDcMediaActivationRecheckPending = config.yudongDcMediaActivationRecheckPending,
+                    hasDcMediaListMarker = hasDcMediaListMarker,
                 )) {
                 if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
                 continue
@@ -1601,6 +1635,32 @@ class BotService : Service() {
             } else {
                 null
             }
+            val yudongDcMediaAction = if (
+                config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker
+            ) {
+                val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                resolveModerationActionConfig(
+                    baseConfig = resolveDefaultModerationActionConfig(config),
+                    override = loadModerationActionOverride(prefs, "yudong"),
+                    sourceLabel = "yudong_override",
+                )
+            } else {
+                null
+            }
+            if (shouldSkipYudongDcMediaHoldPreflight(
+                    activationRecheckPending = config.yudongDcMediaActivationRecheckPending,
+                    hasDcMediaListMarker = hasDcMediaListMarker,
+                    rowUnchanged = rowUnchanged,
+                    effectiveActionIsHold = yudongDcMediaAction?.mode == ModerationActionMode.HOLD,
+                    alreadyHeld = yudongDcMediaAction?.mode == ModerationActionMode.HOLD &&
+                        GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
+                    otherForcedRecheck = hasPumListMarker && (config.pumBlockAllPosts || config.pumRecheckEveryCycle),
+                )) {
+                if (config.isDebugMode) {
+                    sendLog("[디버그][유동 디시 동영상][보류중복] 변경 없는 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
+                }
+                continue
+            }
             if (shouldSkipPumHoldPreflight(
                     isPumSourceFilterMode = config.isPumSourceFilterMode,
                     pumBlockAllPosts = config.pumBlockAllPosts,
@@ -1609,6 +1669,7 @@ class BotService : Service() {
                     effectiveActionIsHold = pumBlockAllAction?.mode == ModerationActionMode.HOLD,
                     alreadyHeld = pumBlockAllAction?.mode == ModerationActionMode.HOLD &&
                         GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
+                    otherForcedRecheck = config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker,
                 )) {
                 if (config.isDebugMode) {
                     sendLog("[디버그][PUM][보류중복] 변경 없는 펌 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
@@ -1623,6 +1684,7 @@ class BotService : Service() {
                     savedCommentCount != currentCommentCount -> "댓글 수 변경"
                     titleChanged -> "제목 변경"
                     snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
+                    config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker -> "유동 디시 동영상 필터 활성화 1회 재검사"
                     config.pumBlockAllPosts && hasPumListMarker -> "펌 게시글 모두 차단 확인"
                     config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
                     else -> "변경 감지"
@@ -1630,7 +1692,10 @@ class BotService : Service() {
                 sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
             }
             try {
-                processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
+                val postHandled = processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
+                if (config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker && !postHandled) {
+                    activationRecheckComplete = false
+                }
             } catch (e: Exception) {
                 if (DeletedPostHandling.isDeletedOrUnavailablePost(e)) {
                     GlobalBotState.savePost(
@@ -1649,6 +1714,9 @@ class BotService : Service() {
                         sendLog("[디버그][삭제/접근불가 글] 번호: $postNumStr / 상세 404 → 댓글 수 기준 저장 후 재처리 억제", botId)
                     }
                 } else {
+                    if (config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker) {
+                        activationRecheckComplete = false
+                    }
                     sendLog("[처리 오류] 번호: $postNumStr / ${e.javaClass.simpleName}: ${e.message ?: "원인 불명"}", botId)
                 }
             }
@@ -1665,7 +1733,8 @@ class BotService : Service() {
             hiddenSearchPos = searchNavigation?.currentSearchPos.orEmpty(),
             nextPageUrl = searchNavigation?.nextPageUrl,
             nextSearchChunkUrl = searchNavigation?.nextSearchChunkUrl,
-            currentPageUrl = searchNavigation?.currentPageUrl
+            currentPageUrl = searchNavigation?.currentPageUrl,
+            activationRecheckComplete = activationRecheckComplete,
         )
     }
 
@@ -1701,7 +1770,11 @@ class BotService : Service() {
         pumSourceResolver: PumSourceResolver?,
         notifyIfEnabled: (String, String, String) -> Unit
     ): UrlProcessOutcome {
-        val parsedTarget = parseTargetUrl(rawUrl) ?: return UrlProcessOutcome.CONTINUE
+        val parsedTarget = parseTargetUrl(rawUrl) ?: return if (config.yudongDcMediaActivationRecheckPending) {
+            UrlProcessOutcome.INCOMPLETE
+        } else {
+            UrlProcessOutcome.CONTINUE
+        }
         val gallId = parsedTarget.gallId
         val gallType = parsedTarget.gallType
 
@@ -1711,6 +1784,7 @@ class BotService : Service() {
         if (config.isSearchMode) cleanBaseUrl = cleanBaseUrl.replace(SEARCH_PARAM_CLEANER_REGEX, "")
 
         val activeKeywords = if (config.isSearchMode && config.searchKeywords.isNotEmpty()) config.searchKeywords else listOf("")
+        var activationRecheckComplete = true
 
         for ((keywordIndex, keyword) in activeKeywords.withIndex()) {
             if (!serviceScope.isActive) break
@@ -1743,6 +1817,9 @@ class BotService : Service() {
                         pumSourceResolver = pumSourceResolver,
                         notifyIfEnabled = notifyIfEnabled
                     )
+                    if (!pageResult.activationRecheckComplete) {
+                        activationRecheckComplete = false
+                    }
                     when (pageResult.managerPermissionStatus) {
                         ManagerPermissionStatus.LOGIN_REQUIRED -> {
                             if (!config.isSearchMode) return UrlProcessOutcome.LOGIN_REQUIRED
@@ -1756,6 +1833,7 @@ class BotService : Service() {
                                 ManagerPermissionStatus.LOGIN_REQUIRED -> return UrlProcessOutcome.LOGIN_REQUIRED
                                 ManagerPermissionStatus.NO_PERMISSION -> return UrlProcessOutcome.NO_PERMISSION
                                 ManagerPermissionStatus.AMBIGUOUS, ManagerPermissionStatus.CONFIRMED -> {
+                                    activationRecheckComplete = false
                                     sendLog("[인증 예외] 검색 페이지에서만 로그인 필요로 보여 이번 키워드 스캔은 건너뜁니다.", botId)
                                     break
                                 }
@@ -1784,6 +1862,7 @@ class BotService : Service() {
                         }
                     }
                 } catch (e: Exception) {
+                    activationRecheckComplete = false
                     sendLog("[$currentPage 페이지] 처리 실패. / ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
                 }
 
@@ -1797,7 +1876,11 @@ class BotService : Service() {
 
             if (config.isSearchMode && keywordIndex < activeKeywords.size - 1) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
         }
-        return UrlProcessOutcome.CONTINUE
+        return if (config.yudongDcMediaActivationRecheckPending && !activationRecheckComplete) {
+            UrlProcessOutcome.INCOMPLETE
+        } else {
+            UrlProcessOutcome.CONTINUE
+        }
     }
 
     private fun captureBlockSnapshot(
@@ -2356,7 +2439,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         postWriterHtml: String,
         pumSourceResolver: PumSourceResolver?,
         notifyIfEnabled: (String, String, String) -> Unit
-    ) {
+    ): Boolean {
         if (config.isDebugMode) {
             sendLog("[디버그][게시글] 게시글 상세 접근 시작: 번호 $postNumStr", botId)
         }
@@ -2384,6 +2467,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         val contentText = postDoc.select(".write_div").text()
         val postRawHtml = postDoc.select(".write_div").outerHtml()
+        val hasDcMovie = DcMediaDetection.hasAttachedMovie(postDoc)
         val postImageAlts = extractNonDcconImageAltsFromPost(postDoc)
 
         val freshCiToken = postDoc.select("input[name=ci_t]").attr("value")
@@ -2528,7 +2612,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (config.isDebugMode) {
                 sendLog("[디버그][성능] 차단 예외 글 처리 / 글번호: $postNumStr / ${System.currentTimeMillis() - postProcessStartedAt}ms", botId)
             }
-            return
+            return true
         }
 
         val aiPostPlans = pendingAiPostPlans.getOrPut(botId) { mutableListOf() }
@@ -2545,6 +2629,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             postTitle = text,
             postText = legacyPostText,
             postImageAlts = postImageAlts,
+            hasDcMovie = hasDcMovie,
             postRawHtml = postRawHtml,
             postWriterHtml = postWriterHtml,
             gallogCache = gallogCache,
@@ -2573,6 +2658,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     postTitle = "",
                     postText = source.text,
                     postImageAlts = source.imageAlts,
+                    hasDcMovie = false,
                     postRawHtml = source.rawHtml,
                     postWriterHtml = postWriterHtml,
                     gallogCache = gallogCache,
@@ -2734,11 +2820,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                 botId = botId,
                 isDebugMode = config.isDebugMode
             )
-            if (deleteResponse.contains("\"result\":\"success\"")) {
+            val spamBurstDeleteSucceeded = deleteResponse.contains("\"result\":\"success\"")
+            if (spamBurstDeleteSucceeded) {
                 spamBurstStates[botId]?.samplePostNos?.remove(postNumStr)
             }
             sendLog("[도배 방지] 신규 글 삭제 / 글번호: $postNumStr / 유형: ${postAnalysis.filterSource.name} / 응답: $deleteResponse", botId)
-            return
+            return spamBurstDeleteSucceeded
         }
 
         val isBlacklistedUserId = postAnalysis.isBlacklistedUserId
@@ -3696,7 +3783,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (config.isDebugMode) {
                 sendLog("[디버그][재시도] 차단/삭제 실패가 있어 DB 검사 완료 상태를 갱신하지 않음 / 글번호: $postNumStr", botId)
             }
-            return
+            return false
         }
 
         val adjustedCommentCount = (currentCommentCount - deletedCommentCount).coerceAtLeast(0)
@@ -3732,6 +3819,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         if (config.isDebugMode) {
             sendLog("[디버그][성능] 게시글 처리 전체 / 글번호: $postNumStr / ${System.currentTimeMillis() - postProcessStartedAt}ms", botId)
         }
+        return true
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -4512,6 +4600,9 @@ img.written_dccon{max-width:80px;max-height:80px}
             isYudongPostBlock = botPref.getBoolean("is_yudong_post_block", false),
             isYudongCommentBlock = botPref.getBoolean("is_yudong_comment_block", false),
             isYudongImageBlock = botPref.getBoolean("is_yudong_image_block", false),
+            isYudongDcMediaBlock = botPref.getBoolean("is_yudong_dc_media_block", false),
+            yudongDcMediaActivationRecheckPending = botPref.getBoolean("is_yudong_dc_media_block", false) &&
+                botPref.getBoolean("yudong_dc_media_recheck_pending", true),
             isYudongVoiceBlock = botPref.getBoolean("is_yudong_voice_block", false),
 
             isOverseasIpFilterMode = botPref.getBoolean("is_overseas_ip_filter_mode", false),
@@ -4712,6 +4803,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         postTitle: String,
         postText: String,
         postImageAlts: List<String>,
+        hasDcMovie: Boolean,
         postRawHtml: String,
         postWriterHtml: String,
         gallogCache: MutableMap<String, Pair<Int, Int>>,
@@ -4798,6 +4890,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                     blockReasonPrefix = "유동 이미지 첨부 금지"
                     notiType = "yudong"
                     debugDetail = "유동 작성자 + 이미지 첨부 감지"
+                    filterSource = ModerationFilterSource.YUDONG
+                } else if (shouldBlockYudongDcMedia(toggles.yudongDcMediaEnabled, postUid, hasDcMovie, contentOnly)) {
+                    blockReasonPrefix = "유동 디시 동영상 첨부 금지"
+                    notiType = "yudong"
+                    debugDetail = "유동 작성자 + 디시 동영상 첨부 감지"
                     filterSource = ModerationFilterSource.YUDONG
                 } else if (
                     toggles.yudongVoiceEnabled &&
@@ -5271,8 +5368,9 @@ img.written_dccon{max-width:80px;max-height:80px}
         val yudongPostEnabled = config.isYudongPostBlock
         val yudongCommentEnabled = config.isYudongCommentBlock
         val yudongImageEnabled = config.isYudongImageBlock
+        val yudongDcMediaEnabled = config.isYudongDcMediaBlock
         val yudongVoiceEnabled = config.isYudongVoiceBlock
-        val anyYudongPostEnabled = yudongPostEnabled || yudongImageEnabled || yudongVoiceEnabled
+        val anyYudongPostEnabled = yudongPostEnabled || yudongImageEnabled || yudongDcMediaEnabled || yudongVoiceEnabled
         val anyYudongCommentEnabled = yudongCommentEnabled || yudongVoiceEnabled
         val overseasIpPostEnabled = config.isOverseasIpFilterMode && config.isOverseasIpPostBlock
         val overseasIpCommentEnabled = config.isOverseasIpFilterMode && config.isOverseasIpCommentBlock
@@ -5297,6 +5395,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             yudongPostEnabled = yudongPostEnabled,
             yudongCommentEnabled = yudongCommentEnabled,
             yudongImageEnabled = yudongImageEnabled,
+            yudongDcMediaEnabled = yudongDcMediaEnabled,
             yudongVoiceEnabled = yudongVoiceEnabled,
             anyYudongPostEnabled = anyYudongPostEnabled,
             anyYudongCommentEnabled = anyYudongCommentEnabled,
@@ -5509,7 +5608,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         val nextPageUrl: String? = null,
         val nextSearchChunkUrl: String? = null,
         val currentPageUrl: String? = null,
-        val managerPermissionStatus: ManagerPermissionStatus = ManagerPermissionStatus.CONFIRMED
+        val managerPermissionStatus: ManagerPermissionStatus = ManagerPermissionStatus.CONFIRMED,
+        val activationRecheckComplete: Boolean = true,
     )
 
     private data class SearchNavigation(
@@ -5558,6 +5658,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
     private enum class UrlProcessOutcome {
         CONTINUE,
+        INCOMPLETE,
         LOGIN_REQUIRED,
         NO_PERMISSION
     }
