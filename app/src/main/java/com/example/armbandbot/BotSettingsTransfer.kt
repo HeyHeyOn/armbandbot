@@ -108,6 +108,7 @@ fun importBotSettingsAsNewBot(context: Context, uriString: String): String {
     val newBotId = "bot_${UUID.randomUUID()}"
     val botPref = context.getSharedPreferences("bot_prefs_$newBotId", Context.MODE_PRIVATE)
     applyImportedSettings(botPref, imported)
+    migrateBotSettingsToCurrentVersion(botPref)
 
     val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
     val botIds = (masterPref.getString("bot_ids_list", "") ?: "")

@@ -134,11 +134,7 @@ fun AiFilterSettingsPanel(botId: String) {
                                     botPref.edit().putBoolean("ai_filter_use_custom_endpoint", false).apply()
                                 }
                                 if (!useCustomModel) {
-                                    model = when (key) {
-                                        "groq" -> "llama-3.3-70b-versatile"
-                                        "lm_studio" -> "local-model"
-                                        else -> "gemini-2.5-flash"
-                                    }
+                                    model = defaultAiFilterModel(key)
                                     saveString("ai_filter_model", model)
                                 }
                             })

@@ -1,3 +1,32 @@
+## 1.5.1-beta8 배포 준비
+
+### 주요 변화
+- Groq AI 필터의 기본 모델을 종료된 `llama-3.3-70b-versatile`에서 `openai/gpt-oss-120b`로 변경했습니다.
+- 기존 Groq 설정도 앱 실행 시 자동으로 현재 모델로 전환합니다.
+  - `llama-3.3-70b-versatile` → `openai/gpt-oss-120b`
+  - `llama-3.1-8b-instant` → `openai/gpt-oss-20b`
+- Groq에서 사용자가 직접 입력한 다른 모델과 다른 AI 제공자의 모델 설정은 변경하지 않습니다.
+- 앱 화면을 열기 전에 자동 복구되는 봇과 과거 설정을 가져온 봇에도 모델 전환이 먼저 적용됩니다.
+- AI 모델 입력 도움말의 Groq 예시도 새 기본 모델로 교체했습니다.
+- Room DB 버전과 구조는 그대로 유지하며 DB 마이그레이션은 없습니다.
+
+### 검증
+- `clean testDebugUnitTest testReleaseUnitTest lintDebug lintVitalRelease assembleRelease`: 통과
+- 단위 테스트: Debug 382개 + Release 382개, 실패·오류·건너뜀 0개
+- 독립 코드 리뷰: 자동 복구·설정 가져오기 경로를 보강한 뒤 차단 이슈 없음
+- APK manifest: `versionCode 167`, `versionName 1.5.1` (beta7의 166보다 증가)
+- APK 서명: v2 검증 통과, beta7과 같은 Android Debug 인증서 SHA-256 `06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f`
+- DEX: 3개, 최소 method ID 여유 187개, 최소 field ID 여유 30,527개
+- 현재 빌드 환경에는 실행 가능한 Android 기기가 없어 실제 Groq 호출 E2E는 미실시
+
+### 개발 배포
+- 파일: `완장봇_v1.5.1-beta8.apk`
+- 크기: 12,994,606 bytes
+- SHA-256: `24fa324e61744aa62af50ee21dd80aa9a893916dad94758bafef2ff71c169fcf`
+- Drive 파일 ID: `1Qa8PmSRK45tlonT-5WO5w2u_fcluyrIt`
+- Drive 링크: https://drive.google.com/file/d/1Qa8PmSRK45tlonT-5WO5w2u_fcluyrIt/view?usp=drivesdk
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
 ## 1.5.1-beta7 배포 준비
 
 ### 주요 변화

@@ -690,6 +690,7 @@ class BotService : Service() {
         val cookie = intent.getStringExtra("COOKIE") ?: ""
         val action = intent.action
         val botPref = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+        migrateBotSettingsToCurrentVersion(botPref)
         val botName = botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇"
         runCatching {
             val lastPhase = botPref.getString("last_startup_phase", "") ?: ""

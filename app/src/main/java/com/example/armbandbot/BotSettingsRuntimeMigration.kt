@@ -5,6 +5,22 @@ import android.content.SharedPreferences
 
 internal const val BOT_PREF_SCHEMA_VERSION_KEY = "bot_settings_schema_version"
 internal const val BOT_PREF_APP_VERSION_KEY = "bot_settings_app_version"
+internal const val GROQ_DEFAULT_AI_MODEL = "openai/gpt-oss-120b"
+
+internal fun defaultAiFilterModel(provider: String): String = when (provider.lowercase()) {
+    "groq" -> GROQ_DEFAULT_AI_MODEL
+    "lm_studio" -> "local-model"
+    else -> "gemini-2.5-flash"
+}
+
+private fun migrateRetiredGroqModel(provider: String, model: String): String {
+    if (!provider.equals("groq", ignoreCase = true)) return model
+    return when (model) {
+        "llama-3.3-70b-versatile" -> GROQ_DEFAULT_AI_MODEL
+        "llama-3.1-8b-instant" -> "openai/gpt-oss-20b"
+        else -> model
+    }
+}
 
 private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "ai_delete_only_mode" to false,
@@ -235,6 +251,10 @@ internal fun migrateBotSettingsSnapshot(values: Map<String, Any?>): Map<String, 
     STRING_PREF_DEFAULTS.forEach { (key, default) ->
         migrated[key] = coerceString(migrated[key], default)
     }
+    migrated["ai_filter_model"] = migrateRetiredGroqModel(
+        provider = migrated.getValue("ai_filter_provider") as String,
+        model = migrated.getValue("ai_filter_model") as String,
+    )
     STRING_SET_PREF_DEFAULTS.forEach { (key, default) ->
         migrated[key] = coerceStringSet(migrated[key], default)
     }

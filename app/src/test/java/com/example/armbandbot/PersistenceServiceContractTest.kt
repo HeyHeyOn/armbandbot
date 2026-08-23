@@ -34,6 +34,30 @@ class PersistenceServiceContractTest {
     }
 
     @Test
+    fun serviceMigratesBotSettingsBeforeReadingThemOnEveryStart() {
+        val service = source("BotService.kt")
+        val prefsIndex = service.indexOf("val botPref = getSharedPreferences(\"bot_prefs_\$botId\"")
+        val migrationIndex = service.indexOf("migrateBotSettingsToCurrentVersion(botPref)", prefsIndex)
+        val firstReadIndex = service.indexOf("botPref.get", prefsIndex)
+
+        assertTrue(prefsIndex >= 0)
+        assertTrue(migrationIndex > prefsIndex)
+        assertTrue(firstReadIndex > migrationIndex)
+    }
+
+    @Test
+    fun importedSettingsAreMigratedImmediatelyAfterTheyAreApplied() {
+        val transfer = source("BotSettingsTransfer.kt")
+        val applyIndex = transfer.indexOf("applyImportedSettings(botPref, imported)")
+        val migrationIndex = transfer.indexOf("migrateBotSettingsToCurrentVersion(botPref)", applyIndex)
+        val returnIndex = transfer.indexOf("return newBotId", applyIndex)
+
+        assertTrue(applyIndex >= 0)
+        assertTrue(migrationIndex > applyIndex)
+        assertTrue(returnIndex > migrationIndex)
+    }
+
+    @Test
     fun watchdogRestoresOnlyWhenRestorableServiceIsMissing() {
         val receiver = source("AutoRestartReceiver.kt")
 

@@ -198,6 +198,51 @@ class BotSettingsRuntimeMigrationTest {
     }
 
     @Test
+    fun groqProviderUsesCurrentProductionModelByDefault() {
+        assertEquals("openai/gpt-oss-120b", defaultAiFilterModel("groq"))
+        assertEquals("local-model", defaultAiFilterModel("lm_studio"))
+        assertEquals("gemini-2.5-flash", defaultAiFilterModel("gemini_direct"))
+    }
+
+    @Test
+    fun migrationReplacesRetiredGroqModelsWithCurrentSuccessors() {
+        val retired70b = migrateBotSettingsSnapshot(
+            mapOf(
+                "ai_filter_provider" to "groq",
+                "ai_filter_model" to "llama-3.3-70b-versatile",
+            )
+        )
+        val retired8b = migrateBotSettingsSnapshot(
+            mapOf(
+                "ai_filter_provider" to "GROQ",
+                "ai_filter_model" to "llama-3.1-8b-instant",
+            )
+        )
+
+        assertEquals("openai/gpt-oss-120b", retired70b["ai_filter_model"])
+        assertEquals("openai/gpt-oss-20b", retired8b["ai_filter_model"])
+    }
+
+    @Test
+    fun migrationPreservesCustomModelsAndNonGroqSettings() {
+        val customGroq = migrateBotSettingsSnapshot(
+            mapOf(
+                "ai_filter_provider" to "groq",
+                "ai_filter_model" to "custom/active-model",
+            )
+        )
+        val sameNameOnCustomProvider = migrateBotSettingsSnapshot(
+            mapOf(
+                "ai_filter_provider" to "custom_openai",
+                "ai_filter_model" to "llama-3.3-70b-versatile",
+            )
+        )
+
+        assertEquals("custom/active-model", customGroq["ai_filter_model"])
+        assertEquals("llama-3.3-70b-versatile", sameNameOnCustomProvider["ai_filter_model"])
+    }
+
+    @Test
     fun migrationPreservesRunningStateForLiveBots() {
         val migrated = migrateBotSettingsSnapshot(
             mapOf(

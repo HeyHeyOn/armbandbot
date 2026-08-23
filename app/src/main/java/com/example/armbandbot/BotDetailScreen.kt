@@ -2246,7 +2246,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                 "ai_filter_provider_custom" -> "사용할 AI 제공자 표시 이름을 입력하세요.\n예: 회사 내부 OpenAI 호환 / 기타 API"
                 "ai_filter_endpoint" -> "선택한 AI 서비스의 endpoint를 입력하세요.\n예: LM Studio 에뮬레이터: http://10.0.2.2:1234/v1/chat/completions\n예: 실제 폰 같은 Wi-Fi: http://PC_LAN_IP:1234/v1/chat/completions\n예: 셀룰러/Tailscale: http://PC_TAILSCALE_IP:1234/v1/chat/completions\n주의: 실제 폰에서 127.0.0.1은 PC가 아니라 휴대폰 자신입니다.\n예: Groq는 https://api.groq.com/openai/v1/chat/completions\nGemini direct는 비워두면 기본 경로를 사용합니다."
                 "ai_filter_api_key" -> "선택한 AI 서비스의 API 키를 입력하세요.\nLM Studio는 보통 비워둬도 됩니다.\n예: Gemini key 또는 Groq API key"
-                "ai_filter_model" -> "사용할 모델명을 입력하세요.\n예: gemini-2.5-flash / llama-3.3-70b-versatile"
+                "ai_filter_model" -> "사용할 모델명을 입력하세요.\n예: gemini-2.5-flash / $GROQ_DEFAULT_AI_MODEL"
                 "ai_filter_user_prompt" -> "AI가 어떤 글/댓글을 차단해야 하는지 구체적으로 설명하세요.\n예: 두바이 쫀득 쿠키와 관련 있는 글이나 댓글만 차단해줘. 그 외에는 절대로 차단하지 마."
                 "ai_filter_batch_max_posts" -> "한 번의 AI 배치 요청에 포함할 최대 게시글 수를 숫자로 입력하세요.\n예: 3"
                 "ai_filter_batch_max_wait_sec" -> "배치를 보내기 전 최대 대기 시간을 초 단위 숫자로 입력하세요.\n예: 60"
