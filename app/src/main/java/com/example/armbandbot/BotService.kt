@@ -4550,6 +4550,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             is String -> value.toFloatOrNull() ?: defaultValue
             else -> defaultValue
         }
+        fun orderedMultilineValues(key: String): List<String> =
+            loadOrderedMultilineValues(botPref, key)
 
         val rawUrlsText = safePrefString("target_urls", "")
         val targetUrls = rawUrlsText
@@ -4580,11 +4582,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?: if (botPref.getBoolean("delete_only_mode", false)) "DELETE" else "BLOCK",
             deletePostOnBlock = botPref.getBoolean("delete_post_on_block", true),
             deleteOnlyMode = botPref.getBoolean("delete_only_mode", false),
-            blockExemptPostNumbers = botPref.getStringSet("block_exempt_post_numbers", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?.toSet()
-                ?: emptySet(),
+            blockExemptPostNumbers = orderedMultilineValues("block_exempt_post_numbers").toSet(),
 
             isNotiMaster = botPref.getBoolean("noti_master", true),
             notiKeyword = botPref.getBoolean("noti_keyword", true),
@@ -4616,34 +4614,16 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             isSearchMode = botPref.getBoolean("is_search_mode", false),
             searchType = botPref.getString("search_type", "search_subject_memo") ?: "search_subject_memo",
-            searchKeywords = botPref.getStringSet("search_keywords", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
+            searchKeywords = orderedMultilineValues("search_keywords"),
 
             isUserFilterMode = botPref.getBoolean("is_user_filter_mode", false),
-            userBlacklist = botPref.getStringSet("user_blacklist", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
-            userWhitelist = botPref.getStringSet("user_whitelist", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
+            userBlacklist = orderedMultilineValues("user_blacklist"),
+            userWhitelist = orderedMultilineValues("user_whitelist"),
 
             isNicknameFilterMode = botPref.getBoolean("is_nickname_filter_mode", false),
-            nicknameBlacklist = botPref.getStringSet("nickname_blacklist", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
-            nicknameBypassBlacklist = botPref.getStringSet("nickname_bypass_blacklist", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
-            nicknameWhitelist = botPref.getStringSet("nickname_whitelist", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
+            nicknameBlacklist = orderedMultilineValues("nickname_blacklist"),
+            nicknameBypassBlacklist = orderedMultilineValues("nickname_bypass_blacklist"),
+            nicknameWhitelist = orderedMultilineValues("nickname_whitelist"),
 
             isYudongPostBlock = botPref.getBoolean("is_yudong_post_block", false),
             isYudongCommentBlock = botPref.getBoolean("is_yudong_comment_block", false),
@@ -4680,10 +4660,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             spamBurstTargetKkang = botPref.getBoolean("spam_burst_target_kkang", true),
 
             isUrlFilterMode = botPref.getBoolean("is_url_filter_mode", false),
-            urlWhitelistList = botPref.getStringSet("url_whitelist", setOf())
-                ?.map { it.removeCommentAndTrim().lowercase() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
+            urlWhitelistList = orderedMultilineValues("url_whitelist").map(String::lowercase),
 
             isSpamCodeFilterMode = botPref.getBoolean("is_spam_code_filter_mode", false),
             spamCodeLength = safePrefInt("spam_code_length", 6),
@@ -4708,10 +4685,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ?: emptyList(),
 
             isVoiceFilterMode = botPref.getBoolean("is_voice_filter_mode", false),
-            voiceBlacklist = botPref.getStringSet("voice_blacklist", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
+            voiceBlacklist = orderedMultilineValues("voice_blacklist"),
 
             isPumSourceFilterMode = botPref.getBoolean("is_pum_source_filter_mode", false),
             pumBlockAllPosts = botPref.getBoolean("pum_block_all_posts", false),
@@ -4741,17 +4715,9 @@ img.written_dccon{max-width:80px;max-height:80px}
             cycleMinMs = cycleMinMs,
             cycleMaxMs = cycleMaxMs,
 
-            normalWords = botPref.getStringSet("normal", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?.toTypedArray()
-                ?: arrayOf(),
+            normalWords = orderedMultilineValues("normal").toTypedArray(),
 
-            bypassWords = botPref.getStringSet("bypass", setOf())
-                ?.map { it.removeCommentAndTrim() }
-                ?.filter { it.isNotEmpty() }
-                ?.toTypedArray()
-                ?: arrayOf(),
+            bypassWords = orderedMultilineValues("bypass").toTypedArray(),
             bypassIgnoreCaseEnabled = botPref.getBoolean("bypass_ignore_case_enabled", false),
             bypassUnicodeNormalizationEnabled = botPref.getBoolean("bypass_unicode_normalization_enabled", false),
             keywordApplyYudongOnly = botPref.getBoolean("keyword_apply_yudong_only", false),

@@ -1,6 +1,8 @@
 package com.heyheyon.armbandbot
 
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,6 +41,59 @@ class OrderedMultilineSettingsTest {
 
         assertEquals(listOf("old # memo", "another"), resolved.lines)
         assertEquals(legacy, resolved.values)
+    }
+
+    @Test
+    fun `runtime values prefer canonical text order over legacy set`() {
+        val values = resolveOrderedMultilineValues(
+            savedText = "second # reason\nfirst\nsecond # reason",
+            legacyValues = linkedSetOf("legacy-first", "legacy-second"),
+        )
+
+        assertEquals(listOf("second", "first"), values)
+    }
+
+    @Test
+    fun `runtime values fall back to legacy set only when canonical text is absent`() {
+        val legacy = linkedSetOf(" old # memo ", "another")
+
+        assertEquals(
+            listOf("old", "another"),
+            resolveOrderedMultilineValues(savedText = null, legacyValues = legacy),
+        )
+    }
+
+    @Test
+    fun `explicit empty canonical text does not revive legacy values`() {
+        assertEquals(
+            emptyList<String>(),
+            resolveOrderedMultilineValues(savedText = "", legacyValues = setOf("legacy")),
+        )
+    }
+
+    @Test
+    fun `runtime values trim blanks remove duplicates and preserve case`() {
+        val values = resolveOrderedMultilineValues(
+            savedText = "  alpha # first  \n\nalpha # first\n Alpha \n beta # note ",
+            legacyValues = null,
+        )
+
+        assertEquals(listOf("alpha", "Alpha", "beta"), values)
+    }
+
+    @Test
+    fun `BotService does not directly read ordered multiline legacy sets`() {
+        val source = sequenceOf(
+            File("app/src/main/java/com/example/armbandbot/BotService.kt"),
+            File("src/main/java/com/example/armbandbot/BotService.kt"),
+        ).first(File::isFile).readText()
+
+        ORDERED_MULTILINE_SETTING_KEYS.forEach { key ->
+            assertFalse(
+                "BotService must load $key through the canonical ordered helper",
+                Regex("getStringSet\\(\\\"${Regex.escape(key)}\\\"").containsMatchIn(source),
+            )
+        }
     }
 
     @Test

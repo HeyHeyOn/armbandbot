@@ -1,3 +1,37 @@
+# 완장봇 1.5.1
+
+## 1.5.1 정식 배포 완료
+
+### 변경 사항
+- 휴대폰 재부팅, 앱 업데이트 또는 Android가 앱을 종료한 뒤에도 실행 중이던 봇의 자동 복구를 시도하고, 제한된 경우 알림에서 다시 시작할 수 있도록 개선했습니다.
+- 유동·깡계의 디시 동영상 첨부 게시글 차단 설정을 추가했습니다.
+- DB 대시보드에서 글과 댓글의 작성자·내용까지 검색하고 검색 범위와 일치 항목을 확인할 수 있도록 개선했습니다.
+- 여러 줄 설정 입력창의 사용성과 저장·복사·백업·실행 시 입력 순서 보존을 개선했습니다.
+- 스냅샷 안의 디시 동영상을 재생할 수 있게 하고, 구버전 최초 스냅샷이 첫 재검사에서 덮어써지던 문제를 수정했습니다.
+- Groq의 중단된 기본 모델을 현재 지원 모델로 변경했습니다.
+
+### 검증
+- Clean debug/release 단위 테스트 각각 413개 통과
+- `lintDebug`, `lintVitalRelease`, `assembleRelease` 통과
+- APK manifest `versionName 1.5.1`, `versionCode 169` 확인
+- APK v2 서명 및 기존 인증서 SHA-256 일치 확인
+- DEX method IDs `65,349 / 65,125 / 10,675`, 최소 여유 187
+- DEX 최대 입력 `248/255`, 보수적 여유 7워드
+- Room DB 버전 8 유지, 파괴적 마이그레이션 없음
+- 매뉴얼·패치노트·처음 사용 가이드 갱신 후 탭·스타일·필수 문구 재검증
+
+### 배포 정보
+- versionName: `1.5.1`
+- versionCode: `169`
+- APK: `완장봇_v1.5.1.apk`
+- 크기: `13,010,990 bytes`
+- SHA-256: `2b7c5042cb280ecb04f8e8877c2645e430f16d01bc42b0062101e4b4a016bcb6`
+- Drive 파일 ID: `1vcr8tkkjInDY8KNIBMo31MZ3mhOUs0G-`
+- Drive 링크: https://drive.google.com/file/d/1vcr8tkkjInDY8KNIBMo31MZ3mhOUs0G-/view?usp=drivesdk
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
+---
+
 # 완장봇 1.5.0-beta8
 
 ## 1.5.0-beta8 배포 완료

@@ -48,6 +48,24 @@ internal fun resolveOrderedMultilineText(
     return normalizeOrderedMultilineText(sourceText)
 }
 
+internal fun resolveOrderedMultilineValues(
+    savedText: String?,
+    legacyValues: Set<String>?,
+): List<String> = resolveOrderedMultilineText(savedText, legacyValues)
+    .lines
+    .map { it.substringBefore("#").trim() }
+    .filter(String::isNotEmpty)
+
+internal fun loadOrderedMultilineValues(
+    preferences: SharedPreferences,
+    key: String,
+): List<String> {
+    require(key in ORDERED_MULTILINE_SETTING_KEYS) { "Unsupported ordered multiline key: $key" }
+    val savedText = preferences.getString(orderedMultilineTextKey(key), null)
+    val legacyValues = if (savedText == null) preferences.getStringSet(key, emptySet()) else null
+    return resolveOrderedMultilineValues(savedText, legacyValues)
+}
+
 internal fun loadOrderedMultilineText(
     preferences: SharedPreferences,
     key: String,
