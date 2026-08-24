@@ -8,14 +8,18 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
@@ -34,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,6 +96,18 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     var isSortMenuExpanded by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
+    var debouncedSearchQuery by remember { mutableStateOf(searchQuery) }
+    var debouncedSearchGeneration by remember { mutableIntStateOf(0) }
+    var dashboardDataEpoch by remember { mutableIntStateOf(0) }
+    var isClearingDb by remember { mutableStateOf(false) }
+    var activeSearchScopes by remember {
+        mutableStateOf(
+            decodeDashboardSearchScopes(
+                masterPref.getStringSet("db_search_scopes", null)?.toSet()
+            )
+        )
+    }
+    var showSearchScopeDialog by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     var generalLimit by remember { mutableStateOf(100) }
@@ -141,8 +158,14 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     val postDao = GlobalBotState.getDb()?.postDao()
 
     suspend fun loadGeneralData() {
+        if (isClearingDb) {
+            isGeneralSearchLoading = false
+            return
+        }
         val requestVersion = ++generalLoadVersion
-        val query = searchQuery
+        val query = debouncedSearchQuery
+        val requestDataEpoch = dashboardDataEpoch
+        val enabledCodes = activeSearchScopes.toSet()
         val gallFilter = selectedGall
         val field = sortField
         val ascending = isAscending
@@ -164,6 +187,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     val matched = searchDashboardRows(
                         candidates = postDao?.getAllPostsForBackupMerge() ?: emptyList(),
                         query = query,
+                        enabledCodes = enabledCodes,
                         includeRow = { gallFilter == "ALL" || it.gallId == gallFilter },
                         comparator = checkedPostDashboardComparator(field, ascending),
                         limit = limit,
@@ -181,7 +205,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 }
                 Triple(rowsAndMatches.first, rowsAndMatches.second, postDao?.getPostCount() ?: 0)
             }
-            if (requestVersion == generalLoadVersion) {
+            if (shouldPublishDashboardSearchResult(
+                    requestVersion, generalLoadVersion, query, searchQuery,
+                    requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
+                )
+            ) {
                 generalPosts = result.first
                 generalMatches = result.second
                 recordedPostCount = result.third
@@ -190,7 +218,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            if (requestVersion == generalLoadVersion) {
+            if (shouldPublishDashboardSearchResult(
+                    requestVersion, generalLoadVersion, query, searchQuery,
+                    requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
+                )
+            ) {
                 generalLoadError = "공용 기록을 불러오지 못했습니다."
                 isGeneralSearchLoading = false
             }
@@ -198,8 +230,14 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     }
 
     suspend fun loadBlockData() {
+        if (isClearingDb) {
+            isBlockSearchLoading = false
+            return
+        }
         val requestVersion = ++blockLoadVersion
-        val query = searchQuery
+        val query = debouncedSearchQuery
+        val requestDataEpoch = dashboardDataEpoch
+        val enabledCodes = activeSearchScopes.toSet()
         val typeFilter = selectedBlockType
         val field = sortField
         val ascending = isAscending
@@ -221,6 +259,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     val matched = searchDashboardRows(
                         candidates = postDao?.getAllBlockHistoryForBackupMerge() ?: emptyList(),
                         query = query,
+                        enabledCodes = enabledCodes,
                         includeRow = { typeFilter == "ALL" || it.targetType == typeFilter },
                         comparator = blockHistoryDashboardComparator(field, ascending),
                         limit = limit,
@@ -234,7 +273,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 }
                 Triple(rowsAndMatches.first, rowsAndMatches.second, postDao?.getPostCount() ?: 0)
             }
-            if (requestVersion == blockLoadVersion) {
+            if (shouldPublishDashboardSearchResult(
+                    requestVersion, blockLoadVersion, query, searchQuery,
+                    requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
+                )
+            ) {
                 blockPosts = result.first
                 blockMatches = result.second
                 recordedPostCount = result.third
@@ -243,7 +286,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            if (requestVersion == blockLoadVersion) {
+            if (shouldPublishDashboardSearchResult(
+                    requestVersion, blockLoadVersion, query, searchQuery,
+                    requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
+                )
+            ) {
                 blockLoadError = "차단 기록을 불러오지 못했습니다."
                 isBlockSearchLoading = false
             }
@@ -251,8 +298,14 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     }
 
     suspend fun loadHoldData() {
+        if (isClearingDb) {
+            isHoldSearchLoading = false
+            return
+        }
         val requestVersion = ++holdLoadVersion
-        val query = searchQuery
+        val query = debouncedSearchQuery
+        val requestDataEpoch = dashboardDataEpoch
+        val enabledCodes = activeSearchScopes.toSet()
         val typeFilter = selectedBlockType
         val field = sortField
         val ascending = isAscending
@@ -274,6 +327,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     val matched = searchDashboardRows(
                         candidates = postDao?.getAllHoldHistoryForBackupMerge() ?: emptyList(),
                         query = query,
+                        enabledCodes = enabledCodes,
                         includeRow = { typeFilter == "ALL" || it.targetType == typeFilter },
                         comparator = holdHistoryDashboardComparator(field, ascending),
                         limit = limit,
@@ -287,7 +341,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 }
                 Triple(rowsAndMatches.first, rowsAndMatches.second, postDao?.getPostCount() ?: 0)
             }
-            if (requestVersion == holdLoadVersion) {
+            if (shouldPublishDashboardSearchResult(
+                    requestVersion, holdLoadVersion, query, searchQuery,
+                    requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
+                )
+            ) {
                 holdPosts = result.first
                 holdMatches = result.second
                 recordedPostCount = result.third
@@ -296,7 +354,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            if (requestVersion == holdLoadVersion) {
+            if (shouldPublishDashboardSearchResult(
+                    requestVersion, holdLoadVersion, query, searchQuery,
+                    requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
+                )
+            ) {
                 holdLoadError = "보류 기록을 불러오지 못했습니다."
                 isHoldSearchLoading = false
             }
@@ -377,8 +439,9 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(tabIndex, selectedGall, selectedBlockType, sortField, isAscending, searchQuery, generalLimit, blockLimit, holdLimit) {
-        // Invalidate any independently launched pull/initial request before the debounce window.
+    LaunchedEffect(searchQuery, isClearingDb) {
+        if (isClearingDb) return@LaunchedEffect
+        // Raw input supersedes the visible tab immediately, even while its DB load is debounced.
         when (tabIndex) {
             0 -> { generalLoadVersion++; isGeneralSearchLoading = true; generalLoadError = null }
             1 -> { blockLoadVersion++; isBlockSearchLoading = true; blockLoadError = null }
@@ -386,6 +449,18 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         }
         if (searchQuery.isNotBlank()) {
             delay(300)
+        }
+        debouncedSearchQuery = searchQuery
+        debouncedSearchGeneration++
+    }
+
+    LaunchedEffect(tabIndex, selectedGall, selectedBlockType, sortField, isAscending, debouncedSearchQuery, debouncedSearchGeneration, activeSearchScopes, generalLimit, blockLimit, holdLimit, isClearingDb) {
+        if (isClearingDb) return@LaunchedEffect
+        // Invalidate any independently launched pull/initial request before loading.
+        when (tabIndex) {
+            0 -> { generalLoadVersion++; isGeneralSearchLoading = true; generalLoadError = null }
+            1 -> { blockLoadVersion++; isBlockSearchLoading = true; blockLoadError = null }
+            else -> { holdLoadVersion++; isHoldSearchLoading = true; holdLoadError = null }
         }
         when (tabIndex) {
             0 -> loadGeneralData()
@@ -478,6 +553,41 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         )
     }
 
+    if (showSearchScopeDialog) {
+        DashboardSearchScopeDialog(
+            current = activeSearchScopes,
+            onDismiss = { showSearchScopeDialog = false },
+            onApply = { scopes ->
+                if (scopes == activeSearchScopes) {
+                    showSearchScopeDialog = false
+                } else {
+                    activeSearchScopes = scopes
+                    // Scope changes are a synchronous publication boundary: invalidate every request
+                    // and remove rows/badges that may have been produced under the previous scopes.
+                    generalLoadVersion++
+                    blockLoadVersion++
+                    holdLoadVersion++
+                    generalPosts = emptyList()
+                    blockPosts = emptyList()
+                    holdPosts = emptyList()
+                    generalMatches = emptyMap()
+                    blockMatches = emptyMap()
+                    holdMatches = emptyMap()
+                    generalLoadError = null
+                    blockLoadError = null
+                    holdLoadError = null
+                    generalLimit = 100
+                    blockLimit = 100
+                    holdLimit = 100
+                    masterPref.edit()
+                        .putStringSet("db_search_scopes", encodeDashboardSearchScopes(scopes))
+                        .apply()
+                    showSearchScopeDialog = false
+                }
+            },
+        )
+    }
+
     if (showClearDbConfirm) {
         AlertDialog(
             onDismissRequest = { showClearDbConfirm = false },
@@ -486,32 +596,48 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             confirmButton = {
                 TextButton(
                     onClick = {
+                        // Enter the new data epoch before deletion can yield to another coroutine.
+                        isClearingDb = true
+                        dashboardDataEpoch++
+                        generalLoadVersion++
+                        blockLoadVersion++
+                        holdLoadVersion++
+                        isGeneralSearchLoading = false
+                        isBlockSearchLoading = false
+                        isHoldSearchLoading = false
+                        generalLoadError = null
+                        blockLoadError = null
+                        holdLoadError = null
                         coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                postDao?.getAllSnapshotPaths()?.forEach { deleteSnapshotFiles(it) }
-                                context.cacheDir.listFiles()
-                                    ?.filter { it.isDirectory && it.name.startsWith("snapshots_") }
-                                    ?.forEach { it.deleteRecursively() }
-                                postDao?.clearAllPosts()
-                                postDao?.clearAllBlockHistory()
-                                postDao?.clearAllHoldHistory()
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    postDao?.getAllSnapshotPaths()?.forEach { deleteSnapshotFiles(it) }
+                                    context.cacheDir.listFiles()
+                                        ?.filter { it.isDirectory && it.name.startsWith("snapshots_") }
+                                        ?.forEach { it.deleteRecursively() }
+                                    postDao?.clearAllPosts()
+                                    postDao?.clearAllBlockHistory()
+                                    postDao?.clearAllHoldHistory()
+                                }
+                                GlobalBotState.lastCheckedNumbers.clear()
+                                snapshotSearchCache.clear()
+                                generalDocumentIndex.clear(); blockDocumentIndex.clear(); holdDocumentIndex.clear()
+                                generalPosts = emptyList()
+                                blockPosts = emptyList()
+                                holdPosts = emptyList()
+                                generalMatches = emptyMap()
+                                blockMatches = emptyMap()
+                                holdMatches = emptyMap()
+                                galleries = emptyList()
+                                recordedPostCount = 0
+                                generalLimit = 100
+                                blockLimit = 100
+                                holdLimit = 100
+                                showClearDbConfirm = false
+                                Toast.makeText(context, "DB를 초기화했습니다.", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isClearingDb = false
                             }
-                            GlobalBotState.lastCheckedNumbers.clear()
-                            snapshotSearchCache.clear()
-                            generalDocumentIndex.clear(); blockDocumentIndex.clear(); holdDocumentIndex.clear()
-                            generalPosts = emptyList()
-                            blockPosts = emptyList()
-                            holdPosts = emptyList()
-                            generalMatches = emptyMap()
-                            blockMatches = emptyMap()
-                            holdMatches = emptyMap()
-                            galleries = emptyList()
-                            recordedPostCount = 0
-                            generalLimit = 100
-                            blockLimit = 100
-                            holdLimit = 100
-                            showClearDbConfirm = false
-                            Toast.makeText(context, "DB를 초기화했습니다.", Toast.LENGTH_SHORT).show()
                         }
                     }
                 ) { Text("초기화", color = warningRed, fontWeight = FontWeight.Bold) }
@@ -678,25 +804,51 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("글 번호, 작성자, 제목, 글·댓글 내용 검색...", fontSize = 14.sp) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "검색", tint = Color.Gray) },
-                trailingIcon = { if (searchQuery.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "지우기", modifier = Modifier.clickable { searchQuery = ""; generalLimit=100; blockLimit=100; holdLimit=100 }, tint = Color.Gray) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
-                modifier = Modifier.weight(1f).background(if(isDarkMode) Color(0xFF2C323A) else Color.White, RoundedCornerShape(8.dp)),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = textColor,
-                    unfocusedTextColor = textColor,
-                    focusedPlaceholderColor = subTextColor,
-                    unfocusedPlaceholderColor = subTextColor,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = PastelNavy,
+            Column(modifier = Modifier.weight(1f)) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("검색", fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "검색", tint = Color.Gray) },
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = ""; generalLimit = 100; blockLimit = 100; holdLimit = 100 }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "검색어 지우기", tint = Color.Gray)
+                                }
+                            }
+                            IconButton(onClick = { showSearchScopeDialog = true }) {
+                                Icon(
+                                    Icons.Filled.FilterAlt,
+                                    contentDescription = "검색 범위 설정",
+                                    tint = if (activeSearchScopes == ALL_DASHBOARD_SEARCH_MATCH_CODES) Color.Gray else searchMatchAccent,
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                    modifier = Modifier.fillMaxWidth().background(if(isDarkMode) Color(0xFF2C323A) else Color.White, RoundedCornerShape(8.dp)),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor,
+                        focusedPlaceholderColor = subTextColor,
+                        unfocusedPlaceholderColor = subTextColor,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = PastelNavy,
+                    )
                 )
-            )
+                dashboardSearchScopeSummary(activeSearchScopes)?.let { summary ->
+                    Text(
+                        summary,
+                        fontSize = 11.sp,
+                        color = subTextColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Box {
                 Row(modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { isSortMenuExpanded = true }.padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(if (sortField == "CHECK") "검사" else "작성", fontSize = 12.sp, color = PastelNavy, fontWeight = FontWeight.Bold)
@@ -762,11 +914,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     if (post.title != null) Text("제목: ${post.title}", fontSize = 14.sp, color = textColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     if (post.author != null) Text("작성자: ${post.author}", fontSize = 13.sp, color = subTextColor)
-                                    dashboardSearchMatchLabel(
-                                        generalMatches["${post.gallType}|${post.gallId}|${post.postNum}"].orEmpty()
-                                    )?.let { label ->
-                                        Text(label, fontSize = 11.sp, color = searchMatchAccent, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
+                                    DashboardSearchMatchBadges(
+                                        generalMatches["${post.gallType}|${post.gallId}|${post.postNum}"].orEmpty(),
+                                        searchMatchAccent,
+                                        isDarkMode,
+                                    )
 
                                     Divider(color = dividerColor, modifier = Modifier.padding(vertical = 6.dp))
                                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -837,9 +989,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                         backgroundColor = if(isDarkMode) Color(0xFF4E342E) else Color.White,
                                         modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()
                                     )
-                                    dashboardSearchMatchLabel(blockMatches[history.id].orEmpty())?.let { label ->
-                                        Text(label, fontSize = 11.sp, color = searchMatchAccent, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
+                                    DashboardSearchMatchBadges(blockMatches[history.id].orEmpty(), searchMatchAccent, isDarkMode)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         detailedReason,
@@ -908,9 +1058,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                                 backgroundColor = if(isDarkMode) Color(0xFF4A3420) else Color.White,
                                                 modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()
                                             )
-                                            dashboardSearchMatchLabel(holdMatches[history.id].orEmpty())?.let { label ->
-                                                Text(label, fontSize = 11.sp, color = searchMatchAccent, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            }
+                                            DashboardSearchMatchBadges(holdMatches[history.id].orEmpty(), searchMatchAccent, isDarkMode)
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(history.holdReason, fontSize = 12.sp, color = holdOrange, fontWeight = FontWeight.Bold)
                                             Divider(color = if(isDarkMode) Color(0xFF6D4C20) else Color(0xFFFFD8A8), modifier = Modifier.padding(vertical = 6.dp))
@@ -932,6 +1080,111 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     }
                     PullRefreshIndicator(refreshing = isHoldRefreshing, state = holdPullRefreshState, modifier = Modifier.align(Alignment.TopCenter), contentColor = holdOrange)
                 } // end holdPullRefreshBox
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardSearchScopeDialog(
+    current: Set<DashboardSearchMatchCode>,
+    onDismiss: () -> Unit,
+    onApply: (Set<DashboardSearchMatchCode>) -> Unit,
+) {
+    var draft by remember(current) { mutableStateOf(current.toSet()) }
+    val allSelected = draft == ALL_DASHBOARD_SEARCH_MATCH_CODES
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("검색 범위", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = allSelected,
+                            role = Role.Checkbox,
+                            onValueChange = { checked ->
+                                draft = if (checked) ALL_DASHBOARD_SEARCH_MATCH_CODES else emptySet()
+                            },
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = allSelected,
+                        onCheckedChange = null,
+                    )
+                    Text("전체")
+                }
+                Divider()
+                DashboardSearchMatchCode.entries.forEach { code ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = code in draft,
+                                role = Role.Checkbox,
+                                onValueChange = { checked ->
+                                    draft = if (checked) draft + code else draft - code
+                                },
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = code in draft,
+                            onCheckedChange = null,
+                        )
+                        Text(code.label)
+                    }
+                }
+                if (draft.isEmpty()) {
+                    Text(
+                        "하나 이상의 검색 범위를 선택하세요.",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onApply(draft) }, enabled = draft.isNotEmpty()) {
+                Text("적용")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소") }
+        },
+    )
+}
+
+@Composable
+private fun DashboardSearchMatchBadges(
+    matches: List<DashboardSearchMatchCode>,
+    accent: Color,
+    isDarkMode: Boolean,
+) {
+    if (matches.isEmpty()) return
+    val orderedMatches = DashboardSearchMatchCode.entries.filter(matches.toSet()::contains)
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        orderedMatches.forEach { code ->
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = accent.copy(alpha = if (isDarkMode) 0.16f else 0.08f),
+                border = BorderStroke(1.dp, accent),
+            ) {
+                Text(
+                    code.label,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                    color = accent,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                )
             }
         }
     }

@@ -15,6 +15,99 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class DbDashboardSearchTest {
+    @Test
+    fun dashboardResultPublishesOnlyWhenEveryRequestBoundaryStillMatches() {
+        val scopes = linkedSetOf(
+            DashboardSearchMatchCode.POST_TITLE,
+            DashboardSearchMatchCode.POST_CONTENT,
+        )
+        assertTrue(
+            shouldPublishDashboardSearchResult(
+                requestVersion = 7,
+                currentVersion = 7,
+                requestQuery = "needle",
+                currentInputQuery = "needle",
+                requestDataEpoch = 3,
+                currentDataEpoch = 3,
+                requestScopes = scopes,
+                currentScopes = linkedSetOf(
+                    DashboardSearchMatchCode.POST_CONTENT,
+                    DashboardSearchMatchCode.POST_TITLE,
+                ),
+                isClearing = false,
+            )
+        )
+    }
+
+    @Test
+    fun dashboardResultRejectsEachMismatchedOrClearingBoundary() {
+        fun shouldPublish(
+            requestVersion: Int = 7,
+            currentVersion: Int = 7,
+            requestQuery: String = "needle",
+            currentInputQuery: String = "needle",
+            requestDataEpoch: Int = 3,
+            currentDataEpoch: Int = 3,
+            requestScopes: Set<DashboardSearchMatchCode> = setOf(DashboardSearchMatchCode.POST_TITLE),
+            currentScopes: Set<DashboardSearchMatchCode> = setOf(DashboardSearchMatchCode.POST_TITLE),
+            isClearing: Boolean = false,
+        ) = shouldPublishDashboardSearchResult(
+            requestVersion,
+            currentVersion,
+            requestQuery,
+            currentInputQuery,
+            requestDataEpoch,
+            currentDataEpoch,
+            requestScopes,
+            currentScopes,
+            isClearing,
+        )
+
+        assertFalse(shouldPublish(currentVersion = 8))
+        assertFalse(shouldPublish(currentInputQuery = "new input"))
+        assertFalse(shouldPublish(currentDataEpoch = 4))
+        assertFalse(shouldPublish(currentScopes = setOf(DashboardSearchMatchCode.POST_CONTENT)))
+        assertFalse(shouldPublish(isClearing = true))
+    }
+
+    @Test
+    fun dashboardResultScopeBoundaryUsesSetEqualityRatherThanIterationOrder() {
+        val requestScopes = linkedSetOf(
+            DashboardSearchMatchCode.POST_AUTHOR,
+            DashboardSearchMatchCode.COMMENT_AUTHOR,
+        )
+
+        assertFalse(
+            shouldPublishDashboardSearchResult(
+                requestVersion = 7,
+                currentVersion = 7,
+                requestQuery = "needle",
+                currentInputQuery = "needle",
+                requestDataEpoch = 3,
+                currentDataEpoch = 3,
+                requestScopes = requestScopes,
+                currentScopes = setOf(DashboardSearchMatchCode.POST_TITLE),
+                isClearing = false,
+            )
+        )
+        assertTrue(
+            shouldPublishDashboardSearchResult(
+                requestVersion = 7,
+                currentVersion = 7,
+                requestQuery = "needle",
+                currentInputQuery = "needle",
+                requestDataEpoch = 3,
+                currentDataEpoch = 3,
+                requestScopes = requestScopes,
+                currentScopes = linkedSetOf(
+                    DashboardSearchMatchCode.COMMENT_AUTHOR,
+                    DashboardSearchMatchCode.POST_AUTHOR,
+                ),
+                isClearing = false,
+            )
+        )
+    }
+
     private val testSnapshotAllowedRoots = listOf(
         File(requireNotNull(System.getProperty("java.io.tmpdir")))
     )
@@ -272,6 +365,47 @@ class DbDashboardSearchTest {
     }
 
     @Test
+    fun blankQueryTakesPriorityOverEmptyScopesWithoutReadingDocuments() = runBlocking {
+        val rows = listOf(
+            CheckedPost("M", "excluded", "0", 0),
+            CheckedPost("M", "included", "2", 0),
+            CheckedPost("M", "included", "1", 0),
+        )
+        var documentReads = 0
+
+        val result = searchDashboardRows(
+            candidates = rows,
+            query = " \t ",
+            includeRow = { it.gallId == "included" },
+            comparator = compareBy { it.postNum },
+            limit = 1,
+            directDocument = { documentReads++; it.toDashboardSearchDocument() },
+            snapshotDocument = { documentReads++; DashboardSearchDocument() },
+            enabledCodes = emptySet(),
+        )
+
+        assertEquals(listOf("1"), result.map { it.row.postNum })
+        assertEquals(0, documentReads)
+    }
+
+    @Test
+    fun existingPositionalSearchCallRemainsSourceCompatible() = runBlocking {
+        val row = CheckedPost("M", "g", "1", 0, title = "needle")
+
+        val result = searchDashboardRows(
+            listOf(row),
+            "needle",
+            { true },
+            compareBy { it.postNum },
+            1,
+            CheckedPost::toDashboardSearchDocument,
+            { DashboardSearchDocument() },
+        )
+
+        assertEquals(listOf("1"), result.map { it.row.postNum })
+    }
+
+    @Test
     fun filteredOutRowsNeverBuildDirectOrSnapshotDocuments() = runBlocking {
         val rows = listOf(
             CheckedPost("M", "excluded", "1", 0, title = "needle"),
@@ -375,6 +509,190 @@ class DbDashboardSearchTest {
             ),
             DashboardSearchMatchCode.entries.map { it.name to it.label }
         )
+    }
+
+    @Test
+    fun scopedMatchingChecksOnlyEnabledFieldsAndKeepsEnumOrder() {
+        val document = DashboardSearchDocument(
+            postNumbers = listOf("needle number"),
+            postAuthors = listOf("needle post author"),
+            postTitles = listOf("needle title"),
+            postContents = listOf("needle body"),
+            commentAuthors = listOf("needle comment author"),
+            commentContents = listOf("needle comment body"),
+        )
+
+        assertEquals(
+            listOf(DashboardSearchMatchCode.POST_AUTHOR, DashboardSearchMatchCode.COMMENT_AUTHOR),
+            dashboardSearchMatchCodes(
+                document = document,
+                query = "needle",
+                enabledCodes = setOf(
+                    DashboardSearchMatchCode.COMMENT_AUTHOR,
+                    DashboardSearchMatchCode.POST_AUTHOR,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun titleAndContentScopesUseOrMatchingAndExcludeRowsMatchingOnlyOutsideScopes() = runBlocking {
+        val rows = listOf(
+            CheckedPost("M", "g", "1", 0, author = "needle outside"),
+            CheckedPost("M", "g", "2", 0, title = "needle title"),
+            CheckedPost("M", "g", "3", 0),
+        )
+
+        val result = searchDashboardRows(
+            candidates = rows,
+            query = "needle",
+            enabledCodes = setOf(
+                DashboardSearchMatchCode.POST_TITLE,
+                DashboardSearchMatchCode.POST_CONTENT,
+            ),
+            includeRow = { true },
+            comparator = compareBy { it.postNum },
+            limit = 100,
+            directDocument = CheckedPost::toDashboardSearchDocument,
+            snapshotDocument = { row ->
+                if (row.postNum == "3") DashboardSearchDocument(postContents = listOf("needle body"))
+                else DashboardSearchDocument()
+            },
+        )
+
+        assertEquals(listOf("2", "3"), result.map { it.row.postNum })
+        assertEquals(
+            listOf(
+                listOf(DashboardSearchMatchCode.POST_TITLE),
+                listOf(DashboardSearchMatchCode.POST_CONTENT),
+            ),
+            result.map { it.matches },
+        )
+    }
+
+    @Test
+    fun defaultAllScopesAreEquivalentToExplicitAllScopes() {
+        val document = DashboardSearchDocument(
+            postNumbers = listOf("needle"),
+            postAuthors = listOf("needle"),
+            postTitles = listOf("needle"),
+            postContents = listOf("needle"),
+            commentAuthors = listOf("needle"),
+            commentContents = listOf("needle"),
+        )
+
+        assertEquals(DashboardSearchMatchCode.entries.toSet(), ALL_DASHBOARD_SEARCH_MATCH_CODES)
+        assertEquals(
+            dashboardSearchMatchCodes(document, "needle"),
+            dashboardSearchMatchCodes(document, "needle", ALL_DASHBOARD_SEARCH_MATCH_CODES),
+        )
+    }
+
+    @Test
+    fun nonblankSearchWithNoEnabledScopesReturnsNothingWithoutReadingDocuments() = runBlocking {
+        var documentReads = 0
+
+        val result = searchDashboardRows(
+            candidates = listOf(CheckedPost("M", "g", "1", 0, title = "needle")),
+            query = "needle",
+            enabledCodes = emptySet(),
+            includeRow = { true },
+            comparator = compareBy { it.postNum },
+            limit = 100,
+            directDocument = { documentReads++; it.toDashboardSearchDocument() },
+            snapshotDocument = { documentReads++; DashboardSearchDocument() },
+        )
+
+        assertTrue(result.isEmpty())
+        assertEquals(0, documentReads)
+        assertEquals(
+            emptyList<DashboardSearchMatchCode>(),
+            dashboardSearchMatchCodes(DashboardSearchDocument(postTitles = listOf("needle")), "needle", emptySet()),
+        )
+    }
+
+    @Test
+    fun cancelledNonblankSearchWithNoEnabledScopesPropagatesCancellation() {
+        var searchReturned = false
+        var documentReads = 0
+
+        try {
+            runBlocking {
+                coroutineContext[Job]!!.cancel(CancellationException("already cancelled"))
+                searchDashboardRows(
+                    candidates = listOf(CheckedPost("M", "g", "1", 0, title = "needle")),
+                    query = "needle",
+                    includeRow = { true },
+                    comparator = compareBy { it.postNum },
+                    limit = 1,
+                    directDocument = { documentReads++; it.toDashboardSearchDocument() },
+                    snapshotDocument = { documentReads++; DashboardSearchDocument() },
+                    enabledCodes = emptySet(),
+                )
+                searchReturned = true
+            }
+        } catch (cancellation: CancellationException) {
+            assertEquals("already cancelled", cancellation.message)
+        }
+
+        assertFalse("search must not return from an already cancelled coroutine", searchReturned)
+        assertEquals(0, documentReads)
+    }
+
+    @Test
+    fun emptyOrUnknownOnlyStoredScopesDecodeAsAll() {
+        assertEquals(ALL_DASHBOARD_SEARCH_MATCH_CODES, decodeDashboardSearchScopes(null))
+        assertEquals(ALL_DASHBOARD_SEARCH_MATCH_CODES, decodeDashboardSearchScopes(emptySet()))
+        assertEquals(ALL_DASHBOARD_SEARCH_MATCH_CODES, decodeDashboardSearchScopes(setOf("FUTURE_SCOPE")))
+    }
+
+    @Test
+    fun storedScopesRoundTripAndIgnoreUnknownValuesWhenValidValuesExist() {
+        val scopes = setOf(
+            DashboardSearchMatchCode.POST_AUTHOR,
+            DashboardSearchMatchCode.COMMENT_AUTHOR,
+        )
+
+        assertEquals(
+            scopes,
+            decodeDashboardSearchScopes(encodeDashboardSearchScopes(scopes) + "FUTURE_SCOPE"),
+        )
+        assertEquals(setOf("POST_AUTHOR", "COMMENT_AUTHOR"), encodeDashboardSearchScopes(scopes))
+    }
+
+    @Test
+    fun allScopesEncodeAsEmptyForForwardCompatibility() {
+        assertEquals(emptySet<String>(), encodeDashboardSearchScopes(ALL_DASHBOARD_SEARCH_MATCH_CODES))
+        assertEquals(ALL_DASHBOARD_SEARCH_MATCH_CODES, decodeDashboardSearchScopes(emptySet()))
+    }
+
+    @Test
+    fun decodedScopesUseEnumOrderRegardlessOfStoredIterationOrder() {
+        val stored = linkedSetOf("COMMENT_CONTENT", "POST_TITLE", "POST_NUMBER")
+
+        assertEquals(
+            listOf(
+                DashboardSearchMatchCode.POST_NUMBER,
+                DashboardSearchMatchCode.POST_TITLE,
+                DashboardSearchMatchCode.COMMENT_CONTENT,
+            ),
+            decodeDashboardSearchScopes(stored).toList(),
+        )
+    }
+
+    @Test
+    fun scopeSummaryUsesEnumOrderAndOmitsAllOrEmptyScopes() {
+        assertEquals(
+            "검색 범위: 글 작성자, 댓글 작성자",
+            dashboardSearchScopeSummary(
+                setOf(
+                    DashboardSearchMatchCode.COMMENT_AUTHOR,
+                    DashboardSearchMatchCode.POST_AUTHOR,
+                ),
+            ),
+        )
+        assertNull(dashboardSearchScopeSummary(ALL_DASHBOARD_SEARCH_MATCH_CODES))
+        assertNull(dashboardSearchScopeSummary(emptySet()))
     }
 
     @Test

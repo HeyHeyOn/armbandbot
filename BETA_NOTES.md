@@ -1,3 +1,33 @@
+## 1.5.1-beta9 배포 준비
+
+### 주요 변화
+- DB 대시보드 검색창 안내를 `검색`으로 간단히 줄였습니다.
+- 검색창 오른쪽의 깔대기 버튼에서 검색 범위를 선택할 수 있습니다.
+  - 글 번호, 글 작성자, 글 제목, 글 내용, 댓글 작성자, 댓글 내용
+  - 전체가 아닌 일부 범위를 선택하면 검색창 아래에 현재 범위를 한 줄로 표시합니다.
+  - 선택한 검색 범위는 앱을 다시 열어도 유지됩니다.
+- 검색 결과의 일치 항목을 작은 사각형 배지로 바꿔 카드 높이가 불필요하게 늘어나지 않도록 했습니다.
+- 전체 목록, 차단 내역, 보류 내역에 같은 검색 범위와 배지 UI를 적용했습니다.
+- 검색어 입력·검색 범위 변경·새로고침·DB 초기화가 겹쳐도 이전 검색 결과가 뒤늦게 화면을 덮지 않도록 비동기 결과 검사를 보강했습니다.
+- Room DB 버전과 구조는 그대로 유지하며 DB 마이그레이션은 없습니다.
+
+### 검증
+- `clean testDebugUnitTest testReleaseUnitTest lintDebug lintVitalRelease assembleRelease`: 통과
+- 단위 테스트: Debug 408개 + Release 408개, 실패·오류·건너뜀 0개
+- 독립 명세·코드 품질 검토: 검색 범위 저장·접근성·동시 검색/DB 초기화 경쟁을 보강한 뒤 Critical/Important 차단 이슈 없음
+- APK manifest: `versionCode 168`, `versionName 1.5.1` (beta8의 167보다 증가)
+- APK 서명: v2 검증 통과, beta8과 같은 인증서 SHA-256 `06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f`
+- DEX: 3개, 최소 method ID 여유 187개, 최소 field ID 여유 30,527개
+- 현재 빌드 환경에는 실행 가능한 Android 기기가 없어 실제 기기 UI E2E는 미실시
+
+### 개발 배포
+- 파일: `완장봇_v1.5.1-beta9.apk`
+- 크기: 13,010,990 bytes
+- SHA-256: `92973ebc82bc82839c2f03d8b8c842cfeab9c635561427c26486d41799891d88`
+- Drive 파일 ID: `1wxSNh6Wr8-BAK9zpi_rLL53lL_Rk_etG`
+- Drive 링크: https://drive.google.com/file/d/1wxSNh6Wr8-BAK9zpi_rLL53lL_Rk_etG/view?usp=drivesdk
+- 업로드 후 재다운로드 SHA-256 일치 확인
+
 ## 1.5.1-beta8 배포 준비
 
 ### 주요 변화

@@ -15,6 +15,53 @@ internal enum class DashboardSearchMatchCode(val label: String) {
     COMMENT_CONTENT("댓글 내용")
 }
 
+internal fun shouldPublishDashboardSearchResult(
+    requestVersion: Int,
+    currentVersion: Int,
+    requestQuery: String,
+    currentInputQuery: String,
+    requestDataEpoch: Int,
+    currentDataEpoch: Int,
+    requestScopes: Set<DashboardSearchMatchCode>,
+    currentScopes: Set<DashboardSearchMatchCode>,
+    isClearing: Boolean,
+): Boolean =
+    requestVersion == currentVersion &&
+        requestQuery == currentInputQuery &&
+        requestDataEpoch == currentDataEpoch &&
+        requestScopes == currentScopes &&
+        !isClearing
+
+internal val ALL_DASHBOARD_SEARCH_MATCH_CODES: Set<DashboardSearchMatchCode> =
+    DashboardSearchMatchCode.entries.toSet()
+
+internal fun decodeDashboardSearchScopes(stored: Set<String>?): Set<DashboardSearchMatchCode> {
+    if (stored.isNullOrEmpty()) return ALL_DASHBOARD_SEARCH_MATCH_CODES
+    return DashboardSearchMatchCode.entries
+        .filterTo(linkedSetOf()) { it.name in stored }
+        .ifEmpty { ALL_DASHBOARD_SEARCH_MATCH_CODES }
+}
+
+internal fun encodeDashboardSearchScopes(
+    scopes: Set<DashboardSearchMatchCode>,
+): Set<String> = if (scopes == ALL_DASHBOARD_SEARCH_MATCH_CODES) {
+    emptySet()
+} else {
+    DashboardSearchMatchCode.entries
+        .filter(scopes::contains)
+        .mapTo(linkedSetOf(), DashboardSearchMatchCode::name)
+}
+
+/** Empty scopes are an inapplicable UI state and, like the default all-scopes state, have no summary. */
+internal fun dashboardSearchScopeSummary(scopes: Set<DashboardSearchMatchCode>): String? =
+    scopes
+        .takeUnless { it.isEmpty() || it == ALL_DASHBOARD_SEARCH_MATCH_CODES }
+        ?.let { selected ->
+            DashboardSearchMatchCode.entries
+                .filter(selected::contains)
+                .joinToString(prefix = "검색 범위: ", separator = ", ") { it.label }
+        }
+
 internal data class DashboardSearchDocument(
     val postNumbers: List<String> = emptyList(),
     val postAuthors: List<String> = emptyList(),
@@ -108,6 +155,7 @@ internal suspend fun <T> searchDashboardRows(
     snapshotFreshness: (T) -> Any? = { Unit },
     documentIndex: DashboardRowDocumentIndex? = null,
     rowIdentity: (T) -> Any = { it as Any },
+    enabledCodes: Set<DashboardSearchMatchCode> = ALL_DASHBOARD_SEARCH_MATCH_CODES,
 ): List<DashboardMatched<T>> {
     require(limit >= 0) { "Dashboard search limit must not be negative" }
     if (query.isBlank()) {
@@ -119,6 +167,8 @@ internal suspend fun <T> searchDashboardRows(
             .map { DashboardMatched(it, emptyList()) }
             .toList()
     }
+    currentCoroutineContext().ensureActive()
+    if (enabledCodes.isEmpty()) return emptyList()
 
     val matched = ArrayList<DashboardMatched<T>>()
     for (row in candidates) {
@@ -131,7 +181,7 @@ internal suspend fun <T> searchDashboardRows(
         ) {
             mergeDashboardSearchDocuments(direct, snapshotDocument(row))
         } ?: mergeDashboardSearchDocuments(direct, snapshotDocument(row))
-        val matches = dashboardSearchMatchCodes(document, query)
+        val matches = dashboardSearchMatchCodes(document, query, enabledCodes)
         if (matches.isNotEmpty()) matched += DashboardMatched(row, matches)
     }
     currentCoroutineContext().ensureActive()
@@ -414,7 +464,8 @@ private fun SnapshotData.toDashboardSearchDocument(): DashboardSearchDocument =
 
 internal fun dashboardSearchMatchCodes(
     document: DashboardSearchDocument,
-    query: String
+    query: String,
+    enabledCodes: Set<DashboardSearchMatchCode> = ALL_DASHBOARD_SEARCH_MATCH_CODES,
 ): List<DashboardSearchMatchCode> {
     val trimmedQuery = query.trim()
     if (trimmedQuery.isBlank()) return emptyList()
@@ -423,6 +474,7 @@ internal fun dashboardSearchMatchCodes(
         any { it.contains(trimmedQuery, ignoreCase = true) }
 
     return DashboardSearchMatchCode.entries.filter { code ->
+        if (code !in enabledCodes) return@filter false
         when (code) {
             DashboardSearchMatchCode.POST_NUMBER -> document.postNumbers.containsQuery()
             DashboardSearchMatchCode.POST_AUTHOR -> document.postAuthors.containsQuery()
