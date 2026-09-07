@@ -27,8 +27,43 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.LinkedHashMap
 import java.util.Locale
+import java.util.UUID
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
+
+internal class SchedulePausedException : Exception()
+
+internal suspend fun <T> retrySessionAfterSchedulePause(
+    awaitSchedule: suspend () -> Unit,
+    action: suspend () -> T,
+): T {
+    while (true) {
+        currentCoroutineContext().ensureActive()
+        awaitSchedule()
+        try {
+            return action()
+        } catch (_: SchedulePausedException) {
+            // A schedule boundary is not an auth failure: keep this Job and wait
+            // using the existing bounded schedule recheck before retrying auth.
+        }
+    }
+}
+
+internal enum class ScheduleCycleOutcome {
+    COMPLETED,
+    PAUSED_BY_SCHEDULE,
+}
+
+internal suspend fun mayStartScheduledRequest(readFreshGate: () -> BotWorkGate): Boolean {
+    currentCoroutineContext().ensureActive()
+    return readFreshGate().mayStartNetworkOrAction
+}
+
+internal fun cycleDelayAfterScheduleOutcome(
+    outcome: ScheduleCycleOutcome,
+    plannedDelayMillis: Long,
+): Long? = if (outcome == ScheduleCycleOutcome.PAUSED_BY_SCHEDULE) null else plannedDelayMillis
 
 class BotService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
@@ -57,7 +92,9 @@ class BotService : Service() {
     private val moderationFailureRetrySuppressMs = 10 * 60 * 1000L
     private val pumResolutionFailureLogIntervalMs = 10 * 60 * 1000L
 
+
     private data class BotConfig(
+        val scanScopeId: String,
         val isDebugMode: Boolean,
         val isExpertMode: Boolean,
         val snapshotKeepDays: Int,
@@ -334,6 +371,57 @@ class BotService : Service() {
         val deleteOnlyMode: Boolean?,
         val processMode: String?
     )
+
+    private fun readCurrentSchedule(botId: String): BotRunSchedule {
+        val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+        return runCatching {
+            BotRunSchedule(
+                enabled = prefs.getBoolean("run_schedule_enabled", false),
+                startMinuteOfDay = prefs.getInt("run_schedule_start_minute", 0),
+                endMinuteOfDay = prefs.getInt("run_schedule_end_minute", 1439),
+            )
+        }.getOrElse { BotRunSchedule.disabled() }
+    }
+
+    private fun isScheduleActiveNow(botId: String): Boolean = evaluateBotWorkGate(
+        System.currentTimeMillis(), ZoneId.systemDefault(), readCurrentSchedule(botId)
+    ).mayStartNetworkOrAction
+
+
+
+    private fun Connection.gatedExecute(): Connection.Response =
+        executeGatedJsoup(this, RuntimeRequestGate.requireCurrent()::check)
+
+    private fun Connection.gatedGet(): org.jsoup.nodes.Document =
+        method(Connection.Method.GET).gatedExecute().parse()
+
+    private suspend fun requireActiveScheduleForRequest(botId: String) {
+        val mayStart = mayStartScheduledRequest {
+            evaluateBotWorkGate(
+                System.currentTimeMillis(),
+                ZoneId.systemDefault(),
+                readCurrentSchedule(botId),
+            )
+        }
+        if (!mayStart) throw SchedulePausedException()
+    }
+
+    private suspend fun awaitActiveSchedule(botId: String, botPref: android.content.SharedPreferences) {
+        var waitingLogged = false
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val gate = evaluateBotWorkGate(System.currentTimeMillis(), ZoneId.systemDefault(), readCurrentSchedule(botId))
+            if (gate.mayStartNetworkOrAction) {
+                if (waitingLogged) sendLog("[예약 재개] 작동 시간대에 진입해 검사를 재개합니다.", botId)
+                return
+            }
+            if (!waitingLogged) {
+                waitingLogged = true
+                sendLog("[예약 대기] 현재 작동 시간대가 아니므로 네트워크 검사와 조치를 대기합니다.", botId)
+            }
+            delay(gate.recheckDelayMillis.coerceIn(1L, MAX_SCHEDULE_RECHECK_DELAY_MS))
+        }
+    }
 
     companion object {
         @Volatile
@@ -645,17 +733,12 @@ class BotService : Service() {
 
     private fun cleanupOldSnapshots(keepDays: Int, botId: String) {
         try {
-            val cacheDir = File(cacheDir, "snapshots_$botId")
-            if (!cacheDir.exists()) return
-
+            val snapshotDirs = snapshotDirectoriesForBot(cacheDir, botId)
             val thresholdTime = System.currentTimeMillis() - (keepDays.toLong() * 24 * 60 * 60 * 1000)
-            val oldFiles = cacheDir.listFiles()?.filter { it.lastModified() < thresholdTime }
-
-            if (!oldFiles.isNullOrEmpty()) {
-                var deletedCount = 0
-                oldFiles.forEach { if (it.delete()) deletedCount++ }
-                if (deletedCount > 0) sendLog("🧹 스냅샷 보관 기간($keepDays 일) 만료로 오래된 캐시 ${deletedCount}개 삭제 완료.", botId)
+            val deletedCount = snapshotDirs.sumOf { directory ->
+                deleteTrustedSnapshotDirectoryFiles(cacheDir, directory, thresholdTime)
             }
+            if (deletedCount > 0) sendLog("🧹 스냅샷 보관 기간($keepDays 일) 만료로 오래된 캐시 ${deletedCount}개 삭제 완료.", botId)
         } catch (e: Exception) { /* 무시 */ }
     }
 
@@ -759,7 +842,10 @@ class BotService : Service() {
 
         val job = serviceScope.launch(start = CoroutineStart.LAZY) {
             try {
-                runBotLoop(botId, botName, cookie, botPref)
+                val gate = RuntimeRequestGate(currentCoroutineContext().job) { isScheduleActiveNow(botId) }
+                withContext(RuntimeRequestGate.context.asContextElement(gate)) {
+                    runBotLoop(botId, botName, cookie, botPref)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1059,13 +1145,14 @@ class BotService : Service() {
         }
     }
 
-    private fun isSessionValid(cookie: String): Boolean {
+    private suspend fun isSessionValid(cookie: String, botId: String): Boolean {
         if (cookie.isBlank()) return false
         return try {
+            requireActiveScheduleForRequest(botId)
             val sessionCheckDoc = Jsoup.connect("https://m.dcinside.com/")
                 .userAgent(dcUserAgent)
                 .header("Cookie", cookie)
-                .get()
+                .gatedGet()
 
             val bodyText = sessionCheckDoc.text()
             when {
@@ -1074,6 +1161,10 @@ class BotService : Service() {
                 isConfirmedLoginPage(sessionCheckDoc, "https://m.dcinside.com/") -> false
                 else -> false
             }
+        } catch (paused: SchedulePausedException) {
+            throw paused
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             true
         }
@@ -1141,12 +1232,13 @@ class BotService : Service() {
             .apply()
     }
 
-    private fun performAutoLogin(loginId: String, loginPw: String, botId: String? = null): String? {
+    private suspend fun performAutoLogin(loginId: String, loginPw: String, botId: String): String? {
         botId?.let { sendLog("[자동 로그인][1/3] 로그인 페이지 요청 시작", it) }
+        requireActiveScheduleForRequest(botId)
         val loginPageResponse = Jsoup.connect("https://sign.dcinside.com/login")
             .userAgent(dcUserAgent)
             .method(Connection.Method.GET)
-            .execute()
+            .gatedExecute()
 
         val loginDocument = loginPageResponse.parse()
         val loginForm = loginDocument.selectFirst("form[action*=member_check]")
@@ -1167,6 +1259,7 @@ class BotService : Service() {
         formData["pw"] = loginPw
 
         botId?.let { sendLog("[자동 로그인][2/3] member_check 로그인 제출", it) }
+        requireActiveScheduleForRequest(botId)
         val loginResponse = Jsoup.connect(actionUrl)
             .userAgent(dcUserAgent)
             .referrer(loginPageResponse.url().toString())
@@ -1178,7 +1271,7 @@ class BotService : Service() {
             .method(Connection.Method.POST)
             .followRedirects(true)
             .ignoreContentType(true)
-            .execute()
+            .gatedExecute()
 
         val mergedCookie = mergeCookieStrings(
             loginPageResponse.cookies().toCookieHeader(),
@@ -1190,7 +1283,7 @@ class BotService : Service() {
             return null
         }
 
-        val sessionValid = isSessionValid(mergedCookie)
+        val sessionValid = isSessionValid(mergedCookie, botId)
         if (!sessionValid) {
             botId?.let { sendLog("[자동 로그인 실패][3/3] 로그인 제출 후에도 유효 세션 검증에 실패했습니다.", it) }
             return null
@@ -1236,7 +1329,7 @@ class BotService : Service() {
         sendBroadcast(sessionExpiredIntent)
     }
 
-    private fun tryRecoverSession(
+    private suspend fun tryRecoverSession(
         botId: String,
         botPref: android.content.SharedPreferences,
         reason: String,
@@ -1280,6 +1373,10 @@ class BotService : Service() {
                 sendLog("[자동 로그인 성공] 새 세션을 저장했고 작업을 재개합니다.", botId)
                 mergedCookie
             }
+        } catch (paused: SchedulePausedException) {
+            throw paused
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             recordAutoLoginFailure(botPref)
             sendLog("[자동 로그인 오류] ${e.message ?: "알 수 없는 오류"}", botId)
@@ -1326,17 +1423,21 @@ class BotService : Service() {
         GlobalBotState.initDb(this@BotService)
         GlobalBotState.startSnapshotWorker(this)
         sendLog("[복구 점검] runBotLoop 시작 완료", botId)
-        val currentJob = coroutineContext[Job]
-            ?: throw IllegalStateException("runBotLoop Job을 확인할 수 없습니다.")
+        val currentJob = RuntimeRequestGate.requireCurrent().owner
         if (activeBots[botId] !== currentJob) {
             throw CancellationException("교체된 봇 Job 세대입니다.")
         }
         markStartupPhase(botId, "run_loop_entered")
         runLoopEnteredJobs[botId] = currentJob
         acknowledgeRestoreSuccess(botId)
+        val scanScopeId = resolveScanScopeId(
+            botId = botId,
+            independent = botPref.getBoolean("independent_scan_state_enabled", false),
+        )
 
         while (isActive) {
-            val config = loadBotConfig(botPref)
+            awaitActiveSchedule(botId, botPref)
+            val config = loadBotConfig(botId, botPref).copy(scanScopeId = scanScopeId)
             val blockDuration = config.blockDurationHours.toString()
             val blockReason = config.blockReason
             val delChk = if (config.deletePostOnBlock) "1" else "0"
@@ -1381,12 +1482,21 @@ class BotService : Service() {
             if (config.isDebugMode) {
                 sendLog("[세션 진단] runBotLoop 시작 / hasCookie=${currentCookie.isNotBlank()} / cookieLength=${currentCookie.length}", botId)
             }
-            if (!isSessionValid(currentCookie)) {
-                val recoveredCookie = tryRecoverSession(
-                    botId = botId,
-                    botPref = botPref,
-                    reason = "세션 만료 감지",
-                    currentCookie = currentCookie
+            awaitActiveSchedule(botId, botPref)
+            if (!retrySessionAfterSchedulePause(
+                    awaitSchedule = { awaitActiveSchedule(botId, botPref) },
+                    action = { isSessionValid(currentCookie, botId) },
+                )) {
+                val recoveredCookie = retrySessionAfterSchedulePause(
+                    awaitSchedule = { awaitActiveSchedule(botId, botPref) },
+                    action = {
+                        tryRecoverSession(
+                            botId = botId,
+                            botPref = botPref,
+                            reason = "세션 만료 감지",
+                            currentCookie = currentCookie
+                        )
+                    },
                 )
                 if (recoveredCookie != null) {
                     currentCookie = recoveredCookie
@@ -1409,18 +1519,25 @@ class BotService : Service() {
                 }
             }
 
-            maybeRefreshGallerySettings(
-                botId = botId,
-                botPref = botPref,
-                config = config,
-                cookie = currentCookie,
-                urlList = urlList
-            )
+            try {
+                maybeRefreshGallerySettings(
+                    botId = botId,
+                    botPref = botPref,
+                    config = config,
+                    cookie = currentCookie,
+                    urlList = urlList
+                )
+            } catch (paused: SchedulePausedException) {
+                continue
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            }
 
             // PUM source inspection is a base moderation capability. Resolver state and its
             // normalized-source cache intentionally live for one scan cycle only.
             val pumSourceResolver = PumSourceResolver(
                 http = UrlConnectionPumHttpClient(),
+                beforeRequest = RuntimeRequestGate.requireCurrent()::check,
                 cookies = { currentCookie },
                 userAgent = dcUserAgent,
             )
@@ -1432,6 +1549,7 @@ class BotService : Service() {
             val cycleMaxMs = config.cycleMaxMs
 
             var completedAllTargets = true
+            var scheduleCycleOutcome = ScheduleCycleOutcome.COMPLETED
             for ((urlIndex, rawUrl) in urlList.withIndex()) {
                 if (!isActive) {
                     completedAllTargets = false
@@ -1457,12 +1575,22 @@ class BotService : Service() {
                 when (processOutcome) {
                     UrlProcessOutcome.CONTINUE -> Unit
                     UrlProcessOutcome.INCOMPLETE -> completedAllTargets = false
+                    UrlProcessOutcome.PAUSED_BY_SCHEDULE -> {
+                        completedAllTargets = false
+                        scheduleCycleOutcome = ScheduleCycleOutcome.PAUSED_BY_SCHEDULE
+                        break
+                    }
                     UrlProcessOutcome.LOGIN_REQUIRED -> {
-                        val recoveredCookie = tryRecoverSession(
-                            botId = botId,
-                            botPref = botPref,
-                            reason = "페이지 접근 중 로그인 필요 판정",
-                            currentCookie = currentCookie
+                        val recoveredCookie = retrySessionAfterSchedulePause(
+                            awaitSchedule = { awaitActiveSchedule(botId, botPref) },
+                            action = {
+                                tryRecoverSession(
+                                    botId = botId,
+                                    botPref = botPref,
+                                    reason = "페이지 접근 중 로그인 필요 판정",
+                                    currentCookie = currentCookie
+                                )
+                            },
                         )
                         if (recoveredCookie != null) {
                             currentCookie = recoveredCookie
@@ -1515,8 +1643,10 @@ class BotService : Service() {
             cleanupRuntimeState(botId)
             maybeLogRuntimeHealth(botId)
             val randomCycleDelay = randomDelay(cycleMinMs, cycleMaxMs)
-            sendLog("[$botName] 사이클 완료! ${String.format("%.1f", randomCycleDelay / 1000f)}초 대기.", botId)
-            delay(randomCycleDelay)
+            val cycleDelay = cycleDelayAfterScheduleOutcome(scheduleCycleOutcome, randomCycleDelay)
+            if (cycleDelay == null) continue
+            sendLog("[$botName] 사이클 완료! ${String.format("%.1f", cycleDelay / 1000f)}초 대기.", botId)
+            delay(cycleDelay)
         }
     }
 
@@ -1540,13 +1670,14 @@ class BotService : Service() {
         if (config.isDebugMode) {
             sendLog("[디버그][페이지] 처리 URL 접근 시작: $pageUrl", botId)
         }
+        requireActiveScheduleForRequest(botId)
         val pageFetchStartedAt = System.currentTimeMillis()
         val document = try {
             Jsoup.connect(pageUrl)
                 .userAgent("Mozilla/5.0")
                 .header("Cookie", cookie)
                 .timeout(15_000)
-                .get()
+                .gatedGet()
         } catch (e: Exception) {
             val elapsedMs = System.currentTimeMillis() - pageFetchStartedAt
             sendLog("[오류][페이지] 목록 fetch 실패 / ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"} / ${elapsedMs}ms / url=$pageUrl", botId)
@@ -1610,13 +1741,16 @@ class BotService : Service() {
             if (firstPostNumOfThisPage.isEmpty()) firstPostNumOfThisPage = postNumStr
             val replyBox = row.selectFirst(".reply_numbox")
             val currentCommentCount = replyBox?.text()?.split("/")?.firstOrNull()?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0
-            val savedPost = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)
+            val savedPost = GlobalBotState.getSavedPost(config.scanScopeId, gallType, gallId, postNumStr)
             val savedCommentCount = savedPost?.commentCount ?: -1
             val savedTitle = savedPost?.title
             val hasPumListMarker = PumParser.hasListMarker(titleElement)
             val snapshotBackfillRequired = savedPost != null && config.isExpertMode && config.isSnapshotAll &&
                 savedPost.snapshotPath?.takeIf { it.isNotBlank() }?.let { File(it).isFile } != true
-            if (!shouldRecheckPost(
+            val interruptedAiRetry = aiBatchQueues[botId]?.needsInterruptedRetry(
+                PostKey(gallType, gallId, postNumStr)
+            ) == true
+            if (!interruptedAiRetry && !shouldRecheckPost(
                     savedCommentCount = savedCommentCount,
                     currentCommentCount = currentCommentCount,
                     savedTitle = savedTitle,
@@ -1705,13 +1839,19 @@ class BotService : Service() {
                 sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
             }
             try {
+                requireActiveScheduleForRequest(botId)
                 val postHandled = processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
                 if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker && !postHandled) {
                     activationRecheckComplete = false
                 }
+            } catch (paused: SchedulePausedException) {
+                throw paused
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 if (DeletedPostHandling.isDeletedOrUnavailablePost(e)) {
                     GlobalBotState.savePost(
+                scopeId = config.scanScopeId,
                         gallType = gallType,
                         gallId = gallId,
                         postNum = postNumStr,
@@ -1751,20 +1891,25 @@ class BotService : Service() {
         )
     }
 
-    private fun revalidateSearchLoginRequirement(
+    private suspend fun revalidateSearchLoginRequirement(
         botId: String,
         cookie: String,
         stableListUrl: String
     ): ManagerPermissionStatus {
         return try {
             val verifyUrl = if (stableListUrl.contains("page=")) stableListUrl else "$stableListUrl&page=1"
+            requireActiveScheduleForRequest(botId)
             val verifyDocument = Jsoup.connect(verifyUrl)
                 .userAgent("Mozilla/5.0")
                 .header("Cookie", cookie)
-                .get()
+                .gatedGet()
             val verifyStatus = evaluateManagerPermission(verifyDocument, verifyUrl)
             sendLog("[\uC778\uC99D \uC7AC\uAC80\uC99D] \uAC80\uC0C9 \uD398\uC774\uC9C0 \uB85C\uADF8\uC778 \uD544\uC694 \uD310\uC815 ? \uC77C\uBC18 \uBAA9\uB85D \uD655\uC778 \uACB0\uACFC: ${verifyStatus.logLabel}", botId)
             verifyStatus
+        } catch (paused: SchedulePausedException) {
+            throw paused
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             sendLog("[\uC778\uC99D \uC7AC\uAC80\uC99D] \uC77C\uBC18 \uBAA9\uB85D \uD655\uC778 \uC2E4\uD328: ${e.message ?: "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"}", botId)
             ManagerPermissionStatus.AMBIGUOUS
@@ -1783,6 +1928,8 @@ class BotService : Service() {
         pumSourceResolver: PumSourceResolver?,
         notifyIfEnabled: (String, String, String) -> Unit
     ): UrlProcessOutcome {
+        currentCoroutineContext().ensureActive()
+        if (!isScheduleActiveNow(botId)) return UrlProcessOutcome.PAUSED_BY_SCHEDULE
         val parsedTarget = parseTargetUrl(rawUrl) ?: return if (shouldMarkDcMediaActivationTargetIncomplete(
                 config.yudongDcMediaActivationRecheckPending,
                 config.kkangDcMediaActivationRecheckPending,
@@ -1804,7 +1951,8 @@ class BotService : Service() {
         var activationRecheckComplete = true
 
         for ((keywordIndex, keyword) in activeKeywords.withIndex()) {
-            if (!serviceScope.isActive) break
+            currentCoroutineContext().ensureActive()
+            if (!isScheduleActiveNow(botId)) return UrlProcessOutcome.PAUSED_BY_SCHEDULE
             val pageMatch = Regex("[?&]page=([0-9]+)").find(rawUrl)
             var currentPage = pageMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
             var currentSearchPos = parseQueryParams(rawUrl)["search_pos"].orEmpty()
@@ -1813,7 +1961,8 @@ class BotService : Service() {
             var currentPageUrl = if (config.isSearchMode) buildSearchPageUrl(cleanBaseUrl, config.searchType, keyword, currentPage, currentSearchPos.ifBlank { null }) else "$cleanBaseUrl&page=$currentPage"
             val visitedSearchUrls = mutableSetOf<String>()
 
-            while (logicalPageCount < config.scanPageCount && serviceScope.isActive) {
+            while (logicalPageCount < config.scanPageCount && currentCoroutineContext().isActive) {
+                if (!isScheduleActiveNow(botId)) return UrlProcessOutcome.PAUSED_BY_SCHEDULE
                 val pageUrl = if (config.isSearchMode) normalizeSearchUrlForTraversal(currentPageUrl, cleanBaseUrl, config.searchType, keyword) else currentPageUrl
                 if (config.isSearchMode && !visitedSearchUrls.add(pageUrl)) break
                 try {
@@ -1878,6 +2027,10 @@ class BotService : Service() {
                             currentSearchPos = parseQueryParams(nextPageUrl)["search_pos"].orEmpty()
                         }
                     }
+                } catch (paused: SchedulePausedException) {
+                    return UrlProcessOutcome.PAUSED_BY_SCHEDULE
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     activationRecheckComplete = false
                     sendLog("[$currentPage 페이지] 처리 실패. / ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
@@ -1922,7 +2075,7 @@ class BotService : Service() {
         ) ?: return null
 
         return try {
-            val config = loadBotConfig(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))
+            val config = loadBotConfig(botId, getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))
             saveSnapshotFromDocCommon(
                 config = config,
                 botId = botId,
@@ -1952,7 +2105,7 @@ class BotService : Service() {
         pumResolution: PumResolution? = null,
     ): String? {
         return try {
-            val config = loadBotConfig(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))
+            val config = loadBotConfig(botId, getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))
             if (!config.isExpertMode) return null
 
             val pcPostDetailUrl = if (gallType == "M") {
@@ -1961,13 +2114,15 @@ class BotService : Service() {
                 "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=$postNumStr"
             }
 
+            if (!isScheduleActiveNow(botId)) throw SchedulePausedException()
             val postDoc = Jsoup.connect(pcPostDetailUrl)
                 .userAgent("Mozilla/5.0")
                 .header("Cookie", cookie)
-                .get()
+                .gatedGet()
 
             val esnoToken = postDoc.select("input[id=e_s_n_o]").attr("value")
             val commentApiUrl = "https://gall.dcinside.com/board/comment/"
+            if (!isScheduleActiveNow(botId)) throw SchedulePausedException()
             val commentResponse = Jsoup.connect(commentApiUrl)
                 .userAgent("Mozilla/5.0")
                 .header("Cookie", cookie)
@@ -1983,7 +2138,7 @@ class BotService : Service() {
                 .data("_GALLTYPE_", gallType)
                 .ignoreContentType(true)
                 .method(org.jsoup.Connection.Method.POST)
-                .execute()
+                .gatedExecute()
 
             val commentsJson = filterDcUserComments(
                 JSONObject(commentResponse.body()).optJSONArray("comments"),
@@ -2017,7 +2172,10 @@ class BotService : Service() {
                 blockedTs = System.currentTimeMillis().toString(),
                 pumResolution = pumResolution,
             )
+        } catch (paused: SchedulePausedException) {
+            throw paused
         } catch (e: Exception) {
+            if (e is CancellationException || e is SchedulePausedException) throw e
             Log.e("BotService", "[$botId] comment block snapshot save failed", e)
             sendLog("[오류] AI 댓글 차단 스냅샷 저장 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
             null
@@ -2369,7 +2527,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             // 7. Preserve DC's original page DOM and styles; only the unnecessary shell was pruned above.
             return try {
-                val cacheDir = File(cacheDir, "snapshots_$botId")
+                val cacheDir = snapshotDirectoryForScope(this@BotService.cacheDir, botId, config.scanScopeId)
                 if (!cacheDir.exists()) cacheDir.mkdirs()
 
                 val html = doc.html()
@@ -2387,6 +2545,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         existingSnapshotPath = existingSnapshotPath,
                         html = html,
                         allowedSnapshotRoots = listOf(this@BotService.cacheDir, this@BotService.filesDir),
+                        relocateToRequestedDirectory = true,
                     )
                 }
             } catch (e: Exception) {
@@ -2411,10 +2570,11 @@ img.written_dccon{max-width:80px;max-height:80px}
             } else {
                 val snapshotUrl = buildSnapshotUrl(gallType, gallId, postNumStr)
                 sendLog("[디버그] $debugLabel 시도 URL: $snapshotUrl", botId)
+                if (!isScheduleActiveNow(botId)) throw SchedulePausedException()
                 Jsoup.connect(snapshotUrl)
                     .userAgent(dcUserAgent)
                     .header("Cookie", cookie)
-                    .get()
+                    .gatedGet()
             }
 
             val redirectScript = snapshotDoc.select("script").eachText().joinToString("\n")
@@ -2430,10 +2590,20 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             snapshotDoc.head().append("<meta name=\"referrer\" content=\"unsafe-url\">")
             snapshotDoc.html()
+        } catch (paused: SchedulePausedException) {
+            throw paused
         } catch (e: Exception) {
+            if (e is CancellationException || e is SchedulePausedException) throw e
             Log.e("BotService", "[$botId] snapshot html build failed", e)
             sendLog("[경고] $debugLabel 생성 실패: ${e.javaClass.simpleName} / ${e.message ?: "원인 불명"}", botId)
             null
+        }
+    }
+
+    private fun updateLastCheckedNumber(botId: String, postNumber: Int) {
+        synchronized(GlobalBotState) {
+            val currentLast = GlobalBotState.lastCheckedNumbers[botId] ?: 0
+            if (postNumber > currentLast) GlobalBotState.lastCheckedNumbers[botId] = postNumber
         }
     }
 
@@ -2465,12 +2635,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             sendLog("[디버그][게시글] 게시글 상세 접근 시작: 번호 $postNumStr", botId)
         }
         if (!config.isSearchMode) {
-            synchronized(GlobalBotState) {
-                val currentLast = GlobalBotState.lastCheckedNumbers[botId] ?: 0
-                if (postNumber > currentLast) {
-                    GlobalBotState.lastCheckedNumbers[botId] = postNumber
-                }
-            }
+            updateLastCheckedNumber(botId, postNumber)
         }
 
         val pcPostDetailUrl =
@@ -2480,11 +2645,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                 "https://gall.dcinside.com/mini/board/view/?id=$gallId&no=$postNumStr"
             }
 
+        requireActiveScheduleForRequest(botId)
         val detailFetchStartedAt = System.currentTimeMillis()
         val postDoc = Jsoup.connect(pcPostDetailUrl)
             .userAgent("Mozilla/5.0")
             .header("Cookie", cookie)
-            .get()
+            .gatedGet()
 
         val contentText = postDoc.select(".write_div").text()
         val postRawHtml = postDoc.select(".write_div").outerHtml()
@@ -2498,6 +2664,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             sendLog("[디버그][성능] 상세 fetch / 글번호: $postNumStr / ${System.currentTimeMillis() - detailFetchStartedAt}ms", botId)
         }
 
+        requireActiveScheduleForRequest(botId)
         val commentFetchStartedAt = System.currentTimeMillis()
         val commentApiUrl = "https://gall.dcinside.com/board/comment/"
         val commentResponse = Jsoup.connect(commentApiUrl)
@@ -2515,7 +2682,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             .data("_GALLTYPE_", gallType)
             .ignoreContentType(true)
             .method(org.jsoup.Connection.Method.POST)
-            .execute()
+            .gatedExecute()
         val rawCommentsArray = org.json.JSONObject(commentResponse.body()).optJSONArray("comments")
         val commentsArray = filterDcUserComments(
             rawCommentsArray,
@@ -2545,6 +2712,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     checkNotNull(pumSourceResolver) { "PUM resolver missing for snapshot/filter scan cycle" }
                         .resolve(postDoc, pcPostDetailUrl)
                 }.getOrElse {
+                    if (it is SchedulePausedException || it is CancellationException) throw it
                     PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
                 }
                 cachedPumResolution
@@ -2587,7 +2755,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (config.isDebugMode) {
                 sendLog("[디버그][차단 예외 글] 번호: $postNumStr / 게시글과 댓글 차단 검사 건너뜀", botId)
             }
-            val exemptSnapshotPath = if (config.isExpertMode && config.isSnapshotAll && GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
+            val exemptSnapshotPath = if (config.isExpertMode && config.isSnapshotAll && GlobalBotState.tryLockGeneralSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)) {
                 try {
                     val snapshotStartedAt = System.currentTimeMillis()
                     val result = saveSnapshotFromDocCommon(
@@ -2597,7 +2765,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         postNumStr = postNumStr,
                         liveDoc = postDoc,
                         comments = commentsArray,
-                        existingSnapshotPath = GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath,
+                        existingSnapshotPath = GlobalBotState.getSavedPost(config.scanScopeId, gallType, gallId, postNumStr)?.snapshotPath,
                         pumResolution = PumSnapshotSourcePolicy.resolve(
                             blockAllActive = false,
                             resolver = ::resolvePumSourceOnce,
@@ -2613,12 +2781,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                     result
                 } finally {
-                    GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
+                    GlobalBotState.unlockGeneralSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)
                 }
             } else {
                 null
             }
             GlobalBotState.savePost(
+                scopeId = config.scanScopeId,
                 gallType = gallType,
                 gallId = gallId,
                 postNum = postNumStr,
@@ -2804,16 +2973,26 @@ img.written_dccon{max-width:80px;max-height:80px}
                         ParsedTargetUrl(gallId = gallId, gallType = gallType, listQueryOptions = ListQueryOptions()),
                         isSearchMode = false
                     )
-                    val response = executeDeletePostRequest(
-                        cookie = cookie,
-                        listRefererUrl = listRefererUrl,
-                        gallId = gallId,
-                        targetNo = samplePostNo,
-                        gallType = gallType,
+                    val response = executeClaimedModerationAction(
                         botId = botId,
-                        isDebugMode = config.isDebugMode
-                    )
-                    val succeeded = response.contains("\"result\":\"success\"")
+                        gallType = gallType,
+                        gallId = gallId,
+                        postNum = samplePostNo,
+                        targetType = "POST",
+                        targetNo = samplePostNo,
+                        actionKind = spamBurstDeleteClaimActionKind("POST"),
+                    ) {
+                        executeDeletePostRequest(
+                            cookie = cookie,
+                            listRefererUrl = listRefererUrl,
+                            gallId = gallId,
+                            targetNo = samplePostNo,
+                            gallType = gallType,
+                            botId = botId,
+                            isDebugMode = config.isDebugMode
+                        )
+                    }
+                    val succeeded = isModerationActionSuccess(response)
                     if (succeeded) {
                         state.samplePostNos.remove(samplePostNo)
                     }
@@ -2832,16 +3011,26 @@ img.written_dccon{max-width:80px;max-height:80px}
                 ParsedTargetUrl(gallId = gallId, gallType = gallType, listQueryOptions = ListQueryOptions()),
                 isSearchMode = false
             )
-            val deleteResponse = executeDeletePostRequest(
-                cookie = cookie,
-                listRefererUrl = deleteListRefererUrl,
-                gallId = gallId,
-                targetNo = postNumStr,
-                gallType = gallType,
+            val deleteResponse = executeClaimedModerationAction(
                 botId = botId,
-                isDebugMode = config.isDebugMode
-            )
-            val spamBurstDeleteSucceeded = deleteResponse.contains("\"result\":\"success\"")
+                gallType = gallType,
+                gallId = gallId,
+                postNum = postNumStr,
+                targetType = "POST",
+                targetNo = postNumStr,
+                actionKind = spamBurstDeleteClaimActionKind("POST"),
+            ) {
+                executeDeletePostRequest(
+                    cookie = cookie,
+                    listRefererUrl = deleteListRefererUrl,
+                    gallId = gallId,
+                    targetNo = postNumStr,
+                    gallType = gallType,
+                    botId = botId,
+                    isDebugMode = config.isDebugMode
+                )
+            }
+            val spamBurstDeleteSucceeded = isModerationActionSuccess(deleteResponse)
             if (spamBurstDeleteSucceeded) {
                 spamBurstStates[botId]?.samplePostNos?.remove(postNumStr)
             }
@@ -2953,7 +3142,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (config.isDebugMode && botId.isNotEmpty()) {
                 sendLog("[AI 배치] AI 필터 활성 / 글 번호: $postNumStr / 댓글 수: ${commentsArray?.length() ?: 0}", botId)
             }
-            runCatching {
+            val aiStageAttempt = AiOuterStageAttempt()
+            runAiOuterStage(aiStageAttempt) {
                 val queue = aiBatchQueues.getOrPut(botId) {
                     AiBatchQueue(
                         maxPosts = config.aiFilterBatchMaxPosts.coerceAtLeast(1),
@@ -2987,7 +3177,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         sendLog("[AI 배치] 이전 호출 실패로 ${remainSec}초 뒤 재시도합니다.", botId)
                     }
                 } else if (isOversizeSingle || shouldFlushNow) {
-                    val flushItems = if (isOversizeSingle) listOfNotNull(queue.remove(queueItem.postKey)) else queue.drainFlushable()
+                    val flushItems = aiStageAttempt.drain(queue, queueItem.postKey.takeIf { isOversizeSingle })
                     val aiProviderName = when {
                         config.aiFilterProvider.equals("gemini_direct", ignoreCase = true) -> "GEMINI_DIRECT"
                         config.aiFilterProvider.equals("groq", ignoreCase = true) -> "GROQ"
@@ -3002,7 +3192,9 @@ img.written_dccon{max-width:80px;max-height:80px}
                     if (config.isDebugMode && botId.isNotEmpty()) {
                         sendLog("AISTAMP:b8103ef [AI 배치] 호출 시작 / 묶음 ${flushItems.size}건 / postNos=${flushItems.joinToString(",") { it.postNo }} / provider=$aiProviderName / endpointHost=$aiEndpointHost / urlHasKey=$aiUrlHasKey / keyLen=$aiKeyLen", botId)
                     }
+                    requireActiveScheduleForRequest(botId)
                     val aiBatchEvaluation = AiFilterClient(
+                        beforeRequest = RuntimeRequestGate.requireCurrent()::check,
                         config = AiFilterConfig(
                             enabled = true,
                             provider = when {
@@ -3095,6 +3287,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         if (config.isDebugMode && botId.isNotEmpty()) {
                             sendLog("[AI 배치][즉시집행 복구] 글 즉시집행 시작 / 글번호: ${decision.postNo} / reason=${decision.decision.reason} / confidence=${decision.decision.confidence}", botId)
                         }
+                        requireActiveScheduleForRequest(botId)
                         runCatching {
                             val targetKey = decision.postKey
                             val immediatePostDetailUrl = if (targetKey.gallType == "M") {
@@ -3102,10 +3295,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                             } else {
                                 "https://gall.dcinside.com/mini/board/view/?id=${targetKey.gallId}&no=${targetKey.postNo}"
                             }
+                            if (!isScheduleActiveNow(botId)) throw SchedulePausedException()
                             val immediatePostDoc = Jsoup.connect(immediatePostDetailUrl)
                                 .userAgent(dcUserAgent)
                                 .header("Cookie", cookie)
-                                .get()
+                                .gatedGet()
                             val resolvedPostDate = extractCreationDateFromPostDoc(immediatePostDoc)
                             val aiPrefs = botPrefs
                             val aiOverride = getActionOverride(PumRuntimeRouting.AI_ACTION_OVERRIDE_PREFIX)
@@ -3175,6 +3369,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 sendLog("[AI 배치][재시도] 글 즉시집행 실패로 계획과 결과 유지 / 글번호: ${decision.postNo}", botId)
                             }
                         }.onFailure {
+                            if (it is SchedulePausedException) throw it
                             if (config.isDebugMode && botId.isNotEmpty()) {
                                 sendLog("[AI 배치][즉시집행 복구] 글 즉시집행 실패 / 글번호: ${decision.postNo} / error=${it.message ?: "원인 불명"}", botId)
                             }
@@ -3203,6 +3398,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                 if (config.isDebugMode && botId.isNotEmpty()) {
                                     sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 시작 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId} / reason=${commentDecision.decision.reason} / confidence=${commentDecision.decision.confidence}", botId)
                                 }
+                                requireActiveScheduleForRequest(botId)
                                 runCatching {
                                     val targetKey = postDecision.postKey
                                     val immediateCommentPostDetailUrl = if (targetKey.gallType == "M") {
@@ -3210,11 +3406,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                                     } else {
                                         "https://gall.dcinside.com/mini/board/view/?id=${targetKey.gallId}&no=${targetKey.postNo}"
                                     }
+                                    if (!isScheduleActiveNow(botId)) throw SchedulePausedException()
                                     val immediateCommentPostDoc = Jsoup.connect(immediateCommentPostDetailUrl)
                                         .userAgent(dcUserAgent)
                                         .header("Cookie", cookie)
-                                        .get()
+                                        .gatedGet()
                                     val esnoToken = immediateCommentPostDoc.select("input[id=e_s_n_o]").attr("value")
+                                    requireActiveScheduleForRequest(botId)
                                     val commentApiResponse = Jsoup.connect("https://gall.dcinside.com/board/comment/")
                                         .userAgent(dcUserAgent)
                                         .header("Cookie", cookie)
@@ -3230,7 +3428,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         .data("_GALLTYPE_", targetKey.gallType)
                                         .ignoreContentType(true)
                                         .method(org.jsoup.Connection.Method.POST)
-                                        .execute()
+                                        .gatedExecute()
                                     val resolvedCommentDate = runCatching {
                                         val commentsJson = JSONObject(commentApiResponse.body()).optJSONArray("comments") ?: JSONArray()
                                         var date = ""
@@ -3309,6 +3507,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                                         sendLog("[AI 배치][재시도] 댓글 즉시집행 실패로 계획 유지 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId}", botId)
                                     }
                                 }.onFailure {
+                                    if (it is SchedulePausedException) throw it
                                     if (config.isDebugMode && botId.isNotEmpty()) {
                                         sendLog("[AI 배치][즉시집행 복구] 댓글 즉시집행 실패 / 글번호: ${postDecision.postNo} / comment=${commentDecision.commentId} / error=${it.message ?: "원인 불명"}", botId)
                                     }
@@ -3427,7 +3626,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 blockedCommentNo = blockedCommentNo,
                 blockedTs = blockedTs,
                 existingSnapshotPath = if (blockedTs == null) {
-                    GlobalBotState.getSavedPost(gallType, gallId, postNumStr)?.snapshotPath
+                    GlobalBotState.getSavedPost(config.scanScopeId, gallType, gallId, postNumStr)?.snapshotPath
                 } else {
                     null
                 },
@@ -3441,6 +3640,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
         fun fetchLatestCommentsArray(): org.json.JSONArray? {
             return runCatching {
+                if (!isScheduleActiveNow(botId)) throw SchedulePausedException()
                 val latestResponse = Jsoup.connect("https://gall.dcinside.com/board/comment/")
                     .userAgent("Mozilla/5.0")
                     .header("Cookie", cookie)
@@ -3456,7 +3656,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     .data("_GALLTYPE_", gallType)
                     .ignoreContentType(true)
                     .method(org.jsoup.Connection.Method.POST)
-                    .execute()
+                    .gatedExecute()
                 filterDcUserComments(
                     org.json.JSONObject(latestResponse.body()).optJSONArray("comments"),
                     botId = botId,
@@ -3464,24 +3664,26 @@ img.written_dccon{max-width:80px;max-height:80px}
                     contextLabel = "최신 댓글 스냅샷 재조회"
                 )
             }.onFailure {
+                if (it is SchedulePausedException) throw it
                 sendLog("[스냅샷][전체] 최신 댓글 재조회 실패: ${it.javaClass.simpleName} / ${it.message ?: "원인 불명"}", botId)
             }.getOrNull()
         }
 
         if (config.isExpertMode && config.isSnapshotAll) {
-            if (GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
+            if (GlobalBotState.tryLockGeneralSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)) {
                 try {
                     val generalSnapshotPath = saveSnapshotFromDoc(postDoc, commentsArray)
                     if (!generalSnapshotPath.isNullOrBlank()) {
                         dbSnapshotPath = generalSnapshotPath
-                        GlobalBotState.getDb()?.postDao()
-                            ?.updateSnapshotPath(gallType, gallId, postNumStr, generalSnapshotPath)
+                        GlobalBotState.updateSnapshotPath(
+                            config.scanScopeId, gallType, gallId, postNumStr, generalSnapshotPath,
+                        )
                         sendLog("[스냅샷][전체] 저장 완료: $generalSnapshotPath", botId)
                     } else {
                         sendLog("[스냅샷][전체] 저장 실패 또는 경로 없음", botId)
                     }
                 } finally {
-                    GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
+                    GlobalBotState.unlockGeneralSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)
                 }
             }
         }
@@ -3569,10 +3771,12 @@ img.written_dccon{max-width:80px;max-height:80px}
                 sendBlockNotification(botId, botName = botId, title = "AI 검토 필요", message = "글 번호 $postNumStr / $reviewReason")
             }
             GlobalBotState.saveBlockHistory(
+                actorBotId = botId,
                 gallType = gallType,
                 gallId = gallId,
                 postNum = postNumStr,
                 targetType = "POST_REVIEW",
+                targetNo = postNumStr,
                 targetAuthor = postDisplayAuthor,
                 targetContent = text,
                 blockReason = reviewReason,
@@ -3810,7 +4014,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         val adjustedCommentCount = (currentCommentCount - deletedCommentCount).coerceAtLeast(0)
         if (deletedCommentCount > 0 && config.isExpertMode && config.isSnapshotAll) {
             val latestCommentsArray = fetchLatestCommentsArray()
-            if (GlobalBotState.tryLockGeneralSnapshot(gallType, gallId, postNumStr)) {
+            if (GlobalBotState.tryLockGeneralSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)) {
                 try {
                     val refreshedSnapshotPath = saveSnapshotFromDoc(postDoc, latestCommentsArray ?: org.json.JSONArray())
                     if (!refreshedSnapshotPath.isNullOrBlank()) {
@@ -3820,12 +4024,13 @@ img.written_dccon{max-width:80px;max-height:80px}
                         sendLog("[스냅샷][전체] 댓글 삭제 반영 저장 실패 또는 경로 없음", botId)
                     }
                 } finally {
-                    GlobalBotState.unlockGeneralSnapshot(gallType, gallId, postNumStr)
+                    GlobalBotState.unlockGeneralSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)
                 }
             }
         }
 
         GlobalBotState.savePost(
+                scopeId = config.scanScopeId,
             gallType = gallType,
             gallId = gallId,
             postNum = postNumStr,
@@ -3990,6 +4195,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         return try {
+            if (!isScheduleActiveNow(botId)) throw SchedulePausedException()
             val res = Jsoup.connect("https://gall.dcinside.com/api/gallog_user_layer/gallog_content_reple/")
                 .userAgent("Mozilla/5.0")
                 .header("Cookie", cookie)
@@ -3998,7 +4204,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 .data("user_id", userId)
                 .method(org.jsoup.Connection.Method.POST)
                 .ignoreContentType(true)
-                .execute()
+                .gatedExecute()
 
             val counts = parseGallogCounts(res.body())
             if (counts == null) {
@@ -4019,7 +4225,10 @@ img.written_dccon{max-width:80px;max-height:80px}
                     commentCount = commentCount
                 )
             }
+        } catch (paused: SchedulePausedException) {
+            throw paused
         } catch (e: Exception) {
+            if (e is CancellationException || e is SchedulePausedException) throw e
             Log.e("BotService", logTag, e)
             GallogStats(postCount = 100, commentCount = 100, lookupSucceeded = false)
         }
@@ -4363,6 +4572,89 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
+    private fun executeClaimedModerationAction(
+        botId: String,
+        gallType: String,
+        gallId: String,
+        postNum: String,
+        targetType: String,
+        targetNo: String,
+        actionKind: String,
+        execute: () -> String,
+    ): String {
+        RuntimeRequestGate.requireCurrent().check()
+        if (!isScheduleActiveNow(botId)) {
+            return "{\"result\":\"skipped\",\"reason\":\"inactive_schedule\"}"
+        }
+        if (!requiresModerationClaim(actionKind)) {
+            return execute()
+        }
+        val claimedAt = System.currentTimeMillis()
+        val claim = ModerationActionClaim(
+            gallType = gallType,
+            gallId = gallId,
+            postNum = postNum,
+            targetType = targetType,
+            targetNo = targetNo,
+            actionKind = actionKind,
+            actorBotId = botId,
+            ownerToken = UUID.randomUUID().toString(),
+            status = ClaimStatus.PENDING.name,
+            claimedAt = claimedAt,
+        )
+        RuntimeRequestGate.requireCurrent().check()
+        if (!GlobalBotState.acquireModerationClaim(
+                claim = claim,
+                now = claimedAt,
+                leaseMs = MODERATION_CLAIM_LEASE_MS,
+                failureCooldownMs = moderationFailureRetrySuppressMs,
+            )
+        ) {
+            return "{\"result\":\"skipped\",\"reason\":\"moderation_claim_unavailable\"}"
+        }
+        if (!isScheduleActiveNow(botId)) {
+            finalizeModerationClaimOrLog(claim, ClaimStatus.FAILED)
+            return "{\"result\":\"skipped\",\"reason\":\"inactive_schedule\"}"
+        }
+        return try {
+            RuntimeRequestGate.requireCurrent().check()
+            val response = execute()
+            val status = classifyModerationClaimStatus(response)
+            finalizeModerationClaimOrLog(claim, status)
+            response
+        } catch (cancelled: CancellationException) {
+            finalizeModerationClaimOrLog(claim, ClaimStatus.UNKNOWN)
+            throw cancelled
+        } catch (failure: Exception) {
+            finalizeModerationClaimOrLog(claim, ClaimStatus.UNKNOWN)
+            throw failure
+        }
+    }
+
+    private fun finalizeModerationClaimOrLog(claim: ModerationActionClaim, status: ClaimStatus) {
+        if (!GlobalBotState.finalizeModerationClaim(claim, status, System.currentTimeMillis())) {
+            logModerationClaimFinalizeFailure(claim, status)
+        }
+    }
+
+    private fun logModerationClaimFinalizeFailure(claim: ModerationActionClaim, status: ClaimStatus) {
+        Log.w(
+            "BotService",
+            "[claim finalize CAS miss] bot=${claim.actorBotId.take(64)} " +
+                "key=${claim.gallType.take(8)}/${claim.gallId.take(64)}/${claim.postNum.take(32)}/" +
+                "${claim.targetType.take(16)}/${claim.targetNo.take(32)}/${claim.actionKind.take(32)} " +
+                "status=${status.name}",
+        )
+    }
+
+    private fun persistModerationHistoryOrLog(botId: String, persist: () -> Unit) {
+        try {
+            persist()
+        } catch (failure: Exception) {
+            Log.e("BotService", "[durable history write failed] bot=${botId.take(64)}", failure)
+        }
+    }
+
     private fun sanitizeAllowedInt(value: Int, allowed: List<Int>, fallback: Int): Int {
         return if (value in allowed) value else fallback
     }
@@ -4407,9 +4699,14 @@ img.written_dccon{max-width:80px;max-height:80px}
         val messages = mutableListOf<String>()
 
         for (target in targets) {
-            val result = runCatching {
-                executeGallerySettingRefresh(cookie, config, target)
-            }.getOrElse { e ->
+            requireActiveScheduleForRequest(botId)
+            val result = try {
+                executeGallerySettingRefresh(botId, cookie, config, target)
+            } catch (paused: SchedulePausedException) {
+                throw paused
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
                 GallerySettingRefreshResult(false, "${e.javaClass.simpleName}: ${e.message ?: "알 수 없는 오류"}")
             }
             if (!result.success) allSuccess = false
@@ -4424,7 +4721,8 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
-    private fun executeGallerySettingRefresh(
+    private suspend fun executeGallerySettingRefresh(
+        botId: String,
         cookie: String,
         config: BotConfig,
         target: GallerySettingRefreshTarget
@@ -4434,7 +4732,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             else -> "https://gall.dcinside.com/mgallery/management/gallery?id=${target.gallId}"
         }
 
-        val (ciToken, ciTokenSource, requestCookie) = resolveGallerySettingCiToken(cookie, referer)
+        val (ciToken, ciTokenSource, requestCookie) = resolveGallerySettingCiToken(botId, cookie, referer)
         if (ciToken.isBlank()) {
             return GallerySettingRefreshResult(false, "ci_t 토큰 없음($ciTokenSource)")
         }
@@ -4467,7 +4765,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (config.gallerySettingImageBlockAll) connection.data("img_block[]", "A")
         }
 
-        val responseBody = connection.execute().body()
+        requireActiveScheduleForRequest(botId)
+        val responseBody = connection.gatedExecute().body()
         val result = runCatching { JSONObject(responseBody).optString("result") }.getOrDefault("")
         return if (result == "success") {
             GallerySettingRefreshResult(true, "success(token=$ciTokenSource)")
@@ -4476,14 +4775,15 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
-    private fun resolveGallerySettingCiToken(cookie: String, managementUrl: String): Triple<String, String, String> {
+    private suspend fun resolveGallerySettingCiToken(botId: String, cookie: String, managementUrl: String): Triple<String, String, String> {
         val savedCookieToken = extractCookieValue(cookie, "ci_c") ?: ""
         var requestCookie = cookie
         var statusInfo = "page=not_requested"
         var pageHasCiInput = false
         var responseCookieToken = ""
 
-        runCatching {
+        try {
+            requireActiveScheduleForRequest(botId)
             val response = Jsoup.connect(managementUrl)
                 .userAgent(dcUserAgent)
                 .header("Cookie", cookie)
@@ -4491,7 +4791,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .followRedirects(true)
                 .ignoreHttpErrors(true)
-                .execute()
+                .gatedExecute()
 
             statusInfo = "pageStatus=${response.statusCode()}"
             responseCookieToken = response.cookies()["ci_c"].orEmpty().trim()
@@ -4507,7 +4807,11 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (pageToken.isNotBlank()) {
                 return Triple(pageToken, "management_page/$statusInfo", requestCookie)
             }
-        }.getOrElse { e ->
+        } catch (paused: SchedulePausedException) {
+            throw paused
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
             statusInfo = "pageError=${e.javaClass.simpleName}"
         }
 
@@ -4532,7 +4836,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         return parts.joinToString("; ")
     }
 
-    private fun loadBotConfig(botPref: android.content.SharedPreferences): BotConfig {
+    private fun loadBotConfig(botId: String, botPref: android.content.SharedPreferences): BotConfig {
         fun safePrefString(key: String, defaultValue: String): String = (botPref.all[key] as? String) ?: defaultValue
         fun safePrefInt(key: String, defaultValue: Int): Int = when (val value = botPref.all[key]) {
             is Int -> value
@@ -4570,6 +4874,10 @@ img.written_dccon{max-width:80px;max-height:80px}
         val cycleMaxMs = maxOf((safePrefFloat("delay_cycle_max_sec", 90.0f) * 1000).toLong(), cycleMinMs + 1L)
 
         return BotConfig(
+            scanScopeId = resolveScanScopeId(
+                botId = botId,
+                independent = botPref.getBoolean("independent_scan_state_enabled", false),
+            ),
             isDebugMode = botPref.getBoolean("is_debug_mode", false),
             isExpertMode = botPref.getBoolean("is_expert_mode", false),
             snapshotKeepDays = safePrefInt("snapshot_keep_days", 7),
@@ -5503,7 +5811,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
-            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)) {
                 try {
                     val path = saveSnapshotFn()
                     if (path != null) {
@@ -5511,7 +5819,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         dbSnapshotPath = path
                     }
                 } finally {
-                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
+                    GlobalBotState.unlockBlockSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)
                 }
             }
         }
@@ -5532,16 +5840,26 @@ img.written_dccon{max-width:80px;max-height:80px}
                 mode = actionConfig.mode
             )
         }
-        val actionResponse = executeModerationAction(
-            actionConfig = actionConfig,
-            cookie = cookie,
-            pcPostDetailUrl = pcPostDetailUrl,
-            tokenToUse = tokenToUse,
+        val actionResponse = executeClaimedModerationAction(
+            botId = botId,
+            gallType = gallType,
             gallId = gallId,
+            postNum = postNumStr,
+            targetType = "POST",
             targetNo = postNumStr,
-            parentPostNo = "",
-            gallType = gallType
-        )
+            actionKind = moderationClaimActionKind(actionConfig.mode.name, "POST", actionConfig.deletePostOnBlock),
+        ) {
+            executeModerationAction(
+                actionConfig = actionConfig,
+                cookie = cookie,
+                pcPostDetailUrl = pcPostDetailUrl,
+                tokenToUse = tokenToUse,
+                gallId = gallId,
+                targetNo = postNumStr,
+                parentPostNo = "",
+                gallType = gallType
+            )
+        }
         val actionSucceeded = isModerationActionSuccess(actionResponse)
         if (!actionSucceeded) rememberModerationFailure(failureKey)
         if (config.isDebugMode) {
@@ -5580,11 +5898,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
 
             if (actionConfig.mode == ModerationActionMode.HOLD) {
-                GlobalBotState.saveHoldHistory(
-                    gallType = gallType,
-                    gallId = gallId,
-                    postNum = postNumStr,
-                    targetType = "POST",
+                persistModerationHistoryOrLog(botId) {
+                    GlobalBotState.saveHoldHistory(
+                        actorBotId = botId,
+                        gallType = gallType,
+                        gallId = gallId,
+                        postNum = postNumStr,
+                        targetType = "POST",
                     targetNo = postNumStr,
                     targetAuthor = postDisplayAuthor,
                     targetContent = postTitle,
@@ -5592,18 +5912,23 @@ img.written_dccon{max-width:80px;max-height:80px}
                     snapshotPath = blockHistorySnapshotPath,
                     creationDate = postDate
                 )
+                }
             } else {
-                GlobalBotState.saveBlockHistory(
+                persistModerationHistoryOrLog(botId) {
+                    GlobalBotState.saveBlockHistory(
+                    actorBotId = botId,
                     gallType = gallType,
                     gallId = gallId,
                     postNum = postNumStr,
                     targetType = "POST",
+                    targetNo = postNumStr,
                     targetAuthor = postDisplayAuthor,
                     targetContent = postTitle,
                     blockReason = "[$actionLabel] $dbBlockReason",
                     snapshotPath = blockHistorySnapshotPath,
                     creationDate = postDate
                 )
+                }
             }
         } else {
             val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.HOLD -> "보류"; else -> "차단" }
@@ -5692,6 +6017,7 @@ img.written_dccon{max-width:80px;max-height:80px}
     private enum class UrlProcessOutcome {
         CONTINUE,
         INCOMPLETE,
+        PAUSED_BY_SCHEDULE,
         LOGIN_REQUIRED,
         NO_PERMISSION
     }
@@ -5753,7 +6079,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         val dbBlockReason = presentation.detailedBlockReason
 
         if (config.isExpertMode && config.isSnapshotBlocked) {
-            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(gallType, gallId, postNumStr)) {
+            if (saveSnapshotFn != null && GlobalBotState.tryLockBlockSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)) {
                 try {
                     val path = saveSnapshotFn()
                     if (path != null) {
@@ -5761,7 +6087,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                         dbSnapshotPath = path
                     }
                 } finally {
-                    GlobalBotState.unlockBlockSnapshot(gallType, gallId, postNumStr)
+                    GlobalBotState.unlockBlockSnapshot(config.scanScopeId, botId, gallType, gallId, postNumStr)
                 }
             }
         }
@@ -5806,16 +6132,26 @@ img.written_dccon{max-width:80px;max-height:80px}
                 mode = actionConfig.mode
             )
         }
-        val actionResponse = executeModerationAction(
-            actionConfig = actionConfig,
-            cookie = cookie,
-            pcPostDetailUrl = pcPostDetailUrl,
-            tokenToUse = tokenToUse,
+        val actionResponse = executeClaimedModerationAction(
+            botId = botId,
+            gallType = gallType,
             gallId = gallId,
+            postNum = postNumStr,
+            targetType = "COMMENT",
             targetNo = commentNo,
-            parentPostNo = postNumStr,
-            gallType = gallType
-        )
+            actionKind = moderationClaimActionKind(actionConfig.mode.name, "COMMENT", actionConfig.deletePostOnBlock),
+        ) {
+            executeModerationAction(
+                actionConfig = actionConfig,
+                cookie = cookie,
+                pcPostDetailUrl = pcPostDetailUrl,
+                tokenToUse = tokenToUse,
+                gallId = gallId,
+                targetNo = commentNo,
+                parentPostNo = postNumStr,
+                gallType = gallType
+            )
+        }
         val actionSucceeded = isModerationActionSuccess(actionResponse)
         if (!actionSucceeded) rememberModerationFailure(failureKey)
         if (config.isDebugMode) {
@@ -5854,7 +6190,9 @@ img.written_dccon{max-width:80px;max-height:80px}
             )
 
             if (actionConfig.mode == ModerationActionMode.HOLD) {
-                GlobalBotState.saveHoldHistory(
+                persistModerationHistoryOrLog(botId) {
+                    GlobalBotState.saveHoldHistory(
+                    actorBotId = botId,
                     gallType = gallType,
                     gallId = gallId,
                     postNum = postNumStr,
@@ -5866,8 +6204,11 @@ img.written_dccon{max-width:80px;max-height:80px}
                     snapshotPath = blockHistorySnapshotPath,
                     creationDate = commentDate
                 )
+                }
             } else {
-                GlobalBotState.saveBlockHistory(
+                persistModerationHistoryOrLog(botId) {
+                    GlobalBotState.saveBlockHistory(
+                    actorBotId = botId,
                     gallType = gallType,
                     gallId = gallId,
                     postNum = postNumStr,
@@ -5879,6 +6220,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     snapshotPath = blockHistorySnapshotPath,
                     creationDate = commentDate
                 )
+                }
             }
         } else {
             val modeLabel = when (actionConfig.mode) { ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.HOLD -> "보류"; else -> "차단" }
@@ -5896,9 +6238,7 @@ img.written_dccon{max-width:80px;max-height:80px}
     }
 
     private fun isModerationActionSuccess(response: String): Boolean {
-        return runCatching {
-            JSONObject(response).optString("result", "").equals("success", ignoreCase = true)
-        }.getOrDefault(false)
+        return classifyModerationClaimStatus(response) == ClaimStatus.SUCCEEDED
     }
 
     private fun filterDcUserComments(
@@ -6016,6 +6356,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         return Jsoup.connect(blockUrl)
+            .timeout(MODERATION_REQUEST_TIMEOUT_MS)
             .userAgent("Mozilla/5.0")
             .header("Cookie", cookie)
             .header("Referer", pcPostDetailUrl)
@@ -6032,7 +6373,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             .data("avoid_type_chk", "1")
             .ignoreContentType(true)
             .method(org.jsoup.Connection.Method.POST)
-            .execute()
+            .gatedExecute()
             .body()
     }
 
@@ -6052,6 +6393,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         return Jsoup.connect(deleteUrl)
+            .timeout(MODERATION_REQUEST_TIMEOUT_MS)
             .userAgent(dcUserAgent)
             .header("Cookie", cookie)
             .header("Referer", pcPostDetailUrl)
@@ -6063,7 +6405,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             .data("cmt_nos[]", commentNo)
             .ignoreContentType(true)
             .method(org.jsoup.Connection.Method.POST)
-            .execute()
+            .gatedExecute()
             .body()
     }
 
@@ -6091,6 +6433,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
 
         return Jsoup.connect(deleteUrl)
+            .timeout(MODERATION_REQUEST_TIMEOUT_MS)
             .userAgent(dcUserAgent)
             .header("Cookie", cookie)
             .header("Referer", listRefererUrl)
@@ -6102,7 +6445,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             .data("_GALLTYPE_", gallType)
             .ignoreContentType(true)
             .method(org.jsoup.Connection.Method.POST)
-            .execute()
+            .gatedExecute()
             .body()
     }
 

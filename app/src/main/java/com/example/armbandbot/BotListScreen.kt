@@ -50,7 +50,12 @@ import androidx.compose.ui.zIndex
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
 import com.heyheyon.armbandbot.ui.botColors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.time.ZoneId
 import java.util.UUID
 import kotlin.math.roundToInt
 
@@ -332,27 +337,101 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
         }
 
         if (botToDelete != null) {
+            var deleteBotSnapshots by remember(botToDelete) { mutableStateOf(false) }
+            var isDeletingBot by remember(botToDelete) { mutableStateOf(false) }
             val delPref = context.getSharedPreferences("bot_prefs_${botToDelete!!}", Context.MODE_PRIVATE)
             val delName = delPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇"
             AlertDialog(
                 containerColor = cardColor, titleContentColor = if (isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F), textContentColor = textColor,
-                onDismissRequest = { botToDelete = null },
+                onDismissRequest = { if (!isDeletingBot) botToDelete = null },
                 title = { Text("봇 삭제", fontWeight = FontWeight.Bold) },
-                text = { Text("'$delName' 봇을 완전히 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.") },
-                confirmButton = { Button(onClick = {
-                    context.startService(Intent(context, BotService::class.java).apply { putExtra("BOT_ID", botToDelete); action = "STOP" })
-                    delPref.edit().clear().apply()
-                    clearBotLogFile(context, botToDelete!!)
-                    GlobalBotState.logs.remove(botToDelete)
-                    botIds.remove(botToDelete)
-                    masterPref.edit().putString("bot_ids_list", botIds.joinToString(",")).apply()
-                    botToDelete = null
-                    Toast.makeText(context, "삭제되었습니다.", Toast.LENGTH_SHORT).show()
-                }, colors = ButtonDefaults.buttonColors(containerColor = if (isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F))) { Text("삭제", color = Color.White) } },
-                dismissButton = { TextButton(onClick = { botToDelete = null }) { Text("취소", color = subTextColor) } }
+                text = {
+                    Column {
+                        Text("'$delName' 봇을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다. 검사 기록과 스냅샷은 기본적으로 보존됩니다.")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = deleteBotSnapshots, onCheckedChange = { deleteBotSnapshots = it }, enabled = !isDeletingBot)
+                            Text("독립 검사 기록과 미참조 스냅샷도 삭제")
+                        }
+                        Text("공용 검사 기록과 조치·보류 이력에서 참조하는 스냅샷은 보존됩니다.", fontSize = 12.sp)
+                    }
+                },
+                confirmButton = { Button(enabled = !isDeletingBot, onClick = {
+                    val deletingBotId = botToDelete ?: return@Button
+                    val removeSnapshots = deleteBotSnapshots
+                    isDeletingBot = true
+                    coroutineScope.launch {
+                        try {
+                            context.startService(Intent(context, BotService::class.java).apply { putExtra("BOT_ID", deletingBotId); action = "STOP" })
+                            withContext(Dispatchers.IO) {
+                                GlobalBotState.withDatabaseMaintenanceLock {
+                                    cleanupDeletedBotSnapshots(GlobalBotState.getDb()?.postDao(), context.cacheDir, deletingBotId, removeSnapshots)
+                                    clearBotLogFile(context, deletingBotId)
+                                }
+                            }
+                            delPref.edit().clear().apply()
+                            GlobalBotState.logs.remove(deletingBotId)
+                            botIds.remove(deletingBotId)
+                            masterPref.edit().putString("bot_ids_list", botIds.joinToString(",")).apply()
+                            botToDelete = null
+                            Toast.makeText(context, "삭제되었습니다.", Toast.LENGTH_SHORT).show()
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            Toast.makeText(context, error.message ?: "삭제에 실패했습니다. 봇 설정은 유지됩니다.", Toast.LENGTH_LONG).show()
+                        } finally {
+                            isDeletingBot = false
+                        }
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = if (isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F))) { Text(if (isDeletingBot) "삭제 중…" else "삭제", color = Color.White) } },
+                dismissButton = { TextButton(enabled = !isDeletingBot, onClick = { botToDelete = null }) { Text("취소", color = subTextColor) } }
             )
         }
         }
+        }
+    }
+}
+
+/** Called on Dispatchers.IO; a missing inventory must never authorize file removal. */
+internal fun cleanupDeletedBotSnapshots(
+    postDao: PostDao?,
+    cacheRoot: File,
+    botId: String,
+    deleteBotSnapshots: Boolean,
+) = GlobalBotState.withDatabaseMaintenanceLock {
+    val dao = checkNotNull(postDao) { "DB를 사용할 수 없습니다. 봇 설정은 유지됩니다." }
+    require(botId != GLOBAL_SCAN_SCOPE && Regex("[A-Za-z0-9._-]{1,96}").matches(botId)) { "안전하지 않은 봇 ID입니다." }
+    if (deleteBotSnapshots) {
+        // Resolve and validate before removing rows. Never interpret failed listing as empty.
+        val root = cacheRoot.canonicalFile
+        val directory = File(root, "snapshots_$botId")
+        check(!isSymbolicLinkWithoutFollowing(directory)) { "스냅샷 폴더가 안전하지 않습니다." }
+        if (directory.exists()) {
+            check(directory.isDirectory && isCanonicalFileStrictlyInside(directory, listOf(root))) { "스냅샷 폴더가 안전하지 않습니다." }
+        }
+        if (root.listFiles() == null) throw java.io.IOException("스냅샷 루트를 읽을 수 없습니다.")
+        val directories = snapshotDirectoriesForBot(root, botId)
+        val candidates = directories.flatMap { candidateDirectory ->
+            (candidateDirectory.listFiles() ?: throw java.io.IOException("스냅샷 폴더를 읽을 수 없습니다.")).toList()
+        }
+        dao.deletePostsForScope(botId)
+        val survivingSnapshotPaths = dao.getAllSnapshotPaths()
+        // The DAO inventory unions checked, block, and hold rows across every scope.
+        val protectedPaths = survivingSnapshotPaths.filter { it.isNotBlank() }.flatMap { path ->
+            val pair = deriveSnapshotVersionPaths(path)
+            if (pair == null) listOf(path) else listOf(path, pair.initialPath, pair.latestPath)
+        }.map { File(it).canonicalPath }.toSet()
+        val removable = candidates.filter {
+            it.extension.equals("html", ignoreCase = true) && it.isFile &&
+                !isSymbolicLinkWithoutFollowing(it) && it.canonicalPath !in protectedPaths
+        }
+        directories.forEach { candidateDirectory ->
+            deleteTrustedSnapshotDirectoryFiles(root, candidateDirectory, survivingSnapshotPaths = survivingSnapshotPaths)
+        }
+        // The shared helper reports a count, not failed deletes. Verify its postcondition so
+        // permission/listing failures cannot remove the bot's preferences or list entry.
+        if (removable.any { it.exists() }) throw java.io.IOException("일부 스냅샷을 삭제하지 못했습니다. 봇 설정은 유지됩니다.")
+        if (directories.any { it.exists() && it.listFiles() == null }) {
+            throw java.io.IOException("스냅샷 폴더를 확인할 수 없습니다.")
         }
     }
 }
@@ -372,6 +451,28 @@ fun BotListItem(
     val botPref = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
     val botName = botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇"
     var isRunning by remember { mutableStateOf(botPref.getBoolean("is_running", false)) }
+    var nowEpochMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowEpochMillis = System.currentTimeMillis()
+            delay(60_000L - nowEpochMillis % 60_000L)
+        }
+    }
+    val runSchedule = runCatching {
+        BotRunSchedule(
+            enabled = botPref.getBoolean("run_schedule_enabled", false),
+            startMinuteOfDay = botPref.getInt("run_schedule_start_minute", 0),
+            endMinuteOfDay = botPref.getInt("run_schedule_end_minute", 0),
+        )
+    }.getOrElse { BotRunSchedule.disabled() }
+    val isLoggedIn = !botPref.getString("saved_cookie", "").isNullOrBlank()
+    val statusText = when {
+        !isLoggedIn -> "로그인 필요"
+        !isRunning -> "중지됨"
+        evaluateSchedule(nowEpochMillis, ZoneId.systemDefault(), runSchedule).state == ScheduleState.WAITING ->
+            "예약 대기 · ${formatMinuteOfDay(runSchedule.startMinuteOfDay)} 시작"
+        else -> "실행 중"
+    }
 
     val isDarkMode = LocalIsDarkMode.current
     val cardBgColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
@@ -445,8 +546,11 @@ fun BotListItem(
         ) {
             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable { if (isSwipedOpen) onSwipeStateChange(false) else onSettingsClick() }, verticalAlignment = Alignment.CenterVertically) {
                 Spacer(modifier = Modifier.width(20.dp))
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().padding(vertical = 20.dp), contentAlignment = Alignment.CenterStart) {
-                    Text(botName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().padding(vertical = 14.dp), contentAlignment = Alignment.CenterStart) {
+                    Column {
+                        Text(botName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
+                        Text(statusText, fontSize = 11.sp, color = if (statusText == "실행 중") PastelNavy else Color.Gray)
+                    }
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight().padding(vertical = 12.dp).background(dividerColor))
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {

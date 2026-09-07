@@ -67,6 +67,13 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
+    val isGlobalDashboard = botId == GLOBAL_SCAN_SCOPE
+    val dashboardBotPref = if (isGlobalDashboard) null else context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+    val scopeId = if (isGlobalDashboard) null else resolveScanScopeId(
+        botId,
+        dashboardBotPref?.getBoolean("independent_scan_state_enabled", false) == true,
+    )
+    val dashboardBotName = dashboardBotPref?.getString("bot_name", "이름 없는 봇") ?: ""
 
     // 🌟 다크모드 색상 팔레트 적용
     val isDarkMode = LocalIsDarkMode.current
@@ -117,7 +124,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     var generalPosts by remember { mutableStateOf<List<CheckedPost>>(emptyList()) }
     var blockPosts by remember { mutableStateOf<List<BlockHistory>>(emptyList()) }
     var holdPosts by remember { mutableStateOf<List<HoldHistory>>(emptyList()) }
-    var generalMatches by remember { mutableStateOf<Map<String, List<DashboardSearchMatchCode>>>(emptyMap()) }
+    var generalMatches by remember { mutableStateOf<Map<CheckedPostDashboardIdentity, List<DashboardSearchMatchCode>>>(emptyMap()) }
     var blockMatches by remember { mutableStateOf<Map<Int, List<DashboardSearchMatchCode>>>(emptyMap()) }
     var holdMatches by remember { mutableStateOf<Map<Int, List<DashboardSearchMatchCode>>>(emptyMap()) }
     var generalLoadVersion by remember { mutableIntStateOf(0) }
@@ -156,6 +163,16 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     var openSwipeKey by remember { mutableStateOf<String?>(null) }
 
     val postDao = GlobalBotState.getDb()?.postDao()
+    fun actorLabel(actorBotId: String): String = when (actorBotId) {
+        LEGACY_ACTOR_BOT_ID -> "이전 버전"
+        else -> context.getSharedPreferences("bot_prefs_$actorBotId", Context.MODE_PRIVATE)
+            .getString("bot_name", actorBotId) ?: actorBotId
+    }
+    fun scopeLabel(rowScopeId: String): String = when {
+        rowScopeId == GLOBAL_SCAN_SCOPE -> "공용 검사 기록"
+        rowScopeId == botId && dashboardBotName.isNotBlank() -> "$dashboardBotName 전용 검사 기록"
+        else -> "${actorLabel(rowScopeId)} 전용 검사 기록"
+    }
 
     suspend fun loadGeneralData() {
         if (isClearingDb) {
@@ -175,20 +192,18 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         try {
             val result = withContext(Dispatchers.IO) {
                 val rowsAndMatches = if (query.isBlank()) {
-                    val rows = when {
-                        field == "CHECK" && !ascending -> postDao?.getPostsCheckDesc(gallFilter, "", limit, 0)
-                        field == "CHECK" && ascending -> postDao?.getPostsCheckAsc(gallFilter, "", limit, 0)
-                        field == "CREATE" && !ascending -> postDao?.getPostsCreateDesc(gallFilter, "", limit, 0)
-                        field == "CREATE" && ascending -> postDao?.getPostsCreateAsc(gallFilter, "", limit, 0)
-                        else -> emptyList()
-                    } ?: emptyList()
+                    val rows = (if (scopeId == null) postDao?.getAllPostsForBackupMerge() else postDao?.getPostsForScope(scopeId))
+                        .orEmpty()
+                        .filter { gallFilter == "ALL" || it.gallId == gallFilter }
+                        .sortedWith(checkedPostDashboardComparator(field, ascending))
+                        .take(limit)
                     rows to emptyMap()
                 } else {
                     val matched = searchDashboardRows(
                         candidates = postDao?.getAllPostsForBackupMerge() ?: emptyList(),
                         query = query,
                         enabledCodes = enabledCodes,
-                        includeRow = { gallFilter == "ALL" || it.gallId == gallFilter },
+                        includeRow = { (scopeId == null || it.scopeId == scopeId) && (gallFilter == "ALL" || it.gallId == gallFilter) },
                         comparator = checkedPostDashboardComparator(field, ascending),
                         limit = limit,
                         directDocument = CheckedPost::toDashboardSearchDocument,
@@ -197,10 +212,10 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                             snapshotSearchFreshnessToken(it.snapshotPath, snapshotSearchAllowedRoots)
                         },
                         documentIndex = generalDocumentIndex,
-                        rowIdentity = { Triple(it.gallType, it.gallId, it.postNum) },
+                        rowIdentity = ::checkedPostDashboardIdentity,
                     )
                     matched.map { it.row } to matched.associate { match ->
-                        "${match.row.gallType}|${match.row.gallId}|${match.row.postNum}" to match.matches
+                        checkedPostDashboardIdentity(match.row) to match.matches
                     }
                 }
                 Triple(rowsAndMatches.first, rowsAndMatches.second, postDao?.getPostCount() ?: 0)
@@ -247,20 +262,18 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         try {
             val result = withContext(Dispatchers.IO) {
                 val rowsAndMatches = if (query.isBlank()) {
-                    val rows = when {
-                        field == "CHECK" && !ascending -> postDao?.getBlockHistoryCheckDesc(typeFilter, "", limit, 0)
-                        field == "CHECK" && ascending -> postDao?.getBlockHistoryCheckAsc(typeFilter, "", limit, 0)
-                        field == "CREATE" && !ascending -> postDao?.getBlockHistoryCreateDesc(typeFilter, "", limit, 0)
-                        field == "CREATE" && ascending -> postDao?.getBlockHistoryCreateAsc(typeFilter, "", limit, 0)
-                        else -> emptyList()
-                    } ?: emptyList()
+                    val rows = (if (isGlobalDashboard) postDao?.getAllBlockHistoryForBackupMerge() else postDao?.getBlockHistoryForActor(botId))
+                        .orEmpty()
+                        .filter { typeFilter == "ALL" || it.targetType == typeFilter }
+                        .sortedWith(blockHistoryDashboardComparator(field, ascending))
+                        .take(limit)
                     rows to emptyMap()
                 } else {
                     val matched = searchDashboardRows(
                         candidates = postDao?.getAllBlockHistoryForBackupMerge() ?: emptyList(),
                         query = query,
                         enabledCodes = enabledCodes,
-                        includeRow = { typeFilter == "ALL" || it.targetType == typeFilter },
+                        includeRow = { (isGlobalDashboard || it.actorBotId == botId) && (typeFilter == "ALL" || it.targetType == typeFilter) },
                         comparator = blockHistoryDashboardComparator(field, ascending),
                         limit = limit,
                         directDocument = BlockHistory::toDashboardSearchDocument,
@@ -315,20 +328,18 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         try {
             val result = withContext(Dispatchers.IO) {
                 val rowsAndMatches = if (query.isBlank()) {
-                    val rows = when {
-                        field == "CHECK" && !ascending -> postDao?.getHoldHistoryCheckDesc(typeFilter, "", limit, 0)
-                        field == "CHECK" && ascending -> postDao?.getHoldHistoryCheckAsc(typeFilter, "", limit, 0)
-                        field == "CREATE" && !ascending -> postDao?.getHoldHistoryCreateDesc(typeFilter, "", limit, 0)
-                        field == "CREATE" && ascending -> postDao?.getHoldHistoryCreateAsc(typeFilter, "", limit, 0)
-                        else -> emptyList()
-                    } ?: emptyList()
+                    val rows = (if (isGlobalDashboard) postDao?.getAllHoldHistoryForBackupMerge() else postDao?.getHoldHistoryForActor(botId))
+                        .orEmpty()
+                        .filter { typeFilter == "ALL" || it.targetType == typeFilter }
+                        .sortedWith(holdHistoryDashboardComparator(field, ascending))
+                        .take(limit)
                     rows to emptyMap()
                 } else {
                     val matched = searchDashboardRows(
                         candidates = postDao?.getAllHoldHistoryForBackupMerge() ?: emptyList(),
                         query = query,
                         enabledCodes = enabledCodes,
-                        includeRow = { typeFilter == "ALL" || it.targetType == typeFilter },
+                        includeRow = { (isGlobalDashboard || it.actorBotId == botId) && (typeFilter == "ALL" || it.targetType == typeFilter) },
                         comparator = holdHistoryDashboardComparator(field, ascending),
                         limit = limit,
                         directDocument = HoldHistory::toDashboardSearchDocument,
@@ -592,7 +603,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { showClearDbConfirm = false },
             title = { Text("DB 초기화", fontWeight = FontWeight.Bold) },
-            text = { Text("공용 DB를 전체 초기화할까요?\n검사 기록과 차단 기록, 저장된 스냅샷이 모두 삭제됩니다.\n(기록된 게시글 수: ${recordedPostCount}개)") },
+            text = { Text(if (isGlobalDashboard) "공용 DB를 전체 초기화할까요?\n검사 기록과 차단 기록, 저장된 스냅샷이 모두 삭제됩니다.\n(기록된 게시글 수: ${recordedPostCount}개)" else "현재 검사 범위(${scopeLabel(scopeId!!)})의 검사 기록만 초기화할까요?\n조치 기록과 다른 검사 범위는 보존됩니다.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -611,13 +622,26 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         coroutineScope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    postDao?.getAllSnapshotPaths()?.forEach { deleteSnapshotFiles(it) }
-                                    context.cacheDir.listFiles()
-                                        ?.filter { it.isDirectory && it.name.startsWith("snapshots_") }
-                                        ?.forEach { it.deleteRecursively() }
-                                    postDao?.clearAllPosts()
-                                    postDao?.clearAllBlockHistory()
-                                    postDao?.clearAllHoldHistory()
+                                    GlobalBotState.withDatabaseMaintenanceLock {
+                                        if (isGlobalDashboard) {
+                                            deleteSnapshotRecordsAndFiles(postDao, listOf(context.cacheDir)) { dao ->
+                                                val paths = dao.getAllSnapshotPaths()
+                                                dao.clearAllPosts(); dao.clearAllBlockHistory(); dao.clearAllHoldHistory()
+                                                GlobalBotState.getDb()?.moderationClaimDao()?.clearAll()
+                                                paths
+                                            }
+                                            val survivors = checkNotNull(postDao).getAllSnapshotPaths()
+                                            context.cacheDir.listFiles()?.filter { it.isDirectory && it.name.startsWith("snapshots_") }?.forEach {
+                                                deleteTrustedSnapshotDirectoryFiles(context.cacheDir, it, survivingSnapshotPaths = survivors)
+                                            }
+                                        } else {
+                                            deleteSnapshotRecordsAndFiles(postDao, listOf(context.cacheDir)) { dao ->
+                                                val paths = dao.getPostsForScope(scopeId!!).map { it.snapshotPath }
+                                                dao.deletePostsForScope(scopeId!!)
+                                                paths
+                                            }
+                                        }
+                                    }
                                 }
                                 GlobalBotState.lastCheckedNumbers.clear()
                                 snapshotSearchCache.clear()
@@ -661,7 +685,9 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { pendingDeletePost = null; pendingDeleteBlock = null; pendingDeleteHold = null },
             title = { Text(deleteTitle, fontWeight = FontWeight.Bold) },
-            text = { Text(deleteMessage) },
+            text = { Text(deleteMessage + if (!isGlobalDashboard && (pendingDeleteBlock != null || pendingDeleteHold != null)) {
+                "\n공용 조치 이력에서도 삭제됩니다."
+            } else "") },
             confirmButton = {
                 TextButton(onClick = {
                     val targetPost = pendingDeletePost
@@ -669,15 +695,17 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     val targetHold = pendingDeleteHold
                     coroutineScope.launch {
                         withContext(Dispatchers.IO) {
-                            if (targetPost != null) {
-                                deleteSnapshotFiles(targetPost.snapshotPath)
-                                postDao?.deletePost(targetPost.gallType, targetPost.gallId, targetPost.postNum)
-                            } else if (targetBlock != null) {
-                                deleteSnapshotFiles(targetBlock.snapshotPath)
-                                postDao?.deleteBlockHistoryById(targetBlock.id)
-                            } else if (targetHold != null) {
-                                deleteSnapshotFiles(targetHold.snapshotPath)
-                                postDao?.deleteHoldHistoryById(targetHold.id)
+                            deleteSnapshotRecordsAndFiles(postDao, listOf(context.cacheDir)) { dao ->
+                                if (targetPost != null) {
+                                    dao.deletePost(targetPost.scopeId, targetPost.gallType, targetPost.gallId, targetPost.postNum)
+                                    listOf(targetPost.snapshotPath)
+                                } else if (targetBlock != null) {
+                                    dao.deleteBlockHistoryById(targetBlock.id)
+                                    listOf(targetBlock.snapshotPath)
+                                } else if (targetHold != null) {
+                                    dao.deleteHoldHistoryById(targetHold.id)
+                                    listOf(targetHold.snapshotPath)
+                                } else emptyList()
                             }
                         }
                         pendingDeletePost = null
@@ -748,7 +776,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                     color = textColor
                 )
                 Text(
-                    "모든 봇이 같은 기록을 공유합니다.",
+                    if (isGlobalDashboard) "모든 검사 범위와 조치 내역" else scopeLabel(scopeId!!),
                     fontSize = 11.sp,
                     color = subTextColor
                 )
@@ -892,9 +920,9 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 }
                 else {
                     LazyColumn(state = generalListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
-                        items(generalPosts, key = { "post_${it.gallType}_${it.gallId}_${it.postNum}" }) { post ->
+                        items(generalPosts, key = { "post_${it.scopeId}_${it.gallType}_${it.gallId}_${it.postNum}" }) { post ->
                             val checkTimeStr = SimpleDateFormat("yy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(post.checkTime))
-                            val rowKey = "post_${post.gallType}_${post.gallId}_${post.postNum}"
+                            val rowKey = "post_${post.scopeId}_${post.gallType}_${post.gallId}_${post.postNum}"
                             SwipeDeleteDbRow(
                                 rowKey = rowKey,
                                 isOpen = openSwipeKey == rowKey,
@@ -914,8 +942,9 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     if (post.title != null) Text("제목: ${post.title}", fontSize = 14.sp, color = textColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     if (post.author != null) Text("작성자: ${post.author}", fontSize = 13.sp, color = subTextColor)
+                                    Text("검사 범위 · ${scopeLabel(post.scopeId)}", fontSize = 11.sp, color = PastelNavy)
                                     DashboardSearchMatchBadges(
-                                        generalMatches["${post.gallType}|${post.gallId}|${post.postNum}"].orEmpty(),
+                                        generalMatches[checkedPostDashboardIdentity(post)].orEmpty(),
                                         searchMatchAccent,
                                         isDarkMode,
                                     )
@@ -997,6 +1026,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                         color = warningRed,
                                         fontWeight = FontWeight.Bold
                                     )
+                                    Text("조치 봇 · ${actorLabel(history.actorBotId)}", fontSize = 11.sp, color = warningRed)
                                     Divider(color = if(isDarkMode) Color(0xFF5D4037) else Color(0xFFE5D5D5), modifier = Modifier.padding(vertical = 6.dp))
                                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                         Text("작성: ${history.creationDate ?: "정보 없음"}", fontSize = 11.sp, color = subTextColor)
@@ -1061,6 +1091,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                             DashboardSearchMatchBadges(holdMatches[history.id].orEmpty(), searchMatchAccent, isDarkMode)
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(history.holdReason, fontSize = 12.sp, color = holdOrange, fontWeight = FontWeight.Bold)
+                                            Text("조치 봇 · ${actorLabel(history.actorBotId)}", fontSize = 11.sp, color = holdOrange)
                                             Divider(color = if(isDarkMode) Color(0xFF6D4C20) else Color(0xFFFFD8A8), modifier = Modifier.padding(vertical = 6.dp))
                                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                                 Text("작성: ${history.creationDate ?: "정보 없음"}", fontSize = 11.sp, color = subTextColor)

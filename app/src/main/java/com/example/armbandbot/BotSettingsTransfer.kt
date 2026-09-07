@@ -4,14 +4,17 @@ import android.content.Context
 import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 import java.util.UUID
 
 private const val BOT_SETTINGS_EXPORT_VERSION = 1
 private val BOT_SETTINGS_APP_VERSION: String
     get() = ARMBANDBOT_APP_VERSION
 private const val BOT_SETTINGS_FILE_TYPE = "armbandbot_bot_settings"
+internal const val BOT_SETTINGS_MAX_IMPORT_BYTES = 1024 * 1024
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 
 internal val EXPORTABLE_STRING_KEYS = listOf(
@@ -32,13 +35,15 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_url_filter_mode", "is_image_filter_mode", "is_dccon_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode", "is_special_char_filter_mode",
     "is_pum_source_filter_mode", "pum_recheck_every_cycle",
     "pum_block_all_posts", "pum_use_custom_action_config", "pum_delete_only_mode", "pum_delete_post_on_block",
+    "independent_scan_state_enabled", "run_schedule_enabled",
     "bypass_ignore_case_enabled", "bypass_unicode_normalization_enabled",
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
 
 internal val EXPORTABLE_INT_KEYS = listOf(
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
-    "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours"
+    "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
+    "run_schedule_start_minute", "run_schedule_end_minute"
 )
 
 internal val EXPORTABLE_FLOAT_KEYS = listOf(
@@ -98,9 +103,8 @@ fun writeBotSettingsJson(context: Context, uriString: String, export: BotSetting
 
 fun importBotSettingsAsNewBot(context: Context, uriString: String): String {
     val uri = android.net.Uri.parse(uriString)
-    val jsonText = context.contentResolver.openInputStream(uri)?.use { input ->
-        BufferedReader(InputStreamReader(input, Charsets.UTF_8)).readText()
-    } ?: error("파일을 읽을 수 없습니다.")
+    val jsonText = context.contentResolver.openInputStream(uri)?.use(::readBoundedUtf8)
+        ?: error("파일을 읽을 수 없습니다.")
 
     val json = JSONObject(jsonText)
     validateBotSettingsFileType(json)
@@ -121,24 +125,61 @@ fun importBotSettingsAsNewBot(context: Context, uriString: String): String {
     return newBotId
 }
 
+internal fun readBoundedUtf8(
+    input: InputStream,
+    maxBytes: Int = BOT_SETTINGS_MAX_IMPORT_BYTES,
+): String {
+    require(maxBytes > 0) { "설정 가져오기 크기 제한이 올바르지 않습니다." }
+    val output = ByteArrayOutputStream(minOf(maxBytes, 8192))
+    val buffer = ByteArray(8192)
+    var total = 0
+    while (true) {
+        val read = input.read(buffer)
+        if (read < 0) break
+        total += read
+        require(total <= maxBytes) { "설정 파일은 1 MiB 이하여야 합니다." }
+        output.write(buffer, 0, read)
+    }
+    val decoder = Charsets.UTF_8.newDecoder()
+        .onMalformedInput(CodingErrorAction.REPORT)
+        .onUnmappableCharacter(CodingErrorAction.REPORT)
+    return runCatching { decoder.decode(ByteBuffer.wrap(output.toByteArray())).toString() }
+        .getOrElse { throw IllegalArgumentException("설정 파일이 올바른 UTF-8이 아닙니다.", it) }
+}
+
 private fun applyImportedSettings(botPref: SharedPreferences, imported: BotSettingsExport) {
     val editor = botPref.edit()
     editor.clear()
-    editor.putString("bot_name", imported.botName.trim().ifBlank { "가져온 봇" })
-
-    imported.strings.forEach { (key, value) -> editor.putString(key, value) }
-    imported.booleans.forEach { (key, value) -> editor.putBoolean(key, value) }
-    imported.ints.forEach { (key, value) -> editor.putInt(key, value) }
-    imported.floats.forEach { (key, value) -> editor.putFloat(key, value) }
-    imported.stringSets.forEach { (key, value) ->
-        editor.putStringSet(key, value.map { it.trim() }.filter { it.isNotEmpty() }.toSet())
+    prepareImportedSettingsForNewBot(imported).forEach { (key, value) ->
+        when (value) {
+            is Boolean -> editor.putBoolean(key, value)
+            is Int -> editor.putInt(key, value)
+            is Float -> editor.putFloat(key, value)
+            is String -> editor.putString(key, value)
+            is Set<*> -> @Suppress("UNCHECKED_CAST") editor.putStringSet(key, value as Set<String>)
+        }
     }
-
-    editor.putBoolean("is_running", false)
-    editor.putBoolean("should_restore_after_restart", false)
-    editor.putInt(BOT_PREF_SCHEMA_VERSION_KEY, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
-    editor.putString(BOT_PREF_APP_VERSION_KEY, ARMBANDBOT_APP_VERSION)
     editor.apply()
+}
+
+internal fun prepareImportedSettingsForNewBot(imported: BotSettingsExport): Map<String, Any> {
+    val values = buildMap<String, Any?> {
+        put("bot_name", imported.botName.trim().ifBlank { "가져온 봇" })
+        putAll(imported.strings)
+        putAll(imported.booleans)
+        putAll(imported.ints)
+        putAll(imported.floats)
+        imported.stringSets.forEach { (key, value) ->
+            put(key, value.map { it.trim() }.filter { it.isNotEmpty() }.toSet())
+        }
+    }
+    return prepareCopiedBotSettingsSnapshot(values, values.getValue("bot_name") as String)
+        .toMutableMap()
+        .apply {
+            this["independent_scan_state_enabled"] = false
+            this["is_running"] = false
+            this["should_restore_after_restart"] = false
+        }
 }
 
 internal fun BotSettingsExport.toJson(): JSONObject = JSONObject().apply {
@@ -229,6 +270,8 @@ internal fun defaultIntValue(key: String): Int = when (key) {
     "pum_block_duration_hours" -> 6
     "scan_page_count" -> 1
     "snapshot_keep_days" -> 7
+    "run_schedule_end_minute" -> 1439
+    "run_schedule_start_minute" -> 0
     else -> 0
 }
 

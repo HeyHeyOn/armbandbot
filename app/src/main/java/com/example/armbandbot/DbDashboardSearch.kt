@@ -76,6 +76,16 @@ internal data class DashboardMatched<T>(
     val matches: List<DashboardSearchMatchCode>,
 )
 
+internal data class CheckedPostDashboardIdentity(
+    val scopeId: String,
+    val gallType: String,
+    val gallId: String,
+    val postNum: String,
+)
+
+internal fun checkedPostDashboardIdentity(post: CheckedPost): CheckedPostDashboardIdentity =
+    CheckedPostDashboardIdentity(post.scopeId, post.gallType, post.gallId, post.postNum)
+
 private data class DashboardRowDocumentEntry(
     val freshness: Any?,
     val document: DashboardSearchDocument,

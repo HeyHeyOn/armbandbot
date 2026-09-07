@@ -444,13 +444,45 @@ class SnapshotRecoveryTest {
     }
 
     @Test
-    fun ambiguousGalleryTypesAreExcludedFromAutomaticRecovery() {
-        val normal = checkedPost(snapshotPath = null).copy(gallType = "G")
-        val minor = checkedPost(snapshotPath = null).copy(gallType = "MI")
+    fun ambiguousScopeOrGalleryTypeIdentitiesAreExcludedFromAutomaticRecovery() {
+        val normal = checkedPost(snapshotPath = null).copy(scopeId = GLOBAL_SCAN_SCOPE, gallType = "G")
+        val minor = checkedPost(snapshotPath = null).copy(scopeId = "bot-a", gallType = "MI")
 
         val ambiguous = findAmbiguousSnapshotIdentities(listOf(normal, minor))
 
-        assertTrue(SnapshotIdentity("armbandbot", "244") in ambiguous)
+        assertTrue(SnapshotIdentity(GLOBAL_SCAN_SCOPE, "G", "armbandbot", "244") in ambiguous)
+        assertTrue(SnapshotIdentity("bot-a", "MI", "armbandbot", "244") in ambiguous)
+    }
+
+    @Test
+    fun snapshotLockIdentityIncludesScopeAndActor() {
+        val globalA = snapshotLockKey(GLOBAL_SCAN_SCOPE, "bot-a", "MI", "g", "7")
+        val globalB = snapshotLockKey(GLOBAL_SCAN_SCOPE, "bot-b", "MI", "g", "7")
+        val independentA = snapshotLockKey("bot-a", "bot-a", "MI", "g", "7")
+
+        assertTrue(globalA != globalB)
+        assertTrue(globalA != independentA)
+        assertEquals(globalA, snapshotLockKey(GLOBAL_SCAN_SCOPE, "bot-a", "MI", "g", "7"))
+    }
+
+    @Test
+    fun copiedScopeGetsPrivateSnapshotFilesInsteadOfSharingGlobalPaths() {
+        val cacheRoot = java.nio.file.Files.createTempDirectory("scope-snapshot-copy").toFile()
+        try {
+            val globalDir = File(cacheRoot, "snapshots_global").apply { mkdirs() }
+            val initial = File(globalDir, "g_7_initial.html").apply { writeText("initial") }
+            val latest = File(globalDir, "g_7_latest.html").apply { writeText("latest") }
+            val copied = copySnapshotPathToScope(initial.path, cacheRoot, "bot-a")
+
+            assertTrue(copied != null)
+            assertTrue(File(copied!!).canonicalPath.startsWith(File(cacheRoot, "snapshots_bot-a").canonicalPath))
+            assertEquals("initial", File(copied).readText())
+            assertEquals("latest", File(deriveSnapshotVersionPaths(copied)!!.latestPath).readText())
+            assertEquals("initial", initial.readText())
+            assertEquals("latest", latest.readText())
+        } finally {
+            cacheRoot.deleteRecursively()
+        }
     }
 
     private fun checkedPost(snapshotPath: String?, title: String = "제목") = CheckedPost(
@@ -459,6 +491,7 @@ class SnapshotRecoveryTest {
         postNum = "244",
         commentCount = 0,
         title = title,
-        snapshotPath = snapshotPath
+        snapshotPath = snapshotPath,
+        scopeId = GLOBAL_SCAN_SCOPE,
     )
 }

@@ -14,7 +14,44 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+@Suppress("FunctionName")
+private fun CheckedPost(
+    gallType: String,
+    gallId: String,
+    postNum: String,
+    commentCount: Int,
+    checkTime: Long = 0,
+    title: String? = null,
+    author: String? = null,
+    isBlocked: Boolean = false,
+    blockReason: String? = null,
+    snapshotPath: String? = null,
+    creationDate: String? = null,
+): com.heyheyon.armbandbot.CheckedPost = com.heyheyon.armbandbot.CheckedPost(
+    gallType = gallType,
+    gallId = gallId,
+    postNum = postNum,
+    commentCount = commentCount,
+    checkTime = checkTime,
+    title = title,
+    author = author,
+    isBlocked = isBlocked,
+    blockReason = blockReason,
+    snapshotPath = snapshotPath,
+    creationDate = creationDate,
+    scopeId = GLOBAL_SCAN_SCOPE,
+)
+
 class DbDashboardSearchTest {
+    @Test
+    fun checkedPostDashboardIdentitySeparatesScanScopes() {
+        val global = CheckedPost("M", "gall", "10", 0)
+        val independent = global.copy(scopeId = "bot-a")
+
+        assertFalse(checkedPostDashboardIdentity(global) == checkedPostDashboardIdentity(independent))
+        assertEquals(checkedPostDashboardIdentity(global), checkedPostDashboardIdentity(global.copy()))
+    }
+
     @Test
     fun dashboardResultPublishesOnlyWhenEveryRequestBoundaryStillMatches() {
         val scopes = linkedSetOf(

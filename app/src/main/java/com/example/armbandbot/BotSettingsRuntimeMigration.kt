@@ -48,6 +48,7 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "image_delete_only_mode" to false,
     "image_delete_post_on_block" to true,
     "image_use_custom_action_config" to false,
+    "independent_scan_state_enabled" to false,
     "is_ai_filter_mode" to false,
     "is_dccon_filter_mode" to false,
     "is_debug_mode" to false,
@@ -109,6 +110,7 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "pum_delete_post_on_block" to true,
     "pum_recheck_every_cycle" to false,
     "pum_use_custom_action_config" to false,
+    "run_schedule_enabled" to false,
     "session_webview_fallback_pending" to false,
     "should_restore_after_restart" to false,
     "spam_burst_target_kkang" to true,
@@ -150,6 +152,8 @@ private val INT_PREF_DEFAULTS: Map<String, Int> = mapOf(
     "nickname_block_duration_hours" to 6,
     "overseas_ip_block_duration_hours" to 6,
     "pum_block_duration_hours" to 6,
+    "run_schedule_end_minute" to 1439,
+    "run_schedule_start_minute" to 0,
     "scan_page_count" to 1,
     "snapshot_keep_days" to 7,
     "spam_block_duration_hours" to 6,
@@ -278,6 +282,15 @@ internal fun migrateBotSettingsSnapshot(values: Map<String, Any?>): Map<String, 
     )
     migrated["pum_block_process_mode"] = normalizedPum.processMode
     migrated["pum_block_duration_hours"] = normalizedPum.blockDurationHours
+
+    val normalizedSchedule = normalizeRunScheduleSettings(
+        enabled = migrated.getValue("run_schedule_enabled") as Boolean,
+        startMinute = migrated.getValue("run_schedule_start_minute") as Int,
+        endMinute = migrated.getValue("run_schedule_end_minute") as Int,
+    )
+    migrated["run_schedule_enabled"] = normalizedSchedule.enabled
+    migrated["run_schedule_start_minute"] = normalizedSchedule.startMinute
+    migrated["run_schedule_end_minute"] = normalizedSchedule.endMinute
 
     migrated[BOT_PREF_SCHEMA_VERSION_KEY] = BOT_SETTINGS_CURRENT_SCHEMA_VERSION
     migrated[BOT_PREF_APP_VERSION_KEY] = ARMBANDBOT_APP_VERSION

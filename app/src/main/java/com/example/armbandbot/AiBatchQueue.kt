@@ -142,6 +142,7 @@ internal class AiBatchQueue(
     private val maxWeight: Int,
 ) {
     private val items = mutableListOf<AiBatchQueueItem>()
+    private val interruptedKeys = mutableSetOf<PostKey>()
 
     @Synchronized
     fun addOrReplace(item: AiBatchQueueItem) {
@@ -155,8 +156,20 @@ internal class AiBatchQueue(
 
     @Synchronized
     fun remove(postKey: PostKey): AiBatchQueueItem? {
+        interruptedKeys.remove(postKey)
         val index = items.indexOfFirst { it.postKey == postKey }
         return if (index >= 0) items.removeAt(index) else null
+    }
+
+    @Synchronized
+    fun needsInterruptedRetry(postKey: PostKey): Boolean = postKey in interruptedKeys
+
+    @Synchronized
+    fun restoreInterrupted(drained: List<AiBatchQueueItem>) {
+        drained.forEach { item ->
+            if (items.none { it.postKey == item.postKey }) items += item
+            interruptedKeys += item.postKey
+        }
     }
 
     @Synchronized
@@ -165,6 +178,7 @@ internal class AiBatchQueue(
     @Synchronized
     fun shouldFlush(nowMs: Long = System.currentTimeMillis()): Boolean {
         if (items.isEmpty()) return false
+        if (interruptedKeys.isNotEmpty()) return true
         val totalWeight = items.sumOf { it.estimatedWeight }
         val firstWaitMs = nowMs - (items.minOfOrNull { it.createdAtMs } ?: nowMs)
         return totalWeight >= maxWeight || items.size >= maxPosts || firstWaitMs >= maxWaitMs
@@ -175,6 +189,7 @@ internal class AiBatchQueue(
         if (items.isEmpty()) return emptyList()
         val drained = items.toList()
         items.clear()
+        interruptedKeys.clear()
         return drained
     }
 }

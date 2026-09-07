@@ -1,5 +1,6 @@
 package com.heyheyon.armbandbot
 
+import android.app.TimePickerDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -69,6 +70,19 @@ import java.util.Date
 import java.util.Locale
 
 
+
+// Keep these observable fields behind one captured reference. Separate local state delegates
+// push BotDetailScreen's large Compose closure past DEX's 255 incoming-word invoke limit.
+private class BotIsolationScheduleUiState(botPref: SharedPreferences) {
+    var independentScanStateEnabled by mutableStateOf(botPref.getBoolean("independent_scan_state_enabled", false))
+    var showScopeBaselineDialog by mutableStateOf(false)
+    var scopeBaselineChoice by mutableStateOf("COPY_GLOBAL")
+    var hasPrivateScopeBaseline by mutableStateOf(false)
+    var isScopeTransitioning by mutableStateOf(false)
+    var runScheduleEnabled by mutableStateOf(botPref.getBoolean("run_schedule_enabled", false))
+    var runScheduleStartMinute by mutableStateOf(botPref.getInt("run_schedule_start_minute", 0).coerceIn(0, 1439))
+    var runScheduleEndMinute by mutableStateOf(botPref.getInt("run_schedule_end_minute", 1439).coerceIn(0, 1439))
+}
 
 private fun fetchPostDocument(url: String) = Jsoup.connect(DcinsidePostUrls.desktopUrl(url))
     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
@@ -597,6 +611,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         val tabs = listOf("기본 설정", "활동 로그")
         val logMessages = GlobalBotState.logs.getOrPut(botId) { mutableStateListOf() }
         var isRunning by remember { mutableStateOf(botPref.getBoolean("is_running", false)) }
+        val isolationScheduleUi = remember { BotIsolationScheduleUiState(botPref) }
         var showEditNameDialog by remember { mutableStateOf(false) }
         var newBotNameInput by remember { mutableStateOf(botName) }
         val settingsScrollState = rememberScrollState()
@@ -910,6 +925,63 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             }
             ContextCompat.registerReceiver(context, sessionReceiver, IntentFilter("BOT_SESSION_EXPIRED"), ContextCompat.RECEIVER_NOT_EXPORTED)
             onDispose { context.unregisterReceiver(sessionReceiver) }
+        }
+
+        if (isolationScheduleUi.showScopeBaselineDialog) {
+            AlertDialog(
+                onDismissRequest = { if (!isolationScheduleUi.isScopeTransitioning) isolationScheduleUi.showScopeBaselineDialog = false },
+                title = { Text("독립 검사 기록 시작") },
+                text = {
+                    Column {
+                        Text("독립 기록의 안전한 시작 기준을 선택하세요.", fontSize = 13.sp)
+                        listOf(
+                            "COPY_GLOBAL" to "공용 검사 기록 복사 (권장)",
+                            "REUSE_PRIVATE" to "기존 전용 검사 기록 재사용",
+                            "EMPTY" to "빈 기록으로 시작 (기존 글 재검사 주의)",
+                        ).forEach { (choice, label) ->
+                            if (choice != "REUSE_PRIVATE" || isolationScheduleUi.hasPrivateScopeBaseline) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable(enabled = !isolationScheduleUi.isScopeTransitioning) { isolationScheduleUi.scopeBaselineChoice = choice }.padding(vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RadioButton(selected = isolationScheduleUi.scopeBaselineChoice == choice, onClick = { isolationScheduleUi.scopeBaselineChoice = choice })
+                                    Text(label, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(enabled = !isRunning && !isolationScheduleUi.isScopeTransitioning, onClick = {
+                        isolationScheduleUi.isScopeTransitioning = true
+                        coroutineScope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    GlobalBotState.withDatabaseMaintenanceLock {
+                                        check(!botPref.getBoolean("is_running", false)) {
+                                            "실행 중에는 검사 범위를 전환할 수 없습니다. 먼저 봇을 중지하세요."
+                                        }
+                                        val dao = GlobalBotState.getDb()?.postDao() ?: error("DB를 사용할 수 없습니다.")
+                                        when (isolationScheduleUi.scopeBaselineChoice) {
+                                            "COPY_GLOBAL" -> dao.replaceScopeBaseline(GLOBAL_SCAN_SCOPE, botId)
+                                            "EMPTY" -> dao.deletePostsForScope(botId)
+                                            else -> dao.getPostsForScope(botId)
+                                        }
+                                    }
+                                }
+                            }.onSuccess {
+                                botPref.edit().putBoolean("independent_scan_state_enabled", true).apply()
+                                isolationScheduleUi.independentScanStateEnabled = true
+                                isolationScheduleUi.showScopeBaselineDialog = false
+                            }.onFailure {
+                                Toast.makeText(context, it.message ?: "검사 기록 전환에 실패했습니다.", Toast.LENGTH_LONG).show()
+                            }
+                            isolationScheduleUi.isScopeTransitioning = false
+                        }
+                    }) { Text(if (isolationScheduleUi.isScopeTransitioning) "전환 중..." else "전환") }
+                },
+                dismissButton = { TextButton(enabled = !isolationScheduleUi.isScopeTransitioning, onClick = { isolationScheduleUi.showScopeBaselineDialog = false }) { Text("취소") } },
+            )
         }
 
         AnimatedContent(
@@ -1859,6 +1931,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         Spacer(modifier = Modifier.width(8.dp))
                         Switch(
                             checked = isRunning,
+                            enabled = !isolationScheduleUi.isScopeTransitioning,
                             onCheckedChange = {
                                 isRunning = it; botPref.edit().putBoolean("is_running", it).apply()
                                 val serviceIntent = Intent(context, BotService::class.java).apply { putExtra("BOT_ID", botId); putExtra("COOKIE", botPref.getString("saved_cookie", "")); action = if (isRunning) "START" else "STOP" }
@@ -1877,6 +1950,116 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         if (selectedTabIndex == 0) {
                             Column(modifier = Modifier.fillMaxSize().verticalScroll(settingsScrollState).padding(horizontal = 16.dp, vertical = 16.dp)) {
                                 Text("기본 탐색 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
+                                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = cardColor)) {
+                                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text("독립 검사 기록", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text("다른 봇의 검사 완료 기록과 분리", fontSize = 12.sp, color = subTextColor)
+                                            }
+                                            Switch(
+                                                checked = isolationScheduleUi.independentScanStateEnabled,
+                                                enabled = !isRunning && !isolationScheduleUi.isScopeTransitioning,
+                                                onCheckedChange = { enable ->
+                                                    if (isRunning) {
+                                                        Toast.makeText(context, "실행 중에는 검사 범위를 전환할 수 없습니다.", Toast.LENGTH_LONG).show()
+                                                    } else if (enable) {
+                                                        isolationScheduleUi.isScopeTransitioning = true
+                                                        coroutineScope.launch {
+                                                            runCatching {
+                                                                withContext(Dispatchers.IO) {
+                                                                    val dao = GlobalBotState.getDb()?.postDao() ?: error("DB를 사용할 수 없습니다.")
+                                                                    dao.getPostsForScope(botId).isNotEmpty()
+                                                                }
+                                                            }.onSuccess { hasPrivate ->
+                                                                isolationScheduleUi.hasPrivateScopeBaseline = hasPrivate
+                                                                isolationScheduleUi.scopeBaselineChoice = "COPY_GLOBAL"
+                                                                isolationScheduleUi.showScopeBaselineDialog = true
+                                                            }.onFailure {
+                                                                Toast.makeText(context, it.message ?: "검사 기록을 확인하지 못했습니다.", Toast.LENGTH_LONG).show()
+                                                            }
+                                                            isolationScheduleUi.isScopeTransitioning = false
+                                                        }
+                                                    } else {
+                                                        isolationScheduleUi.isScopeTransitioning = true
+                                                        coroutineScope.launch {
+                                                            runCatching {
+                                                                withContext(Dispatchers.IO) {
+                                                                    val dao = GlobalBotState.getDb()?.postDao() ?: error("DB를 사용할 수 없습니다.")
+                                                                    dao.getPostsForScope(botId) // 전용 scope는 보존하고 접근 성공만 확인합니다.
+                                                                }
+                                                            }.onSuccess {
+                                                                botPref.edit().putBoolean("independent_scan_state_enabled", false).apply()
+                                                                isolationScheduleUi.independentScanStateEnabled = false
+                                                            }.onFailure {
+                                                                Toast.makeText(context, it.message ?: "검사 기록 전환에 실패했습니다.", Toast.LENGTH_LONG).show()
+                                                            }
+                                                            isolationScheduleUi.isScopeTransitioning = false
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier.scale(0.8f),
+                                            )
+                                        }
+                                        Text(
+                                            if (isolationScheduleUi.independentScanStateEnabled) "$botName 전용 검사 기록" else "공용 검사 기록",
+                                            color = PastelNavy,
+                                            fontSize = 11.sp,
+                                        )
+                                    }
+                                }
+                                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = cardColor)) {
+                                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text("작동 시간대", fontWeight = FontWeight.Bold, color = textColor)
+                                                Text(scheduleRangeLabel(isolationScheduleUi.runScheduleStartMinute, isolationScheduleUi.runScheduleEndMinute), fontSize = 12.sp, color = subTextColor)
+                                            }
+                                            Switch(
+                                                checked = isolationScheduleUi.runScheduleEnabled,
+                                                onCheckedChange = { enabled ->
+                                                    if (enabled && isolationScheduleUi.runScheduleStartMinute == isolationScheduleUi.runScheduleEndMinute) {
+                                                        Toast.makeText(context, "시작과 종료 시각은 달라야", Toast.LENGTH_LONG).show()
+                                                    } else {
+                                                        isolationScheduleUi.runScheduleEnabled = enabled
+                                                        botPref.edit().putBoolean("run_schedule_enabled", enabled).apply()
+                                                    }
+                                                },
+                                                modifier = Modifier.scale(0.8f),
+                                            )
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    TimePickerDialog(context, { _, hour, minute ->
+                                                        val selected = hour * 60 + minute
+                                                        if (isolationScheduleUi.runScheduleEnabled && selected == isolationScheduleUi.runScheduleEndMinute) {
+                                                            Toast.makeText(context, "시작과 종료 시각은 달라야", Toast.LENGTH_LONG).show()
+                                                        } else {
+                                                            isolationScheduleUi.runScheduleStartMinute = selected
+                                                            botPref.edit().putInt("run_schedule_start_minute", selected).apply()
+                                                        }
+                                                    }, isolationScheduleUi.runScheduleStartMinute / 60, isolationScheduleUi.runScheduleStartMinute % 60, true).show()
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            ) { Text("시작 ${formatMinuteOfDay(isolationScheduleUi.runScheduleStartMinute)}", fontSize = 12.sp) }
+                                            OutlinedButton(
+                                                onClick = {
+                                                    TimePickerDialog(context, { _, hour, minute ->
+                                                        val selected = hour * 60 + minute
+                                                        if (isolationScheduleUi.runScheduleEnabled && selected == isolationScheduleUi.runScheduleStartMinute) {
+                                                            Toast.makeText(context, "시작과 종료 시각은 달라야", Toast.LENGTH_LONG).show()
+                                                        } else {
+                                                            isolationScheduleUi.runScheduleEndMinute = selected
+                                                            botPref.edit().putInt("run_schedule_end_minute", selected).apply()
+                                                        }
+                                                    }, isolationScheduleUi.runScheduleEndMinute / 60, isolationScheduleUi.runScheduleEndMinute % 60, true).show()
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            ) { Text("종료 ${formatMinuteOfDay(isolationScheduleUi.runScheduleEndMinute)}", fontSize = 12.sp) }
+                                        }
+                                    }
+                                }
                                 ModernSettingItem("관리할 갤러리 및 검색 모드", if (targetUrlsText.isBlank()) "대상 없음" else "대상 설정됨", Icons.Filled.List, colors) { currentSubScreen = "TARGET" }
                                 ModernSettingItem("탐색 속도 및 범위", "페이지 수 및 딜레이 설정", Icons.Filled.Build, colors) { currentSubScreen = "SPEED" }
                                 ModernSettingItem("갤러리 설정 자동 갱신", "VPN/통신사/첨부 제한 시간 유지", Icons.Filled.Refresh, colors, isGallerySettingRefreshEnabled, { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }) { currentSubScreen = "GALLERY_REFRESH" }

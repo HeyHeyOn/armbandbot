@@ -85,25 +85,13 @@ import kotlin.math.roundToInt
 
 
 
-fun deleteSnapshotFiles(path: String?) {
-    if (path.isNullOrBlank()) return
-    try {
-        val file = java.io.File(path)
-        val candidates = buildSet {
-            add(file)
-            val absolutePath = file.absolutePath
-            if (absolutePath.endsWith("_latest.html")) add(java.io.File(absolutePath.replace("_latest.html", "_initial.html")))
-            if (absolutePath.endsWith("_initial.html")) add(java.io.File(absolutePath.replace("_initial.html", "_latest.html")))
-        }
-        candidates.forEach { if (it.exists()) it.delete() }
-    } catch (_: Exception) {
-    }
-}
-
 object GlobalBotState {
     val logs = mutableMapOf<String, SnapshotStateList<BotLogEntry>>()
     val lastCheckedNumbers = mutableMapOf<String, Int>()
     private var db: AppDatabase? = null
+    private val databaseMaintenanceLock = DatabaseMaintenanceLock()
+
+    fun <T> withDatabaseMaintenanceLock(block: () -> T): T = databaseMaintenanceLock.withLock(block)
 
     private val generalSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val blockSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
@@ -146,17 +134,18 @@ object GlobalBotState {
         }
     }
 
-    fun tryLockGeneralSnapshot(gallType: String, gallId: String, postNum: String): Boolean {
-        return generalSnapshotInProgress.add(gallType + '_' + gallId + '_' + postNum)
+    fun tryLockGeneralSnapshot(scopeId: String, actorBotId: String, gallType: String, gallId: String, postNum: String): Boolean {
+        return generalSnapshotInProgress.add(snapshotLockKey(scopeId, actorBotId, gallType, gallId, postNum))
     }
-    fun unlockGeneralSnapshot(gallType: String, gallId: String, postNum: String) {
-        generalSnapshotInProgress.remove(gallType + '_' + gallId + '_' + postNum)
+    fun unlockGeneralSnapshot(scopeId: String, actorBotId: String, gallType: String, gallId: String, postNum: String) {
+        generalSnapshotInProgress.remove(snapshotLockKey(scopeId, actorBotId, gallType, gallId, postNum))
     }
-    fun tryLockBlockSnapshot(gallType: String, gallId: String, postNum: String): Boolean {
-        return blockSnapshotInProgress.add(gallType + '_' + gallId + '_' + postNum)
+
+    fun tryLockBlockSnapshot(scopeId: String, actorBotId: String, gallType: String, gallId: String, postNum: String): Boolean {
+        return blockSnapshotInProgress.add(snapshotLockKey(scopeId, actorBotId, gallType, gallId, postNum))
     }
-    fun unlockBlockSnapshot(gallType: String, gallId: String, postNum: String) {
-        blockSnapshotInProgress.remove(gallType + '_' + gallId + '_' + postNum)
+    fun unlockBlockSnapshot(scopeId: String, actorBotId: String, gallType: String, gallId: String, postNum: String) {
+        blockSnapshotInProgress.remove(snapshotLockKey(scopeId, actorBotId, gallType, gallId, postNum))
     }
 
     @Synchronized
@@ -168,28 +157,45 @@ object GlobalBotState {
 
     fun getDb() = db
 
-    fun getSavedPost(gallType: String, gallId: String, postNum: String): CheckedPost? {
-        return try {
-            db?.postDao()?.getPost(gallType, gallId, postNum)
-        } catch (e: Exception) {
-            null
+    private fun requireDb(): AppDatabase = checkNotNull(db) { "Database is not initialized" }
+    private fun postDao(): PostDao {
+        val database = requireDb()
+        return database.postDao()
+    }
+    private fun moderationClaimDao(): ModerationClaimDao {
+        val database = requireDb()
+        return database.moderationClaimDao()
+    }
+
+    fun getSavedPost(scopeId: String, gallType: String, gallId: String, postNum: String): CheckedPost? =
+        withDatabaseMaintenanceLock {
+            postDao().getPost(scopeId, gallType, gallId, postNum)
         }
+
+    fun updateSnapshotPath(scopeId: String, gallType: String, gallId: String, postNum: String, path: String) =
+        withDatabaseMaintenanceLock {
+            postDao().updateSnapshotPath(scopeId, gallType, gallId, postNum, path)
+        }
+
+    fun getCommentCount(scopeId: String, gallType: String, gallId: String, postNum: String): Int {
+        return getSavedPost(scopeId, gallType, gallId, postNum)?.commentCount ?: -1
     }
 
-    fun getCommentCount(gallType: String, gallId: String, postNum: String): Int {
-        return getSavedPost(gallType, gallId, postNum)?.commentCount ?: -1
-    }
-
-    fun recoverOrphanedSnapshotPaths(context: Context): Int {
-        val dao = db?.postDao() ?: return 0
+    fun recoverOrphanedSnapshotPaths(context: Context): Int = withDatabaseMaintenanceLock {
+        val dao = db?.postDao() ?: return@withDatabaseMaintenanceLock 0
         val snapshotFilesByName = buildSnapshotFileIndex(context.cacheDir)
-        if (snapshotFilesByName.isEmpty()) return 0
+        if (snapshotFilesByName.isEmpty()) return@withDatabaseMaintenanceLock 0
 
         val posts = dao.getAllPostsForBackupMerge()
         val ambiguousIdentities = findAmbiguousSnapshotIdentities(posts)
         var recoveredCount = 0
         posts.forEach { post ->
-            val identity = SnapshotIdentity(post.gallId, post.postNum)
+            val identity = SnapshotIdentity(
+                scopeId = post.scopeId,
+                gallType = post.gallType,
+                gallId = post.gallId,
+                postNum = post.postNum,
+            )
             if (identity in ambiguousIdentities) return@forEach
 
             val currentPath = post.snapshotPath
@@ -198,6 +204,7 @@ object GlobalBotState {
             val recoveredPath = findRecoverableSnapshotPath(snapshotFilesByName, post.gallId, post.postNum)
             if (!recoveredPath.isNullOrBlank()) {
                 recoveredCount += dao.updateSnapshotPathIfUnchanged(
+                    scopeId = post.scopeId,
                     gallType = post.gallType,
                     gallId = post.gallId,
                     postNum = post.postNum,
@@ -206,10 +213,11 @@ object GlobalBotState {
                 )
             }
         }
-        return recoveredCount
+        recoveredCount
     }
 
     fun savePost(
+        scopeId: String,
         gallType: String,
         gallId: String,
         postNum: String,
@@ -221,8 +229,8 @@ object GlobalBotState {
         snapshotPath: String? = null,
         creationDate: String? = null
     ) {
-        try {
-            db?.postDao()?.insertOrUpdatePreservingSnapshot(
+        withDatabaseMaintenanceLock {
+            postDao().insertOrUpdatePreservingSnapshot(
                 CheckedPost(
                     gallType = gallType,
                     gallId = gallId,
@@ -233,27 +241,28 @@ object GlobalBotState {
                     isBlocked = isBlocked,
                     blockReason = blockReason,
                     snapshotPath = snapshotPath,
-                    creationDate = creationDate
+                    creationDate = creationDate,
+                    scopeId = scopeId
                 )
             )
-        } catch (e: Exception) {
         }
     }
 
     fun saveBlockHistory(
+        actorBotId: String,
         gallType: String,
         gallId: String,
         postNum: String,
         targetType: String,
-        targetNo: String = "",
+        targetNo: String,
         targetAuthor: String,
         targetContent: String,
         blockReason: String,
         snapshotPath: String? = null,
         creationDate: String? = null
     ) {
-        try {
-            db?.postDao()?.insertBlockHistory(
+        val rowId = withDatabaseMaintenanceLock {
+            postDao().insertBlockHistory(
                 BlockHistory(
                     gallType = gallType,
                     gallId = gallId,
@@ -264,14 +273,16 @@ object GlobalBotState {
                     targetContent = targetContent,
                     blockReason = blockReason,
                     snapshotPath = snapshotPath,
-                    creationDate = creationDate
+                    creationDate = creationDate,
+                    actorBotId = actorBotId
                 )
             )
-        } catch (e: Exception) {
         }
+        check(rowId != -1L) { "Failed to persist block history" }
     }
 
     fun saveHoldHistory(
+        actorBotId: String,
         gallType: String,
         gallId: String,
         postNum: String,
@@ -282,9 +293,9 @@ object GlobalBotState {
         holdReason: String,
         snapshotPath: String? = null,
         creationDate: String? = null
-    ): Boolean {
-        return try {
-            val rowId = db?.postDao()?.insertHoldHistory(
+    ) {
+        val rowId = withDatabaseMaintenanceLock {
+            postDao().insertHoldHistory(
                 HoldHistory(
                     gallType = gallType,
                     gallId = gallId,
@@ -295,20 +306,43 @@ object GlobalBotState {
                     targetContent = targetContent,
                     holdReason = holdReason,
                     snapshotPath = snapshotPath,
-                    creationDate = creationDate
+                    creationDate = creationDate,
+                    actorBotId = actorBotId
                 )
-            ) ?: -1L
-            rowId != -1L
-        } catch (e: Exception) {
-            false
+            )
+        }
+        check(rowId != -1L) { "Failed to persist hold history" }
+    }
+
+    fun hasHoldHistory(gallType: String, gallId: String, postNum: String, targetType: String, targetNo: String): Boolean =
+        withDatabaseMaintenanceLock {
+            postDao().hasHoldHistory(gallType, gallId, postNum, targetType, targetNo)
+        }
+
+    internal fun acquireModerationClaim(
+        claim: ModerationActionClaim,
+        now: Long,
+        leaseMs: Long,
+        failureCooldownMs: Long,
+        beforeAcquire: () -> Unit = { RuntimeRequestGate.context.get()?.check() },
+        clock: () -> Long = System::currentTimeMillis,
+    ): Boolean {
+        require(claim.ownerToken.isNotBlank()) { "ownerToken이 필요합니다." }
+        return withDatabaseMaintenanceLock {
+            gatedClaimNow(beforeAcquire, clock) { freshNow ->
+                moderationClaimDao().acquire(claim.copy(claimedAt = freshNow), freshNow, leaseMs, failureCooldownMs)
+            }
         }
     }
 
-    fun hasHoldHistory(gallType: String, gallId: String, postNum: String, targetType: String, targetNo: String): Boolean {
-        return try {
-            db?.postDao()?.hasHoldHistory(gallType, gallId, postNum, targetType, targetNo) ?: false
-        } catch (e: Exception) {
-            false
+    internal fun finalizeModerationClaim(
+        claim: ModerationActionClaim,
+        status: ClaimStatus,
+        finishedAt: Long,
+    ): Boolean {
+        require(claim.ownerToken.isNotBlank()) { "ownerToken이 필요합니다." }
+        return withDatabaseMaintenanceLock {
+            moderationClaimDao().finalize(claim, status, finishedAt)
         }
     }
 
@@ -318,35 +352,31 @@ object GlobalBotState {
     @Synchronized
     fun clearDb(context: Context) {
         Thread {
-            try {
-                val dao = db?.postDao()
-                dao?.getAllSnapshotPaths()?.forEach { path -> deleteSnapshotFiles(path) }
-                context.cacheDir.listFiles()
-                    ?.filter { it.isDirectory && it.name.startsWith("snapshots_") }
-                    ?.forEach { it.deleteRecursively() }
-                dao?.clearAllPosts()
-                dao?.clearAllBlockHistory()
-                dao?.clearAllHoldHistory()
-            } catch (_: Exception) {
+            runCatching {
+                withDatabaseMaintenanceLock {
+                    val dao = postDao()
+                    dao.getAllSnapshotPaths().forEach { path -> deleteSnapshotFiles(path, listOf(context.cacheDir)) }
+                    context.cacheDir.listFiles()
+                        ?.filter { it.isDirectory && it.name.startsWith("snapshots_") }
+                        ?.forEach { deleteTrustedSnapshotDirectoryFiles(context.cacheDir, it) }
+                    dao.clearAllPosts()
+                    dao.clearAllBlockHistory()
+                    dao.clearAllHoldHistory()
+                    moderationClaimDao().clearAll()
+                }
+            }.onFailure { error ->
+                Log.e("GlobalBotState", "데이터베이스 초기화 실패", error)
             }
         }.start()
         lastCheckedNumbers.clear()
     }
 
-    fun getHistoryCount(): Int {
-        return try {
-            db?.postDao()?.getPostCount() ?: 0
-        } catch (e: Exception) {
-            0
-        }
+    fun getHistoryCount(): Int = withDatabaseMaintenanceLock {
+        postDao().getPostCount()
     }
 
-    fun getRecentPosts(): List<CheckedPost> {
-        return try {
-            db?.postDao()?.getRecentPosts() ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+    fun getRecentPosts(): List<CheckedPost> = withDatabaseMaintenanceLock {
+        postDao().getRecentPosts()
     }
 }
 
@@ -393,8 +423,9 @@ fun clearBotLogFile(context: Context, botId: String) {
 fun duplicateBotPref(context: Context, oldBotId: String, newBotId: String, newName: String) {
     val oldPref = context.getSharedPreferences("bot_prefs_$oldBotId", Context.MODE_PRIVATE)
     val newPref = context.getSharedPreferences("bot_prefs_$newBotId", Context.MODE_PRIVATE)
-    val editor = newPref.edit()
-    oldPref.all.forEach { (key, value) ->
+    val copied = prepareCopiedBotSettingsSnapshot(oldPref.all, newName)
+    val editor = newPref.edit().clear()
+    copied.forEach { (key, value) ->
         when (value) {
             is String -> editor.putString(key, value)
             is Int -> editor.putInt(key, value)
@@ -404,9 +435,6 @@ fun duplicateBotPref(context: Context, oldBotId: String, newBotId: String, newNa
             is Set<*> -> { @Suppress("UNCHECKED_CAST") editor.putStringSet(key, value as Set<String>) }
         }
     }
-    editor.putString("bot_name", newName)
-    editor.putBoolean("is_running", false)
-    editor.putBoolean("should_restore_after_restart", false)
     editor.putInt(BOT_PREF_SCHEMA_VERSION_KEY, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
     editor.putString(BOT_PREF_APP_VERSION_KEY, ARMBANDBOT_APP_VERSION)
     editor.apply()

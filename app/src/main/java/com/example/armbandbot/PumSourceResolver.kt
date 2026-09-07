@@ -159,6 +159,7 @@ class PumSourceResolver(
     private val userAgent: String = "Mozilla/5.0 (compatible; ArmbandBot)",
     private val resolutionTimeoutMs: Long = DEFAULT_RESOLUTION_TIMEOUT_MS,
     private val nanoTime: () -> Long = System::nanoTime,
+    private val beforeRequest: () -> Unit = {},
 ) {
     private val sourceCache = mutableMapOf<PostKey, PumResolution>()
 
@@ -193,6 +194,10 @@ class PumSourceResolver(
             )
         } catch (_: UnsafeRedirectException) {
             return PumResolution(PumSourceStatus.INVALID_SOURCE)
+        } catch (control: SchedulePausedException) {
+            throw control
+        } catch (control: java.util.concurrent.CancellationException) {
+            throw control
         } catch (_: Exception) {
             return PumResolution(PumSourceStatus.TEMPORARY_FAILURE)
         }
@@ -243,6 +248,10 @@ class PumSourceResolver(
             )
         } catch (_: UnsafeRedirectException) {
             return PumResolution(PumSourceStatus.INVALID_SOURCE, key, sourceUrl)
+        } catch (control: SchedulePausedException) {
+            throw control
+        } catch (control: java.util.concurrent.CancellationException) {
+            throw control
         } catch (_: Exception) {
             return PumResolution(PumSourceStatus.TEMPORARY_FAILURE, key, sourceUrl)
         }
@@ -364,6 +373,7 @@ class PumSourceResolver(
         var request = initial
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
             val remainingBudgetMs = deadline.remainingTimeoutMs()
+            beforeRequest()
             val response = http.execute(
                 request.copy(followRedirects = false, timeoutBudgetMs = remainingBudgetMs),
             )

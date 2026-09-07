@@ -8,7 +8,84 @@ import org.junit.Test
 class BotSettingsRuntimeMigrationTest {
     @Test
     fun orderedMultilineMigrationUsesNewSchemaVersion() {
-        assertEquals(2, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
+        assertEquals(3, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
+    }
+
+    @Test
+    fun migrationBackfillsIndependentScopeAndScheduleDefaults() {
+        val migrated = migrateBotSettingsSnapshot(emptyMap())
+
+        assertEquals(false, migrated["independent_scan_state_enabled"])
+        assertEquals(false, migrated["run_schedule_enabled"])
+        assertEquals(0, migrated["run_schedule_start_minute"])
+        assertEquals(1439, migrated["run_schedule_end_minute"])
+    }
+
+    @Test
+    fun migrationPreservesExistingIndependentScopeAndValidSchedule() {
+        val migrated = migrateBotSettingsSnapshot(
+            mapOf(
+                "independent_scan_state_enabled" to true,
+                "run_schedule_enabled" to true,
+                "run_schedule_start_minute" to 22 * 60,
+                "run_schedule_end_minute" to 6 * 60,
+            )
+        )
+
+        assertEquals(true, migrated["independent_scan_state_enabled"])
+        assertEquals(true, migrated["run_schedule_enabled"])
+        assertEquals(22 * 60, migrated["run_schedule_start_minute"])
+        assertEquals(6 * 60, migrated["run_schedule_end_minute"])
+    }
+
+    @Test
+    fun migrationDisablesInvalidEnabledSchedulesAndNormalizesOutOfRangeMinutes() {
+        val equal = migrateBotSettingsSnapshot(
+            mapOf(
+                "run_schedule_enabled" to true,
+                "run_schedule_start_minute" to 300,
+                "run_schedule_end_minute" to 300,
+            )
+        )
+        val outOfRange = migrateBotSettingsSnapshot(
+            mapOf(
+                "run_schedule_enabled" to true,
+                "run_schedule_start_minute" to -1,
+                "run_schedule_end_minute" to 1440,
+            )
+        )
+
+        assertEquals(false, equal["run_schedule_enabled"])
+        assertEquals(300, equal["run_schedule_start_minute"])
+        assertEquals(300, equal["run_schedule_end_minute"])
+        assertEquals(false, outOfRange["run_schedule_enabled"])
+        assertEquals(0, outOfRange["run_schedule_start_minute"])
+        assertEquals(1439, outOfRange["run_schedule_end_minute"])
+    }
+
+    @Test
+    fun newBotCopyPreservesSafeSettingsButDropsScopeAndRunningState() {
+        val copied = prepareCopiedBotSettingsSnapshot(
+            source = mapOf(
+                "target_urls" to "https://example.test/board",
+                "independent_scan_state_enabled" to true,
+                "run_schedule_enabled" to true,
+                "run_schedule_start_minute" to 540,
+                "run_schedule_end_minute" to 1080,
+                "is_running" to true,
+                "should_restore_after_restart" to true,
+            ),
+            newBotName = "복사본",
+        )
+
+        assertEquals("복사본", copied["bot_name"])
+        assertEquals("https://example.test/board", copied["target_urls"])
+        assertEquals(false, copied["independent_scan_state_enabled"])
+        assertEquals(true, copied["run_schedule_enabled"])
+        assertEquals(540, copied["run_schedule_start_minute"])
+        assertEquals(1080, copied["run_schedule_end_minute"])
+        assertEquals(false, copied["is_running"])
+        assertEquals(false, copied["should_restore_after_restart"])
     }
 
     @Test

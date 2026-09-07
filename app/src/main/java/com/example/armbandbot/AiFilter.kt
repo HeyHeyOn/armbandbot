@@ -183,6 +183,7 @@ internal class AiFilterClient(
     private val logger: (String) -> Unit = {},
     private val clockMillis: () -> Long = System::currentTimeMillis,
     private val apiCaller: ((AiFilterBatchRequest, AiWireRegistry) -> String)? = null,
+    private val beforeRequest: () -> Unit = {},
 ) {
     companion object {
         private const val CACHE_LIMIT = 100
@@ -257,9 +258,13 @@ internal class AiFilterClient(
                 logger("MARKER_AI_ENTER_V2 posts=${request.posts.size}")
             }
             val registry = AiWireRegistry.create(request)
-            val responseText = apiCaller?.invoke(request, registry) ?: callApi(request, registry)
+            val responseText = if (apiCaller != null) {
+                beforeRequest()
+                apiCaller.invoke(request, registry)
+            } else callApi(request, registry)
             parseBatchResponse(responseText, request, registry).copy(debugSummary = debugSummary)
         } catch (e: Exception) {
+            if (e is SchedulePausedException || e is java.util.concurrent.CancellationException) throw e
             val failureMessage = redactForLog(e.message ?: "AI 배치 호출 실패")
             logger("AI 배치 호출 실패 [MARKER_AI_CATCH_V2]: $failureMessage")
             AiFilterBatchEvaluation(failureReason = failureMessage, debugSummary = debugSummary)
@@ -489,6 +494,8 @@ internal class AiFilterClient(
 
         for (attempt in 0..retryDelaysMs.size) {
             val connection = (URL(requestUrl).openConnection() as HttpURLConnection).apply {
+                // Provider endpoints must be explicit: redirects must not bypass beforeRequest.
+                instanceFollowRedirects = false
                 requestMethod = "POST"
                 connectTimeout = config.timeoutMs
                 readTimeout = config.timeoutMs
@@ -497,6 +504,7 @@ internal class AiFilterClient(
                 buildAuthHeadersForTest(requestUrl).forEach(::setRequestProperty)
             }
 
+            beforeRequest()
             connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream

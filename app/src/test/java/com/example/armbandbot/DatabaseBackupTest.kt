@@ -2,10 +2,14 @@ package com.heyheyon.armbandbot
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
 
 class DatabaseBackupTest {
@@ -28,7 +32,103 @@ class DatabaseBackupTest {
     }
 
     @Test
-    fun defaultBackupFileNameUsesZipExtension() {
+    fun checkpointMustBeTruncatedAndNotBusyBeforeExport() {
+        assertEquals(Unit, requireSuccessfulWalCheckpoint(listOf(0, 0, 0)))
+        assertThrows(IllegalStateException::class.java) {
+            requireSuccessfulWalCheckpoint(listOf(1, 4, 4))
+        }
+        assertThrows(IllegalStateException::class.java) {
+            requireSuccessfulWalCheckpoint(emptyList())
+        }
+        listOf(
+            listOf(0, 1, 1),
+            listOf(0, 0, 1),
+            listOf(0, 1, 0),
+            listOf(0, 0),
+            listOf(0, 0, 0, 0),
+        ).forEach { nonTruncatedState ->
+            assertThrows(IllegalStateException::class.java) {
+                requireSuccessfulWalCheckpoint(nonTruncatedState)
+            }
+        }
+    }
+
+    @Test
+    fun fairMaintenanceLockExcludesDaoWorkUntilBackupWorkReleasesIt() {
+        val lock = DatabaseMaintenanceLock()
+        val backupEntered = CountDownLatch(1)
+        val releaseBackup = CountDownLatch(1)
+        val daoEntered = CountDownLatch(1)
+        val daoRanBeforeRelease = AtomicBoolean(false)
+
+        val backup = Thread {
+            lock.withLock {
+                backupEntered.countDown()
+                releaseBackup.await(5, TimeUnit.SECONDS)
+            }
+        }
+        val dao = Thread {
+            check(backupEntered.await(5, TimeUnit.SECONDS))
+            lock.withLock {
+                daoRanBeforeRelease.set(releaseBackup.count > 0)
+                daoEntered.countDown()
+            }
+        }
+
+        backup.start()
+        dao.start()
+        assertTrue(backupEntered.await(5, TimeUnit.SECONDS))
+        assertFalse(daoEntered.await(150, TimeUnit.MILLISECONDS))
+        releaseBackup.countDown()
+        assertTrue(daoEntered.await(5, TimeUnit.SECONDS))
+        backup.join(5_000)
+        dao.join(5_000)
+        assertFalse(daoRanBeforeRelease.get())
+        assertTrue(lock.isFair)
+    }
+
+    @Test
+    fun consistentExportIncludesOnlyMainDatabaseFile() {
+        val dir = createTempDir(prefix = "armbandbot-db-main-only")
+        try {
+            val db = File(dir, "bot_database").apply { writeText("main") }
+            File(dir, "bot_database-wal").writeText("wal")
+            File(dir, "bot_database-shm").writeText("shm")
+
+            assertEquals(listOf(db), consistentDatabaseExportFiles(db))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun unchangedCheckedPostCountsAsSkippedForItsScope() {
+        val counts = incrementCheckedPostRestoreCounts(
+            CheckedPostRestoreCounts(),
+            CheckedPostRestoreOutcome.SKIPPED,
+        )
+
+        assertEquals(CheckedPostRestoreCounts(skipped = 1), counts)
+    }
+
+    @Test
+    fun restoreResultReportsCheckedPostCountsByScope() {
+        val result = DatabaseRestoreResult(
+            insertedPosts = 3,
+            updatedPosts = 2,
+            skippedRows = 4,
+            checkedPostsByScopeId = mapOf(
+                "bot-a" to CheckedPostRestoreCounts(inserted = 2, updated = 1, skipped = 3),
+                "bot-b" to CheckedPostRestoreCounts(inserted = 1, updated = 1, skipped = 1),
+            ),
+        )
+
+        assertEquals(CheckedPostRestoreCounts(2, 1, 3), result.checkedPostsByScopeId["bot-a"])
+        assertEquals(CheckedPostRestoreCounts(1, 1, 1), result.checkedPostsByScopeId["bot-b"])
+    }
+
+    @Test
+    fun writerIncludesOnlyMainDatabaseFile() {
         val dir = createTempDir(prefix = "armbandbot-db-backup-test")
         try {
             val db = File(dir, "bot_database").apply { writeText("main-db") }
@@ -39,9 +139,9 @@ class DatabaseBackupTest {
             val count = writeDatabaseBackupZip(listOf(db, wal, missingShm), output)
             val entries = readZipEntries(output)
 
-            assertEquals(2, count)
+            assertEquals(1, count)
             assertEquals("main-db", entries["bot_database"])
-            assertEquals("wal-db", entries["bot_database-wal"])
+            assertTrue("WAL must not be included after a complete checkpoint", "bot_database-wal" !in entries)
             assertTrue("missing shm should not be included", "bot_database-shm" !in entries)
         } finally {
             dir.deleteRecursively()
@@ -72,7 +172,7 @@ class DatabaseBackupTest {
             assertEquals("main-db", entries["bot_database"])
             assertEquals("initial-html", entries["snapshots/snapshots_botA/gall_10_initial.html"])
             assertEquals("latest-html", entries["snapshots/snapshots_botA/gall_10_latest.html"])
-            assertTrue(entries["manifest.json"]!!.contains("\"formatVersion\":2"))
+            assertTrue(entries["manifest.json"]!!.contains("\"formatVersion\":4"))
             assertTrue(entries["manifest.json"]!!.contains("snapshots/snapshots_botA/gall_10_initial.html"))
             assertFalse("ZIP should not expose absolute paths as entry names", entries.keys.any { it.contains(dir.absolutePath.replace('\\', '/')) })
         } finally {
@@ -103,6 +203,7 @@ class DatabaseBackupTest {
             )
         )
 
+        assertEquals(GLOBAL_SCAN_SCOPE, row.scopeId)
         assertEquals("M", row.gallType)
         assertEquals("oldgall", row.gallId)
         assertEquals("123", row.postNum)
@@ -130,6 +231,76 @@ class DatabaseBackupTest {
         assertEquals("", row.targetNo)
         assertEquals("COMMENT", row.targetType)
         assertEquals(222L, row.blockTime)
+    }
+
+    @Test
+    fun scopedAndActorColumnsSurviveBackupProjectionWhileLegacyDefaultsAreSafe() {
+        val scoped = checkedPostFromBackupColumns(
+            mapOf(
+                "scopeId" to "bot-c",
+                "gallType" to "M",
+                "gallId" to "gall",
+                "postNum" to "1",
+            )
+        )
+        val block = blockHistoryFromBackupColumns(
+            mapOf("gallType" to "M", "gallId" to "gall", "postNum" to "1")
+        )
+        val hold = holdHistoryFromBackupColumns(
+            mapOf("gallType" to "M", "gallId" to "gall", "postNum" to "1", "actorBotId" to "bot-c")
+        )
+
+        assertEquals("bot-c", scoped.scopeId)
+        assertEquals(LEGACY_ACTOR_BOT_ID, block.actorBotId)
+        assertEquals("bot-c", hold.actorBotId)
+    }
+
+    @Test
+    fun historyMergeKeysPreserveActorAttribution() {
+        val blockBase = BlockHistory(
+            gallType = "M",
+            gallId = "gall",
+            postNum = "1",
+            targetType = "POST",
+            targetNo = "",
+            targetAuthor = "writer",
+            targetContent = "content",
+            blockReason = "reason",
+            blockTime = 10L,
+            actorBotId = "bot-a",
+        )
+        val holdBase = HoldHistory(
+            gallType = "M",
+            gallId = "gall",
+            postNum = "1",
+            targetType = "POST",
+            targetNo = "",
+            targetAuthor = "writer",
+            targetContent = "content",
+            holdReason = "reason",
+            holdTime = 10L,
+            actorBotId = "bot-a",
+        )
+
+        assertTrue(blockHistoryMergeKey(blockBase) != blockHistoryMergeKey(blockBase.copy(actorBotId = "bot-b")))
+        assertTrue(holdHistoryMergeKey(holdBase) != holdHistoryMergeKey(holdBase.copy(actorBotId = "bot-b")))
+    }
+
+    @Test
+    fun claimBackupRestorePreservesFailClosedStatesAndDropsExplicitFailures() {
+        val base = mapOf<String, Any?>(
+            "gallType" to "M", "gallId" to "g", "postNum" to "7",
+            "targetType" to "POST", "targetNo" to "7", "actionKind" to "DELETE_POST",
+            "actorBotId" to "bot-a", "claimedAt" to 10L, "finishedAt" to 20L,
+        )
+        val succeeded = moderationClaimFromBackupColumns(base + ("status" to "SUCCEEDED")) { "restored-owner" }
+        val pending = moderationClaimFromBackupColumns(base + ("status" to "PENDING")) { "restored-owner" }
+        val failed = moderationClaimFromBackupColumns(base + ("status" to "FAILED")) { "restored-owner" }
+
+        assertEquals(ClaimStatus.SUCCEEDED.name, succeeded?.status)
+        assertEquals(ClaimStatus.UNKNOWN.name, pending?.status)
+        assertEquals("restored-owner", pending?.ownerToken)
+        assertEquals(null, failed)
     }
 
     @Test

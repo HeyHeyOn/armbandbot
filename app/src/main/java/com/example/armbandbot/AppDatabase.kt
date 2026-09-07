@@ -5,9 +5,15 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+internal const val LEGACY_ACTOR_BOT_ID = "LEGACY"
+internal const val CHECKED_POST_SCOPE_INDEX_NAME = "index_checked_posts_scopeId"
+internal const val HOLD_HISTORY_UNIQUE_INDEX_NAME =
+    "index_hold_history_gallType_gallId_postNum_targetType_targetNo"
+
 @Entity(
     tableName = "checked_posts",
-    primaryKeys = ["gallType", "gallId", "postNum"]
+    primaryKeys = ["scopeId", "gallType", "gallId", "postNum"],
+    indices = [Index(value = ["scopeId"])],
 )
 data class CheckedPost(
     val gallType: String,
@@ -20,7 +26,8 @@ data class CheckedPost(
     val isBlocked: Boolean = false,
     val blockReason: String? = null,
     val snapshotPath: String? = null,
-    val creationDate: String? = null
+    val creationDate: String? = null,
+    val scopeId: String,
 )
 
 @Entity(tableName = "block_history")
@@ -36,7 +43,8 @@ data class BlockHistory(
     val blockReason: String,
     val blockTime: Long = System.currentTimeMillis(),
     val snapshotPath: String? = null,
-    val creationDate: String? = null
+    val creationDate: String? = null,
+    val actorBotId: String = LEGACY_ACTOR_BOT_ID
 )
 
 @Entity(
@@ -55,7 +63,8 @@ data class HoldHistory(
     val holdReason: String,
     val holdTime: Long = System.currentTimeMillis(),
     val snapshotPath: String? = null,
-    val creationDate: String? = null
+    val creationDate: String? = null,
+    val actorBotId: String = LEGACY_ACTOR_BOT_ID
 )
 
 @Dao
@@ -65,12 +74,36 @@ interface PostDao {
 
     @Transaction
     fun insertOrUpdatePreservingSnapshot(post: CheckedPost) {
-        val existing = getPost(post.gallType, post.gallId, post.postNum)
+        val existing = getPost(post.scopeId, post.gallType, post.gallId, post.postNum)
         insertOrUpdate(mergeCheckedPostPreservingSnapshot(existing, post))
     }
 
-    @Query("SELECT * FROM checked_posts WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum LIMIT 1")
-    fun getPost(gallType: String, gallId: String, postNum: String): CheckedPost?
+    @Query("SELECT * FROM checked_posts WHERE scopeId = :scopeId AND gallType = :gallType AND gallId = :gallId AND postNum = :postNum LIMIT 1")
+    fun getPost(scopeId: String, gallType: String, gallId: String, postNum: String): CheckedPost?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertOrUpdateAll(posts: List<CheckedPost>)
+
+    @Query("SELECT * FROM checked_posts WHERE scopeId = :scopeId")
+    fun getPostsForScope(scopeId: String): List<CheckedPost>
+
+    @Query("DELETE FROM checked_posts WHERE scopeId = :scopeId")
+    fun deletePostsForScope(scopeId: String)
+
+    @Transaction
+    fun replaceScopeBaseline(fromScopeId: String, toScopeId: String) {
+        require(fromScopeId.isNotBlank()) { "fromScopeId가 필요합니다." }
+        require(toScopeId.isNotBlank()) { "toScopeId가 필요합니다." }
+        require(fromScopeId != toScopeId) { "같은 scope로 기준선을 복사할 수 없습니다." }
+        val posts = getPostsForScope(fromScopeId).map { post ->
+            post.copy(
+                scopeId = toScopeId,
+                snapshotPath = null,
+            )
+        }
+        deletePostsForScope(toScopeId)
+        if (posts.isNotEmpty()) insertOrUpdateAll(posts)
+    }
 
     @Query("SELECT COUNT(*) FROM checked_posts")
     fun getPostCount(): Int
@@ -81,8 +114,8 @@ interface PostDao {
     @Query("DELETE FROM checked_posts")
     fun clearAllPosts()
 
-    @Query("DELETE FROM checked_posts WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
-    fun deletePost(gallType: String, gallId: String, postNum: String)
+    @Query("DELETE FROM checked_posts WHERE scopeId = :scopeId AND gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
+    fun deletePost(scopeId: String, gallType: String, gallId: String, postNum: String)
 
     @Query("SELECT DISTINCT gallId FROM checked_posts")
     fun getGalleries(): List<String>
@@ -129,15 +162,16 @@ interface PostDao {
     @Query("SELECT * FROM checked_posts")
     fun getAllPostsForBackupMerge(): List<CheckedPost>
 
-    @Query("UPDATE checked_posts SET snapshotPath = :path WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
-    fun updateSnapshotPath(gallType: String, gallId: String, postNum: String, path: String)
+    @Query("UPDATE checked_posts SET snapshotPath = :path WHERE scopeId = :scopeId AND gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
+    fun updateSnapshotPath(scopeId: String, gallType: String, gallId: String, postNum: String, path: String)
 
     @Query("""
         UPDATE checked_posts SET snapshotPath = :newPath
-        WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum
+        WHERE scopeId = :scopeId AND gallType = :gallType AND gallId = :gallId AND postNum = :postNum
           AND ((snapshotPath IS NULL AND :expectedPath IS NULL) OR snapshotPath = :expectedPath)
     """)
     fun updateSnapshotPathIfUnchanged(
+        scopeId: String,
         gallType: String,
         gallId: String,
         postNum: String,
@@ -168,6 +202,12 @@ interface PostDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM hold_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum AND targetType = :targetType AND targetNo = :targetNo LIMIT 1)")
     fun hasHoldHistory(gallType: String, gallId: String, postNum: String, targetType: String, targetNo: String): Boolean
+
+    @Query("SELECT * FROM block_history WHERE actorBotId = :actorBotId ORDER BY blockTime DESC")
+    fun getBlockHistoryForActor(actorBotId: String): List<BlockHistory>
+
+    @Query("SELECT * FROM hold_history WHERE actorBotId = :actorBotId ORDER BY holdTime DESC")
+    fun getHoldHistoryForActor(actorBotId: String): List<HoldHistory>
 
     @Query("SELECT snapshotPath FROM hold_history WHERE gallType = :gallType AND gallId = :gallId AND postNum = :postNum AND snapshotPath IS NOT NULL")
     fun getHoldSnapshotPathsForPost(gallType: String, gallId: String, postNum: String): List<String>
@@ -298,9 +338,14 @@ interface PostDao {
     fun getAllHoldHistoryForBackupMerge(): List<HoldHistory>
 }
 
-@Database(entities = [CheckedPost::class, BlockHistory::class, HoldHistory::class], version = 8, exportSchema = false)
+@Database(
+    entities = [CheckedPost::class, BlockHistory::class, HoldHistory::class, ModerationActionClaim::class],
+    version = 9,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
+    internal abstract fun moderationClaimDao(): ModerationClaimDao
 
     companion object {
         const val CREATE_HOLD_HISTORY_SQL = """
@@ -340,17 +385,72 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        const val CREATE_MODERATION_ACTION_CLAIMS_SQL = """
+            CREATE TABLE IF NOT EXISTS `moderation_action_claims` (
+                `gallType` TEXT NOT NULL,
+                `gallId` TEXT NOT NULL,
+                `postNum` TEXT NOT NULL,
+                `targetType` TEXT NOT NULL,
+                `targetNo` TEXT NOT NULL,
+                `actionKind` TEXT NOT NULL,
+                `actorBotId` TEXT NOT NULL,
+                `ownerToken` TEXT NOT NULL DEFAULT '',
+                `status` TEXT NOT NULL,
+                `claimedAt` INTEGER NOT NULL,
+                `finishedAt` INTEGER,
+                PRIMARY KEY(`gallType`, `gallId`, `postNum`, `targetType`, `targetNo`, `actionKind`)
+            )
+        """
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE `checked_posts_v9` (
+                        `gallType` TEXT NOT NULL,
+                        `gallId` TEXT NOT NULL,
+                        `postNum` TEXT NOT NULL,
+                        `commentCount` INTEGER NOT NULL,
+                        `checkTime` INTEGER NOT NULL,
+                        `title` TEXT,
+                        `author` TEXT,
+                        `isBlocked` INTEGER NOT NULL,
+                        `blockReason` TEXT,
+                        `snapshotPath` TEXT,
+                        `creationDate` TEXT,
+                        `scopeId` TEXT NOT NULL,
+                        PRIMARY KEY(`scopeId`, `gallType`, `gallId`, `postNum`)
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO `checked_posts_v9`
+                        (`gallType`, `gallId`, `postNum`, `commentCount`, `checkTime`, `title`, `author`,
+                         `isBlocked`, `blockReason`, `snapshotPath`, `creationDate`, `scopeId`)
+                    SELECT `gallType`, `gallId`, `postNum`, `commentCount`, `checkTime`, `title`, `author`,
+                           `isBlocked`, `blockReason`, `snapshotPath`, `creationDate`, '$GLOBAL_SCAN_SCOPE'
+                    FROM `checked_posts`
+                """.trimIndent())
+                db.execSQL("DROP TABLE `checked_posts`")
+                db.execSQL("ALTER TABLE `checked_posts_v9` RENAME TO `checked_posts`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `$CHECKED_POST_SCOPE_INDEX_NAME` ON `checked_posts` (`scopeId`)")
+                db.execSQL("ALTER TABLE `block_history` ADD COLUMN `actorBotId` TEXT NOT NULL DEFAULT '$LEGACY_ACTOR_BOT_ID'")
+                db.execSQL("ALTER TABLE `hold_history` ADD COLUMN `actorBotId` TEXT NOT NULL DEFAULT '$LEGACY_ACTOR_BOT_ID'")
+                db.execSQL(CREATE_HOLD_HISTORY_INDEX_SQL)
+                db.execSQL(CREATE_MODERATION_ACTION_CLAIMS_SQL.trimIndent())
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                ensurePreMigrationDatabaseBackup(context, targetVersion = 9)
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "bot_database"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .build()
                 INSTANCE = instance
                 instance

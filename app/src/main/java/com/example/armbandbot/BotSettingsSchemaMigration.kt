@@ -2,7 +2,7 @@ package com.heyheyon.armbandbot
 
 import org.json.JSONObject
 
-internal const val BOT_SETTINGS_CURRENT_SCHEMA_VERSION = 2
+internal const val BOT_SETTINGS_CURRENT_SCHEMA_VERSION = 3
 private const val BOT_SETTINGS_MIN_SUPPORTED_SCHEMA_VERSION = 1
 
 internal data class BotSettingsImportEnvelope(
@@ -58,7 +58,7 @@ private fun validateSupportedSchemaVersion(schemaVersion: Int) {
 }
 
 private fun migrateBotSettingsEnvelopeToCurrent(envelope: BotSettingsImportEnvelope): BotSettingsExport = when (envelope.schemaVersion) {
-    1, BOT_SETTINGS_CURRENT_SCHEMA_VERSION -> migrateSupportedSchemaToCurrent(envelope)
+    1, 2, BOT_SETTINGS_CURRENT_SCHEMA_VERSION -> migrateSupportedSchemaToCurrent(envelope)
     else -> error("schemaVersion ${envelope.schemaVersion} 마이그레이션이 아직 구현되지 않았습니다.")
 }
 
@@ -80,15 +80,45 @@ private fun migrateSupportedSchemaToCurrent(envelope: BotSettingsImportEnvelope)
         legacyDeleteOnly = envelope.booleans["pum_delete_only_mode"] == true,
         processModePresent = envelope.pumProcessModePresent,
     )
+    val normalizedSchedule = normalizeRunScheduleSettings(
+        enabled = envelope.booleans["run_schedule_enabled"] == true,
+        startMinute = envelope.ints["run_schedule_start_minute"] ?: 0,
+        endMinute = envelope.ints["run_schedule_end_minute"] ?: 1439,
+    )
     return BotSettingsExport(
         schemaVersion = BOT_SETTINGS_CURRENT_SCHEMA_VERSION,
         exportVersion = envelope.exportVersion,
         exportedByAppVersion = envelope.exportedByAppVersion.ifBlank { "unknown" },
         botName = envelope.botName,
         strings = normalizedStrings + ("pum_block_process_mode" to normalizedPum.processMode),
-        booleans = envelope.booleans,
-        ints = envelope.ints + ("pum_block_duration_hours" to normalizedPum.blockDurationHours),
+        booleans = envelope.booleans + ("run_schedule_enabled" to normalizedSchedule.enabled),
+        ints = envelope.ints + mapOf(
+            "pum_block_duration_hours" to normalizedPum.blockDurationHours,
+            "run_schedule_start_minute" to normalizedSchedule.startMinute,
+            "run_schedule_end_minute" to normalizedSchedule.endMinute,
+        ),
         floats = envelope.floats,
         stringSets = normalizedStringSets,
+    )
+}
+
+internal data class NormalizedRunScheduleSettings(
+    val enabled: Boolean,
+    val startMinute: Int,
+    val endMinute: Int,
+)
+
+internal fun normalizeRunScheduleSettings(
+    enabled: Boolean,
+    startMinute: Int,
+    endMinute: Int,
+): NormalizedRunScheduleSettings {
+    val normalizedStart = startMinute.takeIf { it in 0..1439 } ?: 0
+    val normalizedEnd = endMinute.takeIf { it in 0..1439 } ?: 1439
+    val valid = startMinute in 0..1439 && endMinute in 0..1439 && startMinute != endMinute
+    return NormalizedRunScheduleSettings(
+        enabled = enabled && valid,
+        startMinute = normalizedStart,
+        endMinute = normalizedEnd,
     )
 }

@@ -4,8 +4,137 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class BotSettingsTransferTest {
+    @Test
+    fun settingsImportRejectsMoreThanOneMiB() {
+        val oversized = ByteArray(BOT_SETTINGS_MAX_IMPORT_BYTES + 1) { 'a'.code.toByte() }
+        val failure = runCatching { readBoundedUtf8(ByteArrayInputStream(oversized)) }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message?.contains("1 MiB") == true)
+    }
+
+    @Test
+    fun settingsImportAcceptsValidUtf8WithinLimit() {
+        val json = "{\"botName\":\"테스트\"}"
+        assertEquals(json, readBoundedUtf8(ByteArrayInputStream(json.toByteArray(Charsets.UTF_8))))
+    }
+
+    @Test
+    fun settingsImportRejectsMalformedUtf8() {
+        val malformed = byteArrayOf(0x7b, 0x22, 0xc3.toByte(), 0x28, 0x22, 0x7d)
+
+        val failure = runCatching { readBoundedUtf8(ByteArrayInputStream(malformed)) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message?.contains("UTF-8") == true)
+    }
+
+    @Test
+    fun scopeAndScheduleKeysAreExportable() {
+        assertTrue("independent_scan_state_enabled" in EXPORTABLE_BOOLEAN_KEYS)
+        assertTrue("run_schedule_enabled" in EXPORTABLE_BOOLEAN_KEYS)
+        assertTrue("run_schedule_start_minute" in EXPORTABLE_INT_KEYS)
+        assertTrue("run_schedule_end_minute" in EXPORTABLE_INT_KEYS)
+    }
+
+    @Test
+    fun legacySchemaDefaultsScopeAndScheduleSafely() {
+        val imported = parseAndMigrateBotSettingsExport(
+            BotSettingsExport(
+                schemaVersion = 1,
+                botName = "legacy",
+                strings = emptyMap(),
+                booleans = emptyMap(),
+                ints = emptyMap(),
+                floats = emptyMap(),
+                stringSets = emptyMap(),
+            ).toJson()
+        )
+
+        assertEquals(false, imported.booleans["independent_scan_state_enabled"])
+        assertEquals(false, imported.booleans["run_schedule_enabled"])
+        assertEquals(0, imported.ints["run_schedule_start_minute"])
+        assertEquals(1439, imported.ints["run_schedule_end_minute"])
+        assertEquals(BOT_SETTINGS_CURRENT_SCHEMA_VERSION, imported.schemaVersion)
+    }
+
+    @Test
+    fun currentScopeAndScheduleRoundTripWithoutLosingValues() {
+        val original = BotSettingsExport(
+            botName = "scheduled",
+            strings = emptyMap(),
+            booleans = mapOf(
+                "independent_scan_state_enabled" to true,
+                "run_schedule_enabled" to true,
+            ),
+            ints = mapOf(
+                "run_schedule_start_minute" to 22 * 60,
+                "run_schedule_end_minute" to 6 * 60,
+            ),
+            floats = emptyMap(),
+            stringSets = emptyMap(),
+        )
+
+        val imported = parseAndMigrateBotSettingsExport(original.toJson())
+
+        assertEquals(true, imported.booleans["independent_scan_state_enabled"])
+        assertEquals(true, imported.booleans["run_schedule_enabled"])
+        assertEquals(22 * 60, imported.ints["run_schedule_start_minute"])
+        assertEquals(6 * 60, imported.ints["run_schedule_end_minute"])
+    }
+
+    @Test
+    fun invalidImportedScheduleFailsClosed() {
+        val imported = parseAndMigrateBotSettingsExport(
+            BotSettingsExport(
+                botName = "invalid",
+                strings = emptyMap(),
+                booleans = mapOf("run_schedule_enabled" to true),
+                ints = mapOf(
+                    "run_schedule_start_minute" to 480,
+                    "run_schedule_end_minute" to 480,
+                ),
+                floats = emptyMap(),
+                stringSets = emptyMap(),
+            ).toJson()
+        )
+
+        assertEquals(false, imported.booleans["run_schedule_enabled"])
+        assertEquals(480, imported.ints["run_schedule_start_minute"])
+        assertEquals(480, imported.ints["run_schedule_end_minute"])
+    }
+
+    @Test
+    fun importAsNewBotForcesSharedScopeButPreservesSchedule() {
+        val imported = BotSettingsExport(
+            botName = "foreign",
+            strings = mapOf("target_urls" to "https://example.test/board"),
+            booleans = mapOf(
+                "independent_scan_state_enabled" to true,
+                "run_schedule_enabled" to true,
+            ),
+            ints = mapOf(
+                "run_schedule_start_minute" to 540,
+                "run_schedule_end_minute" to 1080,
+            ),
+            floats = emptyMap(),
+            stringSets = emptyMap(),
+        )
+
+        val settings = prepareImportedSettingsForNewBot(imported)
+
+        assertEquals("foreign", settings["bot_name"])
+        assertEquals("https://example.test/board", settings["target_urls"])
+        assertEquals(false, settings["independent_scan_state_enabled"])
+        assertEquals(true, settings["run_schedule_enabled"])
+        assertEquals(540, settings["run_schedule_start_minute"])
+        assertEquals(1080, settings["run_schedule_end_minute"])
+        assertEquals(false, settings["is_running"])
+        assertEquals(false, settings["should_restore_after_restart"])
+    }
+
     @Test
     fun legacySchemaOneImportBackfillsOrderedTextFromJsonArrayOrder() {
         val legacy = BotSettingsExport(
