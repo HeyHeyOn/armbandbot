@@ -1,0 +1,136 @@
+{
+  "release": "1.5.2-beta1",
+  "versionName": "1.5.2",
+  "versionCode": 170,
+  "source_commit": "a58fab64befcb3ad5259a7ca6689380ff7ff1252",
+  "verified_at_utc": "2026-09-07T23:13:33.114791+00:00",
+  "jvm": {
+    "tests": 564,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "android_instrumentation": {
+    "API24": 19,
+    "API35": 19,
+    "totals": {
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "passed": true,
+    "issues": {
+      "Warning": 45,
+      "Information": 30
+    }
+  },
+  "release_build": true,
+  "signature_verified": true,
+  "signer_matches_previous_formal": true,
+  "final_apk_detail_smoke": {
+    "API24": "PASS",
+    "API35": "PASS",
+    "scope": "Create empty test bot, open detail/login screen, process alive and no fatal exception"
+  },
+  "dex": {
+    "apk": "releases/완장봇_v1.5.2-beta1.apk",
+    "dex_count": 5,
+    "dex": [
+      {
+        "dex": "classes.dex",
+        "methods": 65466,
+        "method_headroom": 70,
+        "fields": 35009,
+        "field_headroom": 30527,
+        "classes": 17981,
+        "max_parameter_words": 175,
+        "max_words_with_receiver_upper_bound": 176,
+        "invoke_range_word_headroom_upper_bound": 79
+      },
+      {
+        "dex": "classes2.dex",
+        "methods": 15,
+        "method_headroom": 65521,
+        "fields": 0,
+        "field_headroom": 65536,
+        "classes": 14,
+        "max_parameter_words": 0,
+        "max_words_with_receiver_upper_bound": 1,
+        "invoke_range_word_headroom_upper_bound": 254
+      },
+      {
+        "dex": "classes3.dex",
+        "methods": 2144,
+        "method_headroom": 63392,
+        "fields": 547,
+        "field_headroom": 64989,
+        "classes": 175,
+        "max_parameter_words": 10,
+        "max_words_with_receiver_upper_bound": 11,
+        "invoke_range_word_headroom_upper_bound": 244
+      },
+      {
+        "dex": "classes4.dex",
+        "methods": 65304,
+        "method_headroom": 232,
+        "fields": 21728,
+        "field_headroom": 43808,
+        "classes": 7865,
+        "max_parameter_words": 248,
+        "max_words_with_receiver_upper_bound": 249,
+        "invoke_range_word_headroom_upper_bound": 6
+      },
+      {
+        "dex": "classes5.dex",
+        "methods": 12022,
+        "method_headroom": 53514,
+        "fields": 4443,
+        "field_headroom": 61093,
+        "classes": 1470,
+        "max_parameter_words": 22,
+        "max_words_with_receiver_upper_bound": 23,
+        "invoke_range_word_headroom_upper_bound": 232
+      }
+    ],
+    "minimum_method_headroom": 70,
+    "minimum_field_headroom": 30527,
+    "maximum_parameter_words": 248,
+    "maximum_words_with_receiver_upper_bound": 249
+  },
+  "artifacts": [
+    {
+      "id": "1nqhqyg0b3VojIT8zrqupqzg1gJjvscle",
+      "mimeType": "application/vnd.android.package-archive",
+      "name": "완장봇_v1.5.2-beta1.apk",
+      "parents": [
+        "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+      ],
+      "size": "13256866",
+      "webViewLink": "https://drive.google.com/file/d/1nqhqyg0b3VojIT8zrqupqzg1gJjvscle/view?usp=drivesdk",
+      "local_path": "/home/haeon/workspace/projects/armbandbot/releases/완장봇_v1.5.2-beta1.apk",
+      "sha256": "106c57502fd798f3ad6cfc0c407f2bf53ed26c1aba63f4275982f085e65b2262",
+      "download_sha256_matches": true
+    },
+    {
+      "id": "1RkrPZ5iYFFNcp7rDs_qpphn8G0gFWzCK",
+      "mimeType": "text/markdown",
+      "name": "완장봇_v1.5.2-beta1_사용안내.md",
+      "parents": [
+        "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+      ],
+      "size": "3206",
+      "webViewLink": "https://drive.google.com/file/d/1RkrPZ5iYFFNcp7rDs_qpphn8G0gFWzCK/view?usp=drivesdk",
+      "local_path": "/home/haeon/workspace/projects/armbandbot/releases/완장봇_v1.5.2-beta1_사용안내.md",
+      "sha256": "755dbf86e1a278a70964e989d10cba3b95c60d39138f0c4501213cae081ae237",
+      "download_sha256_matches": true
+    }
+  ],
+  "not_exercised": [
+    "real DC account login and destructive moderation",
+    "authenticated settings interactions",
+    "long-duration live operation/reboot survival"
+  ]
+}

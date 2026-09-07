@@ -1,3 +1,20 @@
+# 완장봇 1.5.2-beta1
+
+## 개발용 베타 배포 완료
+- 봇별 독립 검사 기록과 매일 작동 시간대 설정을 추가했습니다.
+- [사용 안내](../docs/independent-records-and-schedules.md)
+
+### 검증 및 배포
+- JVM 테스트 564개, API 24·35 계측 테스트 각각 19개 통과.
+- lint 오류 0개, release 빌드·서명·DEX 한도와 양 기기의 봇 상세 화면 진입 확인.
+- APK와 사용 안내문을 개발용 Drive 폴더에 업로드하고 재다운로드 SHA-256 일치를 확인했습니다.
+- [APK 다운로드](https://drive.google.com/file/d/1nqhqyg0b3VojIT8zrqupqzg1gJjvscle/view?usp=drivesdk) · [사용 안내](https://drive.google.com/file/d/1RkrPZ5iYFFNcp7rDs_qpphn8G0gFWzCK/view?usp=drivesdk)
+- 소스 커밋: `a58fab64befcb3ad5259a7ca6689380ff7ff1252`
+- APK SHA-256: `106c57502fd798f3ad6cfc0c407f2bf53ed26c1aba63f4275982f085e65b2262`
+- 실제 DC 로그인·삭제·차단 및 장시간 운용은 이번 자동 검증에 포함하지 않았습니다.
+
+---
+
 # 완장봇 1.5.1
 
 ## 1.5.1 정식 배포 완료
