@@ -79,9 +79,7 @@ private class BotIsolationScheduleUiState(botPref: SharedPreferences) {
     var scopeBaselineChoice by mutableStateOf("COPY_GLOBAL")
     var hasPrivateScopeBaseline by mutableStateOf(false)
     var isScopeTransitioning by mutableStateOf(false)
-    var runScheduleEnabled by mutableStateOf(botPref.getBoolean("run_schedule_enabled", false))
-    var runScheduleStartMinute by mutableStateOf(botPref.getInt("run_schedule_start_minute", 0).coerceIn(0, 1439))
-    var runScheduleEndMinute by mutableStateOf(botPref.getInt("run_schedule_end_minute", 1439).coerceIn(0, 1439))
+
 }
 
 private fun fetchPostDocument(url: String) = Jsoup.connect(DcinsidePostUrls.desktopUrl(url))
@@ -1950,6 +1948,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                         if (selectedTabIndex == 0) {
                             Column(modifier = Modifier.fillMaxSize().verticalScroll(settingsScrollState).padding(horizontal = 16.dp, vertical = 16.dp)) {
                                 Text("기본 탐색 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
+                                ModernSettingItem("관리할 갤러리 및 검색 모드", if (targetUrlsText.isBlank()) "대상 없음" else "대상 설정됨", Icons.Filled.List, colors) { currentSubScreen = "TARGET" }
+                                ModernSettingItem("탐색 속도 및 범위", "페이지 수 및 딜레이 설정", Icons.Filled.Build, colors) { currentSubScreen = "SPEED" }
+                                ModernSettingItem("갤러리 설정 자동 갱신", "VPN/통신사/첨부 제한 시간 유지", Icons.Filled.Refresh, colors, isGallerySettingRefreshEnabled, { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }) { currentSubScreen = "GALLERY_REFRESH" }
                                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = cardColor)) {
                                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2008,61 +2009,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         )
                                     }
                                 }
-                                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = cardColor)) {
-                                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("작동 시간대", fontWeight = FontWeight.Bold, color = textColor)
-                                                Text(scheduleRangeLabel(isolationScheduleUi.runScheduleStartMinute, isolationScheduleUi.runScheduleEndMinute), fontSize = 12.sp, color = subTextColor)
-                                            }
-                                            Switch(
-                                                checked = isolationScheduleUi.runScheduleEnabled,
-                                                onCheckedChange = { enabled ->
-                                                    if (enabled && isolationScheduleUi.runScheduleStartMinute == isolationScheduleUi.runScheduleEndMinute) {
-                                                        Toast.makeText(context, "시작과 종료 시각은 달라야", Toast.LENGTH_LONG).show()
-                                                    } else {
-                                                        isolationScheduleUi.runScheduleEnabled = enabled
-                                                        botPref.edit().putBoolean("run_schedule_enabled", enabled).apply()
-                                                    }
-                                                },
-                                                modifier = Modifier.scale(0.8f),
-                                            )
-                                        }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            OutlinedButton(
-                                                onClick = {
-                                                    TimePickerDialog(context, { _, hour, minute ->
-                                                        val selected = hour * 60 + minute
-                                                        if (isolationScheduleUi.runScheduleEnabled && selected == isolationScheduleUi.runScheduleEndMinute) {
-                                                            Toast.makeText(context, "시작과 종료 시각은 달라야", Toast.LENGTH_LONG).show()
-                                                        } else {
-                                                            isolationScheduleUi.runScheduleStartMinute = selected
-                                                            botPref.edit().putInt("run_schedule_start_minute", selected).apply()
-                                                        }
-                                                    }, isolationScheduleUi.runScheduleStartMinute / 60, isolationScheduleUi.runScheduleStartMinute % 60, true).show()
-                                                },
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                            ) { Text("시작 ${formatMinuteOfDay(isolationScheduleUi.runScheduleStartMinute)}", fontSize = 12.sp) }
-                                            OutlinedButton(
-                                                onClick = {
-                                                    TimePickerDialog(context, { _, hour, minute ->
-                                                        val selected = hour * 60 + minute
-                                                        if (isolationScheduleUi.runScheduleEnabled && selected == isolationScheduleUi.runScheduleStartMinute) {
-                                                            Toast.makeText(context, "시작과 종료 시각은 달라야", Toast.LENGTH_LONG).show()
-                                                        } else {
-                                                            isolationScheduleUi.runScheduleEndMinute = selected
-                                                            botPref.edit().putInt("run_schedule_end_minute", selected).apply()
-                                                        }
-                                                    }, isolationScheduleUi.runScheduleEndMinute / 60, isolationScheduleUi.runScheduleEndMinute % 60, true).show()
-                                                },
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                            ) { Text("종료 ${formatMinuteOfDay(isolationScheduleUi.runScheduleEndMinute)}", fontSize = 12.sp) }
-                                        }
-                                    }
-                                }
-                                ModernSettingItem("관리할 갤러리 및 검색 모드", if (targetUrlsText.isBlank()) "대상 없음" else "대상 설정됨", Icons.Filled.List, colors) { currentSubScreen = "TARGET" }
-                                ModernSettingItem("탐색 속도 및 범위", "페이지 수 및 딜레이 설정", Icons.Filled.Build, colors) { currentSubScreen = "SPEED" }
-                                ModernSettingItem("갤러리 설정 자동 갱신", "VPN/통신사/첨부 제한 시간 유지", Icons.Filled.Refresh, colors, isGallerySettingRefreshEnabled, { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }) { currentSubScreen = "GALLERY_REFRESH" }
+                                BotRunScheduleSettingsCard(botPref, cardColor, textColor)
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("차단 후속 동작", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))

@@ -12,6 +12,15 @@ internal data class BotWorkGate(
 internal fun evaluateBotWorkGate(
     nowEpochMillis: Long,
     zoneId: ZoneId,
+    schedule: BotRunScheduleLoadResult,
+): BotWorkGate = when (schedule) {
+    is BotRunScheduleLoadResult.Valid -> evaluateBotWorkGate(nowEpochMillis, zoneId, schedule.schedule)
+    is BotRunScheduleLoadResult.Error -> BotWorkGate(false, MAX_SCHEDULE_RECHECK_DELAY_MS)
+}
+
+internal fun evaluateBotWorkGate(
+    nowEpochMillis: Long,
+    zoneId: ZoneId,
     schedule: BotRunSchedule,
 ): BotWorkGate {
     val decision = evaluateSchedule(nowEpochMillis, zoneId, schedule)

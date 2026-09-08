@@ -17,6 +17,21 @@ class BotScheduleAndroidRuntimeTest {
     private val seoul = ZoneId.of("Asia/Seoul")
     private val berlin = ZoneId.of("Europe/Berlin")
 
+    @Test fun canonicalInvalidGateRecoversAfterAtomicSave() {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "schedule_runtime_${java.util.UUID.randomUUID()}"
+        val prefs = context.getSharedPreferences(name, android.content.Context.MODE_PRIVATE)
+        try {
+            prefs.edit().putBoolean("run_schedule_enabled", true).putString(RUN_SCHEDULE_WINDOWS_JSON_KEY, "broken").commit()
+            val now = Instant.parse("2026-09-07T03:00:00Z").toEpochMilli()
+            org.junit.Assert.assertFalse(evaluateBotWorkGate(now, seoul, loadBotRunSchedule(prefs)).mayStartNetworkOrAction)
+            val fullDay = BotRunSchedule(true, listOf(BotRunWindow(720, 0), BotRunWindow(0, 720)))
+            saveBotRunSchedule(prefs, fullDay)
+            assertTrue(evaluateBotWorkGate(now, seoul, loadBotRunSchedule(prefs)).mayStartNetworkOrAction)
+            assertEquals("실행 중", botScheduleStatus(true, true, now, seoul, loadBotRunSchedule(prefs)))
+        } finally { context.deleteSharedPreferences(name) }
+    }
+
     @Test
     fun disabledScheduleIsActiveWithBoundedWorkGate() {
         assertEvaluation(

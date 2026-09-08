@@ -8,7 +8,7 @@ import org.junit.Test
 class BotSettingsRuntimeMigrationTest {
     @Test
     fun orderedMultilineMigrationUsesNewSchemaVersion() {
-        assertEquals(3, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
+        assertEquals(4, BOT_SETTINGS_CURRENT_SCHEMA_VERSION)
     }
 
     @Test

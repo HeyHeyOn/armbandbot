@@ -6,27 +6,24 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-internal data class BotRunSchedule(
-    val enabled: Boolean,
-    val startMinuteOfDay: Int,
-    val endMinuteOfDay: Int,
-) {
+internal data class BotRunWindow(val startMinuteOfDay: Int, val endMinuteOfDay: Int) {
     init {
-        require(startMinuteOfDay in MINUTE_RANGE) { "시작 시각이 올바르지 않습니다." }
-        require(endMinuteOfDay in MINUTE_RANGE) { "종료 시각이 올바르지 않습니다." }
-        require(!enabled || startMinuteOfDay != endMinuteOfDay) {
-            "작동 시간대의 시작과 종료 시각은 달라야 합니다."
-        }
+        require(startMinuteOfDay in 0..1439 && endMinuteOfDay in 0..1439)
+        require(startMinuteOfDay != endMinuteOfDay) { "작동 시간대의 시작과 종료 시각은 달라야 합니다." }
     }
+    fun contains(minute: Int): Boolean = if (startMinuteOfDay < endMinuteOfDay) {
+        minute >= startMinuteOfDay && minute < endMinuteOfDay
+    } else minute >= startMinuteOfDay || minute < endMinuteOfDay
+}
 
+internal data class BotRunSchedule(val enabled: Boolean, val windows: List<BotRunWindow>) {
+    init { require(windows.size in 1..64) }
+    constructor(enabled: Boolean, startMinuteOfDay: Int, endMinuteOfDay: Int) : this(
+        enabled, listOf(BotRunWindow(startMinuteOfDay,endMinuteOfDay)))
+    val startMinuteOfDay: Int get() = windows.first().startMinuteOfDay
+    val endMinuteOfDay: Int get() = windows.first().endMinuteOfDay
     companion object {
-        private val MINUTE_RANGE = 0 until 24 * 60
-
-        fun disabled(): BotRunSchedule = BotRunSchedule(
-            enabled = false,
-            startMinuteOfDay = 0,
-            endMinuteOfDay = 0,
-        )
+        fun disabled(): BotRunSchedule = BotRunSchedule(false, 0, 1439)
     }
 }
 
@@ -42,7 +39,7 @@ internal fun evaluateSchedule(
     zoneId: ZoneId,
     schedule: BotRunSchedule,
 ): ScheduleDecision {
-    if (!schedule.enabled) {
+    if (!schedule.enabled || (0..1439).all { minute -> schedule.windows.any { it.contains(minute) } }) {
         return ScheduleDecision(ScheduleState.ACTIVE, Long.MAX_VALUE)
     }
 
@@ -71,11 +68,7 @@ private fun isScheduleActive(
 ): Boolean {
     val local = instant.atZone(zoneId)
     val minute = local.hour * 60 + local.minute
-    return if (schedule.startMinuteOfDay < schedule.endMinuteOfDay) {
-        minute >= schedule.startMinuteOfDay && minute < schedule.endMinuteOfDay
-    } else {
-        minute >= schedule.startMinuteOfDay || minute < schedule.endMinuteOfDay
-    }
+    return schedule.windows.any { it.contains(minute) }
 }
 
 private fun scheduleBoundaryCandidates(
@@ -86,7 +79,7 @@ private fun scheduleBoundaryCandidates(
     val today = now.atZone(zoneId).toLocalDate()
     for (dayOffset in -1L..3L) {
         val date = today.plusDays(dayOffset)
-        for (minute in listOf(schedule.startMinuteOfDay, schedule.endMinuteOfDay)) {
+        for (minute in schedule.windows.flatMap { listOf(it.startMinuteOfDay, it.endMinuteOfDay) }) {
             addLocalBoundary(LocalDateTime.of(date, LocalTime.of(minute / 60, minute % 60)), zoneId)
         }
     }

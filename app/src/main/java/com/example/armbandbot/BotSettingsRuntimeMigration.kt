@@ -283,14 +283,21 @@ internal fun migrateBotSettingsSnapshot(values: Map<String, Any?>): Map<String, 
     migrated["pum_block_process_mode"] = normalizedPum.processMode
     migrated["pum_block_duration_hours"] = normalizedPum.blockDurationHours
 
-    val normalizedSchedule = normalizeRunScheduleSettings(
-        enabled = migrated.getValue("run_schedule_enabled") as Boolean,
-        startMinute = migrated.getValue("run_schedule_start_minute") as Int,
-        endMinute = migrated.getValue("run_schedule_end_minute") as Int,
-    )
-    migrated["run_schedule_enabled"] = normalizedSchedule.enabled
-    migrated["run_schedule_start_minute"] = normalizedSchedule.startMinute
-    migrated["run_schedule_end_minute"] = normalizedSchedule.endMinute
+    // Canonical corruption must survive migration unchanged for explicit repair.
+    val scheduleInput = if (values.containsKey(RUN_SCHEDULE_WINDOWS_JSON_KEY)) values else migrated
+    when (val result = loadBotRunSchedule(scheduleInput)) {
+        is BotRunScheduleLoadResult.Valid -> {
+            if (result.legacyEditor == null) {
+                migrated[RUN_SCHEDULE_WINDOWS_JSON_KEY] = encodeBotRunWindows(result.schedule.windows)
+            }
+            migrated["run_schedule_enabled"] = result.schedule.enabled
+            migrated["run_schedule_start_minute"] = result.legacyEditor?.startMinute ?: result.schedule.startMinuteOfDay
+            migrated["run_schedule_end_minute"] = result.legacyEditor?.endMinute ?: result.schedule.endMinuteOfDay
+        }
+        is BotRunScheduleLoadResult.Error -> {
+            values["run_schedule_enabled"]?.let { migrated["run_schedule_enabled"] = it }
+        }
+    }
 
     migrated[BOT_PREF_SCHEMA_VERSION_KEY] = BOT_SETTINGS_CURRENT_SCHEMA_VERSION
     migrated[BOT_PREF_APP_VERSION_KEY] = ARMBANDBOT_APP_VERSION

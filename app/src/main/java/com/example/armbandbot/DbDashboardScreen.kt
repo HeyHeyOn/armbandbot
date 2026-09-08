@@ -63,7 +63,40 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
-fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
+fun DbDashboardScreen(botId: String, onBack: () -> Unit) = DbDashboardScreen(botId, onBack, GlobalBotState.getDb(), singletonOperationsEnabled = true)
+
+// Optional per-screen IO dependencies; defaults preserve the real parser and work.
+internal interface DashboardLoaderDependencies {
+    fun parseSnapshotFile(path: String): SnapshotData = parseSnapshot(path)
+    suspend fun <T> generalWork(
+        request: DashboardScopeRequest,
+        version: Int,
+        query: String,
+        work: suspend () -> T,
+    ): T = work()
+}
+
+internal object DefaultDashboardLoaderDependencies : DashboardLoaderDependencies
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+@Composable
+internal fun DbDashboardScreen(
+    botId: String,
+    onBack: () -> Unit,
+    database: AppDatabase?,
+    loaderDependencies: DashboardLoaderDependencies = DefaultDashboardLoaderDependencies,
+) = DbDashboardScreen(botId, onBack, database, singletonOperationsEnabled = false, loaderDependencies = loaderDependencies)
+
+// Only the production wrapper may opt into APIs that resolve GlobalBotState's DB.
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+@Composable
+private fun DbDashboardScreen(
+    botId: String,
+    onBack: () -> Unit,
+    database: AppDatabase?,
+    singletonOperationsEnabled: Boolean,
+    loaderDependencies: DashboardLoaderDependencies = DefaultDashboardLoaderDependencies,
+) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
@@ -73,6 +106,15 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         botId,
         dashboardBotPref?.getBoolean("independent_scan_state_enabled", false) == true,
     )
+    var recordScope by remember(botId) { mutableStateOf<DashboardRecordScope>(
+        if (isGlobalDashboard) DashboardRecordScope.All else DashboardRecordScope.Exact(checkNotNull(scopeId))
+    ) }
+    var retainedScopeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val scopeBots = (masterPref.getString("bot_ids_list", "") ?: "").split(",").filter { it.isNotBlank() }.map { id ->
+        val pref = context.getSharedPreferences("bot_prefs_$id", Context.MODE_PRIVATE)
+        DashboardScopeBot(id, pref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇", pref.getBoolean("independent_scan_state_enabled", false))
+    }
+    val recordScopeOptions = dashboardScopeOptions(scopeBots, retainedScopeIds)
     val dashboardBotName = dashboardBotPref?.getString("bot_name", "이름 없는 봇") ?: ""
 
     // 🌟 다크모드 색상 팔레트 적용
@@ -131,8 +173,8 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     var blockLoadVersion by remember { mutableIntStateOf(0) }
     var holdLoadVersion by remember { mutableIntStateOf(0) }
     val snapshotSearchAllowedRoots = remember(context) { listOf(context.cacheDir) }
-    val snapshotSearchCache = remember(context) {
-        SnapshotSearchDocumentCache(allowedRoots = snapshotSearchAllowedRoots)
+    val snapshotSearchCache = remember(context, loaderDependencies) {
+        SnapshotSearchDocumentCache(allowedRoots = snapshotSearchAllowedRoots, parser = loaderDependencies::parseSnapshotFile)
     }
     val generalDocumentIndex = remember { DashboardRowDocumentIndex() }
     val blockDocumentIndex = remember { DashboardRowDocumentIndex() }
@@ -153,6 +195,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
     var snapshotViewerPath by remember { mutableStateOf<String?>(null) }
     var showClearDbConfirm by remember { mutableStateOf(false) }
+    var pendingResetTarget by remember { mutableStateOf<DashboardResetTarget?>(null) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var isBackupImporting by remember { mutableStateOf(false) }
     var recordedPostCount by remember { mutableStateOf(0) }
@@ -162,7 +205,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     var webViewUrl by remember { mutableStateOf<String?>(null) }
     var openSwipeKey by remember { mutableStateOf<String?>(null) }
 
-    val postDao = GlobalBotState.getDb()?.postDao()
+    val postDao = database?.postDao()
     fun actorLabel(actorBotId: String): String = when (actorBotId) {
         LEGACY_ACTOR_BOT_ID -> "이전 버전"
         else -> context.getSharedPreferences("bot_prefs_$actorBotId", Context.MODE_PRIVATE)
@@ -174,11 +217,28 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         else -> "${actorLabel(rowScopeId)} 전용 검사 기록"
     }
 
+    fun switchRecordScope(next: DashboardRecordScope) {
+        if (!isGlobalDashboard || isClearingDb || next == recordScope) return
+        dashboardDataEpoch++
+        generalLoadVersion++; blockLoadVersion++; holdLoadVersion++
+        recordScope = next
+        generalPosts = emptyList(); blockPosts = emptyList(); holdPosts = emptyList()
+        generalMatches = emptyMap(); blockMatches = emptyMap(); holdMatches = emptyMap()
+        generalLoadError = null; blockLoadError = null; holdLoadError = null
+        pendingDeletePost = null; pendingDeleteBlock = null; pendingDeleteHold = null
+        showClearDbConfirm = false; pendingResetTarget = null; showBackupDialog = false
+        openSwipeKey = null
+        generalLimit = 100; blockLimit = 100; holdLimit = 100
+        isGeneralSearchLoading = true; isBlockSearchLoading = false; isHoldSearchLoading = false
+        generalListState.requestScrollToItem(0)
+    }
+
     suspend fun loadGeneralData() {
         if (isClearingDb) {
             isGeneralSearchLoading = false
             return
         }
+        val requestScope = DashboardScopeRequest(recordScope, dashboardDataEpoch)
         val requestVersion = ++generalLoadVersion
         val query = debouncedSearchQuery
         val requestDataEpoch = dashboardDataEpoch
@@ -190,11 +250,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         isGeneralSearchLoading = true
         generalLoadError = null
         try {
-            val result = withContext(Dispatchers.IO) {
+            val result = loaderDependencies.generalWork(requestScope, requestVersion, query) {
+                withContext(Dispatchers.IO) {
                 val rowsAndMatches = if (query.isBlank()) {
-                    val rows = (if (scopeId == null) postDao?.getAllPostsForBackupMerge() else postDao?.getPostsForScope(scopeId))
-                        .orEmpty()
-                        .filter { gallFilter == "ALL" || it.gallId == gallFilter }
+                    val rows = postDao?.getAllPostsForBackupMerge().orEmpty()
+                        .filter { dashboardIncludesPost(requestScope.scope, gallFilter, it) }
                         .sortedWith(checkedPostDashboardComparator(field, ascending))
                         .take(limit)
                     rows to emptyMap()
@@ -203,7 +263,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         candidates = postDao?.getAllPostsForBackupMerge() ?: emptyList(),
                         query = query,
                         enabledCodes = enabledCodes,
-                        includeRow = { (scopeId == null || it.scopeId == scopeId) && (gallFilter == "ALL" || it.gallId == gallFilter) },
+                        includeRow = { dashboardIncludesPost(requestScope.scope, gallFilter, it) },
                         comparator = checkedPostDashboardComparator(field, ascending),
                         limit = limit,
                         directDocument = CheckedPost::toDashboardSearchDocument,
@@ -218,28 +278,34 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         checkedPostDashboardIdentity(match.row) to match.matches
                     }
                 }
-                Triple(rowsAndMatches.first, rowsAndMatches.second, postDao?.getPostCount() ?: 0)
+                Triple(rowsAndMatches.first, rowsAndMatches.second, postDao?.getAllPostsForBackupMerge().orEmpty())
+                }
             }
-            if (shouldPublishDashboardSearchResult(
+            if (requestScope.isCurrent(recordScope, dashboardDataEpoch) && shouldPublishDashboardSearchResult(
                     requestVersion, generalLoadVersion, query, searchQuery,
                     requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
                 )
             ) {
-                generalPosts = result.first
-                generalMatches = result.second
-                recordedPostCount = result.third
-                isGeneralSearchLoading = false
+                requestScope.publishIfCurrent(recordScope, dashboardDataEpoch) {
+                    generalPosts = result.first
+                    generalMatches = result.second
+                    recordedPostCount = result.third.size
+                    retainedScopeIds = result.third.map { it.scopeId }.toSet()
+                    isGeneralSearchLoading = false
+                }
             }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            if (shouldPublishDashboardSearchResult(
+            if (requestScope.isCurrent(recordScope, dashboardDataEpoch) && shouldPublishDashboardSearchResult(
                     requestVersion, generalLoadVersion, query, searchQuery,
                     requestDataEpoch, dashboardDataEpoch, enabledCodes, activeSearchScopes, isClearingDb,
                 )
             ) {
-                generalLoadError = "공용 기록을 불러오지 못했습니다."
-                isGeneralSearchLoading = false
+                requestScope.publishIfCurrent(recordScope, dashboardDataEpoch) {
+                    generalLoadError = "모니터링 기록을 불러오지 못했습니다."
+                    isGeneralSearchLoading = false
+                }
             }
         }
     }
@@ -391,7 +457,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     }
 
     val dbBackupSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        if (uri == null || !singletonOperationsEnabled) return@rememberLauncherForActivityResult
         coroutineScope.launch {
             try {
                 val count = withContext(Dispatchers.IO) { backupDatabaseToUri(context, uri) }
@@ -405,7 +471,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     }
 
     val dbBackupOpenLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        if (uri == null || !singletonOperationsEnabled) return@rememberLauncherForActivityResult
         coroutineScope.launch {
             isBackupImporting = true
             try {
@@ -430,7 +496,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
     LaunchedEffect(botId) {
         val recoveredSnapshots = try {
-            withContext(Dispatchers.IO) { GlobalBotState.recoverOrphanedSnapshotPaths(context) }
+            if (singletonOperationsEnabled) withContext(Dispatchers.IO) { GlobalBotState.recoverOrphanedSnapshotPaths(context) } else 0
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
@@ -465,7 +531,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
         debouncedSearchGeneration++
     }
 
-    LaunchedEffect(tabIndex, selectedGall, selectedBlockType, sortField, isAscending, debouncedSearchQuery, debouncedSearchGeneration, activeSearchScopes, generalLimit, blockLimit, holdLimit, isClearingDb) {
+    LaunchedEffect(tabIndex, selectedGall, selectedBlockType, recordScope, sortField, isAscending, debouncedSearchQuery, debouncedSearchGeneration, activeSearchScopes, generalLimit, blockLimit, holdLimit, isClearingDb) {
         if (isClearingDb) return@LaunchedEffect
         // Invalidate any independently launched pull/initial request before loading.
         when (tabIndex) {
@@ -531,7 +597,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     if (showBackupDialog) {
         AlertDialog(
             onDismissRequest = { if (!isBackupImporting) showBackupDialog = false },
-            title = { Text("DB 백업", fontWeight = FontWeight.Bold) },
+            title = { Text("전체 DB 백업", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     BackupDialogPillButton(
@@ -600,10 +666,11 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
     }
 
     if (showClearDbConfirm) {
+        val resetTarget = pendingResetTarget ?: dashboardResetTarget(recordScope)
         AlertDialog(
             onDismissRequest = { showClearDbConfirm = false },
             title = { Text("DB 초기화", fontWeight = FontWeight.Bold) },
-            text = { Text(if (isGlobalDashboard) "공용 DB를 전체 초기화할까요?\n검사 기록과 차단 기록, 저장된 스냅샷이 모두 삭제됩니다.\n(기록된 게시글 수: ${recordedPostCount}개)" else "현재 검사 범위(${scopeLabel(scopeId!!)})의 검사 기록만 초기화할까요?\n조치 기록과 다른 검사 범위는 보존됩니다.") },
+            text = { Text(if (resetTarget == DashboardResetTarget.WholeDatabase) "전체 DB를 초기화할까요?\n모든 범위의 검사·차단·보류 기록, 조치 중복방지 정보와 스냅샷이 삭제됩니다.\n(기록된 게시글 수: ${recordedPostCount}개)" else "현재 검사 범위(${scopeLabel((resetTarget as DashboardResetTarget.CheckedScope).scopeId)})의 검사 기록만 초기화할까요?\n조치 기록과 다른 검사 범위는 보존됩니다.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -623,27 +690,27 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                             try {
                                 withContext(Dispatchers.IO) {
                                     GlobalBotState.withDatabaseMaintenanceLock {
-                                        if (isGlobalDashboard) {
+                                        if (resetTarget == DashboardResetTarget.WholeDatabase) {
                                             deleteSnapshotRecordsAndFiles(postDao, listOf(context.cacheDir)) { dao ->
                                                 val paths = dao.getAllSnapshotPaths()
                                                 dao.clearAllPosts(); dao.clearAllBlockHistory(); dao.clearAllHoldHistory()
-                                                GlobalBotState.getDb()?.moderationClaimDao()?.clearAll()
+                                                database?.moderationClaimDao()?.clearAll()
                                                 paths
                                             }
                                             val survivors = checkNotNull(postDao).getAllSnapshotPaths()
                                             context.cacheDir.listFiles()?.filter { it.isDirectory && it.name.startsWith("snapshots_") }?.forEach {
                                                 deleteTrustedSnapshotDirectoryFiles(context.cacheDir, it, survivingSnapshotPaths = survivors)
                                             }
-                                        } else {
+                                        } else if (resetTarget is DashboardResetTarget.CheckedScope) {
                                             deleteSnapshotRecordsAndFiles(postDao, listOf(context.cacheDir)) { dao ->
-                                                val paths = dao.getPostsForScope(scopeId!!).map { it.snapshotPath }
-                                                dao.deletePostsForScope(scopeId!!)
+                                                val paths = dao.getPostsForScope(resetTarget.scopeId).map { it.snapshotPath }
+                                                dao.deletePostsForScope(resetTarget.scopeId)
                                                 paths
                                             }
                                         }
                                     }
                                 }
-                                GlobalBotState.lastCheckedNumbers.clear()
+                                if (singletonOperationsEnabled && resetTarget == DashboardResetTarget.WholeDatabase) GlobalBotState.lastCheckedNumbers.clear()
                                 snapshotSearchCache.clear()
                                 generalDocumentIndex.clear(); blockDocumentIndex.clear(); holdDocumentIndex.clear()
                                 generalPosts = emptyList()
@@ -652,7 +719,9 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                                 generalMatches = emptyMap()
                                 blockMatches = emptyMap()
                                 holdMatches = emptyMap()
-                                galleries = emptyList()
+                                galleries = withContext(Dispatchers.IO) { postDao?.getGalleries() ?: emptyList() }
+                                // Retain an explicit gallery only while its inventory survives.
+                                if (selectedGall != "ALL" && selectedGall !in galleries) selectedGall = "ALL"
                                 recordedPostCount = 0
                                 generalLimit = 100
                                 blockLimit = 100
@@ -770,7 +839,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "DB 대시보드",
+                    if (isGlobalDashboard) "모니터링 기록" else "DB 대시보드",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = textColor
@@ -785,7 +854,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { showBackupDialog = true },
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable(enabled = singletonOperationsEnabled) { showBackupDialog = true },
                 color = if (isDarkMode) Color(0xFF263238) else Color(0xFFE8EEF7),
                 contentColor = PastelNavy,
                 shape = RoundedCornerShape(50)
@@ -798,7 +867,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             }
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { showClearDbConfirm = true },
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable(enabled = !isClearingDb) { pendingResetTarget = dashboardResetTarget(recordScope); showClearDbConfirm = true },
                 color = if (isDarkMode) Color(0xFF3E2723) else Color(0xFFFFEBEE),
                 contentColor = warningRed,
                 shape = RoundedCornerShape(50)
@@ -817,7 +886,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                 onClick = { tabIndex = 0 },
                 text = {
                     Text(
-                        "공용 모니터링 기록",
+                        "모니터링 기록",
                         fontWeight = FontWeight.Bold,
                         color = if (tabIndex == 0) PastelNavy else subTextColor
                     )
@@ -904,6 +973,18 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
             }
         }
 
+        if (isGlobalDashboard && tabIndex == 0) {
+            LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(recordScopeOptions, key = { it.scope.toString() }) { option ->
+                    FilterChip(selected = recordScope == option.scope, enabled = !isClearingDb,
+                        onClick = { switchRecordScope(option.scope) }, label = { Text(option.label) })
+                }
+            }
+        }
+        if (tabIndex != 0) {
+            Text(if (isGlobalDashboard) "공용 조치 이력 · 모든 봇 (검사 범위 선택과 무관)" else "공용 조치 이력 · 현재 봇의 조치", modifier = Modifier.padding(horizontal = 16.dp), fontSize = 11.sp, color = subTextColor)
+        }
+
         Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
             if (tabIndex == 0) {
                 Box(modifier = Modifier.fillMaxSize().pullRefresh(generalPullRefreshState)) {
@@ -912,7 +993,7 @@ fun DbDashboardScreen(botId: String, onBack: () -> Unit) {
                         when {
                             isGeneralSearchLoading -> "검색 중..."
                             generalLoadError != null -> generalLoadError!!
-                            else -> "조건에 맞는 공용 기록이 없습니다."
+                            else -> "조건에 맞는 모니터링 기록이 없습니다."
                         },
                         modifier = Modifier.align(Alignment.Center),
                         color = subTextColor

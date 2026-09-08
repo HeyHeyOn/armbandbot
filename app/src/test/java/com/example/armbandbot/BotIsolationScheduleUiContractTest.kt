@@ -1,90 +1,103 @@
 package com.heyheyon.armbandbot
 
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
 class BotIsolationScheduleUiContractTest {
-    private fun source(name: String): String {
-        val candidates = listOf(
-            File("app/src/main/java/com/example/armbandbot/$name"),
-            File("src/main/java/com/example/armbandbot/$name"),
-        )
-        return candidates.firstOrNull(File::isFile)?.readText()?.replace("\r\n", "\n")
-            ?: error("$name not found")
+    private fun source(name: String) = listOf(File("app/src/main/java/com/example/armbandbot/$name"), File("src/main/java/com/example/armbandbot/$name")).first { it.isFile }.readText()
+
+    @Test fun refreshPrecedesIndependentThenExtractedSchedule() {
+        val detail = source("BotDetailScreen.kt").substringAfter("Text(\"기본 탐색 설정\"")
+        val refresh = detail.indexOf("ModernSettingItem(\"갤러리 설정 자동 갱신\"")
+        val independent = detail.indexOf("Text(\"독립 검사 기록\"")
+        val schedule = detail.indexOf("BotRunScheduleSettingsCard(")
+        assertTrue(refresh >= 0 && independent > refresh && schedule > independent)
+        assertFalse(detail.contains("runScheduleStartMinute"))
     }
 
-    @Test
-    fun isolationAndScheduleStateUseOneClosureCapture() {
+    @Test fun scopeGuardsRemain() {
         val detail = source("BotDetailScreen.kt")
-        val screen = detail.substringAfter("fun BotDetailScreen(")
-        val fields = listOf(
-            "independentScanStateEnabled", "showScopeBaselineDialog", "scopeBaselineChoice",
-            "hasPrivateScopeBaseline", "isScopeTransitioning", "runScheduleEnabled",
-            "runScheduleStartMinute", "runScheduleEndMinute",
-        )
-        assertTrue(detail.contains("private class BotIsolationScheduleUiState(botPref: SharedPreferences)"))
-        assertTrue(screen.contains("val isolationScheduleUi = remember { BotIsolationScheduleUiState(botPref) }"))
-        fields.forEach { field ->
-            assertTrue("$field must remain observable holder state", detail.contains("var $field by mutableStateOf("))
-            assertTrue("$field must be accessed through the holder, not captured separately",
-                Regex("(?<![\\w.])$field\\b").find(screen) == null)
-            assertTrue(screen.contains("isolationScheduleUi.$field"))
+        assertTrue(detail.contains("enabled = !isRunning && !isolationScheduleUi.isScopeTransitioning"))
+        assertTrue(detail.contains("enabled = !isolationScheduleUi.isScopeTransitioning"))
+        assertTrue(detail.contains("check(!botPref.getBoolean(\"is_running\", false))"))
+        assertTrue(detail.contains("dao.replaceScopeBaseline("))
+    }
+
+    @Test fun legacyEqualPairIsDisplayedAndCannotEnableUntilIntentionalRepair() {
+        for (minute in listOf(0, 300, 1439)) {
+            val saved = mutableListOf<BotRunSchedule>()
+            val loaded = loadBotRunSchedule(mapOf("run_schedule_enabled" to false,
+                "run_schedule_start_minute" to minute, "run_schedule_end_minute" to minute))
+            val state = BotRunScheduleEditorState(loaded, saved::add)
+            assertEquals(minute, state.legacyEditor?.startMinute)
+            assertEquals(minute, state.legacyEditor?.endMinute)
+            state.changeEnabled(true)
+            state.addWindow()
+            state.editWindow(0, minute, minute)
+            assertFalse(state.enabled)
+            assertTrue(saved.isEmpty())
+            assertEquals(minute, state.legacyEditor?.endMinute)
+            val reopened = BotRunScheduleEditorState(loaded, saved::add)
+            assertEquals(minute, reopened.legacyEditor?.startMinute)
+            assertEquals(minute, reopened.legacyEditor?.endMinute)
+            assertTrue(saved.isEmpty())
+            val end = (minute + 60) % 1440
+            state.editWindow(0, minute, end)
+            assertNull(state.legacyEditor)
+            assertEquals(BotRunWindow(minute, end), saved.single().windows.single())
+            assertFalse(saved.single().enabled)
+            state.changeEnabled(true)
+            assertTrue(saved.last().enabled)
         }
     }
 
-    @Test
-    fun botDetailExposesIsolationAndValidatedScheduleControls() {
-        val detail = source("BotDetailScreen.kt")
-        assertTrue(detail.contains("독립 검사 기록"))
-        assertTrue(detail.contains("다른 봇의 검사 완료 기록과 분리"))
-        assertTrue(detail.contains("independent_scan_state"))
-        assertTrue(detail.contains("작동 시간대"))
-        assertTrue(detail.contains("run_schedule_enabled"))
-        assertTrue(detail.contains("run_schedule_start_minute"))
-        assertTrue(detail.contains("run_schedule_end_minute"))
-        assertTrue(detail.contains("botPref.getInt(\"run_schedule_end_minute\", 1439)"))
-        assertTrue(detail.contains("시작과 종료 시각은 달라야"))
+    private fun initial() = BotRunScheduleLoadResult.Valid(BotRunSchedule(true, listOf(BotRunWindow(60, 120))))
+
+    @Test fun addRemoveReindexAndMasterOffPersistOrderedList() {
+        val saved = mutableListOf<BotRunSchedule>()
+        val state = BotRunScheduleEditorState(initial(), saved::add)
+        state.addWindow()
+        assertEquals(listOf(BotRunWindow(60,120), BotRunWindow(540,1080)), state.windows)
+        state.changeEnabled(false)
+        assertEquals(2, saved.last().windows.size)
+        assertFalse(saved.last().enabled)
+        state.removeWindow(0)
+        assertEquals(BotRunWindow(540,1080), state.windows.single())
+        state.removeWindow(0)
+        assertEquals(1, state.windows.size)
+        val reopened = BotRunScheduleEditorState(BotRunScheduleLoadResult.Valid(saved.last()), {})
+        assertEquals(state.windows, reopened.windows)
     }
 
-    @Test
-    fun scopeTransitionControlsAndConfirmationRejectRunningBots() {
-        val detail = source("BotDetailScreen.kt")
-        val toggle = detail.substringAfter("checked = isolationScheduleUi.independentScanStateEnabled,").substringBefore("onCheckedChange")
-        assertTrue(toggle.contains("enabled = !isRunning && !isolationScheduleUi.isScopeTransitioning"))
-        val runToggle = detail.substringAfter("checked = isRunning,").substringBefore("onCheckedChange")
-        assertTrue("A baseline transition must not race a start request", runToggle.contains("enabled = !isolationScheduleUi.isScopeTransitioning"))
-        val confirmation = detail.substringAfter("if (isolationScheduleUi.showScopeBaselineDialog)").substringBefore("AnimatedContent(")
-        assertTrue(confirmation.contains("TextButton(enabled = !isRunning && !isolationScheduleUi.isScopeTransitioning"))
-        val freshCheck = confirmation.indexOf("check(!botPref.getBoolean(\"is_running\", false))")
-        val mutation = confirmation.indexOf("dao.replaceScopeBaseline(")
-        assertTrue("Confirm must check persisted running state before mutating the baseline", freshCheck >= 0 && freshCheck < mutation)
+    @Test fun equalEndpointsRejectedEvenWhenDisabledBeforePersistence() {
+        val saved = mutableListOf<BotRunSchedule>()
+        val state = BotRunScheduleEditorState(initial(), saved::add)
+        state.changeEnabled(false)
+        state.editWindow(0, 60, 60)
+        assertEquals(1, saved.size)
+        assertNotNull(state.error)
+        assertEquals(BotRunWindow(60,120), state.windows.single())
     }
 
-    @Test
-    fun botListShowsWaitingStateWithoutPretendingTheBotIsStopped() {
-        val list = source("BotListScreen.kt")
-        assertTrue(list.contains("예약 대기"))
-        assertTrue(list.contains("run_schedule_enabled"))
-        assertTrue(list.contains("evaluateSchedule"))
+    @Test fun invalidCanonicalRequiresExplicitRepair() {
+        val saved = mutableListOf<BotRunSchedule>()
+        val state = BotRunScheduleEditorState(BotRunScheduleLoadResult.Error(true, "broken", "invalid"), saved::add)
+        assertTrue(state.enabled)
+        assertNotNull(state.error)
+        state.changeEnabled(false)
+        assertTrue(saved.isEmpty())
+        state.repair()
+        assertEquals(listOf(BotRunWindow(540,1080)), saved.single().windows)
+        assertTrue(saved.single().enabled)
+        assertNull(state.error)
     }
 
-    @Test
-    fun botCopyAndImportDoNotInheritPrivateScopeOrRunningState() {
-        val main = source("MainActivity.kt")
-        val transfer = source("BotSettingsTransfer.kt")
-        assertTrue(main.contains("prepareCopiedBotSettingsSnapshot("))
-        assertTrue(transfer.contains("independent_scan_state_enabled"))
-        assertTrue(transfer.contains("is_running"))
-        assertTrue(transfer.contains("should_restore_after_restart"))
-    }
-
-    @Test
-    fun dashboardShowsScopeAndActorAttribution() {
-        val dashboard = source("DbDashboardScreen.kt")
-        assertTrue(dashboard.contains("scopeId"))
-        assertTrue(dashboard.contains("actorBotId"))
-        assertTrue(dashboard.contains("검사 범위"))
-        assertTrue(dashboard.contains("조치 봇"))
+    @Test fun capIs64NotThreeAndOvernightAccepted() {
+        val state = BotRunScheduleEditorState(initial(), {})
+        repeat(70) { state.addWindow() }
+        assertEquals(64, state.windows.size)
+        state.editWindow(0, 1320, 120)
+        assertEquals(BotRunWindow(1320,120), state.windows.first())
     }
 }

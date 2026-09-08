@@ -68,6 +68,24 @@ class BotScheduleGateTest {
         assertEquals(2, reads)
     }
 
+    @Test fun invalidCanonicalDeniesRequestsAndRepairIsReadOnNextRequest() = runBlocking {
+        val values = mutableMapOf<String, Any>("run_schedule_enabled" to true, RUN_SCHEDULE_WINDOWS_JSON_KEY to "broken")
+        val read = { evaluateBotWorkGate(epoch("2026-09-07T12:00:00+09:00"), zone, loadBotRunSchedule(values)) }
+        assertFalse(mayStartScheduledRequest(read))
+        assertEquals(60_000L, read().recheckDelayMillis)
+        values[RUN_SCHEDULE_WINDOWS_JSON_KEY] = encodeBotRunWindows(listOf(BotRunWindow(0, 720), BotRunWindow(720, 0)))
+        assertTrue(mayStartScheduledRequest(read))
+        values[RUN_SCHEDULE_WINDOWS_JSON_KEY] = "broken again"
+        assertFalse(mayStartScheduledRequest(read))
+    }
+
+    @Test fun touchingAndOverlappingWindowsDoNotPauseRequests() {
+        for (start in listOf(660, 720)) {
+            val schedule = BotRunSchedule(true, listOf(BotRunWindow(540, 720), BotRunWindow(start, 900)))
+            assertTrue(evaluateBotWorkGate(epoch("2026-09-07T12:00:00+09:00"), zone, schedule).mayStartNetworkOrAction)
+        }
+    }
+
     @Test
     fun pausedCycleHasNoNormalCycleDelay() {
         assertEquals(

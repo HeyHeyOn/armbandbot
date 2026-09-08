@@ -18,6 +18,7 @@ internal const val BOT_SETTINGS_MAX_IMPORT_BYTES = 1024 * 1024
 private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtube.com", "youtu.be")
 
 internal val EXPORTABLE_STRING_KEYS = listOf(
+    RUN_SCHEDULE_WINDOWS_JSON_KEY,
     "target_urls",
     "search_type",
     "block_reason_text",

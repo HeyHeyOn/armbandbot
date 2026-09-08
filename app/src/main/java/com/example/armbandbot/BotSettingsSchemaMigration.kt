@@ -2,7 +2,7 @@ package com.heyheyon.armbandbot
 
 import org.json.JSONObject
 
-internal const val BOT_SETTINGS_CURRENT_SCHEMA_VERSION = 3
+internal const val BOT_SETTINGS_CURRENT_SCHEMA_VERSION = 4
 private const val BOT_SETTINGS_MIN_SUPPORTED_SCHEMA_VERSION = 1
 
 internal data class BotSettingsImportEnvelope(
@@ -34,6 +34,13 @@ private fun parseBotSettingsImportEnvelope(json: JSONObject): BotSettingsImportE
     require(rawSchemaVersion > 0) { "설정 파일 schemaVersion 값이 올바르지 않습니다." }
 
     val stringsJson = json.optJSONObject("strings")
+    if (stringsJson?.has(RUN_SCHEDULE_WINDOWS_JSON_KEY) == true) {
+        val raw = stringsJson.get(RUN_SCHEDULE_WINDOWS_JSON_KEY)
+        require(raw is String) { "작동 시간대 JSON은 문자열이어야 합니다." }
+        decodeBotRunWindows(raw)
+        val booleans = json.optJSONObject("booleans")
+        require(booleans?.has("run_schedule_enabled") != true || booleans.get("run_schedule_enabled") is Boolean)
+    }
     return BotSettingsImportEnvelope(
         schemaVersion = rawSchemaVersion,
         exportVersion = json.optInt("exportVersion", 1),
@@ -58,7 +65,7 @@ private fun validateSupportedSchemaVersion(schemaVersion: Int) {
 }
 
 private fun migrateBotSettingsEnvelopeToCurrent(envelope: BotSettingsImportEnvelope): BotSettingsExport = when (envelope.schemaVersion) {
-    1, 2, BOT_SETTINGS_CURRENT_SCHEMA_VERSION -> migrateSupportedSchemaToCurrent(envelope)
+    1, 2, 3, BOT_SETTINGS_CURRENT_SCHEMA_VERSION -> migrateSupportedSchemaToCurrent(envelope)
     else -> error("schemaVersion ${envelope.schemaVersion} 마이그레이션이 아직 구현되지 않았습니다.")
 }
 
@@ -80,11 +87,12 @@ private fun migrateSupportedSchemaToCurrent(envelope: BotSettingsImportEnvelope)
         legacyDeleteOnly = envelope.booleans["pum_delete_only_mode"] == true,
         processModePresent = envelope.pumProcessModePresent,
     )
-    val normalizedSchedule = normalizeRunScheduleSettings(
-        enabled = envelope.booleans["run_schedule_enabled"] == true,
-        startMinute = envelope.ints["run_schedule_start_minute"] ?: 0,
-        endMinute = envelope.ints["run_schedule_end_minute"] ?: 1439,
-    )
+    val scheduleResult = loadBotRunSchedule(envelope.strings + envelope.booleans + envelope.ints)
+    require(scheduleResult is BotRunScheduleLoadResult.Valid) { "작동 시간대 설정이 올바르지 않습니다." }
+    val normalizedSchedule = scheduleResult.schedule
+    if (scheduleResult.legacyEditor == null) {
+        normalizedStrings[RUN_SCHEDULE_WINDOWS_JSON_KEY] = encodeBotRunWindows(normalizedSchedule.windows)
+    }
     return BotSettingsExport(
         schemaVersion = BOT_SETTINGS_CURRENT_SCHEMA_VERSION,
         exportVersion = envelope.exportVersion,
@@ -94,8 +102,8 @@ private fun migrateSupportedSchemaToCurrent(envelope: BotSettingsImportEnvelope)
         booleans = envelope.booleans + ("run_schedule_enabled" to normalizedSchedule.enabled),
         ints = envelope.ints + mapOf(
             "pum_block_duration_hours" to normalizedPum.blockDurationHours,
-            "run_schedule_start_minute" to normalizedSchedule.startMinute,
-            "run_schedule_end_minute" to normalizedSchedule.endMinute,
+            "run_schedule_start_minute" to (scheduleResult.legacyEditor?.startMinute ?: normalizedSchedule.startMinuteOfDay),
+            "run_schedule_end_minute" to (scheduleResult.legacyEditor?.endMinute ?: normalizedSchedule.endMinuteOfDay),
         ),
         floats = envelope.floats,
         stringSets = normalizedStringSets,

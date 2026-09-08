@@ -458,21 +458,9 @@ fun BotListItem(
             delay(60_000L - nowEpochMillis % 60_000L)
         }
     }
-    val runSchedule = runCatching {
-        BotRunSchedule(
-            enabled = botPref.getBoolean("run_schedule_enabled", false),
-            startMinuteOfDay = botPref.getInt("run_schedule_start_minute", 0),
-            endMinuteOfDay = botPref.getInt("run_schedule_end_minute", 0),
-        )
-    }.getOrElse { BotRunSchedule.disabled() }
+    val runSchedule = loadBotRunSchedule(botPref)
     val isLoggedIn = !botPref.getString("saved_cookie", "").isNullOrBlank()
-    val statusText = when {
-        !isLoggedIn -> "로그인 필요"
-        !isRunning -> "중지됨"
-        evaluateSchedule(nowEpochMillis, ZoneId.systemDefault(), runSchedule).state == ScheduleState.WAITING ->
-            "예약 대기 · ${formatMinuteOfDay(runSchedule.startMinuteOfDay)} 시작"
-        else -> "실행 중"
-    }
+    val statusText = botScheduleStatus(isLoggedIn, isRunning, nowEpochMillis, ZoneId.systemDefault(), runSchedule)
 
     val isDarkMode = LocalIsDarkMode.current
     val cardBgColor = if (isDarkMode) Color(0xFF1E2329) else Color.White

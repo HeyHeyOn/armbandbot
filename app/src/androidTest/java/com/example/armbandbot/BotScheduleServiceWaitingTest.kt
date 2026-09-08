@@ -33,7 +33,11 @@ import java.util.concurrent.CopyOnWriteArrayList
 @RunWith(AndroidJUnit4::class)
 class BotScheduleServiceWaitingTest {
     @Test
-    fun scheduledWaitingRetainsLiveWatchdogJobUntilExplicitStop() {
+    fun scheduledWaitingRetainsLiveWatchdogJobUntilExplicitStop() = verifyWaiting(false)
+
+    @Test fun corruptCanonicalRetainsLiveJobUntilExplicitStop() = verifyWaiting(true)
+
+    private fun verifyWaiting(corrupt: Boolean) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         // Do not stop or interfere with a user's already-running service.
         assumeFalse("Requires an idle service on the test device", BotService.isServiceCreated())
@@ -62,7 +66,11 @@ class BotScheduleServiceWaitingTest {
         try {
             val now = ZonedDateTime.now()
             val minute = now.hour * 60 + now.minute
-            val schedule = BotRunSchedule(true, (minute + 60) % 1440, (minute + 120) % 1440)
+            // Unsorted windows bracket the current minute with a real union gap.
+            val schedule = BotRunSchedule(true, listOf(
+                BotRunWindow((minute + 60) % 1440, (minute + 120) % 1440),
+                BotRunWindow((minute + 1320) % 1440, (minute + 1380) % 1440),
+            ))
             assertEquals(ScheduleState.WAITING,
                 evaluateSchedule(System.currentTimeMillis(), now.zone, schedule).state)
             assertTrue(prefs.edit()
@@ -75,8 +83,10 @@ class BotScheduleServiceWaitingTest {
                 .putBoolean("is_debug_mode", true)
                 .putBoolean("independent_scan_state_enabled", true)
                 .putBoolean("run_schedule_enabled", true)
-                .putInt("run_schedule_start_minute", schedule.startMinuteOfDay)
-                .putInt("run_schedule_end_minute", schedule.endMinuteOfDay)
+                // Legacy mirror deliberately covers NOW: only canonical loading may gate this fixture.
+                .putInt("run_schedule_start_minute", (minute + 1380) % 1440)
+                .putInt("run_schedule_end_minute", (minute + 60) % 1440)
+                .putString(RUN_SCHEDULE_WINDOWS_JSON_KEY, if (corrupt) "broken" else encodeBotRunWindows(schedule.windows))
                 .commit())
             ContextCompat.registerReceiver(context, receiver, IntentFilter("BOT_LOG_EVENT"),
                 ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -90,6 +100,7 @@ class BotScheduleServiceWaitingTest {
                 prefs.getString("last_startup_phase", "") == "run_loop_entered" &&
                     messages.any { it.contains("[예약 대기]") }
             }
+            if (corrupt) assertTrue(messages.any { it.contains("시간대 설정 오류") })
             service = currentService()
             assertNotNull("Started Android service must still exist", service)
             val instance = requireNotNull(service)

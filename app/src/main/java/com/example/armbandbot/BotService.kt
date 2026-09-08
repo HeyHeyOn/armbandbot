@@ -372,15 +372,9 @@ class BotService : Service() {
         val processMode: String?
     )
 
-    private fun readCurrentSchedule(botId: String): BotRunSchedule {
+    private fun readCurrentSchedule(botId: String): BotRunScheduleLoadResult {
         val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-        return runCatching {
-            BotRunSchedule(
-                enabled = prefs.getBoolean("run_schedule_enabled", false),
-                startMinuteOfDay = prefs.getInt("run_schedule_start_minute", 0),
-                endMinuteOfDay = prefs.getInt("run_schedule_end_minute", 1439),
-            )
-        }.getOrElse { BotRunSchedule.disabled() }
+        return loadBotRunSchedule(prefs)
     }
 
     private fun isScheduleActiveNow(botId: String): Boolean = evaluateBotWorkGate(
@@ -408,16 +402,24 @@ class BotService : Service() {
 
     private suspend fun awaitActiveSchedule(botId: String, botPref: android.content.SharedPreferences) {
         var waitingLogged = false
+        var lastWaitingMessage: String? = null
         while (true) {
             currentCoroutineContext().ensureActive()
-            val gate = evaluateBotWorkGate(System.currentTimeMillis(), ZoneId.systemDefault(), readCurrentSchedule(botId))
+            val schedule = readCurrentSchedule(botId)
+            val gate = evaluateBotWorkGate(System.currentTimeMillis(), ZoneId.systemDefault(), schedule)
             if (gate.mayStartNetworkOrAction) {
                 if (waitingLogged) sendLog("[예약 재개] 작동 시간대에 진입해 검사를 재개합니다.", botId)
                 return
             }
-            if (!waitingLogged) {
+            val waitingMessage = if (schedule is BotRunScheduleLoadResult.Error) {
+                "[예약 대기] 시간대 설정 오류 · 설정을 수정할 때까지 네트워크 검사와 조치를 대기합니다."
+            } else {
+                "[예약 대기] 현재 작동 시간대가 아니므로 네트워크 검사와 조치를 대기합니다."
+            }
+            if (lastWaitingMessage != waitingMessage) {
                 waitingLogged = true
-                sendLog("[예약 대기] 현재 작동 시간대가 아니므로 네트워크 검사와 조치를 대기합니다.", botId)
+                lastWaitingMessage = waitingMessage
+                sendLog(waitingMessage, botId)
             }
             delay(gate.recheckDelayMillis.coerceIn(1L, MAX_SCHEDULE_RECHECK_DELAY_MS))
         }

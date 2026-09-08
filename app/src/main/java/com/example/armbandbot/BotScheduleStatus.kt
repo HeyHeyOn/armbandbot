@@ -7,14 +7,32 @@ internal fun botScheduleStatus(
     isRunning: Boolean,
     nowEpochMillis: Long,
     zoneId: ZoneId,
+    schedule: BotRunScheduleLoadResult,
+): String {
+    if (!isLoggedIn) return "로그인 필요"
+    if (!isRunning) return "중지됨"
+    return when (schedule) {
+        is BotRunScheduleLoadResult.Valid -> botScheduleStatus(isLoggedIn, isRunning, nowEpochMillis, zoneId, schedule.schedule)
+        is BotRunScheduleLoadResult.Error -> "예약 대기 · 시간대 설정 오류"
+    }
+}
+
+internal fun botScheduleStatus(
+    isLoggedIn: Boolean,
+    isRunning: Boolean,
+    nowEpochMillis: Long,
+    zoneId: ZoneId,
     schedule: BotRunSchedule,
 ): String {
     if (!isLoggedIn) return "로그인 필요"
     if (!isRunning) return "중지됨"
-    return if (evaluateSchedule(nowEpochMillis, zoneId, schedule).state == ScheduleState.ACTIVE) {
+    val decision = evaluateSchedule(nowEpochMillis, zoneId, schedule)
+    return if (decision.state == ScheduleState.ACTIVE) {
         "실행 중"
     } else {
-        "예약 대기 · ${formatMinuteOfDay(schedule.startMinuteOfDay)} 시작"
+        val opening = java.time.Instant.ofEpochMilli(nowEpochMillis)
+            .plusMillis(decision.millisUntilBoundary).atZone(zoneId)
+        "예약 대기 · ${formatMinuteOfDay(opening.hour * 60 + opening.minute)} 시작"
     }
 }
 
