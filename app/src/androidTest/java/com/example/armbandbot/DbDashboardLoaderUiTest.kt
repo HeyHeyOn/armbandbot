@@ -210,10 +210,9 @@ class DbDashboardLoaderUiTest {
         fun select(id: String) {
             val label = dashboardScopeOptions(listOf(DashboardScopeBot(id, if (id == A) "A" else "B", true)), emptySet())
                 .single { it.scope == DashboardRecordScope.Exact(id) }.label
-            // B may be outside the viewport; scroll the real scope LazyRow, then click its chip.
-            compose.onNode(hasScrollToIndexAction() and hasAnyDescendant(hasText(selectedLabel)))
-                .performScrollToNode(hasText(label))
-            compose.onNodeWithText(label).performClick().assertIsSelected()
+            compose.onNodeWithTag("record-filter-button").performClick()
+            compose.onNodeWithTag("record-filter-scope-$id").performScrollTo().performClick().assertIsSelected()
+            compose.onNodeWithTag("record-filter-apply").performClick()
             selectedLabel = label
         }
         fun search() {

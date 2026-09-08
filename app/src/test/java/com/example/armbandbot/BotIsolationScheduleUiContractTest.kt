@@ -10,10 +10,29 @@ class BotIsolationScheduleUiContractTest {
     @Test fun refreshPrecedesIndependentThenExtractedSchedule() {
         val detail = source("BotDetailScreen.kt").substringAfter("Text(\"기본 탐색 설정\"")
         val refresh = detail.indexOf("ModernSettingItem(\"갤러리 설정 자동 갱신\"")
-        val independent = detail.indexOf("Text(\"독립 검사 기록\"")
+        val independent = detail.indexOf("title = \"독립 검사 기록\"")
         val schedule = detail.indexOf("BotRunScheduleSettingsCard(")
         assertTrue(refresh >= 0 && independent > refresh && schedule > independent)
         assertFalse(detail.contains("runScheduleStartMinute"))
+    }
+
+    @Test fun inlineSettingsShareModernCardAndThemeContract() {
+        val common = source("ui/CommonComponents.kt")
+        assertTrue("Missing shared inline block", common.contains("fun ModernSettingsBlock("))
+        val block = common.substringAfter("fun ModernSettingsBlock(").substringBefore("fun ModernSettingItem(")
+        listOf("RoundedCornerShape(12.dp)", "defaultElevation = 0.dp", "padding(vertical = 4.dp)",
+            "padding(16.dp)", "size(24.dp)", "width(16.dp)", "FontWeight.Bold", "15.sp", "12.sp",
+            "colors.card", "colors.text", "colors.subText", "colors.iconTint", "ColumnScope.() -> Unit").forEach {
+            assertTrue("Missing block token: $it", block.contains(it))
+        }
+        assertFalse(block.contains("clickable"))
+        val detail = source("BotDetailScreen.kt").substringAfter("Text(\"기본 탐색 설정\"")
+        assertTrue(detail.contains("ModernSettingsBlock("))
+        assertTrue(detail.contains("BotRunScheduleSettingsCard(botPref, colors)"))
+        val schedule = source("BotRunScheduleSettingsCard.kt")
+        assertTrue(schedule.contains("ModernSettingsBlock("))
+        assertTrue(schedule.contains("ModernSettingsSwitch("))
+        assertTrue(schedule.contains("colors.subText"))
     }
 
     @Test fun scopeGuardsRemain() {

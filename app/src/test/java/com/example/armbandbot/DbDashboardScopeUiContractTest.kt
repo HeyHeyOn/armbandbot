@@ -6,8 +6,11 @@ import java.io.File
 
 class DbDashboardScopeUiContractTest {
     private val source = listOf(File("src/main/java/com/example/armbandbot/DbDashboardScreen.kt"), File("app/src/main/java/com/example/armbandbot/DbDashboardScreen.kt")).first { it.isFile }.readText()
-    @Test fun monitoringOnlyStripFollowsGallerySelector() {
-        assertTrue(source.indexOf("if (isGlobalDashboard && tabIndex == 0)") > source.indexOf("전체 갤러리"))
+    @Test fun monitoringUsesCompactRecordFilter() {
+        assertTrue(source.contains("DashboardRecordFilterDialog("))
+        assertTrue(source.contains("record-filter-button"))
+        assertTrue(source.contains("record-filter-summary"))
+        assertTrue(source.contains("if (post.scopeId != GLOBAL_SCAN_SCOPE)"))
         assertTrue(source.contains("모니터링 기록"))
         assertTrue(source.contains("공용 조치 이력"))
         assertTrue(source.contains("전체 DB 백업"))

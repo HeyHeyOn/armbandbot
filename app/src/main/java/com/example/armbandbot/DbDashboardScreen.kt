@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -157,6 +158,7 @@ private fun DbDashboardScreen(
         )
     }
     var showSearchScopeDialog by remember { mutableStateOf(false) }
+    val recordFilterUi = remember { DashboardRecordFilterUiState() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     var generalLimit by remember { mutableStateOf(100) }
@@ -217,11 +219,12 @@ private fun DbDashboardScreen(
         else -> "${actorLabel(rowScopeId)} 전용 검사 기록"
     }
 
-    fun switchRecordScope(next: DashboardRecordScope) {
-        if (!isGlobalDashboard || isClearingDb || next == recordScope) return
+    fun switchRecordScope(next: DashboardRecordScope, gallery: String = selectedGall) {
+            if (isClearingDb || (!isGlobalDashboard && next != recordScope) || (next == recordScope && gallery == selectedGall)) return
         dashboardDataEpoch++
         generalLoadVersion++; blockLoadVersion++; holdLoadVersion++
         recordScope = next
+        selectedGall = gallery
         generalPosts = emptyList(); blockPosts = emptyList(); holdPosts = emptyList()
         generalMatches = emptyMap(); blockMatches = emptyMap(); holdMatches = emptyMap()
         generalLoadError = null; blockLoadError = null; holdLoadError = null
@@ -231,6 +234,15 @@ private fun DbDashboardScreen(
         generalLimit = 100; blockLimit = 100; holdLimit = 100
         isGeneralSearchLoading = true; isBlockSearchLoading = false; isHoldSearchLoading = false
         generalListState.requestScrollToItem(0)
+    }
+
+    if (recordFilterUi.open) {
+        DashboardRecordFilterDialog(selectedGall, recordScope, galleries, recordScopeOptions, isGlobalDashboard,
+            onDismiss = { recordFilterUi.open = false },
+            onApply = { gallery, scope ->
+                recordFilterUi.open = false
+                switchRecordScope(scope, gallery)
+            })
     }
 
     suspend fun loadGeneralData() {
@@ -936,6 +948,16 @@ private fun DbDashboardScreen(
                         focusedBorderColor = PastelNavy,
                     )
                 )
+                if (tabIndex == 0) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { recordFilterUi.open = true }, enabled = !isClearingDb,
+                        modifier = Modifier.size(48.dp).testTag("record-filter-button")) {
+                        Icon(Icons.Filled.FilterAlt, contentDescription = "기록 필터 설정", tint = subTextColor)
+                    }
+                    dashboardRecordFilterSummary(selectedGall, recordScope, recordScopeOptions)?.let { summary ->
+                        Text(summary, modifier = Modifier.weight(1f).testTag("record-filter-summary"),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, color = subTextColor)
+                    }
+                }
                 dashboardSearchScopeSummary(activeSearchScopes)?.let { summary ->
                     Text(
                         summary,
@@ -961,11 +983,8 @@ private fun DbDashboardScreen(
             }
         }
 
-        LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (tabIndex == 0) {
-                item { FilterChip(selected = selectedGall == "ALL", onClick = { selectedGall = "ALL"; generalLimit = 100 }, label = { Text("전체 갤러리", color=if(selectedGall == "ALL") Color.White else textColor) }) }
-                items(galleries) { gId -> FilterChip(selected = selectedGall == gId, onClick = { selectedGall = gId; generalLimit = 100 }, label = { Text(gId, color=if(selectedGall == gId) Color.White else textColor) }) }
-            } else {
+        if (tabIndex != 0) LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            run {
                 val chipColor = if (tabIndex == 2) holdOrange else warningRed
                 item { FilterChip(selected = selectedBlockType == "ALL", onClick = { selectedBlockType = "ALL"; blockLimit = 100; holdLimit = 100 }, label = { Text("전체 내역", color=if(selectedBlockType == "ALL") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = chipColor, selectedLabelColor = Color.White)) }
                 item { FilterChip(selected = selectedBlockType == "POST", onClick = { selectedBlockType = "POST"; blockLimit = 100; holdLimit = 100 }, label = { Text(if (tabIndex == 2) "게시글 보류" else "게시글 차단", color=if(selectedBlockType == "POST") Color.White else textColor) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = chipColor, selectedLabelColor = Color.White)) }
@@ -973,14 +992,7 @@ private fun DbDashboardScreen(
             }
         }
 
-        if (isGlobalDashboard && tabIndex == 0) {
-            LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(recordScopeOptions, key = { it.scope.toString() }) { option ->
-                    FilterChip(selected = recordScope == option.scope, enabled = !isClearingDb,
-                        onClick = { switchRecordScope(option.scope) }, label = { Text(option.label) })
-                }
-            }
-        }
+
         if (tabIndex != 0) {
             Text(if (isGlobalDashboard) "공용 조치 이력 · 모든 봇 (검사 범위 선택과 무관)" else "공용 조치 이력 · 현재 봇의 조치", modifier = Modifier.padding(horizontal = 16.dp), fontSize = 11.sp, color = subTextColor)
         }
@@ -1023,7 +1035,7 @@ private fun DbDashboardScreen(
                                     Spacer(modifier = Modifier.height(4.dp))
                                     if (post.title != null) Text("제목: ${post.title}", fontSize = 14.sp, color = textColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     if (post.author != null) Text("작성자: ${post.author}", fontSize = 13.sp, color = subTextColor)
-                                    Text("검사 범위 · ${scopeLabel(post.scopeId)}", fontSize = 11.sp, color = PastelNavy)
+                                    if (post.scopeId != GLOBAL_SCAN_SCOPE) Text("검사 범위 · ${scopeLabel(post.scopeId)}", fontSize = 11.sp, color = PastelNavy)
                                     DashboardSearchMatchBadges(
                                         generalMatches[checkedPostDashboardIdentity(post)].orEmpty(),
                                         searchMatchAccent,

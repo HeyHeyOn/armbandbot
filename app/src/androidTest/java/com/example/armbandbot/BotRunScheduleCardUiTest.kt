@@ -11,6 +11,9 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.ViewMatchers.*
 import org.hamcrest.Matcher
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
+import com.heyheyon.armbandbot.ui.botColors
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +28,26 @@ import org.junit.Test
 /** Isolated fixture: never opens MainActivity or starts a service/network request. */
 class BotRunScheduleCardUiTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun narrowHeaderKeepsTitleAndSwitchSeparateAndBodyEditable() {
+        val state = BotRunScheduleEditorState(
+            BotRunScheduleLoadResult.Valid(BotRunSchedule(true, listOf(BotRunWindow(540, 1080)))), {})
+        compose.setContent { MaterialTheme {
+            Column(Modifier.width(280.dp).verticalScroll(rememberScrollState())) {
+                BotRunScheduleSettingsCard(state, botColors(true))
+            }
+        } }
+        val title = compose.onNodeWithText("작동 시간대").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val toggle = compose.onNodeWithTag("schedule-enabled").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue("Header title must not overlap switch", title.right <= toggle.left)
+        compose.onNodeWithTag("schedule-card").assertHasNoClickAction()
+        compose.onNodeWithTag("schedule-enabled").performClick().assertIsOff()
+        compose.onNodeWithTag("schedule-add").performScrollTo().performClick()
+        compose.onNodeWithText("시간대2").assertExists()
+        compose.onNodeWithTag("schedule-start-1").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("schedule-end-1").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        compose.runOnIdle { assertEquals(2, state.windows.size) }
+    }
 
     private fun pick(hour: Int, minute: Int) {
         onView(isAssignableFrom(TimePicker::class.java)).perform(object : ViewAction {
@@ -48,7 +71,7 @@ class BotRunScheduleCardUiTest {
         try {
             compose.setContent { MaterialTheme { key(generation) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    BotRunScheduleSettingsCard(prefs, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurface)
+                    BotRunScheduleSettingsCard(prefs, botColors(false))
                 }
             } } }
             repeat(2) { compose.onNodeWithTag("schedule-add").performScrollTo().performClick() }
@@ -86,7 +109,7 @@ class BotRunScheduleCardUiTest {
             .putInt("run_schedule_end_minute", 300).commit()
         try {
             compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-                BotRunScheduleSettingsCard(prefs, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurface)
+                BotRunScheduleSettingsCard(prefs, botColors(false))
             } } }
             compose.onNodeWithText("시작 05:00").assertExists()
             compose.onNodeWithText("종료 05:00").assertExists()
@@ -111,7 +134,7 @@ class BotRunScheduleCardUiTest {
         val prefs = context.getSharedPreferences("schedule_ui_fixture", Context.MODE_PRIVATE)
         prefs.edit().clear().putInt("run_schedule_start_minute", 60).putInt("run_schedule_end_minute", 120).commit()
         try {
-            compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BotRunScheduleSettingsCard(prefs, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurface) } } }
+            compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BotRunScheduleSettingsCard(prefs, botColors(false)) } } }
             assertFalse(prefs.contains(RUN_SCHEDULE_WINDOWS_JSON_KEY))
             compose.onNodeWithText("시간대1").assertExists()
             compose.onNodeWithTag("schedule-remove-0").assertIsNotEnabled()

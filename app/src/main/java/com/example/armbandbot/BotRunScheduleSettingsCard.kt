@@ -12,6 +12,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
+import com.heyheyon.armbandbot.ui.*
 
 /** One observable reference; do not expand the large detail-screen closure's captures. */
 internal class BotRunScheduleEditorState(initial: BotRunScheduleLoadResult, private val persist: (BotRunSchedule) -> Unit) {
@@ -61,20 +65,27 @@ internal class BotRunScheduleEditorState(initial: BotRunScheduleLoadResult, priv
 }
 
 @Composable
-internal fun BotRunScheduleSettingsCard(preferences: SharedPreferences, cardColor: Color, textColor: Color) {
+internal fun BotRunScheduleSettingsCard(preferences: SharedPreferences, colors: BotColorScheme) {
     val state = remember(preferences) { BotRunScheduleEditorState(loadBotRunSchedule(preferences)) { saveBotRunSchedule(preferences, it) } }
-    BotRunScheduleSettingsCard(state, cardColor, textColor)
+    BotRunScheduleSettingsCard(state, colors)
 }
 
 @Composable
-internal fun BotRunScheduleSettingsCard(state: BotRunScheduleEditorState, cardColor: Color = MaterialTheme.colorScheme.surface, textColor: Color = MaterialTheme.colorScheme.onSurface) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("schedule-card"), colors = CardDefaults.cardColors(containerColor = cardColor)) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("작동 시간대", Modifier.weight(1f), fontWeight = FontWeight.Bold, color = textColor)
-                Switch(checked = state.enabled, onCheckedChange = state::changeEnabled, enabled = !state.needsRepair && state.legacyEditor == null, modifier = Modifier.testTag("schedule-enabled"))
-            }
-            Text("설정한 시간대 중 하나에 해당하면 작동합니다. 끄더라도 시간대 목록은 유지됩니다.", color = textColor)
+internal fun BotRunScheduleSettingsCard(state: BotRunScheduleEditorState, colors: BotColorScheme = botColors(false)) {
+    val textColor = colors.text
+    ModernSettingsBlock(
+        title = "작동 시간대",
+        subtitle = "설정한 시간대 중 하나에 해당하면 작동",
+        icon = Icons.Filled.Schedule,
+        colors = colors,
+        modifier = Modifier.testTag("schedule-card"),
+        trailing = {
+            ModernSettingsSwitch(checked = state.enabled, onCheckedChange = state::changeEnabled,
+                colors = colors, enabled = !state.needsRepair && state.legacyEditor == null,
+                modifier = Modifier.testTag("schedule-enabled"))
+        },
+    ) {
+            Text("끄더라도 시간대 목록은 유지됩니다.", color = colors.subText, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("schedule-error")) }
             if (state.needsRepair) {
                 Text("저장된 시간대가 손상되었습니다. 복구 전에는 설정을 사용할 수 없습니다.", color = textColor)
@@ -87,9 +98,8 @@ internal fun BotRunScheduleSettingsCard(state: BotRunScheduleEditorState, cardCo
                     ScheduleWindowRow(state, index, window.startMinuteOfDay, window.endMinuteOfDay, textColor)
                 }
                 TextButton(onClick = state::addWindow, enabled = state.legacyEditor == null && state.windows.size < 64, modifier = Modifier.testTag("schedule-add")) { Text("시간대 추가") }
-                Text("${state.windows.size}/64 시간대 · 최대 64개", color = textColor)
+                Text("${state.windows.size}/64 시간대 · 최대 64개", color = colors.subText, fontSize = 12.sp)
             }
-        }
     }
 }
 

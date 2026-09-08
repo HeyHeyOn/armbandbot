@@ -99,6 +99,63 @@ fun ReadOnlyTextCard(
 }
 
 @Composable
+fun ModernSettingsSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    colors: BotColorScheme,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        modifier = modifier.scale(0.8f),
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = Color.White,
+            checkedTrackColor = PastelNavy,
+            uncheckedThumbColor = colors.switchUncheckedThumb,
+            uncheckedTrackColor = colors.switchUncheckedTrack,
+            uncheckedBorderColor = Color.Transparent,
+        ),
+    )
+}
+
+/** Inline settings with a header control and optional body; never navigates. */
+@Composable
+fun ModernSettingsBlock(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    colors: BotColorScheme,
+    modifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit = {},
+) {
+    Card(
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.card),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = colors.iconTint, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    // Keep the text layout width equal to its allocated header column.
+                    Text(title, modifier = Modifier.fillMaxWidth(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = colors.text)
+                    if (subtitle.isNotEmpty()) Text(subtitle, modifier = Modifier.fillMaxWidth(), fontSize = 12.sp, color = colors.subText)
+                }
+                Spacer(Modifier.width(16.dp))
+                trailing()
+            }
+            content()
+        }
+    }
+}
+
+@Composable
 fun ModernSettingItem(
     title: String,
     subtitle: String,

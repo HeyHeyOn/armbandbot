@@ -1951,14 +1951,14 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 ModernSettingItem("관리할 갤러리 및 검색 모드", if (targetUrlsText.isBlank()) "대상 없음" else "대상 설정됨", Icons.Filled.List, colors) { currentSubScreen = "TARGET" }
                                 ModernSettingItem("탐색 속도 및 범위", "페이지 수 및 딜레이 설정", Icons.Filled.Build, colors) { currentSubScreen = "SPEED" }
                                 ModernSettingItem("갤러리 설정 자동 갱신", "VPN/통신사/첨부 제한 시간 유지", Icons.Filled.Refresh, colors, isGallerySettingRefreshEnabled, { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }) { currentSubScreen = "GALLERY_REFRESH" }
-                                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = cardColor)) {
-                                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("독립 검사 기록", fontWeight = FontWeight.Bold, color = textColor)
-                                                Text("다른 봇의 검사 완료 기록과 분리", fontSize = 12.sp, color = subTextColor)
-                                            }
-                                            Switch(
+                                ModernSettingsBlock(
+                                    title = "독립 검사 기록",
+                                    subtitle = "다른 봇의 검사 완료 기록과 분리",
+                                    icon = Icons.Filled.Storage,
+                                    colors = colors,
+                                    trailing = {
+                                            ModernSettingsSwitch(
+                                                colors = colors,
                                                 checked = isolationScheduleUi.independentScanStateEnabled,
                                                 enabled = !isRunning && !isolationScheduleUi.isScopeTransitioning,
                                                 onCheckedChange = { enable ->
@@ -1999,17 +1999,17 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                                         }
                                                     }
                                                 },
-                                                modifier = Modifier.scale(0.8f),
                                             )
-                                        }
-                                        Text(
-                                            if (isolationScheduleUi.independentScanStateEnabled) "$botName 전용 검사 기록" else "공용 검사 기록",
-                                            color = PastelNavy,
-                                            fontSize = 11.sp,
-                                        )
-                                    }
+                                    },
+                                ) {
+                                    Text(
+                                        if (isolationScheduleUi.independentScanStateEnabled) "$botName 전용 검사 기록" else "공용 검사 기록",
+                                        color = colors.subText,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(top = 8.dp),
+                                    )
                                 }
-                                BotRunScheduleSettingsCard(botPref, cardColor, textColor)
+                                BotRunScheduleSettingsCard(botPref, colors)
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("차단 후속 동작", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
