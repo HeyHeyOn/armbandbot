@@ -1,0 +1,117 @@
+{
+  "release": "1.5.2-beta3",
+  "versionCode": 172,
+  "versionName": "1.5.2",
+  "source_commit": "093d141aae3eaabcbad6bcc2986d49113eaa47a3",
+  "apk": {
+    "name": "완장봇_v1.5.2-beta3.apk",
+    "sha256": "4460c3dcf81b2dea1ccc76f6bc3833f5009bcebc9d431ef2a8407dbb217d4329",
+    "size": 13273250
+  },
+  "source_freeze": {
+    "files": 144,
+    "unchanged": true
+  },
+  "jvm": {
+    "tests": 603,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "instrumentation": {
+    "24": {
+      "tests": 40,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "35": {
+      "tests": 42,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 73
+  },
+  "signature": "v2 verified; certificate 06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+  "dex": {
+    "invoke_range": "pass",
+    "max_input_words": 249,
+    "headroom_words": 6,
+    "capacity": [
+      {
+        "name": "classes.dex",
+        "methods": 65466,
+        "fields": 35009
+      },
+      {
+        "name": "classes2.dex",
+        "methods": 15,
+        "fields": 0
+      },
+      {
+        "name": "classes3.dex",
+        "methods": 2144,
+        "fields": 547
+      },
+      {
+        "name": "classes4.dex",
+        "methods": 64373,
+        "fields": 21677
+      },
+      {
+        "name": "classes5.dex",
+        "methods": 13146,
+        "fields": 4701
+      }
+    ]
+  },
+  "visual": "Exact release on both APIs, app-local light/dark, parent contact-sheet inspection accepted",
+  "limitations": [
+    "Offline synthetic fixtures; no live account login, deletion, blocking or long-duration repeat.",
+    "API24 excludes two API26+ PixelCopy tests; runner reports zero skips.",
+    "Original API24 5 failures preserved; same APKs pass stabilized portrait focused 5 and full suite.",
+    "No measured accessibility conformance claim."
+  ],
+  "evidence": [
+    "artifacts/beta3/filter-theme-release-result.json",
+    "artifacts/beta3/theme-final-validation/portrait-recovery/results.json",
+    "artifacts/beta3/corrected-release-visual/final-verification.json"
+  ],
+  "formal_google_docs": "untouched",
+  "drive": {
+    "완장봇_v1.5.2-beta3.apk": {
+      "metadata": {
+        "id": "1fuXQbxIpQO5EoHE5vuympZ6fX_nTkb5J",
+        "mimeType": "application/vnd.android.package-archive",
+        "name": "완장봇_v1.5.2-beta3.apk",
+        "parents": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "size": "13273250",
+        "webViewLink": "https://drive.google.com/file/d/1fuXQbxIpQO5EoHE5vuympZ6fX_nTkb5J/view?usp=drivesdk"
+      },
+      "local_sha256": "4460c3dcf81b2dea1ccc76f6bc3833f5009bcebc9d431ef2a8407dbb217d4329",
+      "download_verified": true,
+      "download_sha256": "4460c3dcf81b2dea1ccc76f6bc3833f5009bcebc9d431ef2a8407dbb217d4329"
+    },
+    "완장봇_v1.5.2-beta3_사용안내.md": {
+      "metadata": {
+        "id": "1mQSvndMH1o3Qk_CLKcMb3aGzPUkPi8Jr",
+        "mimeType": "text/markdown",
+        "name": "완장봇_v1.5.2-beta3_사용안내.md",
+        "parents": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "size": "5205",
+        "webViewLink": "https://drive.google.com/file/d/1mQSvndMH1o3Qk_CLKcMb3aGzPUkPi8Jr/view?usp=drivesdk"
+      },
+      "local_sha256": "1e37759ab2d1a4aa6ae324e799490d929086b5bd24e666909a8ef52db3969613",
+      "download_verified": true,
+      "download_sha256": "1e37759ab2d1a4aa6ae324e799490d929086b5bd24e666909a8ef52db3969613"
+    }
+  }
+}
