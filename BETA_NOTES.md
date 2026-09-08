@@ -1,3 +1,16 @@
+## 1.5.2-beta2 배포 완료
+
+- 한 봇에 여러 작동 시간대를 추가·편집·삭제할 수 있습니다. 야간 구간과 떨어진 구간을 함께 지정하고, 옵션을 꺼도 목록을 유지합니다.
+- 갤러리 선택 아래에서 전체 / 공용 / 봇별 독립 검사 기록을 전환합니다. 범위 변경 중 오래된 검색 결과가 새 화면을 덮지 않도록 보강했습니다.
+- 범위 초기화는 선택한 검사 범위 전체에 적용됩니다. 전체 탭의 초기화는 조치 이력까지 삭제하므로 먼저 백업하세요.
+- [사용 안내](https://drive.google.com/file/d/1FnBj5h1Spf5Po7WyOZxFbEVvvu8r2_lE/view) · [APK 다운로드](https://drive.google.com/file/d/1ALI5Wg8up-rJOFZFUNyXAH-TGvH9Ii1H/view)
+- JVM 596개, API 24·35 계측 각각 31개 통과(실패·오류·건너뜀 0). lintRelease·서명·DEX 검사 통과.
+- 최종 APK로 양 API에서 독립 기록 탭과 시간대 편집·동일 시각 거부·재진입 보존을 확인했습니다. 다크 DB 일부 비선택 글자는 대비가 약하며 접근성 기준 충족을 측정하지 않았습니다.
+- versionCode 171 / versionName 1.5.2. APK·안내문 Drive 메타데이터와 재다운로드 SHA-256 일치 확인.
+- 소스 커밋: `bc85909e9794bd6a02f6b894e7fd309cd8596cab`
+- APK SHA-256: `a391c4845a74fa318ce80b30aa118aa0e9a4811f1a6c3db9c2f07748c66c9ab2`
+- 검증 근거: `releases/1.5.2-beta2-verification.json`. 이번 최종 검증은 오프라인 UI/자동 테스트이며 실제 계정 연동·장시간 운용 검증은 아닙니다.
+
 ## 1.5.2-beta1 배포 완료
 
 ### 주요 변화

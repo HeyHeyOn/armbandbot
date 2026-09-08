@@ -1,0 +1,146 @@
+{
+  "release": "1.5.2-beta2",
+  "versionName": "1.5.2",
+  "versionCode": 171,
+  "previous_versionCode": 170,
+  "source_commit": "bc85909e9794bd6a02f6b894e7fd309cd8596cab",
+  "baseline_commit": "c298ccf052aef7b6363d3c2ffcf7a166e31bab39",
+  "verified_at_utc": "2026-09-08T13:55:31.958474+00:00",
+  "tests": {
+    "jvm": {
+      "tests": 596,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "API24": {
+      "tests": 31,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "API35": {
+      "tests": 31,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "source_manifest_sha256": "b2ebb33f79fab8010ff8f28744956504d78dbc1c00adb016553fd8d723cb725e",
+  "source_manifest_entries": 184,
+  "source_manifest_matches": true,
+  "evidence_directory": "artifacts/beta2/release-final/r2-20260908-221601",
+  "release_build": true,
+  "lintRelease": true,
+  "signature_v2_verified": true,
+  "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+  "dex": {
+    "apk": "releases/완장봇_v1.5.2-beta2.apk",
+    "dex_count": 5,
+    "dex": [
+      {
+        "dex": "classes.dex",
+        "methods": 65466,
+        "method_headroom": 70,
+        "fields": 35009,
+        "field_headroom": 30527,
+        "classes": 17981,
+        "max_parameter_words": 175,
+        "max_words_with_receiver_upper_bound": 176,
+        "invoke_range_word_headroom_upper_bound": 79
+      },
+      {
+        "dex": "classes2.dex",
+        "methods": 15,
+        "method_headroom": 65521,
+        "fields": 0,
+        "field_headroom": 65536,
+        "classes": 14,
+        "max_parameter_words": 0,
+        "max_words_with_receiver_upper_bound": 1,
+        "invoke_range_word_headroom_upper_bound": 254
+      },
+      {
+        "dex": "classes3.dex",
+        "methods": 2144,
+        "method_headroom": 63392,
+        "fields": 547,
+        "field_headroom": 64989,
+        "classes": 175,
+        "max_parameter_words": 10,
+        "max_words_with_receiver_upper_bound": 11,
+        "invoke_range_word_headroom_upper_bound": 244
+      },
+      {
+        "dex": "classes4.dex",
+        "methods": 65502,
+        "method_headroom": 34,
+        "fields": 21942,
+        "field_headroom": 43594,
+        "classes": 7901,
+        "max_parameter_words": 248,
+        "max_words_with_receiver_upper_bound": 249,
+        "invoke_range_word_headroom_upper_bound": 6
+      },
+      {
+        "dex": "classes5.dex",
+        "methods": 12096,
+        "method_headroom": 53440,
+        "fields": 4460,
+        "field_headroom": 61076,
+        "classes": 1480,
+        "max_parameter_words": 22,
+        "max_words_with_receiver_upper_bound": 23,
+        "invoke_range_word_headroom_upper_bound": 232
+      }
+    ],
+    "minimum_method_headroom": 34,
+    "minimum_field_headroom": 30527,
+    "maximum_parameter_words": 248,
+    "maximum_words_with_receiver_upper_bound": 249
+  },
+  "dex_actual_invoke_max_ins": 249,
+  "dex_actual_invoke_headroom": 6,
+  "exact_release_visual": {
+    "API24": "PASS",
+    "API35": "PASS",
+    "matrix": "artifacts/beta2/release-visual-final/remaining-matrix-report.md",
+    "scope": "Offline NONAUTH contained guests: settings independent toggle, DB tabs, add/edit/equal-time rejection/remove/reopen retention, portrait light and landscape dark. Parent and packaging worker inspected representative images.",
+    "limitation": "Dark DB unselected/header labels have weak contrast; no measured accessibility compliance claimed."
+  },
+  "artifacts": [
+    {
+      "id": "1ALI5Wg8up-rJOFZFUNyXAH-TGvH9Ii1H",
+      "mimeType": "application/vnd.android.package-archive",
+      "name": "완장봇_v1.5.2-beta2.apk",
+      "parents": [
+        "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+      ],
+      "sha256Checksum": "a391c4845a74fa318ce80b30aa118aa0e9a4811f1a6c3db9c2f07748c66c9ab2",
+      "size": "13273250",
+      "webViewLink": "https://drive.google.com/file/d/1ALI5Wg8up-rJOFZFUNyXAH-TGvH9Ii1H/view?usp=drivesdk",
+      "local_path": "releases/완장봇_v1.5.2-beta2.apk",
+      "sha256": "a391c4845a74fa318ce80b30aa118aa0e9a4811f1a6c3db9c2f07748c66c9ab2",
+      "download_sha256_matches": true
+    },
+    {
+      "id": "1FnBj5h1Spf5Po7WyOZxFbEVvvu8r2_lE",
+      "mimeType": "text/markdown",
+      "name": "완장봇_v1.5.2-beta2_사용안내.md",
+      "parents": [
+        "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+      ],
+      "sha256Checksum": "40cec6e53212052f7b432be5146a17ed7c5ed580a57c937e82c281285bf614a8",
+      "size": "4217",
+      "webViewLink": "https://drive.google.com/file/d/1FnBj5h1Spf5Po7WyOZxFbEVvvu8r2_lE/view?usp=drivesdk",
+      "local_path": "releases/완장봇_v1.5.2-beta2_사용안내.md",
+      "sha256": "40cec6e53212052f7b432be5146a17ed7c5ed580a57c937e82c281285bf614a8",
+      "download_sha256_matches": true
+    }
+  ],
+  "google_docs_modified": false,
+  "not_exercised": [
+    "Authenticated DC moderation in this final offline release validation",
+    "Long-duration operation"
+  ]
+}
