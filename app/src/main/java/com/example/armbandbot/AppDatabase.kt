@@ -44,7 +44,8 @@ data class BlockHistory(
     val blockTime: Long = System.currentTimeMillis(),
     val snapshotPath: String? = null,
     val creationDate: String? = null,
-    val actorBotId: String = LEGACY_ACTOR_BOT_ID
+    val actorBotId: String = LEGACY_ACTOR_BOT_ID,
+    @ColumnInfo(defaultValue = "'LEGACY'") val scopeId: String = LEGACY_ACTOR_BOT_ID
 )
 
 @Entity(
@@ -64,7 +65,8 @@ data class HoldHistory(
     val holdTime: Long = System.currentTimeMillis(),
     val snapshotPath: String? = null,
     val creationDate: String? = null,
-    val actorBotId: String = LEGACY_ACTOR_BOT_ID
+    val actorBotId: String = LEGACY_ACTOR_BOT_ID,
+    @ColumnInfo(defaultValue = "'LEGACY'") val scopeId: String = LEGACY_ACTOR_BOT_ID
 )
 
 @Dao
@@ -117,8 +119,11 @@ interface PostDao {
     @Query("DELETE FROM checked_posts WHERE scopeId = :scopeId AND gallType = :gallType AND gallId = :gallId AND postNum = :postNum")
     fun deletePost(scopeId: String, gallType: String, gallId: String, postNum: String)
 
-    @Query("SELECT DISTINCT gallId FROM checked_posts")
+    @Query("SELECT gallId FROM checked_posts UNION SELECT gallId FROM block_history UNION SELECT gallId FROM hold_history")
     fun getGalleries(): List<String>
+
+    @Query("SELECT scopeId FROM checked_posts UNION SELECT scopeId FROM block_history UNION SELECT scopeId FROM hold_history")
+    fun getHistoryScopeIds(): List<String>
 
     @Query("""
         SELECT * FROM checked_posts
@@ -340,7 +345,7 @@ interface PostDao {
 
 @Database(
     entities = [CheckedPost::class, BlockHistory::class, HoldHistory::class, ModerationActionClaim::class],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -439,18 +444,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // The actor does not identify its historical DB mode. Preserve unknown provenance.
+                db.execSQL("ALTER TABLE `block_history` ADD COLUMN `scopeId` TEXT NOT NULL DEFAULT 'LEGACY'")
+                db.execSQL("ALTER TABLE `hold_history` ADD COLUMN `scopeId` TEXT NOT NULL DEFAULT 'LEGACY'")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                ensurePreMigrationDatabaseBackup(context, targetVersion = 9)
+                ensurePreMigrationDatabaseBackup(context, targetVersion = 10)
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "bot_database"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
                 INSTANCE = instance
                 instance

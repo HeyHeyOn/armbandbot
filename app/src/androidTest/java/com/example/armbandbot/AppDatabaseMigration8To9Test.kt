@@ -115,7 +115,7 @@ class AppDatabaseMigration8To9Test {
             )
         }
         val room = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_8_9)
+            .addMigrations(AppDatabase.MIGRATION_8_9, AppDatabase.MIGRATION_9_10)
             .build()
         try {
             // Opening through Room, not only executing SQL, validates its generated schema.
@@ -124,10 +124,35 @@ class AppDatabaseMigration8To9Test {
             assertEquals("writer", post?.author)
             assertEquals(7, post?.commentCount)
             assertEquals(123L, post?.checkTime)
-            assertEquals(9, room.openHelper.writableDatabase.version)
+            assertEquals(10, room.openHelper.writableDatabase.version)
         } finally {
             room.close()
         }
+    }
+
+    @Test
+    fun actualRoomOpenFromV9PreservesUnknownProvenanceAndGlobalHoldDedup() {
+        open(version = 9, onCreate = { db -> createVersion8Schema(db); AppDatabase.MIGRATION_8_9.migrate(db) }).use { db ->
+            db.execSQL("INSERT INTO block_history (gallType,gallId,postNum,targetType,targetNo,targetAuthor,targetContent,blockReason,blockTime,actorBotId) VALUES ('M','fixture','1','POST','1','author','body','reason',99,'same-bot')")
+            db.execSQL("INSERT INTO hold_history (gallType,gallId,postNum,targetType,targetNo,targetAuthor,targetContent,holdReason,holdTime,actorBotId) VALUES ('M','fixture','2','POST','2','author','body','reason',98,'same-bot')")
+        }
+        val room = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(AppDatabase.MIGRATION_9_10).build()
+        try {
+            assertEquals(10, room.openHelper.writableDatabase.version)
+            val dao = room.postDao()
+            val old = dao.getAllBlockHistoryForBackupMerge().single()
+            assertEquals(LEGACY_ACTOR_BOT_ID, old.scopeId)
+            assertEquals("same-bot", old.actorBotId)
+            assertEquals("body", old.targetContent)
+            assertEquals(99L, old.blockTime)
+            val hold = dao.getAllHoldHistoryForBackupMerge().single()
+            assertEquals(LEGACY_ACTOR_BOT_ID, hold.scopeId)
+            assertEquals(-1L, dao.insertHoldHistory(hold.copy(id = 0, scopeId = "private")))
+            assertEquals(hold, dao.getAllHoldHistoryForBackupMerge().single())
+            dao.insertBlockHistory(old.copy(id = 0, scopeId = "private-at-operation"))
+            assertEquals(setOf(LEGACY_ACTOR_BOT_ID, "private-at-operation"), dao.getAllBlockHistoryForBackupMerge().map { it.scopeId }.toSet())
+        } finally { room.close() }
     }
 
     private fun open(

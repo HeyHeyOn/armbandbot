@@ -521,6 +521,7 @@ fun blockHistoryFromBackupColumns(row: Map<String, Any?>): BlockHistory = BlockH
     snapshotPath = row.string("snapshotPath"),
     creationDate = row.string("creationDate"),
     actorBotId = row.string("actorBotId") ?: LEGACY_ACTOR_BOT_ID,
+    scopeId = row.string("scopeId") ?: LEGACY_ACTOR_BOT_ID,
 )
 
 fun holdHistoryFromBackupColumns(row: Map<String, Any?>): HoldHistory = HoldHistory(
@@ -537,6 +538,7 @@ fun holdHistoryFromBackupColumns(row: Map<String, Any?>): HoldHistory = HoldHist
     snapshotPath = row.string("snapshotPath"),
     creationDate = row.string("creationDate"),
     actorBotId = row.string("actorBotId") ?: LEGACY_ACTOR_BOT_ID,
+    scopeId = row.string("scopeId") ?: LEGACY_ACTOR_BOT_ID,
 )
 
 internal fun shouldReplaceClaimForRestore(currentStatus: String, importedStatus: String): Boolean =
@@ -926,6 +928,7 @@ private fun snapshotKind(name: String): String? = when {
 }
 
 internal fun blockHistoryMergeKey(history: BlockHistory): String = listOf(
+    history.scopeId,
     history.actorBotId,
     history.gallType,
     history.gallId,

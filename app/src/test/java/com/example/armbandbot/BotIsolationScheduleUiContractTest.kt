@@ -10,7 +10,7 @@ class BotIsolationScheduleUiContractTest {
     @Test fun refreshPrecedesIndependentThenExtractedSchedule() {
         val detail = source("BotDetailScreen.kt").substringAfter("Text(\"기본 탐색 설정\"")
         val refresh = detail.indexOf("ModernSettingItem(\"갤러리 설정 자동 갱신\"")
-        val independent = detail.indexOf("title = \"독립 검사 기록\"")
+        val independent = detail.indexOf("IndependentDbSettingsCard(")
         val schedule = detail.indexOf("BotRunScheduleSettingsCard(")
         assertTrue(refresh >= 0 && independent > refresh && schedule > independent)
         assertFalse(detail.contains("runScheduleStartMinute"))
@@ -27,7 +27,7 @@ class BotIsolationScheduleUiContractTest {
         }
         assertFalse(block.contains("clickable"))
         val detail = source("BotDetailScreen.kt").substringAfter("Text(\"기본 탐색 설정\"")
-        assertTrue(detail.contains("ModernSettingsBlock("))
+        assertTrue(detail.contains("IndependentDbSettingsCard(botId, botPref, isRunning, colors)"))
         assertTrue(detail.contains("BotRunScheduleSettingsCard(botPref, colors)"))
         val schedule = source("BotRunScheduleSettingsCard.kt")
         assertTrue(schedule.contains("ModernSettingsBlock("))
@@ -37,12 +37,14 @@ class BotIsolationScheduleUiContractTest {
 
     @Test fun scopeGuardsRemain() {
         val detail = source("BotDetailScreen.kt")
-        assertTrue(detail.contains("enabled = !isRunning && !isolationScheduleUi.isScopeTransitioning"))
-        assertTrue(detail.contains("enabled = !isolationScheduleUi.isScopeTransitioning"))
-        assertTrue(detail.contains("check(!botPref.getBoolean(\"is_running\", false))"))
-        assertTrue(detail.contains("dao.replaceScopeBaseline("))
+        val toggle = source("IndependentDbSettingsCard.kt")
+        assertTrue(toggle.contains("!running && !preferences.getBoolean(\"is_running\", false)"))
+        assertTrue(toggle.contains("!BotService.hasUnfinishedDatabaseWork(botId)"))
+        assertTrue(toggle.contains("GlobalBotState.withDatabaseMaintenanceLock"))
+        assertFalse(detail.contains("dao.replaceScopeBaseline("))
+        assertFalse(detail.contains("showScopeBaselineDialog) {"))
+        assertFalse(toggle.contains("deletePostsForScope"))
     }
-
     @Test fun legacyEqualPairIsDisplayedAndCannotEnableUntilIntentionalRepair() {
         for (minute in listOf(0, 300, 1439)) {
             val saved = mutableListOf<BotRunSchedule>()

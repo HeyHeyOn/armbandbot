@@ -57,7 +57,7 @@ class DbDashboardSearchUiContractTest {
 
         val debounceEffect = sourceBetween(
             "LaunchedEffect(searchQuery, isClearingDb) {",
-            "LaunchedEffect(tabIndex, selectedGall",
+            "LaunchedEffect(tabIndex, recordFilterUi.selectedGall",
         )
         assertTrue("DB clear must cancel and suppress pending debounce work", "if (isClearingDb) return@LaunchedEffect" in debounceEffect)
         assertTrue(
@@ -97,7 +97,7 @@ class DbDashboardSearchUiContractTest {
     fun rawQueryInvalidatesCurrentTabBeforeDebounceDelay() {
         val effect = sourceBetween(
             "LaunchedEffect(searchQuery, isClearingDb) {",
-            "LaunchedEffect(tabIndex, selectedGall",
+            "LaunchedEffect(tabIndex, recordFilterUi.selectedGall",
         )
         val delayIndex = effect.indexOf("delay(300)")
         assertTrue("The query effect must still debounce non-blank input", delayIndex >= 0)
@@ -121,7 +121,7 @@ class DbDashboardSearchUiContractTest {
         assertTrue(source.contains("var debouncedSearchGeneration by remember { mutableIntStateOf(0) }"))
         val effect = sourceBetween(
             "LaunchedEffect(searchQuery, isClearingDb) {",
-            "LaunchedEffect(tabIndex, selectedGall",
+            "LaunchedEffect(tabIndex, recordFilterUi.selectedGall",
         )
         val assignment = effect.indexOf("debouncedSearchQuery = searchQuery")
         val increment = effect.indexOf("debouncedSearchGeneration++")
@@ -131,10 +131,10 @@ class DbDashboardSearchUiContractTest {
     @Test
     fun clearDatabaseInvalidatesEveryLoaderBeforeLaunchingDelete() {
         val clearDialog = sourceBetween(
-            "if (showClearDbConfirm) {",
+            "recordFilterUi.frozenReset?.let { resetTarget ->",
             "if (pendingDeletePost != null",
         )
-        val onClick = clearDialog.substring(clearDialog.indexOf("onClick = {") + "onClick = {".length)
+        val onClick = clearDialog.substring(clearDialog.indexOf("onReset = {") + "onReset = {".length)
         val beforeLaunch = onClick.substringBefore("coroutineScope.launch {")
 
         assertTrue("Clear mode must begin synchronously", "isClearingDb = true" in beforeLaunch)
@@ -150,7 +150,7 @@ class DbDashboardSearchUiContractTest {
             assertTrue("$error must be cleared before launching DB deletion", "$error = null" in beforeLaunch)
         }
         val launchBody = onClick.substringAfter("coroutineScope.launch {")
-        assertTrue("Clear mode must end only after empty-state/cache cleanup", launchBody.indexOf("isClearingDb = false") > launchBody.indexOf("recordedPostCount = 0"))
+        assertTrue("Clear mode must end only after empty-state/cache cleanup", launchBody.indexOf("isClearingDb = false") > launchBody.indexOf("recordedPostCount = withContext"))
     }
 
     @Test

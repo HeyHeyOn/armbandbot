@@ -40,7 +40,7 @@ class DbDashboardRecordFilterUiTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun draftCancelApplyAndReopenKeepTheCommittedPair() {
-        var gallery by mutableStateOf("ALL")
+        var gallery by mutableStateOf<Set<String>?>(null)
         var scope by mutableStateOf<DashboardRecordScope>(DashboardRecordScope.All)
         var open by mutableStateOf(true)
         var calls = 0
@@ -50,20 +50,20 @@ class DbDashboardRecordFilterUiTest {
                 onDismiss = { open = false }, onApply = { g, s -> gallery = g; scope = s; calls++; open = false })
         } }
         fun draft() {
-            compose.onNodeWithTag("record-filter-gallery-real-gallery").performScrollTo().performClick()
-            compose.onNodeWithTag("record-filter-scope-private-id").performScrollTo().performClick()
+            compose.selectOnlyRecordFilter("gallery", "real-gallery")
+            compose.selectOnlyRecordFilter("scope", "private-id")
         }
         draft()
-        compose.runOnIdle { assertEquals("ALL", gallery); assertEquals(DashboardRecordScope.All, scope); assertEquals(0, calls) }
+        compose.runOnIdle { assertNull(gallery); assertEquals(DashboardRecordScope.All, scope); assertEquals(0, calls) }
         compose.onNodeWithTag("record-filter-cancel").performClick()
         compose.runOnIdle { open = true }
-        compose.onNodeWithTag("record-filter-gallery-ALL").assertIsSelected()
-        compose.onNodeWithTag("record-filter-scope-ALL").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("record-filter-gallery-ALL").assertIsOn()
+        compose.onNodeWithTag("record-filter-scope-ALL").performScrollTo().assertIsOn()
         draft()
         compose.onNodeWithTag("record-filter-apply").performClick()
-        compose.runOnIdle { assertEquals("real-gallery", gallery); assertEquals(DashboardRecordScope.Exact("private-id"), scope); assertEquals(1, calls); open = true }
-        compose.onNodeWithTag("record-filter-gallery-real-gallery").assertIsSelected()
-        compose.onNodeWithTag("record-filter-scope-private-id").performScrollTo().assertIsSelected()
+        compose.runOnIdle { assertEquals(setOf("real-gallery"), gallery); assertEquals(DashboardRecordScope.Exact("private-id"), scope); assertEquals(1, calls); open = true }
+        compose.onNodeWithTag("record-filter-gallery-real-gallery").assertIsOn()
+        compose.onNodeWithTag("record-filter-scope-private-id").performScrollTo().assertIsOn()
     }
 
     @Test fun popupDraftBackDismissalKeepsAppliedSummaryResultsAndReopenSelections() =
@@ -161,16 +161,18 @@ class DbDashboardRecordFilterUiTest {
                 assertRenderedColor("record-filter-dialog", if (dark) Color(0xFF2C323A) else Color.White, 500)
                 assertRenderedColor("record-filter-gallery-ALL", if (dark) Color(0xFFE0E0E0) else Color(0xFF2C3E50))
                 assertRenderedColor("record-filter-gallery-ALL", if (dark) Color(0xFF90A4AE) else Color(0xFF4A6583))
+                compose.onNodeWithTag("record-filter-gallery-applied-gallery").performClick().assertIsOff()
                 assertRenderedColor("record-filter-gallery-applied-gallery", if (dark) Color(0xFFAAAEB3) else Color.DarkGray)
             }
-            compose.onNodeWithTag("record-filter-gallery-applied-gallery").performScrollTo().performClick()
-            compose.onNodeWithTag("record-filter-scope-$GLOBAL_SCAN_SCOPE").performScrollTo().performClick()
+            saveBeta4UiEvidence("filter-local-theme-$dark")
+            compose.selectOnlyRecordFilter("gallery", "applied-gallery")
+            compose.selectOnlyRecordFilter("scope", "$GLOBAL_SCAN_SCOPE")
             compose.onNodeWithTag("record-filter-apply").performClick()
             assertAppliedResults()
 
             compose.onNodeWithTag("record-filter-button").performClick()
-            compose.onNodeWithTag("record-filter-gallery-draft-gallery").performScrollTo().performClick().assertIsSelected()
-            compose.onNodeWithTag("record-filter-scope-dismissal-private").performScrollTo().performClick().assertIsSelected()
+            compose.selectOnlyRecordFilter("gallery", "draft-gallery").assertIsOn()
+            compose.selectOnlyRecordFilter("scope", "dismissal-private").assertIsOn()
             // Draft changes must not leak into the actual dashboard, even before dismissal.
             compose.onNodeWithTag("record-filter-summary").assertTextEquals("applied-gallery, 공용")
             compose.onNodeWithText("제목: $appliedTitle").assertExists()
@@ -184,12 +186,12 @@ class DbDashboardRecordFilterUiTest {
             assertAppliedResults()
 
             compose.onNodeWithTag("record-filter-button").performClick()
-            compose.onNodeWithTag("record-filter-gallery-applied-gallery").performScrollTo().assertIsSelected()
-            compose.onNodeWithTag("record-filter-gallery-draft-gallery").performScrollTo().assertIsNotSelected()
-            compose.onNodeWithTag("record-filter-gallery-ALL").performScrollTo().assertIsNotSelected()
-            compose.onNodeWithTag("record-filter-scope-$GLOBAL_SCAN_SCOPE").performScrollTo().assertIsSelected()
-            compose.onNodeWithTag("record-filter-scope-dismissal-private").performScrollTo().assertIsNotSelected()
-            compose.onNodeWithTag("record-filter-scope-ALL").performScrollTo().assertIsNotSelected()
+            compose.onNodeWithTag("record-filter-gallery-applied-gallery").performScrollTo().assertIsOn()
+            compose.onNodeWithTag("record-filter-gallery-draft-gallery").performScrollTo().assertIsOff()
+            compose.onNodeWithTag("record-filter-gallery-ALL").performScrollTo().assertIsOff()
+            compose.onNodeWithTag("record-filter-scope-$GLOBAL_SCAN_SCOPE").performScrollTo().assertIsOn()
+            compose.onNodeWithTag("record-filter-scope-dismissal-private").performScrollTo().assertIsOff()
+            compose.onNodeWithTag("record-filter-scope-ALL").performScrollTo().assertIsOff()
             compose.onNodeWithTag("record-filter-cancel").performClick()
             assertAppliedResults()
             assertEquals(4, db.postDao().getAllPostsForBackupMerge().size)
@@ -246,10 +248,10 @@ class DbDashboardRecordFilterUiTest {
         val fixed = DashboardRecordScope.Exact("private-id")
         var applied: DashboardRecordScope? = null
         compose.setContent { MaterialTheme {
-            DashboardRecordFilterDialog("ALL", fixed, listOf("real-gallery"), dashboardScopeOptions(emptyList(), setOf("private-id")), false, {}, { _, s -> applied = s })
+            DashboardRecordFilterDialog(null, fixed, listOf("real-gallery"), dashboardScopeOptions(emptyList(), setOf("private-id")), false, {}, { _, s -> applied = s })
         } }
         compose.onNodeWithTag("record-filter-scope-GLOBAL").assertDoesNotExist()
-        compose.onNodeWithTag("record-filter-gallery-real-gallery").performClick()
+        compose.selectOnlyRecordFilter("gallery", "real-gallery")
         compose.onNodeWithTag("record-filter-apply").performClick()
         compose.runOnIdle { assertEquals(fixed, applied) }
     }

@@ -65,13 +65,13 @@ internal class BotRunScheduleEditorState(initial: BotRunScheduleLoadResult, priv
 }
 
 @Composable
-internal fun BotRunScheduleSettingsCard(preferences: SharedPreferences, colors: BotColorScheme) {
+internal fun BotRunScheduleSettingsPage(preferences: SharedPreferences, colors: BotColorScheme) {
     val state = remember(preferences) { BotRunScheduleEditorState(loadBotRunSchedule(preferences)) { saveBotRunSchedule(preferences, it) } }
-    BotRunScheduleSettingsCard(state, colors)
+    BotRunScheduleSettingsPage(state, colors)
 }
 
 @Composable
-internal fun BotRunScheduleSettingsCard(state: BotRunScheduleEditorState, colors: BotColorScheme = botColors(false)) {
+internal fun BotRunScheduleSettingsPage(state: BotRunScheduleEditorState, colors: BotColorScheme = botColors(false)) {
     val textColor = colors.text
     ModernSettingsBlock(
         title = "작동 시간대",

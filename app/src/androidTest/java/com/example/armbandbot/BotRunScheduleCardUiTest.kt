@@ -29,12 +29,38 @@ import org.junit.Test
 class BotRunScheduleCardUiTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun detailCardNavigatesWithoutInlineIntervalsAndSwitchDoesNotNavigate() {
+        val state = BotRunScheduleEditorState(
+            BotRunScheduleLoadResult.Valid(BotRunSchedule(true, listOf(BotRunWindow(540, 1080)))), {})
+        compose.setContent { MaterialTheme { BotRunScheduleSettingsCard(state, botColors(true)) } }
+        compose.onNodeWithTag("schedule-add").assertDoesNotExist()
+        compose.onNodeWithTag("schedule-enabled").performClick().assertIsOff()
+        compose.onNodeWithTag("schedule-add").assertDoesNotExist()
+        val divider = compose.onNodeWithTag("schedule-divider", useUnmergedTree = true).assertExists().fetchSemanticsNode().boundsInRoot
+        val toggle = compose.onNodeWithTag("schedule-enabled").fetchSemanticsNode().boundsInRoot
+        assertTrue(divider.width > 0 && divider.right < toggle.left)
+        saveBeta4UiEvidence("schedule-detail-card")
+        compose.onNodeWithTag("schedule-card").performClick()
+        compose.onAllNodes(isDialog()).assertCountEquals(0)
+        val page = compose.onNodeWithTag("schedule-page").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals(root.width, page.width, 1f)
+        assertEquals(root.height, page.height, 1f)
+        saveBeta4UiEvidence("schedule-full-page")
+        compose.onNodeWithTag("schedule-add").assertIsDisplayed().performClick()
+        compose.onNodeWithText("시간대2").assertExists()
+        compose.onNodeWithTag("schedule-back").performClick()
+        compose.onNodeWithTag("schedule-add").assertDoesNotExist()
+        compose.onNodeWithTag("schedule-enabled").assertIsOff()
+        compose.runOnIdle { assertEquals(2, state.windows.size) }
+    }
+
     @Test fun narrowHeaderKeepsTitleAndSwitchSeparateAndBodyEditable() {
         val state = BotRunScheduleEditorState(
             BotRunScheduleLoadResult.Valid(BotRunSchedule(true, listOf(BotRunWindow(540, 1080)))), {})
         compose.setContent { MaterialTheme {
             Column(Modifier.width(280.dp).verticalScroll(rememberScrollState())) {
-                BotRunScheduleSettingsCard(state, botColors(true))
+                BotRunScheduleSettingsPage(state, botColors(true))
             }
         } }
         val title = compose.onNodeWithText("작동 시간대").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
@@ -71,7 +97,7 @@ class BotRunScheduleCardUiTest {
         try {
             compose.setContent { MaterialTheme { key(generation) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    BotRunScheduleSettingsCard(prefs, botColors(false))
+                    BotRunScheduleSettingsPage(prefs, botColors(false))
                 }
             } } }
             repeat(2) { compose.onNodeWithTag("schedule-add").performScrollTo().performClick() }
@@ -109,7 +135,7 @@ class BotRunScheduleCardUiTest {
             .putInt("run_schedule_end_minute", 300).commit()
         try {
             compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-                BotRunScheduleSettingsCard(prefs, botColors(false))
+                BotRunScheduleSettingsPage(prefs, botColors(false))
             } } }
             compose.onNodeWithText("시작 05:00").assertExists()
             compose.onNodeWithText("종료 05:00").assertExists()
@@ -134,7 +160,7 @@ class BotRunScheduleCardUiTest {
         val prefs = context.getSharedPreferences("schedule_ui_fixture", Context.MODE_PRIVATE)
         prefs.edit().clear().putInt("run_schedule_start_minute", 60).putInt("run_schedule_end_minute", 120).commit()
         try {
-            compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BotRunScheduleSettingsCard(prefs, botColors(false)) } } }
+            compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BotRunScheduleSettingsPage(prefs, botColors(false)) } } }
             assertFalse(prefs.contains(RUN_SCHEDULE_WINDOWS_JSON_KEY))
             compose.onNodeWithText("시간대1").assertExists()
             compose.onNodeWithTag("schedule-remove-0").assertIsNotEnabled()
@@ -154,7 +180,7 @@ class BotRunScheduleCardUiTest {
     @Test fun corruptCanonicalShowsExplicitRepairAndNeverAutoSaves() {
         var saved: BotRunSchedule? = null
         val state = BotRunScheduleEditorState(BotRunScheduleLoadResult.Error(true,"broken","손상된 설정")) { saved = it }
-        compose.setContent { MaterialTheme { BotRunScheduleSettingsCard(state) } }
+        compose.setContent { MaterialTheme { BotRunScheduleSettingsPage(state) } }
         compose.onNodeWithTag("schedule-error").assertExists()
         compose.onNodeWithTag("schedule-enabled").assertIsNotEnabled().assertIsOn()
         assertNull(saved)

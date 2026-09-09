@@ -110,6 +110,8 @@ class BotScheduleServiceWaitingTest {
             // the real bot list merely to make the test bot eligible for global restoration.
             assertSame(job, jobs(instance, "runLoopEnteredJobs")[botId])
             assertTrue(job.isActive)
+            assertTrue(BotService.hasUnfinishedDatabaseWork())
+            assertTrue(BotService.hasUnfinishedDatabaseWork(botId))
             assertTrue(prefs.getBoolean("is_running", false))
             assertTrue(prefs.getBoolean("should_restore_after_restart", false))
 
@@ -131,6 +133,7 @@ class BotScheduleServiceWaitingTest {
                     jobs(instance, "activeBots")[botId] == null &&
                     jobs(instance, "runLoopEnteredJobs")[botId] == null
             }
+            assertFalse(BotService.hasUnfinishedDatabaseWork(botId))
             stopAcknowledged = true
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
             assertNoAuthOrCycle(messages)

@@ -36,7 +36,13 @@ class DbDashboardScopeTest {
         assertFalse(frozen.isCurrent(DashboardRecordScope.Exact("a"), 4))
     }
     @Test fun destructiveTargetFreezesExactGlobalRatherThanFullDatabase() {
-        assertEquals(DashboardResetTarget.CheckedScope(GLOBAL_SCAN_SCOPE), dashboardResetTarget(DashboardRecordScope.Exact(GLOBAL_SCAN_SCOPE)))
-        assertEquals(DashboardResetTarget.WholeDatabase, dashboardResetTarget(DashboardRecordScope.All))
+        val inventory = mutableSetOf(GLOBAL_SCAN_SCOPE, "private")
+        val common = freezeDashboardResetTarget(false, setOf(GLOBAL_SCAN_SCOPE), inventory)
+        val all = freezeDashboardResetTarget(true, emptySet(), inventory)
+        inventory.add("later")
+        assertEquals(setOf(GLOBAL_SCAN_SCOPE), common.scopeIds)
+        assertFalse(common.allDatabases)
+        assertEquals(setOf(GLOBAL_SCAN_SCOPE, "private"), all.scopeIds)
+        assertTrue(all.allDatabases)
     }
 }

@@ -34,7 +34,14 @@ class DatabaseBackupSourceContractTest {
         val dashboard = source("DbDashboardScreen.kt")
 
         assertTrue(restoreBody.contains("GlobalBotState.withDatabaseMaintenanceLock"))
-        assertTrue(dashboard.contains("GlobalBotState.withDatabaseMaintenanceLock"))
+        assertTrue(dashboard.contains("resetDashboardRecords(checkNotNull(database), context.cacheDir, resetTarget)"))
+        val reset = source("DashboardResetUi.kt").substringAfter("internal fun resetDashboardRecords")
+        assertTrue(reset.contains("GlobalBotState.withDatabaseMaintenanceLock"))
+        assertTrue(reset.indexOf("withDatabaseMaintenanceLock") < reset.indexOf("check(mayReset())"))
+        assertTrue(reset.contains("database.runInTransaction"))
+        assertTrue(dashboard.contains("deleteSnapshotRecordsAndFiles("))
+        val rowDelete = source("SnapshotRecovery.kt").substringAfter("fun deleteSnapshotRecordsAndFiles")
+        assertTrue(rowDelete.contains("GlobalBotState.withDatabaseMaintenanceLock"))
     }
 
     @Test

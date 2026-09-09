@@ -137,6 +137,6 @@ class SnapshotRecordDeletionTest {
             File("app/src/main/java/com/example/armbandbot/DbDashboardScreen.kt")).first { it.exists() }.readText()
         assertTrue(source.contains("deleteSnapshotRecordsAndFiles(postDao"))
         assertFalse(source.contains("deleteSnapshotFiles(target"))
-        assertTrue(source.contains("공용 조치 이력에서도 삭제됩니다"))
+        assertTrue(source.contains("이 조치 기록은 다른 조회 화면에서도 삭제됩니다"))
     }
 }

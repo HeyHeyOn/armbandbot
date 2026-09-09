@@ -250,6 +250,7 @@ object GlobalBotState {
 
     fun saveBlockHistory(
         actorBotId: String,
+        scopeId: String,
         gallType: String,
         gallId: String,
         postNum: String,
@@ -274,7 +275,8 @@ object GlobalBotState {
                     blockReason = blockReason,
                     snapshotPath = snapshotPath,
                     creationDate = creationDate,
-                    actorBotId = actorBotId
+                    actorBotId = actorBotId,
+                    scopeId = scopeId
                 )
             )
         }
@@ -283,6 +285,7 @@ object GlobalBotState {
 
     fun saveHoldHistory(
         actorBotId: String,
+        scopeId: String,
         gallType: String,
         gallId: String,
         postNum: String,
@@ -307,7 +310,8 @@ object GlobalBotState {
                     holdReason = holdReason,
                     snapshotPath = snapshotPath,
                     creationDate = creationDate,
-                    actorBotId = actorBotId
+                    actorBotId = actorBotId,
+                    scopeId = scopeId
                 )
             )
         }

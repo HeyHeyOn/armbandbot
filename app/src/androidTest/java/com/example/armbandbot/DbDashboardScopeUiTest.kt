@@ -66,6 +66,13 @@ class DbDashboardScopeUiTest {
                 }
             }
         }
+        fun chooseReset(all: Boolean, vararg ids: String) {
+            compose.onNodeWithText("초기화").performClick()
+            compose.onNodeWithTag("db-reset-chooser").assertExists()
+            compose.onNodeWithTag(if (all) "db-reset-all" else "db-reset-selected").performClick()
+            if (!all) ids.forEach { compose.onNodeWithTag("db-reset-scope-$it").performScrollTo().performClick() }
+            compose.onNodeWithTag("db-reset-next").performClick()
+        }
         try {
             compose.setContent { CompositionLocalProvider(LocalContext provides context, LocalActivityResultRegistryOwner provides registryOwner) { MaterialTheme { DbDashboardScreen(GLOBAL_SCAN_SCOPE, {}, database = db) } } }
             compose.waitUntil(10_000) { compose.onAllNodesWithText("제목: global fixture title").fetchSemanticsNodes().isNotEmpty() }
@@ -73,7 +80,7 @@ class DbDashboardScopeUiTest {
                 compose.onNodeWithText("백업").assertIsNotEnabled()
                 GlobalBotState.lastCheckedNumbers[prefix] = 731
                 try {
-                    compose.onNodeWithText("초기화").performClick()
+                    chooseReset(true)
                     compose.onNode(hasText("초기화") and hasAnyAncestor(isDialog())).performClick()
                     compose.waitUntil(10_000) {
                         dao.getAllPostsForBackupMerge().isEmpty() &&
@@ -87,7 +94,7 @@ class DbDashboardScopeUiTest {
             }
             fun selectScope(id: String) {
                 compose.onNodeWithTag("record-filter-button").performClick()
-                compose.onNodeWithTag("record-filter-scope-$id").performScrollTo().performClick()
+                compose.selectOnlyRecordFilter("scope", "$id")
                 compose.onNodeWithTag("record-filter-apply").performClick()
             }
             compose.onNodeWithTag("record-filter-summary").assertDoesNotExist()
@@ -99,23 +106,23 @@ class DbDashboardScopeUiTest {
             // Exercise the real scope callback while a confirmation is pending; a modal
             // blocks pointer input, so retain its semantics action before opening it.
             compose.onNodeWithTag("record-filter-button").performClick()
-            compose.onNodeWithTag("record-filter-scope-fixture-private").performScrollTo().performClick()
+            compose.selectOnlyRecordFilter("scope", "fixture-private")
             val switchToPrivate = compose.onNodeWithTag("record-filter-apply").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
             compose.onNodeWithTag("record-filter-cancel").performClick()
-            compose.onNodeWithText("초기화").performClick()
-            compose.onNodeWithText("조치 기록과 다른 검사 범위는 보존됩니다.", substring = true).assertExists()
+            chooseReset(false, GLOBAL_SCAN_SCOPE)
+            compose.onNodeWithText("다른 DB와 중복 조치 방지 정보는 보존됩니다.", substring = true).assertExists()
             compose.runOnIdle { switchToPrivate() }
             compose.onAllNodes(isDialog()).assertCountEquals(0)
             assertEquals(2, dao.getPostsForScope(GLOBAL_SCAN_SCOPE).size)
             selectScope("ALL")
-            compose.onNodeWithText("초기화").performClick()
-            compose.onNodeWithText("전체 DB를 초기화할까요?", substring = true).assertExists()
+            chooseReset(true)
+            compose.onNodeWithText("전체 DB 기록을 초기화할까요?", substring = true).assertExists()
             compose.onNodeWithText("취소").performClick()
             compose.onNodeWithTag("record-filter-button").performClick()
-            compose.onNodeWithTag("record-filter-gallery-fixture-gallery").performScrollTo().performClick()
+            compose.selectOnlyRecordFilter("gallery", "fixture-gallery")
             compose.onNodeWithTag("record-filter-apply").performClick()
             selectScope(GLOBAL_SCAN_SCOPE)
-            compose.onNodeWithText("초기화").performClick()
+            chooseReset(false, GLOBAL_SCAN_SCOPE)
             compose.onNode(hasText("초기화") and hasAnyAncestor(isDialog())).performClick()
             compose.waitUntil(10_000) {
                 dao.getPostsForScope(GLOBAL_SCAN_SCOPE).isEmpty() && !exclusive.exists() &&
@@ -125,7 +132,7 @@ class DbDashboardScopeUiTest {
             selectScope("fixture-private")
             compose.waitUntil(10_000) { compose.onAllNodesWithText("제목: private fixture title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("record-filter-button").performClick()
-            compose.onNodeWithTag("record-filter-gallery-fixture-gallery").assertIsSelected()
+            compose.onNodeWithTag("record-filter-gallery-fixture-gallery").assertIsOn()
             compose.onNodeWithTag("record-filter-cancel").performClick()
             compose.onNodeWithText("백업").assertIsNotEnabled()
             assertEquals(listOf(privateRow), dao.getPostsForScope("fixture-private"))

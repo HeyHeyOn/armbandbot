@@ -434,6 +434,9 @@ class BotService : Service() {
 
         fun isServiceCreated(): Boolean = serviceCreated
 
+        private val databaseWork = DatabaseWorkRegistry()
+        internal fun hasUnfinishedDatabaseWork(botId: String? = null): Boolean = databaseWork.hasUnfinishedWork(botId)
+
         fun hasAllRestorableBotsEnteredRunLoop(context: Context): Boolean {
             val instance = currentInstance ?: return false
             val expectedBotIds = getEligibleRestorableBotIds(context).toSet()
@@ -870,8 +873,11 @@ class BotService : Service() {
             }
         }
 
-        activeBots[botId] = job
-        val started = job.start()
+        val started = GlobalBotState.withDatabaseMaintenanceLock {
+            databaseWork.register(job, botId)
+            activeBots[botId] = job
+            job.start()
+        }
         if (started && job.isActive && !job.isCancelled) {
             sendLog("[복구 점검] activeBots에 Job 등록 및 시작 완료", botId)
         } else {
@@ -3774,6 +3780,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
             GlobalBotState.saveBlockHistory(
                 actorBotId = botId,
+                    scopeId = config.scanScopeId,
                 gallType = gallType,
                 gallId = gallId,
                 postNum = postNumStr,
@@ -5903,6 +5910,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 persistModerationHistoryOrLog(botId) {
                     GlobalBotState.saveHoldHistory(
                         actorBotId = botId,
+                    scopeId = config.scanScopeId,
                         gallType = gallType,
                         gallId = gallId,
                         postNum = postNumStr,
@@ -5919,6 +5927,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 persistModerationHistoryOrLog(botId) {
                     GlobalBotState.saveBlockHistory(
                     actorBotId = botId,
+                    scopeId = config.scanScopeId,
                     gallType = gallType,
                     gallId = gallId,
                     postNum = postNumStr,
@@ -6195,6 +6204,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 persistModerationHistoryOrLog(botId) {
                     GlobalBotState.saveHoldHistory(
                     actorBotId = botId,
+                    scopeId = config.scanScopeId,
                     gallType = gallType,
                     gallId = gallId,
                     postNum = postNumStr,
@@ -6211,6 +6221,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 persistModerationHistoryOrLog(botId) {
                     GlobalBotState.saveBlockHistory(
                     actorBotId = botId,
+                    scopeId = config.scanScopeId,
                     gallType = gallType,
                     gallId = gallId,
                     postNum = postNumStr,

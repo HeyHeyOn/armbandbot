@@ -211,7 +211,7 @@ class DbDashboardLoaderUiTest {
             val label = dashboardScopeOptions(listOf(DashboardScopeBot(id, if (id == A) "A" else "B", true)), emptySet())
                 .single { it.scope == DashboardRecordScope.Exact(id) }.label
             compose.onNodeWithTag("record-filter-button").performClick()
-            compose.onNodeWithTag("record-filter-scope-$id").performScrollTo().performClick().assertIsSelected()
+            compose.selectOnlyRecordFilter("scope", "$id").assertIsOn()
             compose.onNodeWithTag("record-filter-apply").performClick()
             selectedLabel = label
         }
