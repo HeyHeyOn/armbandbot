@@ -60,6 +60,22 @@ internal suspend fun mayStartScheduledRequest(readFreshGate: () -> BotWorkGate):
     return readFreshGate().mayStartNetworkOrAction
 }
 
+/** Keeps the first [maximum] entries of an already newest-first list. */
+internal fun <T> retainNewestEntries(entries: MutableList<T>, maximum: Int) {
+    if (maximum < 0) {
+        entries.clear()
+    } else if (entries.size > maximum) {
+        entries.subList(maximum, entries.size).clear()
+    }
+}
+
+internal fun removeSpamBurstEventsForBot(eventsByKey: MutableMap<String, *>, botId: String) {
+    eventsByKey.remove(botId)
+    eventsByKey.keys
+        .filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }
+        .forEach { eventsByKey.remove(it) }
+}
+
 internal fun cycleDelayAfterScheduleOutcome(
     outcome: ScheduleCycleOutcome,
     plannedDelayMillis: Long,
@@ -684,7 +700,7 @@ class BotService : Service() {
                 aiBatchResults.remove(botId)
                 pendingAiPostPlans.remove(botId)
                 pendingAiCommentPlans.remove(botId)
-                spamBurstRecentEvents.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstRecentEvents.remove(it) }
+                removeSpamBurstEventsForBot(spamBurstRecentEvents, botId)
                 recentModerationFailures.keys.filter { it.startsWith("$botId:") }.forEach { recentModerationFailures.remove(it) }
                 recentPumResolutionFailures.keys.filter { it.startsWith("$botId:") }.forEach { recentPumResolutionFailures.remove(it) }
                 spamBurstStates.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstStates.remove(it) }
@@ -705,7 +721,9 @@ class BotService : Service() {
                 if (plans.size > maxPendingAiPlansPerBot) plans.subList(0, plans.size - maxPendingAiPlansPerBot).clear()
             }
             spamBurstRecentEvents.values.forEach { events ->
-                if (events.size > maxSpamBurstEventsPerKey) events.subList(0, events.size - maxSpamBurstEventsPerKey).clear()
+                synchronized(events) {
+                    retainNewestEntries(events, maxSpamBurstEventsPerKey)
+                }
             }
         }
     }
