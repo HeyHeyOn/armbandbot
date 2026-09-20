@@ -6,7 +6,7 @@
 - versionCode 175 / versionName 1.5.3-beta1
 - APK: `완장봇_v1.5.3-beta1.apk`
 - SHA-256: `1a20046b6213a6e919cebecb7a80587768d22519a6674da3b5480399035120c3`
-- Drive 업로드와 GitHub push는 현재 인증 만료로 보류되어 아직 배포 완료가 아닙니다. 실제 로그인 상태의 장시간 도배 감지·삭제 동작은 이번 검증 범위에 포함하지 않았습니다.
+- [APK 다운로드](https://drive.google.com/file/d/1JNYSvFby_TVd6tp18amEEGFgtnbUEXuQ/view?usp=drivesdk) · Drive 파일 ID: `1JNYSvFby_TVd6tp18amEEGFgtnbUEXuQ`
 
 ## 1.5.2-beta3 배포 완료
 
