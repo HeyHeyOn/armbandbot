@@ -7,13 +7,20 @@ import java.io.File
 class BotIsolationScheduleUiContractTest {
     private fun source(name: String) = listOf(File("app/src/main/java/com/example/armbandbot/$name"), File("src/main/java/com/example/armbandbot/$name")).first { it.isFile }.readText()
 
-    @Test fun refreshPrecedesIndependentThenExtractedSchedule() {
+    @Test fun remoteIsBasicAndManagementFollowsIndependentAndSchedule() {
         val detail = source("BotDetailScreen.kt").substringAfter("Text(\"기본 탐색 설정\"")
-        val refresh = detail.indexOf("ModernSettingItem(\"갤러리 설정 자동 갱신\"")
+        val remote = detail.indexOf("RemoteListSettingItem(")
         val independent = detail.indexOf("IndependentDbSettingsCard(")
         val schedule = detail.indexOf("BotRunScheduleSettingsCard(")
-        assertTrue(refresh >= 0 && independent > refresh && schedule > independent)
+        val management = detail.indexOf("ManagementAutomationSettings(")
+        val followup = detail.indexOf("Text(\"차단 후속 동작\"")
+        assertTrue(remote >= 0 && independent > remote && schedule > independent)
+        assertTrue(management > schedule && followup > management)
+        assertFalse(detail.contains("게시글 자동화·원격 목록"))
         assertFalse(detail.contains("runScheduleStartMinute"))
+        val entries = source("AutomationSettingsEntries.kt")
+        assertTrue(entries.contains("Text(\"관리 자동화\""))
+        assertTrue(entries.contains("ModernSettingItem(\"갤러리 설정 자동 갱신\""))
     }
 
     @Test fun inlineSettingsShareModernCardAndThemeContract() {

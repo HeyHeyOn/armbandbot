@@ -24,14 +24,15 @@ import org.jsoup.Jsoup
 
 /** Drafts are local to this page. Closing the page never publishes unfinished edits. */
 @Composable
-internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColorScheme, onBack: () -> Unit) {
+internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColorScheme, page: AutomationSettingsPage = AutomationSettingsPage.BUMP, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+    var showHelp by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var bumpEnabled by remember { mutableStateOf(p.getBoolean(BUMP_ENABLED_KEY, false)) }
     var moveEnabled by remember { mutableStateOf(p.getBoolean(MOVE_ENABLED_KEY, false)) }
     var remoteEnabled by remember { mutableStateOf(p.getBoolean(REMOTE_ENABLED_KEY, false)) }
-    var bumps by remember { mutableStateOf(runCatching { parseBumpRules(p.getString(BUMP_RULES_KEY,"[]")!!) }.getOrElse { error=it.message; emptyList() }) }
-    var moves by remember { mutableStateOf(runCatching { parseTabMoveRules(p.getString(MOVE_RULES_KEY,"[]")!!) }.getOrElse { error=it.message; emptyList() }) }
+    var bumps by remember { mutableStateOf(if(page==AutomationSettingsPage.BUMP) runCatching { parseBumpRules(p.getString(BUMP_RULES_KEY,"[]")!!) }.getOrElse { error=it.message; emptyList() } else emptyList()) }
+    var moves by remember { mutableStateOf(if(page==AutomationSettingsPage.TAB) runCatching { parseTabMoveRules(p.getString(MOVE_RULES_KEY,"[]")!!) }.getOrElse { error=it.message; emptyList() } else emptyList()) }
     var bumpUrl by remember { mutableStateOf("") }
     var bumpTimes by remember { mutableStateOf("09:00") }
     var bumpEditId by remember { mutableStateOf<String?>(null) }
@@ -51,17 +52,19 @@ internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColor
     Column(Modifier.fillMaxSize().background(colors.bg).testTag("automation-page")) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onBack,modifier=Modifier.testTag("automation-back")) { Icon(Icons.Default.ArrowBack,"뒤로",tint=colors.text) }
-            Text("게시글 자동화 · 원격 목록", color=colors.text,fontWeight=FontWeight.Bold)
+            Text(page.title, color=colors.text,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+            IconButton(onClick={showHelp=true},modifier=Modifier.testTag("automation-help")) { Icon(Icons.Default.HelpOutline,"도움말",tint=colors.text) }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             error?.let { Text(it, color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("automation-error")) }
-            ModernSettingsBlock("예약 끌올","지정한 일반 글을 매일 같은 시각에 끌올",Icons.Default.Schedule,colors,trailing={
+            if(page==AutomationSettingsPage.BUMP) {
+            ModernSettingsBlock("예약 목록","매일 지정한 시각에 실행",Icons.Default.Schedule,colors,trailing={
                 ModernSettingsSwitch(bumpEnabled,{ next -> attempt {
                     if(next) require(bumps.isNotEmpty()) { "예약을 먼저 저장하세요." }
                     check(p.edit().putBoolean(BUMP_ENABLED_KEY,next).commit()); bumpEnabled=next
                 } },colors,Modifier.testTag("bump-enabled"))
             }) {
-                Text("봇 작동 중에만 실행합니다. 최대 15분 이내 지연된 예약만 처리하며, 앱 강제 종료·절전·권한 만료 시 정각 실행은 보장되지 않습니다. 공지·고정글은 제외합니다.",color=colors.subText)
+
                 bumps.forEach { rule ->
                     Text("${strictAutomationPost(rule.url).key.postNo} · ${rule.minutes.joinToString { formatMinuteOfDay(it) }}",color=colors.text)
                     Row {
@@ -69,7 +72,7 @@ internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColor
                         TextButton(onClick={ attempt { val next=bumps.filterNot { it.id==rule.id };check(p.edit().putString(BUMP_RULES_KEY,encodeBumpRules(next)).commit());bumps=next } }) { Text("삭제") }
                     }
                 }
-                AutomationField(bumpUrl,{bumpUrl=it},"PC 게시글 주소",colors,"bump-url")
+                AutomationField(bumpUrl,{bumpUrl=it},"게시글 주소",colors,"bump-url")
                 AutomationField(bumpTimes,{bumpTimes=it},"시각 (09:00, 18:30)",colors,"bump-times")
                 Row {
                     TextButton(onClick={ attempt {
@@ -83,13 +86,15 @@ internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColor
                 }
                 Text(p.getString("automation_last_status","").orEmpty(),color=colors.subText)
             }
-            ModernSettingsBlock("키워드 탭 이동","게시글 제목·본문에 포함된 키워드 기준",Icons.Default.SwapHoriz,colors,trailing={
+            }
+            if(page==AutomationSettingsPage.TAB) {
+            ModernSettingsBlock("분류 규칙","제목·본문의 키워드로 분류",Icons.Default.SwapHoriz,colors,trailing={
                 ModernSettingsSwitch(moveEnabled,{next->attempt {
                     if(next)require(moves.isNotEmpty()){ "이동 규칙을 먼저 저장하세요." }
                     check(p.edit().putBoolean(MOVE_ENABLED_KEY,next).commit());moveEnabled=next
                 }},colors,Modifier.testTag("move-enabled"))
             }) {
-                Text("등록 순서의 첫 규칙을 적용합니다. 화이트리스트·제외 글은 건너뛰고 삭제·차단·검토가 우선합니다. 댓글 자체의 탭은 이동하지 않습니다.",color=colors.subText)
+
                 moves.forEach { rule ->
                     Text("${rule.gallId} · ${rule.keyword} → ${rule.label}",color=colors.text)
                     Row {
@@ -134,7 +139,9 @@ internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColor
                     if(moveEditId!=null)TextButton(onClick={moveEditId=null;moveKeyword=""}) { Text("취소") }
                 }
             }
-            ModernSettingsBlock("원격 목록","로컬 목록을 보존하고 수신 목록을 함께 사용",Icons.Default.CloudDownload,colors,trailing={
+            }
+            if(page==AutomationSettingsPage.REMOTE) {
+            ModernSettingsBlock("목록 연결","받은 목록을 로컬 목록과 함께 사용",Icons.Default.CloudDownload,colors,trailing={
                 ModernSettingsSwitch(remoteEnabled,{next->attempt{
                     if(next)resolveRemoteUrl(p.getString("remote_lists_url","").orEmpty(),RemoteSourceKind.valueOf(p.getString("remote_lists_kind","GITHUB")!!))
                     check(p.edit().putBoolean(REMOTE_ENABLED_KEY,next).commit());remoteEnabled=next
@@ -142,12 +149,12 @@ internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColor
             }) {
                 RemoteSourceKind.entries.forEach { k -> Row(verticalAlignment=Alignment.CenterVertically) {
                     RadioButton(sourceKind==k,{sourceKind=k},colors=RadioButtonDefaults.colors(selectedColor=PastelNavy,unselectedColor=colors.subText))
-                    Text(when(k){RemoteSourceKind.GITHUB->"GitHub Raw JSON";RemoteSourceKind.SHEETS->"Google Sheets CSV";RemoteSourceKind.JSON->"Apps Script JSON"},color=colors.text)
+                    Text(when(k){RemoteSourceKind.GITHUB->"GitHub";RemoteSourceKind.SHEETS->"Google Sheets";RemoteSourceKind.JSON->"Apps Script"},color=colors.text)
                 } }
-                AutomationField(remoteUrl,{remoteUrl=it},"원격 목록 주소",colors,"remote-url")
+                AutomationField(remoteUrl,{remoteUrl=it},"목록 주소",colors,"remote-url")
                 AutomationField(interval,{interval=it},"갱신 간격 (5~1440분)",colors,"remote-interval")
-                Text("시트는 type,value 두 열로 구성합니다. 종류: normal, bypass, user_blacklist, nickname_blacklist, nickname_bypass_blacklist. 로그인 없이 읽을 수 있는 전용 목록만 지원하며, 기존 시트를 자동 공개하지 않습니다.",color=colors.subText)
-                Text("목록은 해당 필터가 켜져 있을 때 적용합니다. 원격 실패 시 같은 원본의 마지막 정상 목록을 유지하며, 원격을 끄면 로컬 목록만 사용합니다.",color=colors.subText)
+
+
                 Row {
                     TextButton(onClick={attempt{
                         resolveRemoteUrl(remoteUrl,sourceKind);val minutes=interval.toIntOrNull() ?: error("갱신 간격을 확인하세요.");require(minutes in 5..1440){"갱신 간격은 5~1440분입니다."}
@@ -161,9 +168,11 @@ internal fun PostAutomationSettingsScreen(p: SharedPreferences, colors: BotColor
                 Text(status,color=colors.subText,modifier=Modifier.testTag("remote-status"))
                 Spacer(Modifier.height(12.dp))
             }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
+    if(showHelp) AutomationSettingsHelp(page,colors) { showHelp=false }
 }
 @Composable
 private fun AutomationField(value:String,onChange:(String)->Unit,label:String,colors:BotColorScheme,tag:String) {

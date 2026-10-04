@@ -24,6 +24,16 @@ Test pure behavior and real Android preference round-trip, cache failure preserv
 ## 6. Beta packaging
 Set code177/name1.5.4-beta1, create a separate beta guide and release verification report. Commit only intended sources/tests/docs/versioned APK, push feature branch and read remote SHA. Upload versioned APK and guide to the established beta folder using existing Drive auth; read metadata and re-download/hash. No formal Docs changes or public gallery announcement for a beta. Preserve old artifacts and preexisting worktree state.
 
+## 1.5.4-beta2 UI follow-up
+
+User scope: move gallery auto-refresh, scheduled bump and automatic tab classification into a new management-automation section; move remote lists into basic exploration settings. Detail rows only toggle or navigate. Each page contains only its own settings; long explanations are opened with the help icon. No backend-policy, DB-schema or local-list replacement changes.
+
+- [x] Add isolated page routes, shared themed navigation rows, saved-setting preservation and concise/help-only instructions.
+- [x] RED: new navigation APIs and DC list-template parsing failures reproduced before fixes. Final complete Debug/Release JVM suites: 666 each, zero failures/errors/skips; both sequential lint variants: zero errors; signed build and DEX gate pass.
+- [x] Final-source API35: 10 UI cases, one real GitHub JSON/CSV case and one real-service sandbox case; zero failed/skipped tests. The service reached the natural future clock boundary, verified server changes and persistent claims, then stopped/restored only the owned fixture.
+- [x] Exact signed beta2 SHA `624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242`: beta1 upgrade retains registration/settings; actual main switches, separate pages, reservation edit, real gallery-tab selection/rule save, real Sheets reception/local-list preservation and restart retention passed. Six unchanged native PNG captures are prepared for Telegram attachment.
+- [ ] Release closeout: versioned APK/guide are packaged; selective commit/push and independent GitHub artifact readback remain at this checkpoint. Drive upload is separately blocked: existing Python OAuth and gws/keyring both returned `invalid_grant`; user reauthentication is required. Do not claim a Drive upload or broaden scopes.
+
 ## Implementation/verification checkpoint
 - [x] Pure models, URL/time/CSV/list validation and normal/bypass storage-key aliases.
 - [x] Remote source-scoped cache, stale-source rejection, local list retention, private per-preference locks (API24 disk-write regression) and per-HTTP-attempt work gates.
@@ -33,6 +43,6 @@ Set code177/name1.5.4-beta1, create a separate beta guide and release verificati
 - [x] Native move/bump were first exercised through direct runner calls. The real-service acceptance below supersedes that earlier evidence; injected claims or skipped GitHub checks are not reported as full live acceptance.
 - [x] Latest real `BotService` API35 scenario: 1 complete test, 0 skips. Natural future-clock bump, exact server-top readback, persistent Room claims, exemption protection, competing enabled/disabled/stopped bot safety and restart duplicate prevention passed; owned tab and guest secrets restored/removed. Debug SHA `b9eedebb9086cb901b66e59e03c9059818dcd8e793445f2799c73e8c69a49602`. RED reproduced a disabled-competitor reversal; saved policies now remain in the shared move identity while election alone uses enabled/running flags.
 - [x] Final signed release SHA `cfe313db1b8add5da8bbb058853de3d51e7de88019eb5cce4b44243e3a2736e0`: v1.5.3 upgrade smoke retains bot registration and existing settings; certificate matches the previous release. Real GitHub JSON/CSV reception and local-list retention passed against immutable source commit `02b963d86a8a52339eb7e860d2f1c460a65d01bf`. Feature source push was read back; APK/guide were uploaded to the established beta Drive folder and independently re-downloaded with matching hashes. Final metadata push is verified at closeout.
-- [ ] Live Google Sheets endpoint: intentionally not exercised without an owner-approved published-sheet fixture. Do not publish or change permissions on an existing sheet automatically.
+- [x] Live Google Sheets endpoint: following the user's later explicit approval, a dummy-only sheet was created in the existing development folder and exercised. Exact signed beta2 now receives its six rows through the actual native UI, retaining local lists. No pre-existing private sheet was published or given broader permissions.
 
 The new settings page exposes source type, URL and manual refresh; automatic polling uses the bounded stored interval. The old interrupted Google-sheet idea was not silently re-enabled. Existing operating schedules, local lists, user exceptions and delete/block priority are retained. No formal Google Docs edits or public gallery announcement are part of this beta.

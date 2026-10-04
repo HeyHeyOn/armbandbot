@@ -43,15 +43,15 @@ class PostAutomationUiTest {
   compose.setContent {MaterialTheme {PostAutomationSettingsScreen(p,botColors(true)) {}}}
   compose.onNodeWithTag("bump-enabled").assertIsOff().assertIsDisplayed()
   compose.onNodeWithTag("bump-save").performScrollTo().assertIsDisplayed()
-  compose.onNodeWithTag("remote-enabled").performScrollTo().assertIsOff()
-  compose.onNodeWithTag("remote-save").performScrollTo().assertIsDisplayed()
+  compose.onNodeWithTag("remote-enabled").assertDoesNotExist()
+  compose.onNodeWithTag("remote-save").assertDoesNotExist()
   compose.runOnIdle {assertFalse(p.getBoolean(REMOTE_ENABLED_KEY,false))}
  }
  @Test fun remoteInvalidUrlStaysDraftAndDefaultsAreOff() {
   val p=prefs;p.edit().clear().putString("remote_lists_url","https://raw.githubusercontent.com/a/b/main/list.json").commit()
   try {
-   compose.setContent { MaterialTheme { PostAutomationSettingsScreen(p,botColors(false),onBack={}) } }
-   compose.onNodeWithTag("move-enabled").performScrollTo().assertIsOff()
+   compose.setContent { MaterialTheme { PostAutomationSettingsScreen(p,botColors(false),AutomationSettingsPage.REMOTE,onBack={}) } }
+   compose.onNodeWithTag("move-enabled").assertDoesNotExist()
    compose.onNodeWithTag("remote-enabled").performScrollTo().assertIsOff()
    compose.onNodeWithTag("remote-url").performScrollTo().performTextReplacement("https://evil.example/x")
    compose.onNodeWithTag("remote-save").performScrollTo().performClick()
