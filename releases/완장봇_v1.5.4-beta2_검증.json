@@ -1,0 +1,209 @@
+{
+  "schema": 1,
+  "verified_at_utc": "2026-10-04T16:02:39.470114+00:00",
+  "version_name": "1.5.4-beta2",
+  "version_code": 178,
+  "application_id": "com.heyheyon.armbandbot",
+  "source_commit": "ad3ae7763fea28a2ef679953689742d6dd98f0f3",
+  "production_source_snapshot": {
+    "file_count": 184,
+    "raw_working_tree_manifest_sha256": "f9bbe2078b7887c567ac15e7d899cd96dbd6d4ce684511492a3e1ebe0a7a77ab",
+    "unchanged_after_final_validation": true
+  },
+  "jvm_tests_from_actual_xml": {
+    "debug": {
+      "tests": 666,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "classes": 77
+    },
+    "release": {
+      "tests": 666,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "classes": 77
+    }
+  },
+  "lint_from_actual_xml": {
+    "debug": {
+      "errors": 0,
+      "warnings": 50,
+      "report_sha256": "ccf795a36bf2c5fcf57b908f0aba33d407d8a9df36183ed101d773878e8277f8"
+    },
+    "release": {
+      "errors": 0,
+      "warnings": 45,
+      "report_sha256": "865082814c5fa195b57aa6114ffccd0fb4a7c9667ac48f80c63bb0f13a599df3"
+    }
+  },
+  "api35_instrumentation_from_actual_logs": {
+    "PostAutomationUiTest": {
+      "completed": 10,
+      "expected": 10,
+      "skipped": 0,
+      "failed": 0
+    },
+    "PostAutomationLiveTest#ownedGithubJsonAndCsvUseNativeClientAndLocalKeys": {
+      "completed": 1,
+      "expected": 1,
+      "skipped": 0,
+      "failed": 0
+    },
+    "PostAutomationServiceLiveTest": {
+      "completed": 1,
+      "expected": 1,
+      "skipped": 0,
+      "failed": 0
+    }
+  },
+  "exact_signed_release_gates": {
+    "beta1_upgrade_preferences_preserved": [
+      "automation_bump_enabled",
+      "automation_move_enabled",
+      "automation_bump_rules",
+      "automation_move_rules",
+      "remote_lists_enabled",
+      "remote_lists_kind",
+      "remote_lists_url",
+      "banned_normal_text",
+      "banned_normal"
+    ],
+    "exact_release_installed": true,
+    "gallery_refresh_main_switch_without_navigation": true,
+    "main_toggle_without_navigation_or_rule_loss": true,
+    "native_bump_edit_persisted": true,
+    "native_tab_page_opened": true,
+    "native_tab_rule_save_from_real_gallery_metadata": true,
+    "real_sheets_receive_and_local_preservation": {
+      "status": "수신 완료 · 6개 항목",
+      "data_rows": 6
+    },
+    "app_restart_saved_schedule_retained": true,
+    "service_stopped": {
+      "is_running": false,
+      "service_absent": true
+    }
+  },
+  "live_service_against_owned_sandbox": {
+    "scope": "laboratory1",
+    "post_no": "2371",
+    "real_bot_service": true,
+    "mock_transport": false,
+    "mock_claims": false,
+    "exempt_post_unchanged_after_real_cycle": true,
+    "native_move_readback": true,
+    "disabled_first_bot_no_conflicting_move": true,
+    "scheduled_epoch_ms": 1791125880000,
+    "scheduled_local": "2026-10-04T23:58+09:00[Asia/Seoul]",
+    "not_executed_before_scheduled_time": true,
+    "scheduled_bump_success": true,
+    "actual_claimed_epoch_ms": 1791125886586,
+    "server_top_post_verified": true,
+    "service_restart_no_duplicate_claims": true,
+    "only_owned_post_actions": true,
+    "passed": true,
+    "owned_tab_restored": true,
+    "guest_session_files_removed": true
+  },
+  "artifacts": [
+    {
+      "name": "완장봇_v1.5.4-beta2.apk",
+      "bytes": 13338798,
+      "sha256": "624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242",
+      "readback_url": "https://raw.githubusercontent.com/HeyHeyOn/armbandbot/ad3ae7763fea28a2ef679953689742d6dd98f0f3/releases/%EC%99%84%EC%9E%A5%EB%B4%87_v1.5.4-beta2.apk",
+      "byte_match": true
+    },
+    {
+      "name": "완장봇_v1.5.4-beta2_사용안내.txt",
+      "bytes": 1489,
+      "sha256": "f82d99262a5267f8d99e57cc0ec0130181caae84441a379879c1248e754c60d0",
+      "readback_url": "https://raw.githubusercontent.com/HeyHeyOn/armbandbot/ad3ae7763fea28a2ef679953689742d6dd98f0f3/releases/%EC%99%84%EC%9E%A5%EB%B4%87_v1.5.4-beta2_%EC%82%AC%EC%9A%A9%EC%95%88%EB%82%B4.txt",
+      "byte_match": true
+    }
+  ],
+  "signing_certificate_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+  "dex_invoke_gate": {
+    "passed": true,
+    "max_ins": 248,
+    "headroom": 7
+  },
+  "native_screenshots_prepared_for_telegram": [
+    {
+      "screen": "basic",
+      "file": "01-basic-settings.png",
+      "bytes": 61908,
+      "sha256": "7e82048a35e1457467c918c43cd48f97b1895082819d5debfbbc2a1f1fc33c3d",
+      "dimensions": [
+        432,
+        960
+      ],
+      "exact_apk_sha256": "624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242"
+    },
+    {
+      "screen": "management",
+      "file": "02-management-automation.png",
+      "bytes": 61776,
+      "sha256": "8eb1f501c84b36b68e2ccdcc549da0250d4e8b4147ea0e164d82b2afe2af1277",
+      "dimensions": [
+        432,
+        960
+      ],
+      "exact_apk_sha256": "624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242"
+    },
+    {
+      "screen": "bump",
+      "file": "03-scheduled-bump.png",
+      "bytes": 25947,
+      "sha256": "1d19c521ac69fcdb918a9be37a1baa4d999cf286d5a809ecd595a476550c952b",
+      "dimensions": [
+        432,
+        960
+      ],
+      "exact_apk_sha256": "624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242"
+    },
+    {
+      "screen": "tab",
+      "file": "04-auto-tab-classification.png",
+      "bytes": 36145,
+      "sha256": "b34fac715de1ec959a8a30bdbbcf720e02cef475f39e6e4978da202438ba693e",
+      "dimensions": [
+        432,
+        960
+      ],
+      "exact_apk_sha256": "624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242"
+    },
+    {
+      "screen": "remote",
+      "file": "05-remote-list-success.png",
+      "bytes": 35252,
+      "sha256": "b5f867b4c1a46c050df57d817da6bff71f2d8b50dd4491f17f37a9f69e13a113",
+      "dimensions": [
+        432,
+        960
+      ],
+      "exact_apk_sha256": "624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242"
+    },
+    {
+      "screen": "help",
+      "file": "06-bump-help.png",
+      "bytes": 52205,
+      "sha256": "6397363cccc3c3b608511260b7bcf39d0fa88b5d3359eb22c70ae7d90ea397ea",
+      "dimensions": [
+        432,
+        960
+      ],
+      "exact_apk_sha256": "624084212162d315693f38ade453aea44b0c603c2063808426f30d0300dad242"
+    }
+  ],
+  "distribution": {
+    "github_artifact_and_guide_readback": "verified identical bytes",
+    "telegram": "exact APK, guide and six original native screenshots prepared for closing reply",
+    "drive": "blocked_pending_user_reauthentication",
+    "drive_auth_error": "invalid_grant in both existing approved Python OAuth and gws/keyring paths",
+    "drive_browser_login_wall_observed": true,
+    "intended_drive_folder_id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+    "new_accounts_clients_or_scope_expansion": false
+  }
+}
