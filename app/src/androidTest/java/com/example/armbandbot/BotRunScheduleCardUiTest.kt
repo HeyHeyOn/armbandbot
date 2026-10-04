@@ -76,7 +76,7 @@ class BotRunScheduleCardUiTest {
     }
 
     private fun pick(hour: Int, minute: Int) {
-        onView(isAssignableFrom(TimePicker::class.java)).perform(object : ViewAction {
+        onView(isAssignableFrom(TimePicker::class.java)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(object : ViewAction {
             override fun getConstraints(): Matcher<View> = isAssignableFrom(TimePicker::class.java)
             override fun getDescription() = "set native time picker"
             override fun perform(ui: UiController, view: View) {
@@ -84,7 +84,7 @@ class BotRunScheduleCardUiTest {
                 ui.loopMainThreadUntilIdle()
             }
         })
-        onView(withId(android.R.id.button1)).perform(click())
+        onView(withId(android.R.id.button1)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(click())
         compose.waitForIdle()
     }
 

@@ -1,3 +1,13 @@
+## 1.5.4-beta1
+
+- 예약한 시간에 지정한 글을 끌올할 수 있습니다.
+- 제목·본문의 키워드에 맞춰 글을 지정한 탭으로 옮길 수 있습니다.
+- GitHub JSON 또는 Google Sheets CSV 목록을 불러와 기존 로컬 목록과 함께 사용할 수 있습니다.
+
+봇 상세 설정의 **게시글 자동화 · 원격 목록**에서 설정합니다. 세 기능은 직접 켜야 작동하며, 시트를 자동으로 공개하거나 로컬 목록을 지우지 않습니다. 끌올·탭 이동은 관리 권한이 있는 마이너/미니 갤러리를 대상으로 합니다.
+
+원격 목록 예시: `docs/examples/remote-lists.json`, `docs/examples/remote-lists.csv`. Google Sheets는 첫 행에 `type,value`를 두고 `normal`, `bypass`, `user_blacklist`, `nickname_blacklist`, `nickname_bypass_blacklist` 중 하나와 값을 입력합니다. CSV 게시/내보내기 주소는 기존 열람 권한으로 접근 가능해야 합니다. 접속에 실패하면 같은 주소의 마지막 정상 목록을 유지합니다.
+
 ## 1.5.3-beta1 배포 준비
 
 - 장시간 실행 뒤 도배 감지 이벤트가 최대 보관 수를 넘었을 때 최신 글 대신 오래된 글만 남아 감지가 멈출 수 있던 문제를 수정했습니다.

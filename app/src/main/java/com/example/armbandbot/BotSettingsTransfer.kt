@@ -19,6 +19,7 @@ private val DEFAULT_URL_WHITELIST = setOf("dcinside.com", "dcinside.kr", "youtub
 
 internal val EXPORTABLE_STRING_KEYS = listOf(
     RUN_SCHEDULE_WINDOWS_JSON_KEY,
+    BUMP_RULES_KEY, MOVE_RULES_KEY, "remote_lists_kind", "remote_lists_url",
     "target_urls",
     "search_type",
     "block_reason_text",
@@ -37,6 +38,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_pum_source_filter_mode", "pum_recheck_every_cycle",
     "pum_block_all_posts", "pum_use_custom_action_config", "pum_delete_only_mode", "pum_delete_post_on_block",
     "independent_scan_state_enabled", "run_schedule_enabled",
+    BUMP_ENABLED_KEY, MOVE_ENABLED_KEY, REMOTE_ENABLED_KEY,
     "bypass_ignore_case_enabled", "bypass_unicode_normalization_enabled",
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 )
@@ -44,7 +46,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
 internal val EXPORTABLE_INT_KEYS = listOf(
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
-    "run_schedule_start_minute", "run_schedule_end_minute"
+    "run_schedule_start_minute", "run_schedule_end_minute", "remote_lists_interval_minutes"
 )
 
 internal val EXPORTABLE_FLOAT_KEYS = listOf(
@@ -113,6 +115,7 @@ fun importBotSettingsAsNewBot(context: Context, uriString: String): String {
     val newBotId = "bot_${UUID.randomUUID()}"
     val botPref = context.getSharedPreferences("bot_prefs_$newBotId", Context.MODE_PRIVATE)
     applyImportedSettings(botPref, imported)
+    botPref.edit().putBoolean(BUMP_ENABLED_KEY, false).putBoolean(MOVE_ENABLED_KEY, false).putBoolean(REMOTE_ENABLED_KEY, false).apply()
     migrateBotSettingsToCurrentVersion(botPref)
 
     val masterPref = context.getSharedPreferences("bot_master", Context.MODE_PRIVATE)
@@ -180,6 +183,9 @@ internal fun prepareImportedSettingsForNewBot(imported: BotSettingsExport): Map<
             this["independent_scan_state_enabled"] = false
             this["is_running"] = false
             this["should_restore_after_restart"] = false
+            this[BUMP_ENABLED_KEY] = false
+            this[MOVE_ENABLED_KEY] = false
+            this[REMOTE_ENABLED_KEY] = false
         }
 }
 

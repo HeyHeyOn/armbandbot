@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "lists": {
+    "normal": ["AB154-remote-example"],
+    "bypass": [],
+    "user_blacklist": [],
+    "nickname_blacklist": [],
+    "nickname_bypass_blacklist": []
+  }
+}

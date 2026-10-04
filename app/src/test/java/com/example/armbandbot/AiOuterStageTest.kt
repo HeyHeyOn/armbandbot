@@ -124,7 +124,8 @@ class AiOuterStageTest {
     @Test fun serviceUsesBoundaryAroundDrainAndBeforeCheckedCompletion() {
         val source = java.io.File("src/main/java/com/example/armbandbot/BotService.kt").readText().replace("\r\n", "\n")
         assertTrue(source.contains("val interruptedAiRetry = aiBatchQueues[botId]?.needsInterruptedRetry("))
-        assertTrue(source.contains("if (!interruptedAiRetry && !shouldRecheckPost("))
+        assertTrue(source.contains("if (!automationRecheck && !interruptedAiRetry && !shouldRecheckPost("))
+        assertTrue(source.contains("val automationRecheck = automationRechecks[botId]?.needs("))
         val stage = source.substringAfter("if (shouldRunAiStage) {\n            if (config.isDebugMode")
             .substringBefore("var dbBlockReason:")
         assertTrue(stage.contains("runAiOuterStage(aiStageAttempt) {"))

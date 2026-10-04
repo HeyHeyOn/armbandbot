@@ -936,6 +936,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             if (activeSubScreen != null) {
                 if (activeSubScreen == "SCHEDULE") {
                     BotRunScheduleSettingsScreen(botPref, colors) { currentSubScreen = null }
+                } else if (activeSubScreen == "POST_AUTOMATION") {
+                    PostAutomationSettingsScreen(botPref, colors) { currentSubScreen = null }
                 } else if (activeSubScreen == "DB_DASHBOARD") {
                     DbDashboardScreen(botId = botId, onBack = { currentSubScreen = null })
                 } else {
@@ -1890,6 +1892,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 ModernSettingItem("갤러리 설정 자동 갱신", "VPN/통신사/첨부 제한 시간 유지", Icons.Filled.Refresh, colors, isGallerySettingRefreshEnabled, { isGallerySettingRefreshEnabled = it; botPref.edit().putBoolean("gallery_setting_refresh_enabled", it).apply() }) { currentSubScreen = "GALLERY_REFRESH" }
                                 IndependentDbSettingsCard(botId, botPref, isRunning, colors)
                                 BotRunScheduleSettingsCard(botPref, colors) { currentSubScreen = "SCHEDULE" }
+                                ModernSettingItem("게시글 자동화·원격 목록", "예약 끌올 · 키워드 탭 이동 · 공유 목록", Icons.Filled.AutoAwesome, colors) { currentSubScreen = "POST_AUTOMATION" }
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text("차단 후속 동작", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))

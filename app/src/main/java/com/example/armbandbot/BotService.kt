@@ -82,6 +82,8 @@ internal fun cycleDelayAfterScheduleOutcome(
 ): Long? = if (outcome == ScheduleCycleOutcome.PAUSED_BY_SCHEDULE) null else plannedDelayMillis
 
 class BotService : Service() {
+    private val automationRechecks = java.util.concurrent.ConcurrentHashMap<String, AutomationRecheckState>()
+    private val remoteListClient = RemoteListClient()
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private val activeBots = ConcurrentHashMap<String, Job>()
     private val runLoopEnteredJobs = ConcurrentHashMap<String, Job>()
@@ -1463,6 +1465,12 @@ class BotService : Service() {
 
         while (isActive) {
             awaitActiveSchedule(botId, botPref)
+            try {
+                remoteListClient.sync(botPref, beforeRequest = { RuntimeRequestGate.requireCurrent().check() })
+            } catch (_: SchedulePausedException) {
+                continue
+            }
+            automationRechecks.getOrPut(botId) { AutomationRecheckState() }.update(automationPolicyRevision(botPref))
             val config = loadBotConfig(botId, botPref).copy(scanScopeId = scanScopeId)
             val blockDuration = config.blockDurationHours.toString()
             val blockReason = config.blockReason
@@ -1546,6 +1554,7 @@ class BotService : Service() {
             }
 
             try {
+                automationRunner(botId, currentCookie).runDueBumps()
                 maybeRefreshGallerySettings(
                     botId = botId,
                     botPref = botPref,
@@ -1776,7 +1785,8 @@ class BotService : Service() {
             val interruptedAiRetry = aiBatchQueues[botId]?.needsInterruptedRetry(
                 PostKey(gallType, gallId, postNumStr)
             ) == true
-            if (!interruptedAiRetry && !shouldRecheckPost(
+            val automationRecheck = automationRechecks[botId]?.needs(PostKey(gallType, gallId, postNumStr)) == true
+            if (!automationRecheck && !interruptedAiRetry && !shouldRecheckPost(
                     savedCommentCount = savedCommentCount,
                     currentCommentCount = currentCommentCount,
                     savedTitle = savedTitle,
@@ -1867,6 +1877,7 @@ class BotService : Service() {
             try {
                 requireActiveScheduleForRequest(botId)
                 val postHandled = processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
+                if (postHandled) automationRechecks[botId]?.mark(PostKey(gallType, gallId, postNumStr))
                 if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker && !postHandled) {
                     activationRecheckComplete = false
                 }
@@ -4038,6 +4049,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             return false
         }
 
+        val automationMoveCompleted = automationRunner(botId, cookie).maybeMove(
+            postKey, legacyPostText,
+            postAnalysis.isWhitelistedUser || config.userWhitelist.contains(postAuthor) || config.nicknameWhitelist.contains(postNick),
+            config.blockExemptPostNumbers.contains(postNumStr),
+            isPostBlocked || postAnalysis.action != PostModerationAction.ALLOW || aiPostPlans.any { it.postKey == postKey } || aiReviewReason != null,
+        )
+        if (!automationMoveCompleted) return false
         val adjustedCommentCount = (currentCommentCount - deletedCommentCount).coerceAtLeast(0)
         if (deletedCommentCount > 0 && config.isExpertMode && config.isSnapshotAll) {
             val latestCommentsArray = fetchLatestCommentsArray()
@@ -4599,6 +4617,12 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
     }
 
+    private fun automationRunner(botId: String, cookie: String): PostAutomationRunner = PostAutomationRunner(
+        this, botId, getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE), cookie,
+        claim = { key, kind, action -> executeClaimedModerationAction(botId, key.gallType, key.gallId, key.postNo, "POST", key.postNo, kind, action) },
+        log = { message -> sendLog(message, botId) },
+    )
+
     private fun executeClaimedModerationAction(
         botId: String,
         gallType: String,
@@ -4881,8 +4905,9 @@ img.written_dccon{max-width:80px;max-height:80px}
             is String -> value.toFloatOrNull() ?: defaultValue
             else -> defaultValue
         }
+        val remoteLists = effectiveRemoteLists(botPref)
         fun orderedMultilineValues(key: String): List<String> =
-            loadOrderedMultilineValues(botPref, key)
+            mergeRemoteList(loadOrderedMultilineValues(botPref, key), remoteLists, key)
 
         val rawUrlsText = safePrefString("target_urls", "")
         val targetUrls = rawUrlsText

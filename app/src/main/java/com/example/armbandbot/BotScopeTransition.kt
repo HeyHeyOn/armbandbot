@@ -14,4 +14,10 @@ internal fun prepareCopiedBotSettingsSnapshot(
         this["independent_scan_state_enabled"] = false
         this["is_running"] = false
         this["should_restore_after_restart"] = false
+        this[BUMP_ENABLED_KEY] = false
+        this[MOVE_ENABLED_KEY] = false
+        this[REMOTE_ENABLED_KEY] = false
+        keys.removeAll { key ->
+            key.startsWith("remote_lists_") && key !in setOf(REMOTE_ENABLED_KEY, "remote_lists_url", "remote_lists_kind", "remote_lists_interval_minutes")
+        }
     }
