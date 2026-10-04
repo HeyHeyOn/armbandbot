@@ -1,0 +1,193 @@
+{
+  "version": "1.5.4-beta1",
+  "versionCode": 177,
+  "apk": "releases/완장봇_v1.5.4-beta1.apk",
+  "apk_sha256": "cfe313db1b8add5da8bbb058853de3d51e7de88019eb5cce4b44243e3a2736e0",
+  "compiled_source_commit": "02b963d86a8a52339eb7e860d2f1c460a65d01bf",
+  "source_branch": "feature/1.5.4-beta1",
+  "unit_tests": {
+    "Debug": {
+      "tests": 664,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 664,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "debug": {
+      "errors": 0,
+      "warnings": 50
+    },
+    "release": {
+      "errors": 0,
+      "warnings": 45
+    }
+  },
+  "lint_engine": "classic UAST; no checks disabled",
+  "dex": [
+    {
+      "file": "classes.dex",
+      "method_ids": 65466,
+      "field_ids": 35009
+    },
+    {
+      "file": "classes2.dex",
+      "method_ids": 15,
+      "field_ids": 0
+    },
+    {
+      "file": "classes3.dex",
+      "method_ids": 2145,
+      "field_ids": 547
+    },
+    {
+      "file": "classes4.dex",
+      "method_ids": 65067,
+      "field_ids": 21943
+    },
+    {
+      "file": "classes5.dex",
+      "method_ids": 13146,
+      "field_ids": 4701
+    }
+  ],
+  "android": {
+    "service-live-api35": {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.PostAutomationServiceLiveTest",
+      "passed": true,
+      "declared": 1,
+      "completed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "b9eedebb9086cb901b66e59e03c9059818dcd8e793445f2799c73e8c69a49602"
+    },
+    "github-ui-api35": {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.PostAutomationUiTest,com.heyheyon.armbandbot.RemoteListClientTest,com.heyheyon.armbandbot.PostAutomationLiveTest#ownedGithubJsonAndCsvUseNativeClientAndLocalKeys",
+      "passed": true,
+      "declared": 8,
+      "completed": 8,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 360,
+      "font": "1.3",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "b9eedebb9086cb901b66e59e03c9059818dcd8e793445f2799c73e8c69a49602"
+    },
+    "automation-api24": {
+      "api": "24",
+      "classes": "com.heyheyon.armbandbot.BotRunScheduleCardUiTest,com.heyheyon.armbandbot.PostAutomationUiTest,com.heyheyon.armbandbot.RemoteListClientTest",
+      "passed": true,
+      "declared": 13,
+      "completed": 13,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "b9eedebb9086cb901b66e59e03c9059818dcd8e793445f2799c73e8c69a49602"
+    }
+  },
+  "instrumentation_completed_total": 22,
+  "real_service_acceptance": {
+    "scope": "laboratory1",
+    "post_no": "2371",
+    "real_bot_service": true,
+    "mock_transport": false,
+    "mock_claims": false,
+    "exempt_post_unchanged_after_real_cycle": true,
+    "native_move_readback": true,
+    "disabled_first_bot_no_conflicting_move": true,
+    "scheduled_epoch_ms": 1791109860000,
+    "scheduled_local": "2026-10-04T19:31+09:00[Asia/Seoul]",
+    "not_executed_before_scheduled_time": true,
+    "scheduled_bump_success": true,
+    "actual_claimed_epoch_ms": 1791109874251,
+    "server_top_post_verified": true,
+    "service_restart_no_duplicate_claims": true,
+    "only_owned_post_actions": true,
+    "claims": [
+      [
+        "2371",
+        "BUMP:2026-10-04T19:31",
+        "SUCCEEDED",
+        "owned154_a_1791109737483",
+        "1791109874251",
+        "1791109874630"
+      ],
+      [
+        "2371",
+        "MOVE:ab7e3158d81c0648e19565a8",
+        "SUCCEEDED",
+        "owned154_a_1791109737483",
+        "1791109781898",
+        "1791109782915"
+      ]
+    ],
+    "passed": true,
+    "owned_tab_restored": true,
+    "guest_session_files_removed": true
+  },
+  "scheduled_claim_delay_seconds": 14.251,
+  "signed_release_upgrade": {
+    "api": "35",
+    "mode": "native-release-smoke",
+    "passed": true,
+    "width": 432,
+    "font": "1.0",
+    "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/release/app-release.apk",
+    "sha256": "cfe313db1b8add5da8bbb058853de3d51e7de88019eb5cce4b44243e3a2736e0",
+    "upgrade": {
+      "previous_settings_retained": [
+        "bot_name",
+        "target_urls",
+        "user_blacklist",
+        "is_running",
+        "is_user_filter_mode"
+      ],
+      "bot_registration_retained": true,
+      "source": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.5.3.apk",
+      "row_retention": "covered separately by Room migration/DAO instrumentation, not asserted by this preference fixture"
+    }
+  },
+  "release_certificate_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+  "previous_release_certificate_matches": true,
+  "drive": {
+    "apk": {
+      "id": "1AGzxMfeLh96137BkmtPHk9MVOwPbIn7U",
+      "url": "https://drive.google.com/file/d/1AGzxMfeLh96137BkmtPHk9MVOwPbIn7U/view?usp=drivesdk",
+      "sha256": "cfe313db1b8add5da8bbb058853de3d51e7de88019eb5cce4b44243e3a2736e0",
+      "download_sha_matches": true,
+      "folder_id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+    },
+    "guide": {
+      "id": "1qNlcrUl3nPfPUOXdbsbrfnr80VenzaM0",
+      "url": "https://drive.google.com/file/d/1qNlcrUl3nPfPUOXdbsbrfnr80VenzaM0/view?usp=drivesdk",
+      "sha256": "a45aa7cade73977a8fd73e1d236244127d3efe9264d00bfce7570c1261260a75",
+      "download_sha_matches": true,
+      "folder_id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+    }
+  },
+  "google_sheets_live": {
+    "status": "blocked_missing_owner_approved_published_fixture",
+    "sharing_changed": false
+  },
+  "limitations": [
+    "Real native automation acceptance used the exact Debug APK hash recorded per scenario; the signed Release APK was separately verified by upgrade/smoke and JVM/lint/signature/DEX gates.",
+    "Google Sheets anonymous live reception remains untested until a published fixture is explicitly approved. No existing sheet was published or modified.",
+    "Upgrade smoke checks settings and bot registration; row retention is covered separately and is not asserted by the upgrade preference fixture."
+  ]
+}

@@ -213,5 +213,12 @@ finally:
         except subprocess.TimeoutExpired:
             em.terminate()
             em.wait(timeout=10)
+    if em is not None:
+        disconnect_deadline = time.monotonic() + 15
+        while time.monotonic() < disconnect_deadline:
+            devices = subprocess.run([adb, 'devices'], capture_output=True, text=True, timeout=5)
+            if serial not in devices.stdout:
+                break
+            time.sleep(0.5)
     log.close()
     shutil.rmtree(guest, ignore_errors=True)
