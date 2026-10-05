@@ -45,6 +45,17 @@
 
 원격 목록 예시: `docs/examples/remote-lists.json`, `docs/examples/remote-lists.csv`. Google Sheets는 첫 행에 `type,value`를 두고 `normal`, `bypass`, `user_blacklist`, `nickname_blacklist`, `nickname_bypass_blacklist` 중 하나와 값을 입력합니다. CSV 게시/내보내기 주소는 기존 열람 권한으로 접근 가능해야 합니다. 접속에 실패하면 같은 주소의 마지막 정상 목록을 유지합니다.
 
+## 1.5.3 정식 배포 완료
+
+- 도배 방지의 최근 활동 기록이 보관 한도를 넘어 오래된 항목만 남으면 감지가 멈출 수 있던 문제를 수정했습니다. 정식판 간 변경은 이 수정과 버전 승격입니다.
+- versionCode 176 / versionName 1.5.3. 정식 APK: `releases/완장봇_v1.5.3.apk`.
+- Debug·Release JVM 테스트 각 621개, 양쪽 lint 및 Release 빌드 통과. beta1 API 24 계측 51개, API 35 전체 재실행 53개 통과(실패·오류·건너뜀 0).
+- API 35 격리 에뮬레이터에서 1.5.2→1.5.3 및 beta1→1.5.3 덮어 설치, 테스트 데이터 표식 보존, 앱 기동 확인. 기존 정식·beta1과 서명 인증서 일치. 실제 DC 계정 장시간 운영 검증은 하지 않았습니다.
+- APK SHA-256: `f98a87f70765ea539e65371a9f89403e180cbe984e2d97a23b13608c37179140` (기기 설치본과 Drive 재다운로드본 일치).
+- [정식 APK 다운로드](https://drive.google.com/file/d/1rWGk_iYgyB4WLxO5opIV234FfKd0LuqY/view?usp=drivesdk) · [매뉴얼/패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit).
+- [완장봇 갤러리 패치노트](https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=294): 비로그인 작성, 관리자 권한으로 해당 글만 일반→패치 분류 변경, 로그아웃 화면에서 확인.
+- 승격 소스/태그: `6e3ac364a3e6e29b0b9b600142a8b0f672a503fa` / `v1.5.3`.
+
 ## 1.5.3-beta1 배포 준비
 
 - 장시간 실행 뒤 도배 감지 이벤트가 최대 보관 수를 넘었을 때 최신 글 대신 오래된 글만 남아 감지가 멈출 수 있던 문제를 수정했습니다.
