@@ -26,7 +26,7 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
     "kkang_detection_mode",
     "pum_block_process_mode",
     "pum_block_reason_text"
-) + ORDERED_MULTILINE_SETTING_KEYS.map(::orderedMultilineTextKey)
+) + ORDERED_MULTILINE_SETTING_KEYS.map(::orderedMultilineTextKey) + REMOTE_CHANNEL_EXPORT_STRING_KEYS
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
@@ -41,13 +41,13 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     BUMP_ENABLED_KEY, MOVE_ENABLED_KEY, REMOTE_ENABLED_KEY,
     "bypass_ignore_case_enabled", "bypass_unicode_normalization_enabled",
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
-)
+) + REMOTE_CHANNEL_EXPORT_BOOLEAN_KEYS
 
 internal val EXPORTABLE_INT_KEYS = listOf(
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
     "run_schedule_start_minute", "run_schedule_end_minute", "remote_lists_interval_minutes"
-)
+) + REMOTE_CHANNEL_EXPORT_INT_KEYS
 
 internal val EXPORTABLE_FLOAT_KEYS = listOf(
     "delay_post_min_sec", "delay_post_max_sec", "delay_page_min_sec",

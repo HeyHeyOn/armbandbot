@@ -20,16 +20,16 @@ class RemoteListClientTest {
    assertFalse(client.sync(p,now=100001L));assertEquals(1,calls)
    fail=true;assertFalse(client.sync(p,force=true,now=101000L));assertEquals(listOf("shared"),effectiveRemoteLists(p)!!.values["normal"])
    fail=false;notModified=true;assertFalse(client.sync(p,force=true,now=102000L));assertEquals(listOf("shared"),effectiveRemoteLists(p)!!.values["normal"])
-   p.edit().putBoolean(REMOTE_ENABLED_KEY,false).commit();assertEquals(listOf("local"),mergeRemoteList(listOf("local"),effectiveRemoteLists(p),"normal"));assertEquals("local",p.getString("banned_normal",null))
+   p.edit().also {e->REMOTE_CHANNEL_KEYS.forEach {e.putBoolean(remoteListPrefKey(it,"enabled"),false)}}.commit();assertEquals(listOf("local"),mergeRemoteList(listOf("local"),effectiveRemoteLists(p),"normal"));assertEquals("local",p.getString("banned_normal",null))
   } finally {p.edit().clear().commit()}
  }
  @Test fun staleSourcePublicationAndInvalidUtf8AreRejected()=runBlocking {
   setup()
   try {
-   val stale=RemoteListClient { _,_->p.edit().putString("remote_lists_url","https://raw.githubusercontent.com/a/b/main/other.json").commit();RemoteDownload(200,"{\"version\":1,\"lists\":{\"normal\":[\"stale\"]}}".toByteArray(),null) }
-   assertFalse(stale.sync(p,force=true));assertFalse(p.contains("remote_lists_cache"))
+   val stale=RemoteListClient { _,_->p.edit().also {e->REMOTE_CHANNEL_KEYS.forEach {e.putString(remoteListPrefKey(it,"url"),"https://raw.githubusercontent.com/a/b/main/other.json")}}.commit();RemoteDownload(200,"{\"version\":1,\"lists\":{\"normal\":[\"stale\"]}}".toByteArray(),null) }
+   assertFalse(stale.sync(p,force=true));assertFalse(p.contains(remoteListPrefKey("normal","cache")))
    setup();val bad=RemoteListClient { _,_->RemoteDownload(200,byteArrayOf(0xc3.toByte(),0x28),null) }
-   assertFalse(bad.sync(p,force=true));assertFalse(p.contains("remote_lists_cache"))
+   assertFalse(bad.sync(p,force=true));assertFalse(p.contains(remoteListPrefKey("normal","cache")))
   } finally {p.edit().clear().commit()}
  }
  @Test fun downloaderNeverHoldsPlatformPreferencesMonitor()=runBlocking {
@@ -49,7 +49,7 @@ class RemoteListClientTest {
   try {
    val client=RemoteListClient { _,_->sent=true;RemoteDownload(200,"{}".toByteArray(),null) }
    try {client.sync(p,force=true,beforeRequest={throw SchedulePausedException()});fail("pause swallowed")}catch(_:SchedulePausedException){}
-   assertFalse(sent);assertFalse(p.contains("remote_lists_cache"))
+   assertFalse(sent);assertFalse(p.contains(remoteListPrefKey("normal","cache")))
   }finally{p.edit().clear().commit()}
  }
 }

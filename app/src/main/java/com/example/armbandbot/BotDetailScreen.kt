@@ -383,7 +383,7 @@ private fun KeywordActionSettingsSection(
             }
         }
         if (actionMode == "block") {
-            ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", blockReasonText, botColors(isDarkMode), onEditBlockReason)
+            ReadOnlyTextCard("차단 사유 (유저에게 표시됨)", blockReasonText, botColors(isDarkMode), onClick = onEditBlockReason)
         }
     }
 }
@@ -1162,8 +1162,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
                                     }
                                     Column(modifier = if (!isUserFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
-                                        ReadOnlyTextCard("ID/IP 블랙리스트 (발견 즉시 차단)", userBlacklistText, colors) { tempEditText = userBlacklistText; editDialogType = "user_blacklist" }
-                                        ReadOnlyTextCard("ID/IP 화이트리스트 (차단 예외)", userWhitelistText, colors) { tempEditText = userWhitelistText; editDialogType = "user_whitelist" }
+                                        RemoteListTextCard("ID/IP 블랙리스트 (발견 즉시 차단)", userBlacklistText, colors, botPref, "user_blacklist") { tempEditText = userBlacklistText; editDialogType = "user_blacklist" }
+                                        RemoteListTextCard("ID/IP 화이트리스트 (차단 예외)", userWhitelistText, colors, botPref, "user_whitelist") { tempEditText = userWhitelistText; editDialogType = "user_whitelist" }
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
@@ -1231,9 +1231,9 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                         }
                                     }
                                     Column(modifier = if (!isNicknameFilterMode) Modifier.alpha(0.4f).pointerInput(Unit) { detectTapGestures { } } else Modifier) {
-                                        ReadOnlyTextCard("닉네임 블랙리스트 (발견 즉시 차단)", nicknameBlacklistText, colors) { tempEditText = nicknameBlacklistText; editDialogType = "nickname_blacklist" }
-                                        ReadOnlyTextCard("닉네임 블랙리스트 (우회 방지)", nicknameBypassBlacklistText, colors) { tempEditText = nicknameBypassBlacklistText; editDialogType = "nickname_bypass_blacklist" }
-                                        ReadOnlyTextCard("닉네임 화이트리스트 (차단 예외)", nicknameWhitelistText, colors) { tempEditText = nicknameWhitelistText; editDialogType = "nickname_whitelist" }
+                                        RemoteListTextCard("닉네임 블랙리스트 (발견 즉시 차단)", nicknameBlacklistText, colors, botPref, "nickname_blacklist") { tempEditText = nicknameBlacklistText; editDialogType = "nickname_blacklist" }
+                                        RemoteListTextCard("닉네임 블랙리스트 (우회 방지)", nicknameBypassBlacklistText, colors, botPref, "nickname_bypass_blacklist") { tempEditText = nicknameBypassBlacklistText; editDialogType = "nickname_bypass_blacklist" }
+                                        RemoteListTextCard("닉네임 화이트리스트 (차단 예외)", nicknameWhitelistText, colors, botPref, "nickname_whitelist") { tempEditText = nicknameWhitelistText; editDialogType = "nickname_whitelist" }
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text("개별 차단 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
                                         Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
@@ -1721,8 +1721,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     }
                                 }
                                 "WORD" -> {
-                                    ReadOnlyTextCard("일반 금지어 (완전히 일치하는 경우 차단)", normalWordsText, colors) { tempEditText = normalWordsText; editDialogType = "normal" }
-                                    ReadOnlyTextCard("우회 금지어 (글자 사이 특수문자 등 무시)", bypassWordsText, colors) { tempEditText = bypassWordsText; editDialogType = "bypass" }
+                                    RemoteListTextCard("일반 금지어 (완전히 일치하는 경우 차단)", normalWordsText, colors, botPref, "normal") { tempEditText = normalWordsText; editDialogType = "normal" }
+                                    RemoteListTextCard("우회 금지어 (글자 사이 특수문자 등 무시)", bypassWordsText, colors, botPref, "bypass") { tempEditText = bypassWordsText; editDialogType = "bypass" }
 
                                     BypassKeywordOptionsSection(
                                         botPref = botPref,
@@ -1889,7 +1889,6 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                 Text("기본 탐색 설정", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PastelNavy, modifier = Modifier.padding(start=4.dp, bottom=4.dp))
                                 ModernSettingItem("관리할 갤러리 및 검색 모드", if (targetUrlsText.isBlank()) "대상 없음" else "대상 설정됨", Icons.Filled.List, colors) { currentSubScreen = "TARGET" }
                                 ModernSettingItem("탐색 속도 및 범위", "페이지 수 및 딜레이 설정", Icons.Filled.Build, colors) { currentSubScreen = "SPEED" }
-                                RemoteListSettingItem(botPref, colors) { currentSubScreen = it }
                                 IndependentDbSettingsCard(botId, botPref, isRunning, colors)
                                 BotRunScheduleSettingsCard(botPref, colors) { currentSubScreen = "SCHEDULE" }
                                 Spacer(modifier = Modifier.height(24.dp))

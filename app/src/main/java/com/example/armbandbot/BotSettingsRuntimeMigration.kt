@@ -299,6 +299,7 @@ internal fun migrateBotSettingsSnapshot(values: Map<String, Any?>): Map<String, 
         }
     }
 
+    migrated.putAll(migrateRemoteListSnapshot(migrated))
     migrated[BOT_PREF_SCHEMA_VERSION_KEY] = BOT_SETTINGS_CURRENT_SCHEMA_VERSION
     migrated[BOT_PREF_APP_VERSION_KEY] = ARMBANDBOT_APP_VERSION
     return migrated

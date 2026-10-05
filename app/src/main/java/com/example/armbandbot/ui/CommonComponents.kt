@@ -66,6 +66,7 @@ fun ReadOnlyTextCard(
     title: String,
     content: String,
     colors: BotColorScheme,
+    headerAction: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     Card(
@@ -77,6 +78,7 @@ fun ReadOnlyTextCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, fontWeight = FontWeight.Bold, color = PastelNavy, modifier = Modifier.weight(1f))
+                headerAction?.invoke()
                 Icon(Icons.Filled.Edit, contentDescription = "수정", tint = Color.Gray, modifier = Modifier.size(18.dp))
             }
             Spacer(modifier = Modifier.height(12.dp))

@@ -46,15 +46,14 @@ class AutomationNavigationUiTest {
         compose.onNodeWithText("예약 끌올").performClick()
         assertEquals(listOf("BUMP_SETTINGS"),opened)
     }
-    @Test fun remoteEntryOnlyTogglesAndOpensItsOwnPage() {
-        val opened=mutableListOf<String>()
-        compose.setContent { MaterialTheme { RemoteListSettingItem(p,botColors(false)) { opened.add(it) } } }
-        switch("remote-entry").assertIsOff().performClick().assertIsOn()
-        assertTrue(opened.isEmpty()); assertTrue(p.getBoolean(REMOTE_ENABLED_KEY,false))
-        switch("remote-entry").performClick().assertIsOff()
+    @Test fun remoteCloudBelongsToItsFilterAndDoesNotOpenTheLocalEditor() {
+        var edits=0
+        compose.setContent { MaterialTheme { RemoteListTextCard("일반 금지어","local-retained",botColors(false),p,"normal") { edits++ } } }
+        compose.onNodeWithTag("remote-cloud-normal").performClick()
+        compose.onNodeWithTag("remote-list-dialog").assertExists()
+        assertEquals(0,edits)
+        compose.onNodeWithTag("remote-list-enabled").assertIsOff()
         assertEquals("local-retained",p.getString("banned_normal",null))
-        compose.onNodeWithText("원격 목록").performClick()
-        assertEquals(listOf("REMOTE_LISTS"),opened)
     }
     @Test fun missingScheduleCannotEnableAndOffersSettings() {
         p.edit().remove(BUMP_RULES_KEY).commit()
@@ -92,15 +91,15 @@ class AutomationNavigationUiTest {
         compose.onNodeWithTag("bump-url").assertDoesNotExist()
         compose.onNodeWithTag("remote-url").assertDoesNotExist()
     }
-    @Test fun remotePageHidesFormatInstructionsUntilHelp() {
+    @Test fun remotePopupHidesLongInstructionsUntilHelp() {
         p.edit().putString(BUMP_RULES_KEY,"broken").putString(MOVE_RULES_KEY,"broken").commit()
-        compose.setContent { MaterialTheme { PostAutomationSettingsScreen(p,botColors(true),AutomationSettingsPage.REMOTE) {} } }
-        compose.onNodeWithTag("remote-url").assertExists()
+        compose.setContent { MaterialTheme { RemoteListSettingsDialog(p,"normal",botColors(true)) {} } }
+        compose.onNodeWithTag("remote-list-url").assertExists()
         compose.onNodeWithTag("bump-url").assertDoesNotExist()
         compose.onNodeWithTag("move-keyword").assertDoesNotExist()
-        compose.onNodeWithTag("automation-error").assertDoesNotExist()
-        compose.onNodeWithText("type,value",substring=true).assertDoesNotExist()
-        compose.onNodeWithTag("automation-help").performClick()
-        compose.onNodeWithText("type,value",substring=true).assertExists()
+        compose.onNodeWithTag("remote-list-error").assertDoesNotExist()
+        compose.onNodeWithText("한 열",substring=true).assertDoesNotExist()
+        compose.onNodeWithTag("remote-list-help").performClick()
+        compose.onNodeWithText("한 열",substring=true).assertExists()
     }
 }

@@ -913,66 +913,16 @@ class BotService : Service() {
     private fun String.removeCommentAndTrim() = this.substringBefore("#").trim()
 
     private fun resolveGalleryInfo(rawUrl: String): ParsedTargetUrl? {
-        val url = rawUrl.trim()
-        val queryParams = parseQueryParams(url)
-        val gallIdFromQuery = queryParams["id"]?.trim().orEmpty()
-        val listQueryOptions = ListQueryOptions(
-            recommendOnly = queryParams["recommend"] == "1" || queryParams["exception_mode"].equals("recommend", ignoreCase = true),
-            headId = queryParams["headid"]?.trim()?.takeIf { it.isNotBlank() }
-                ?: queryParams["search_head"]?.trim()?.takeIf { it.isNotBlank() }
-        )
-        val lowerUrl = url.lowercase(Locale.ROOT)
-        val gallTypeFromPath = when {
-            lowerUrl.contains("/mini/") -> "MI"
-            lowerUrl.contains("/mgallery/") || lowerUrl.contains("m.dcinside.com/board/") -> "M"
-            else -> null
-        }
-
-        if (gallIdFromQuery.isNotBlank()) {
-            return ParsedTargetUrl(
-                gallId = gallIdFromQuery,
-                gallType = gallTypeFromPath ?: "M",
-                listQueryOptions = listQueryOptions
-            )
-        }
-
-        val uri = try {
-            URI(url)
-        } catch (_: Exception) {
-            null
-        } ?: return null
-
-        val segments = uri.path
-            ?.trim('/')
-            ?.split('/')
-            ?.filter { it.isNotBlank() }
-            .orEmpty()
-
-        if (segments.isEmpty()) return null
-
-        val gallType = when {
-            segments.contains("mini") -> "MI"
-            segments.contains("mgallery") -> "M"
-            uri.host.equals("m.dcinside.com", ignoreCase = true) && segments.firstOrNull() == "board" -> "M"
-            uri.host.equals("gall.dcinside.com", ignoreCase = true) && segments.size == 1 -> "M"
-            uri.host.equals("gall.dcinside.com", ignoreCase = true) && segments.size == 2 && segments.first() == "mini" -> "MI"
-            else -> null
-        } ?: return null
-
-        val gallId = when {
-            gallType == "MI" && segments.firstOrNull() == "mini" && segments.size >= 2 -> segments[1]
-            gallType == "M" && segments.firstOrNull() == "mgallery" && segments.contains("lists") -> segments.lastOrNull { it != "lists" && it != "board" && it != "mgallery" }
-            gallType == "M" && uri.host.equals("m.dcinside.com", ignoreCase = true) && segments.firstOrNull() == "board" && segments.size >= 2 -> segments[1]
-            gallType == "M" && uri.host.equals("gall.dcinside.com", ignoreCase = true) && segments.size == 1 -> segments[0]
-            else -> segments.lastOrNull()
-        }?.trim().orEmpty()
-
-        if (gallId.isBlank()) return null
-
+        val gallery = parseManagedGalleryUrl(rawUrl) ?: return null
+        val queryParams = parseQueryParams(rawUrl.trim())
         return ParsedTargetUrl(
-            gallId = gallId,
-            gallType = gallType,
-            listQueryOptions = listQueryOptions
+            gallId = gallery.second,
+            gallType = gallery.first,
+            listQueryOptions = ListQueryOptions(
+                recommendOnly = queryParams["recommend"] == "1" || queryParams["exception_mode"].equals("recommend", ignoreCase = true),
+                headId = queryParams["headid"]?.trim()?.takeIf { it.isNotBlank() }
+                    ?: queryParams["search_head"]?.trim()?.takeIf { it.isNotBlank() }
+            )
         )
     }
 
