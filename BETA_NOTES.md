@@ -6,6 +6,7 @@
 - 관련 설정을 하나의 목록 카드로 묶고, 아이콘·여백·색을 통일했습니다. 다크 모드에서도 대화상자와 메뉴가 같은 색을 따릅니다.
 - 봇 목록에 실행 상태 표시를 추가하고, 봇 추가·불러오기·DB 기록 버튼을 정리했습니다.
 - 활동 로그의 내보내기·디버그·삭제는 오른쪽 위 메뉴로 옮겼습니다.
+- [APK 다운로드](https://drive.google.com/file/d/1hMc1T6cI8B3HjLX96W423WoYXa56h7CK/view?usp=drivesdk) · [사용 안내](https://drive.google.com/file/d/1xV0NEEZtTWHNNJ4gxdx3CQGOKk6mbvSe/view?usp=drivesdk)
 
 ## 1.6.0-beta2
 

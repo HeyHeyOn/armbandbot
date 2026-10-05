@@ -1,0 +1,289 @@
+{
+ "version": "1.6.0-beta3",
+ "version_code": 182,
+ "source_commit": "d60e37a8a3c9d723eb4a4fba89659ab4058feac8",
+ "previous_version": "1.6.0-beta2",
+ "previous_commit": "547fa40276bd340e676321b4d0e9fc10872299f1",
+ "change_scope": "UI only: bot detail split into bottom tabs (home/filters/automation/log/settings), shared grouped setting cards, unified palette/headers/icons, lobby redesign, Material theme follows app dark mode. Preference keys, sub-screen routes and dialog triggers verified identical to beta2 by source diff. New entry point: home shortcut opens the existing per-bot DB dashboard route.",
+ "artifacts": [
+  {
+   "name": "완장봇_v1.6.0-beta3.apk",
+   "bytes": 13420718,
+   "sha256": "13502022816dcd1707c0ddbb7c3b6e4e931b3dd02ea97b17454abda05a4336e8"
+  },
+  {
+   "name": "완장봇_v1.6.0-beta3_사용안내.txt",
+   "bytes": 3596,
+   "sha256": "85fe0f75544801d1e7b5e439d7ac2a20ff2caf313ad44d60c959b441fb886fd2"
+  }
+ ],
+ "package": {
+  "application_id": "com.heyheyon.armbandbot",
+  "version_name": "1.6.0-beta3",
+  "version_code": 182,
+  "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+  "signer_matches_beta2": true
+ },
+ "jvm": {
+  "Debug": {
+   "tests": 699,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  "Release": {
+   "tests": 699,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  "rerun_tasks": true
+ },
+ "lint": {
+  "Debug": {
+   "errors": 0,
+   "warnings": 52
+  },
+  "Release": {
+   "errors": 0,
+   "warnings": 47
+  },
+  "classic_uast": true
+ },
+ "dex": {
+  "invoke_range_gate": "passed (max ins=245, headroom=10, BotDetailScreenKt$BotDetailScreen$12.<init>)",
+  "dex_count": 5,
+  "minimum_method_headroom": 70,
+  "maximum_words_with_receiver_upper_bound": 245,
+  "report": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/apk-dex.json"
+ },
+ "instrumentation": [
+  {
+   "api": "24",
+   "scope": "all androidTest classes except opt-in PostAutomationServiceLiveTest",
+   "completed": 78,
+   "failed": 0,
+   "skipped": 4,
+   "skipped_tests": [
+    "ManagedGalleryTabsLiveTest.anonymousSessionCannotUsePublicTabChoices",
+    "ManagedGalleryTabsLiveTest.savedManagerSessionLoadsTabsAndSavesDisabledRule",
+    "PostAutomationLiveTest.ownedGithubJsonAndCsvUseNativeClientAndLocalKeys",
+    "PostAutomationLiveTest.ownedFixtureNativeMoveAndBumpReadbackAreNotRepeated"
+   ],
+   "results_dir": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/instrumentation-api24-results"
+  },
+  {
+   "api": "35",
+   "scope": "all androidTest classes except opt-in PostAutomationServiceLiveTest",
+   "completed": 80,
+   "failed": 0,
+   "skipped": 4,
+   "skipped_tests": [
+    "ManagedGalleryTabsLiveTest.anonymousSessionCannotUsePublicTabChoices",
+    "ManagedGalleryTabsLiveTest.savedManagerSessionLoadsTabsAndSavesDisabledRule",
+    "PostAutomationLiveTest.ownedGithubJsonAndCsvUseNativeClientAndLocalKeys",
+    "PostAutomationLiveTest.ownedFixtureNativeMoveAndBumpReadbackAreNotRepeated"
+   ],
+   "results_dir": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/instrumentation-api35-results"
+  }
+ ],
+ "instrumentation_notes": [
+  "DbDashboardRecordFilterUiTest pixel-color tests are @SdkSuppress(minSdkVersion=26), so API24 lists 78 cases vs 80 on API35.",
+  "4 skipped cases are opt-in live tests (ManagedGalleryTabsLiveTest, PostAutomationLiveTest) without live arguments; not counted as live verification.",
+  "A transient VerifyError in DbDashboardScreen during development came from stale incremental build output; final results are from clean builds. DbDashboardScreen.kt and SnapshotViewer.kt were left unchanged because they are near register limits."
+ ],
+ "signed_release_acceptance": [
+  {
+   "api": "24",
+   "apk_sha256": "13502022816dcd1707c0ddbb7c3b6e4e931b3dd02ea97b17454abda05a4336e8",
+   "checks": {
+    "beta2_release_upgrade_bot_kept": true,
+    "exact_signed_apk_installed_not_debuggable": true,
+    "version_after_install": [
+     "versionCode=182 minSdk=24 targetSdk=35",
+     "versionName=1.6.0-beta3"
+    ],
+    "light_and_dark_lobby_home_filters_automation_log_settings_word_detail_rendered": true,
+    "bot_service_never_started": true,
+    "no_runtime_crash": true,
+    "passed": true
+   },
+   "screenshots": {
+    "upgrade-before-beta2": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/upgrade-before-beta2.png",
+     "sha256": "b81f585e2b62f267d249356032890349c359beca3c4ced17ed7c204fb886bacc"
+    },
+    "upgrade-after-beta3": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/upgrade-after-beta3.png",
+     "sha256": "f5563f7f1350e16b44c03a452ebefedefb34faa898ace5f960f894b89f8eb881"
+    },
+    "light-lobby": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/light-lobby.png",
+     "sha256": "6783247a08dde0c34d12f477d53ad911295896ee2b6b593d2dbef7fae1331af8"
+    },
+    "light-tab-home": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/light-tab-home.png",
+     "sha256": "0e83818818c3576ead956e5c5cc0a4c62e30990334dba71607d05732aa0fce40"
+    },
+    "light-tab-filters": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/light-tab-filters.png",
+     "sha256": "b5c07595c1c8359d6da826a3725b48fdad55836d0c50da670b7553f9ef86b37b"
+    },
+    "light-tab-automation": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/light-tab-automation.png",
+     "sha256": "7e51a05cef4cc3f8acb80dc9ec00bf790df5bd26045df07f8338a7d4147dbd27"
+    },
+    "light-tab-log": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/light-tab-log.png",
+     "sha256": "3854adbe694f2a24ef8080d08afc2bdd53c1f8368c5c94caae60c083f9eba8f2"
+    },
+    "light-tab-settings": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/light-tab-settings.png",
+     "sha256": "378a655dced99a579219076d765ca6eb8d479548530059bbf6aa6f1fcdb69ab0"
+    },
+    "light-word-detail": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/light-word-detail.png",
+     "sha256": "c221ca6ae2db1b9fe0d39abd69b36da59023ecdbf5149523467dab40b57ab06d"
+    },
+    "dark-lobby": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/dark-lobby.png",
+     "sha256": "c6e5f3743da50b41fff1c89b0d19c44582ba2168c8c62cc1ee5107afe4ca5675"
+    },
+    "dark-tab-home": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/dark-tab-home.png",
+     "sha256": "b394538fc4129f197c5043fc7ad7cd4ea8f69108af3a31c5c06b3572ea4a742b"
+    },
+    "dark-tab-filters": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/dark-tab-filters.png",
+     "sha256": "5878b1bc765f846bae71b494aa454e0300fd10a4db15f2718f29518e148fb3ce"
+    },
+    "dark-tab-automation": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/dark-tab-automation.png",
+     "sha256": "a2169f45385d0d997bd4e573342b6cfe10d78709a38fe6cd2845d4ceee442f32"
+    },
+    "dark-tab-log": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/dark-tab-log.png",
+     "sha256": "f7be6baff5b86783f98011875705fafa7d2a885f480ec79b79e6a6bf06d3100b"
+    },
+    "dark-tab-settings": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/dark-tab-settings.png",
+     "sha256": "1ab747a59c09a869d8044581b67e245617477b258e135234deb26ab56cfa724f"
+    },
+    "dark-word-detail": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api24/dark-word-detail.png",
+     "sha256": "ba6d6d4207689a067e79febf0e97f04c5756a860594630ce134b6d4571e6b0bc"
+    }
+   },
+   "script": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/validate_signed_ui.py"
+  },
+  {
+   "api": "35",
+   "apk_sha256": "13502022816dcd1707c0ddbb7c3b6e4e931b3dd02ea97b17454abda05a4336e8",
+   "checks": {
+    "beta2_release_upgrade_bot_kept": true,
+    "exact_signed_apk_installed_not_debuggable": true,
+    "version_after_install": [
+     "versionCode=182 minSdk=24 targetSdk=35",
+     "versionName=1.6.0-beta3"
+    ],
+    "light_and_dark_lobby_home_filters_automation_log_settings_word_detail_rendered": true,
+    "bot_service_never_started": true,
+    "no_runtime_crash": true,
+    "passed": true
+   },
+   "screenshots": {
+    "upgrade-before-beta2": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/upgrade-before-beta2.png",
+     "sha256": "f8c07122061ab683df6f4b4cff6230f460a39e752b52579faa826a0037315773"
+    },
+    "upgrade-after-beta3": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/upgrade-after-beta3.png",
+     "sha256": "c3cc3c5e0f835542e7f60350a221a36c34da12b9d82cc5b3ae8000f0adc63347"
+    },
+    "light-lobby": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/light-lobby.png",
+     "sha256": "d7125ec406b68c641c2603a6567f837746af68910f6ab96f30d17952e282b204"
+    },
+    "light-tab-home": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/light-tab-home.png",
+     "sha256": "8c568289f0a2d85d237a85d2efd8b1ef52a4d9cf10d8c1e06768a84378ae9c18"
+    },
+    "light-tab-filters": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/light-tab-filters.png",
+     "sha256": "ef98a8077605fa5696054d50324cfdfa3d334b89cd1b85b07753f60961a8d71d"
+    },
+    "light-tab-automation": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/light-tab-automation.png",
+     "sha256": "acd7cccae766c0242dfe500990a360c8fe35232a45cf4f7d62a022e1a00671d6"
+    },
+    "light-tab-log": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/light-tab-log.png",
+     "sha256": "7b3b0a8f68e9f161b730b30bc2ff80c90fae1db8d8d886b26a15c01def4c9081"
+    },
+    "light-tab-settings": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/light-tab-settings.png",
+     "sha256": "d4a92fa8e0da1bbe3cf92f0cdb8eeac37983d5c2eeea4bae9b21902a64625888"
+    },
+    "light-word-detail": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/light-word-detail.png",
+     "sha256": "f49d038b66167c7903fa23679578b988f3933ed90c3dbb2af712499cf1191e72"
+    },
+    "dark-lobby": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/dark-lobby.png",
+     "sha256": "e4bf95a64fca530d6ecd71156e5aab5cda531c5b0aec51d6cfe080b82e919d03"
+    },
+    "dark-tab-home": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/dark-tab-home.png",
+     "sha256": "e2d554fdd019686bae12d09f5fa01b7a3a85fb276e835b2815467632d8e310c4"
+    },
+    "dark-tab-filters": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/dark-tab-filters.png",
+     "sha256": "de993705a6b4091023f535c18a3b6c371f500d8fdbe497809cce8aec72c26dac"
+    },
+    "dark-tab-automation": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/dark-tab-automation.png",
+     "sha256": "384b7523df4c21f86047691515dae1252de263292810faea2c9f1c9855759684"
+    },
+    "dark-tab-log": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/dark-tab-log.png",
+     "sha256": "ce27d77da213b44723628f2e44a6cdb15f18ee31367390dcc6a049099d120718"
+    },
+    "dark-tab-settings": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/dark-tab-settings.png",
+     "sha256": "d6c22f73ce4ec23c0ba19396276ddb3229af824d6673470153129e3d3dc5f201"
+    },
+    "dark-word-detail": {
+     "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/api35/dark-word-detail.png",
+     "sha256": "fc87efe4da84c805ef8e9fab638424c92f8dd3c5c7a11b6de65f5702907b9041"
+    }
+   },
+   "script": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta3/validate_signed_ui.py"
+  }
+ ],
+ "drive": {
+  "folder": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+  "apk": {
+   "id": "1hMc1T6cI8B3HjLX96W423WoYXa56h7CK",
+   "name": "완장봇_v1.6.0-beta3.apk",
+   "url": "https://drive.google.com/file/d/1hMc1T6cI8B3HjLX96W423WoYXa56h7CK/view?usp=drivesdk",
+   "size": 13420718,
+   "downloaded_sha256": "13502022816dcd1707c0ddbb7c3b6e4e931b3dd02ea97b17454abda05a4336e8",
+   "metadata_and_download_verified": true
+  },
+  "guide": {
+   "id": "1xV0NEEZtTWHNNJ4gxdx3CQGOKk6mbvSe",
+   "name": "완장봇_v1.6.0-beta3_사용안내.txt",
+   "url": "https://drive.google.com/file/d/1xV0NEEZtTWHNNJ4gxdx3CQGOKk6mbvSe/view?usp=drivesdk",
+   "size": 3596,
+   "downloaded_sha256": "85fe0f75544801d1e7b5e439d7ac2a20ff2caf313ad44d60c959b441fb886fd2",
+   "metadata_and_download_verified": true
+  },
+  "sharing_changed": false
+ },
+ "not_performed": [
+  "real server post/delete/block/tab move",
+  "logged-in manager session checks",
+  "long-running operation",
+  "Telegram/gallery announcement (not requested)"
+ ]
+}
