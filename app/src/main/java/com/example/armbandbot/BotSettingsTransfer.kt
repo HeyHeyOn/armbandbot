@@ -29,6 +29,7 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
 ) + ORDERED_MULTILINE_SETTING_KEYS.map(::orderedMultilineTextKey) + REMOTE_CHANNEL_EXPORT_STRING_KEYS
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
+    WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY,
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block",
     "is_search_mode", "is_user_filter_mode", "is_nickname_filter_mode",
@@ -256,6 +257,7 @@ private inline fun <T> Iterable<String>.associateWithNotNull(valueSelector: (Str
     }
 
 internal fun defaultBooleanValue(key: String): Boolean = when (key) {
+    WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY -> true
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block", "is_snapshot_blocked",
     "pum_delete_post_on_block" -> true

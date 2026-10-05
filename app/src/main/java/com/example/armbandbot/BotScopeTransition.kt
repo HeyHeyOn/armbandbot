@@ -17,6 +17,7 @@ internal fun prepareCopiedBotSettingsSnapshot(
         this[BUMP_ENABLED_KEY] = false
         this[MOVE_ENABLED_KEY] = false
         this[REMOTE_ENABLED_KEY] = false
+        remove(FILTER_MASTER_REVISION_KEY)
         REMOTE_CHANNEL_EXPORT_BOOLEAN_KEYS.forEach { this[it] = false }
         keys.removeAll { it.startsWith("remote_channel_") && it !in REMOTE_CHANNEL_EXPORT_STRING_KEYS && it !in REMOTE_CHANNEL_EXPORT_BOOLEAN_KEYS && it !in REMOTE_CHANNEL_EXPORT_INT_KEYS }
         keys.removeAll { key ->

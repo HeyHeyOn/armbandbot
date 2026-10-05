@@ -19,7 +19,7 @@ class PumFilterUiContractTest {
     @Test
     fun `PUM filter follows word filter before actor filters`() {
         val source = source("BotDetailScreen.kt")
-        val wordIndex = source.indexOf("ModernSettingItem(\"금지어 필터\"")
+        val wordIndex = source.indexOf("FilterMasterEntry(botPref, colors, WORD_FILTER_ENABLED_KEY)")
         val pumIndex = source.indexOf("ModernSettingItem(\"펌 필터\"")
         val userIndex = source.indexOf("ModernSettingItem(\"유저 ID/IP 필터\"")
 

@@ -31,8 +31,9 @@ internal fun effectiveRemoteLists(p:SharedPreferences):RemoteLists? {
 internal fun automationPolicyRevision(p:SharedPreferences):String {
     val move=if(p.getBoolean(MOVE_ENABLED_KEY,false))p.getString(MOVE_RULES_KEY,"[]").orEmpty() else ""
     val remote=effectiveRemoteLists(p)?.revision.orEmpty()
-    if(move.isEmpty() && remote.isEmpty())return ""
-    return policyHash("$move|$remote")
+    val masters=p.getString(FILTER_MASTER_REVISION_KEY, "").orEmpty()
+    if(move.isEmpty() && remote.isEmpty() && masters.isEmpty())return ""
+    return policyHash("$move|$remote|$masters")
 }
 internal fun policyHash(text:String):String=MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString(""){"%02x".format(it)}
 internal fun configuredAutomationGalleries(p:SharedPreferences):Set<Pair<String,String>> = p.getString("target_urls","").orEmpty().lineSequence().mapNotNull { line->parseManagedGalleryUrl(line) }.toSet()

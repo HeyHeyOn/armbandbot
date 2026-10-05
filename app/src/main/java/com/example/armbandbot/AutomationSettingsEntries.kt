@@ -74,7 +74,7 @@ private fun AutomationFeatureSettingItem(p:SharedPreferences,colors:BotColorSche
 internal fun AutomationSettingsHelp(page:AutomationSettingsPage,colors:BotColorScheme,onDismiss:()->Unit) {
     val guidance=when(page) {
         AutomationSettingsPage.BUMP->"관리하는 갤러리의 일반 글을 매일 지정한 시각에 끌올합니다. 시각 버튼을 눌러 고르거나 추가해 주세요.\n\n봇이 작동 중일 때만 실행하며, 15분 이내 늦어진 예약만 처리합니다. 앱 강제 종료·절전·로그인 만료 시 정각 실행은 보장되지 않습니다. 공지·고정글은 제외합니다."
-        AutomationSettingsPage.TAB->"제목·본문에 키워드가 포함된 게시글을 선택한 탭으로 옮깁니다. 각 갤러리의 규칙을 따로 적용하며, 해당 갤러리에서 등록 순서의 첫 번째 규칙을 적용합니다. PC·모바일 주소를 모두 인식합니다.\n\n화이트리스트·예외 글은 건너뛰며, 삭제·차단·검토가 우선합니다. 댓글은 분류하지 않습니다. 탭 설정에 따라 개념글 지정이 해제될 수 있습니다."
+        AutomationSettingsPage.TAB->"제목·본문에 키워드가 포함된 게시글을 선택한 탭으로 옮깁니다. 일반 키워드는 입력한 문자열 그대로, 우회 키워드는 글자 사이의 공백·특수문자를 무시하고 찾습니다. 목록을 눌러 줄바꿈으로 입력하고 규칙을 저장해 주세요. 두 목록 중 하나만 입력해도 됩니다.\n\n각 갤러리의 규칙을 따로 적용하며, 해당 갤러리에서 등록 순서의 첫 번째 규칙을 적용합니다. PC·모바일 주소를 모두 인식합니다.\n\n화이트리스트·예외 글은 건너뛰며, 삭제·차단·검토가 우선합니다. 댓글은 분류하지 않습니다. 탭 설정에 따라 개념글 지정이 해제될 수 있습니다."
     }
     AlertDialog(onDismissRequest=onDismiss,modifier=Modifier.testTag("automation-help-dialog"),containerColor=colors.card,
         titleContentColor=colors.text,textContentColor=colors.subText,title={Text("${page.title} 도움말")},

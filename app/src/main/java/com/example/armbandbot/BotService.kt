@@ -4935,13 +4935,13 @@ img.written_dccon{max-width:80px;max-height:80px}
             nicknameBypassBlacklist = orderedMultilineValues("nickname_bypass_blacklist"),
             nicknameWhitelist = orderedMultilineValues("nickname_whitelist"),
 
-            isYudongPostBlock = botPref.getBoolean("is_yudong_post_block", false),
-            isYudongCommentBlock = botPref.getBoolean("is_yudong_comment_block", false),
-            isYudongImageBlock = botPref.getBoolean("is_yudong_image_block", false),
-            isYudongDcMediaBlock = botPref.getBoolean("is_yudong_dc_media_block", false),
-            yudongDcMediaActivationRecheckPending = botPref.getBoolean("is_yudong_dc_media_block", false) &&
+            isYudongPostBlock = activeYudongFilterOption(botPref, "is_yudong_post_block"),
+            isYudongCommentBlock = activeYudongFilterOption(botPref, "is_yudong_comment_block"),
+            isYudongImageBlock = activeYudongFilterOption(botPref, "is_yudong_image_block"),
+            isYudongDcMediaBlock = activeYudongFilterOption(botPref, "is_yudong_dc_media_block"),
+            yudongDcMediaActivationRecheckPending = activeYudongFilterOption(botPref, "is_yudong_dc_media_block") &&
                 botPref.getBoolean("yudong_dc_media_recheck_pending", true),
-            isYudongVoiceBlock = botPref.getBoolean("is_yudong_voice_block", false),
+            isYudongVoiceBlock = activeYudongFilterOption(botPref, "is_yudong_voice_block"),
 
             isOverseasIpFilterMode = botPref.getBoolean("is_overseas_ip_filter_mode", false),
             isOverseasIpPostBlock = botPref.getBoolean("is_overseas_ip_post_block", true),
@@ -5025,9 +5025,9 @@ img.written_dccon{max-width:80px;max-height:80px}
             cycleMinMs = cycleMinMs,
             cycleMaxMs = cycleMaxMs,
 
-            normalWords = orderedMultilineValues("normal").toTypedArray(),
+            normalWords = activeWordFilterValues(botPref, orderedMultilineValues("normal")).toTypedArray(),
 
-            bypassWords = orderedMultilineValues("bypass").toTypedArray(),
+            bypassWords = activeWordFilterValues(botPref, orderedMultilineValues("bypass")).toTypedArray(),
             bypassIgnoreCaseEnabled = botPref.getBoolean("bypass_ignore_case_enabled", false),
             bypassUnicodeNormalizationEnabled = botPref.getBoolean("bypass_unicode_normalization_enabled", false),
             keywordApplyYudongOnly = botPref.getBoolean("keyword_apply_yudong_only", false),

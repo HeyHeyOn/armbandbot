@@ -10,6 +10,7 @@ import androidx.test.espresso.matcher.ViewMatchers.*
 import org.hamcrest.Matcher
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.heyheyon.armbandbot.ui.botColors
@@ -42,11 +43,15 @@ class PostAutomationUiTest {
    compose.setContent { MaterialTheme { PostAutomationSettingsScreen(p,botColors(true),onBack={}) } }
    compose.onNodeWithTag("bump-enabled").assertIsOff()
    compose.onNodeWithTag("bump-url").performTextReplacement("https://gall.dcinside.com/mgallery/board/view/?id=laboratory1&no=2361")
+   androidx.test.espresso.Espresso.closeSoftKeyboard();compose.waitForIdle()
    compose.onNodeWithTag("bump-time-remove-540").performClick()
    compose.onNodeWithTag("bump-save").performScrollTo().performClick()
    compose.onNodeWithTag("automation-error").assertExists();assertFalse(p.contains(BUMP_RULES_KEY))
-   compose.onNodeWithTag("bump-time-add").performScrollTo().performClick();pick(9,0)
-   compose.onNodeWithTag("bump-time-add").performScrollTo().performClick();pick(18,30)
+   compose.onNodeWithTag("bump-time-add").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) { it() };pick(9,0)
+   compose.onNodeWithTag("bump-time-540").assertExists()
+   compose.onNodeWithTag("bump-time-add").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) { it() };pick(18,30)
+   compose.onNodeWithTag("bump-time-540").assertExists()
+   compose.onNodeWithTag("bump-time-1110").assertExists()
    compose.onNodeWithTag("bump-save").performScrollTo().performClick()
    assertEquals(listOf(540,1110),parseBumpRules(p.getString(BUMP_RULES_KEY,"[]")!!).single().minutes)
    compose.onNodeWithTag("bump-enabled").performScrollTo().performClick().assertIsOn()

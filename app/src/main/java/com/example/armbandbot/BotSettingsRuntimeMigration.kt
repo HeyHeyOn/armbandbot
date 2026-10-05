@@ -23,6 +23,8 @@ private fun migrateRetiredGroqModel(provider: String, model: String): String {
 }
 
 private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
+    WORD_FILTER_ENABLED_KEY to true,
+    YUDONG_FILTER_ENABLED_KEY to true,
     "ai_delete_only_mode" to false,
     "ai_delete_post_on_block" to true,
     "ai_filter_use_custom_endpoint" to false,

@@ -75,7 +75,7 @@ class AutomationNavigationUiTest {
         p.edit().putString(MOVE_RULES_KEY,"broken").commit()
         compose.setContent { MaterialTheme { PostAutomationSettingsScreen(p,botColors(true),AutomationSettingsPage.BUMP) {} } }
         compose.onNodeWithTag("bump-url").assertExists()
-        compose.onNodeWithTag("move-keyword").assertDoesNotExist()
+        compose.onNodeWithTag("move-normal-keywords").assertDoesNotExist()
         compose.onNodeWithTag("remote-url").assertDoesNotExist()
         compose.onNodeWithTag("automation-error").assertDoesNotExist()
         compose.onNodeWithTag("automation-help-dialog").assertDoesNotExist()
@@ -87,7 +87,7 @@ class AutomationNavigationUiTest {
     @Test fun tabPageIsFocusedAndUsesNaturalTitle() {
         compose.setContent { MaterialTheme { PostAutomationSettingsScreen(p,botColors(false),AutomationSettingsPage.TAB) {} } }
         compose.onNodeWithText("자동 탭 분류").assertIsDisplayed()
-        compose.onNodeWithTag("move-keyword").assertExists()
+        compose.onNodeWithTag("move-normal-keywords").assertExists()
         compose.onNodeWithTag("bump-url").assertDoesNotExist()
         compose.onNodeWithTag("remote-url").assertDoesNotExist()
     }
@@ -96,7 +96,7 @@ class AutomationNavigationUiTest {
         compose.setContent { MaterialTheme { RemoteListSettingsDialog(p,"normal",botColors(true)) {} } }
         compose.onNodeWithTag("remote-list-url").assertExists()
         compose.onNodeWithTag("bump-url").assertDoesNotExist()
-        compose.onNodeWithTag("move-keyword").assertDoesNotExist()
+        compose.onNodeWithTag("move-normal-keywords").assertDoesNotExist()
         compose.onNodeWithTag("remote-list-error").assertDoesNotExist()
         compose.onNodeWithText("한 열",substring=true).assertDoesNotExist()
         compose.onNodeWithTag("remote-list-help").performClick()

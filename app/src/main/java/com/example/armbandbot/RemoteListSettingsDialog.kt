@@ -23,7 +23,7 @@ internal fun remoteListLabel(channel:String)=when(channel) {
 
 /** The cloud consumes its own click; the remaining card still opens the local pencil editor. */
 @Composable
-internal fun RemoteListTextCard(title:String,content:String,colors:BotColorScheme,p:SharedPreferences,channel:String,onEdit:()->Unit) {
+internal fun RemoteListTextCard(title:String,content:String,colors:BotColorScheme,p:SharedPreferences,channel:String,enabled:Boolean=true,onEdit:()->Unit) {
     remember(p) {ensureRemoteListSettings(p);true}
     var open by remember {mutableStateOf(false)}
     var revision by remember {mutableIntStateOf(0)}
@@ -32,12 +32,12 @@ internal fun RemoteListTextCard(title:String,content:String,colors:BotColorSchem
         p.registerOnSharedPreferenceChangeListener(listener);onDispose {p.unregisterOnSharedPreferenceChangeListener(listener)}
     }
     val active=remember(p,channel,revision) {p.getBoolean(remoteListPrefKey(channel,"enabled"),false)}
-    ReadOnlyTextCard(title,content,colors,headerAction={
-        IconButton(onClick={open=true},modifier=Modifier.testTag("remote-cloud-$channel")) {
+    ReadOnlyTextCard(title,content,colors,enabled=enabled,headerAction={
+        IconButton(enabled=enabled,onClick={open=true},modifier=Modifier.testTag("remote-cloud-$channel")) {
             Icon(Icons.Default.Cloud,"${remoteListLabel(channel)} 원격 목록${if(active)" 사용 중" else " 설정"}",tint=if(active)PastelNavy else colors.subText)
         }
     },onClick=onEdit)
-    if(open)RemoteListSettingsDialog(p,channel,colors) {open=false}
+    if(open && enabled)RemoteListSettingsDialog(p,channel,colors) {open=false}
 }
 
 @Composable

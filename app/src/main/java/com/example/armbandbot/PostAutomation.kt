@@ -40,18 +40,64 @@ private fun parseBumpRulesUnchecked(text:String):List<BumpRule> {
     return (0 until a.length()).map { val j=a.getJSONObject(it);val times=j.getJSONArray("minutes");BumpRule(j.getString("id"),j.getString("url"),(0 until times.length()).map{n->times.getInt(n)}) }.also { require(it.map{r->r.id}.distinct().size==it.size) }
 }
 internal fun encodeBumpRules(rules:List<BumpRule>):String=JSONArray().apply { rules.forEach { r -> put(JSONObject().put("id",r.id).put("url",r.url).put("minutes",JSONArray(r.minutes))) } }.toString()
-internal data class TabMoveRule(val id:String,val gallType:String,val gallId:String,val keyword:String,val headtext:Int,val label:String,val obstruct:Boolean) {
-    init { require(id.matches(Regex("[A-Za-z0-9_-]{1,80}")));require(gallType in setOf("M","MI"));require(gallId.matches(Regex("[A-Za-z0-9_-]+")));require(keyword.isNotBlank() && keyword.length<=300);require(headtext>=0);require(label.isNotBlank() && label.length<=100) }
+/** Both lists use literal entries; punctuation such as C# remains part of a keyword. */
+internal fun parseAutomationKeywords(text: String): List<String> =
+    text.lines().map(String::trim).filter(String::isNotEmpty).distinct()
+
+internal data class TabMoveRule(
+    val id: String, val gallType: String, val gallId: String,
+    val normalKeywords: List<String>, val headtext: Int, val label: String, val obstruct: Boolean,
+    val bypassKeywords: List<String> = emptyList(),
+) {
+    // Existing single-keyword rules retain their literal meaning on upgrade.
+    constructor(id: String, gallType: String, gallId: String, keyword: String, headtext: Int, label: String, obstruct: Boolean) :
+        this(id, gallType, gallId, listOf(keyword), headtext, label, obstruct)
+    init {
+        require(id.matches(Regex("[A-Za-z0-9_-]{1,80}")))
+        require(gallType in setOf("M", "MI"))
+        require(gallId.matches(Regex("[A-Za-z0-9_-]+")))
+        require(normalKeywords.isNotEmpty() || bypassKeywords.isNotEmpty()) { "일반 또는 우회 키워드를 하나 이상 입력해 주세요." }
+        require((normalKeywords + bypassKeywords).all { it.isNotBlank() && it.length <= 300 }) { "키워드는 한 줄에 300자 이내로 입력해 주세요." }
+        require(headtext >= 0)
+        require(label.isNotBlank() && label.length <= 100)
+    }
 }
 internal fun parseTabMoveRules(text:String):List<TabMoveRule> = try { parseTabMoveRulesUnchecked(text) } catch(e:Exception) { throw IllegalArgumentException("저장된 탭 이동 규칙 형식을 확인하세요.",e) }
-private fun parseTabMoveRulesUnchecked(text:String):List<TabMoveRule> {
-    require(text.length<=131072);val a=JSONArray(text);require(a.length()<=64)
-    return (0 until a.length()).map { val j=a.getJSONObject(it);TabMoveRule(j.getString("id"),j.getString("gallType"),j.getString("gallId"),j.getString("keyword"),j.getInt("headtext"),j.getString("label"),j.optBoolean("obstruct",false)) }.also { require(it.map{r->r.id}.distinct().size==it.size) }
+private fun parseTabMoveRulesUnchecked(text: String): List<TabMoveRule> {
+    require(text.length <= 131072)
+    val array = JSONArray(text)
+    require(array.length() <= 64)
+    return (0 until array.length()).map { index ->
+        val j = array.getJSONObject(index)
+        fun keywords(key: String): List<String> {
+            val values = j.getJSONArray(key)
+            return (0 until values.length()).map { n ->
+                require(values.get(n) is String)
+                values.getString(n)
+            }
+        }
+        val normal = if (j.has("normalKeywords")) keywords("normalKeywords") else listOf(j.getString("keyword"))
+        val bypass = if (j.has("bypassKeywords")) keywords("bypassKeywords") else emptyList()
+        TabMoveRule(j.getString("id"), j.getString("gallType"), j.getString("gallId"), normal,
+            j.getInt("headtext"), j.getString("label"), j.optBoolean("obstruct", false), bypass)
+    }.also { require(it.map { r -> r.id }.distinct().size == it.size) }
 }
-internal fun encodeTabMoveRules(rules:List<TabMoveRule>):String=JSONArray().apply { rules.forEach { r -> put(JSONObject().put("id",r.id).put("gallType",r.gallType).put("gallId",r.gallId).put("keyword",r.keyword).put("headtext",r.headtext).put("label",r.label).put("obstruct",r.obstruct)) } }.toString()
+internal fun encodeTabMoveRules(rules: List<TabMoveRule>): String {
+    require(rules.size <= 64) { "분류 규칙은 최대 64개까지 저장할 수 있습니다." }
+    require(rules.map { it.id }.distinct().size == rules.size)
+    return JSONArray().apply { rules.forEach { r ->
+        put(JSONObject().put("id", r.id).put("gallType", r.gallType).put("gallId", r.gallId)
+            .put("normalKeywords", JSONArray(r.normalKeywords)).put("bypassKeywords", JSONArray(r.bypassKeywords))
+            .put("headtext", r.headtext).put("label", r.label).put("obstruct", r.obstruct))
+    } }.toString().also { require(it.length <= 131072) { "키워드 목록이 너무 큽니다. 목록을 줄여 주세요." } }
+}
 internal fun matchingMove(rules:List<TabMoveRule>,key:PostKey,text:String,whitelisted:Boolean,exempt:Boolean,alreadyHandled:Boolean):TabMoveRule? {
     if(whitelisted || exempt || alreadyHandled)return null
-    return rules.firstOrNull { it.gallType==key.gallType && it.gallId==key.gallId && text.contains(it.keyword,ignoreCase=true) }
+    return rules.firstOrNull { rule ->
+        rule.gallType == key.gallType && rule.gallId == key.gallId &&
+            (rule.normalKeywords.any { text.contains(it, ignoreCase = true) } ||
+                rule.bypassKeywords.any { ModerationTextRules.matchesBypassKeyword(text, it, ignoreLatinCase = false, normalizeUnicode = false) })
+    }
 }
 internal data class GalleryCategory(val id:Int,val label:String,val obstruct:Boolean=false)
 internal fun parseGalleryCategories(html:String):List<GalleryCategory> {

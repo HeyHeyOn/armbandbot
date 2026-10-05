@@ -67,10 +67,12 @@ fun ReadOnlyTextCard(
     content: String,
     colors: BotColorScheme,
     headerAction: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onClick() },
+        modifier = modifier.fillMaxWidth().padding(vertical = 8.dp).clickable(enabled = enabled) { onClick() },
         colors = CardDefaults.cardColors(containerColor = colors.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         shape = RoundedCornerShape(12.dp)
