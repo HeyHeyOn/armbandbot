@@ -1,3 +1,10 @@
+## 1.6.0-beta2
+
+- 예약 끌올·자동 탭 분류의 상세 화면 상단을 기존 필터 화면과 통일했습니다.
+- 자동 탭 분류를 일반·우회 키워드의 줄바꿈 목록과 큰 편집창으로 개선하고, 규칙 화면을 정리했습니다.
+- 금지어·유동 필터에 마스터 토글을 추가했습니다. 끄면 하위 설정을 보관하고 비활성화합니다.
+- [APK 다운로드](https://drive.google.com/file/d/1fM50P7kBvPAtFlVzPiMgwK8OXUvmJfyz/view?usp=drivesdk) · [사용 안내](https://drive.google.com/file/d/1iNt9e7ojXFHogs-iViQn3jByJoy4DgdK/view?usp=drivesdk)
+
 ## 1.6.0-beta1
 
 - 자동 탭 분류의 권한 판정을 보완해, 관리 버튼과 말머리 변경 메뉴가 있어도 권한 확인에 실패하던 경우를 수정했습니다.

@@ -1,0 +1,680 @@
+{
+  "version": "1.6.0-beta2",
+  "version_code": 181,
+  "source_commit": "61ac34ddfcce54bf7bfcaffdfe7b063a48fe30f8",
+  "previous_version": "1.6.0-beta1",
+  "previous_commit": "c7687a235b38ecce34239f651e07742ee6d14db6",
+  "source_inputs_unchanged_after_tests": true,
+  "artifacts": [
+    {
+      "name": "완장봇_v1.6.0-beta2.apk",
+      "bytes": 13387950,
+      "sha256": "be15c4bee19e7481704dbcd3f386ef48b19599b644b6184ad7e28f6afb5fb172"
+    },
+    {
+      "name": "완장봇_v1.6.0-beta2_사용안내.txt",
+      "bytes": 3681,
+      "sha256": "57b883dba49cd9da8ed58eb5314e7c28d891fa1954a98c114629a937e83d82d1"
+    }
+  ],
+  "jvm": {
+    "Debug": {
+      "tests": 699,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 699,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "instrumentation": [
+    {
+      "api": "24",
+      "classes": "com.heyheyon.armbandbot.AutomationNavigationUiTest,com.heyheyon.armbandbot.PostAutomationUiTest,com.heyheyon.armbandbot.AutomationGalleryUiTest,com.heyheyon.armbandbot.ManagedGalleryTabsLiveTest,com.heyheyon.armbandbot.TabKeywordListsUiTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.IndependentRemoteListUiTest",
+      "passed": true,
+      "declared": 21,
+      "completed": 21,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "d9e3115fe0aa0fefc9fa774ee0016f628d462e560969e27339c5dcae17244e38"
+    },
+    {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.AutomationNavigationUiTest,com.heyheyon.armbandbot.PostAutomationUiTest,com.heyheyon.armbandbot.AutomationGalleryUiTest,com.heyheyon.armbandbot.ManagedGalleryTabsLiveTest,com.heyheyon.armbandbot.TabKeywordListsUiTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.IndependentRemoteListUiTest",
+      "passed": true,
+      "declared": 21,
+      "completed": 21,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "d9e3115fe0aa0fefc9fa774ee0016f628d462e560969e27339c5dcae17244e38"
+    }
+  ],
+  "signed_release_acceptance": [
+    {
+      "api": "24",
+      "apk_sha256": "be15c4bee19e7481704dbcd3f386ef48b19599b644b6184ad7e28f6afb5fb172",
+      "checks": {
+        "beta1_upgrade_preferences_preserved": true,
+        "exact_signed_apk_installed": true,
+        "live_tabs_multiline_lists_saved_and_legacy_rule_preserved": true,
+        "both_lists_survive_restart_and_reentry": true,
+        "rule_edit_cancel_preserves_both_lists": true,
+        "manager_refresh_still_works": true,
+        "is_word_filter_mode_light_off_on_reentry_and_disabled_children": true,
+        "is_yudong_filter_mode_light_off_on_reentry_and_disabled_children": true,
+        "is_word_filter_mode_dark_off_on_reentry_and_disabled_children": true,
+        "is_yudong_filter_mode_dark_off_on_reentry_and_disabled_children": true,
+        "disabled_automation_and_filter_subsettings_preserved": true,
+        "bot_service_never_started": true,
+        "room_row_and_snapshot_preserved": true,
+        "no_runtime_crash": true
+      },
+      "screenshots": {
+        "tab-light-top": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/tab-light-top.png",
+          "sha256": "440269f7add0af389c274413569271f5ce0114c64f5d38c71d0adc95822bf956",
+          "bytes": 190862
+        },
+        "normal-keywords-light": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/normal-keywords-light.png",
+          "sha256": "254b6efd0a4d03fcde5f69ba16325ae246dceedbced8034b78a53e96ae9af53e",
+          "bytes": 120871
+        },
+        "bypass-keywords-light": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bypass-keywords-light.png",
+          "sha256": "491ca111fe7f454f92cc611d27dc9e2e95b332bce62499feccab8647b9d2c7e4",
+          "bytes": 143834
+        },
+        "tab-light-rules": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/tab-light-rules.png",
+          "sha256": "636a30085ed1611a5ecf3cd889217dda3772f4d5fabdfae2c2ab11a4d08d2340",
+          "bytes": 189860
+        },
+        "bump-light": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bump-light.png",
+          "sha256": "e335250107f5e21f0218541b8631df6defb96343ae74e282a75116772274cb81",
+          "bytes": 105722
+        },
+        "is_word_filter_mode-light-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-light-on.png",
+          "sha256": "199a495b36dead181d1e1474fd69f4681d6191fceaf21caa765fbf93dbce73ff",
+          "bytes": 253170
+        },
+        "is_word_filter_mode-light-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-light-off.png",
+          "sha256": "181bd8b62065a06f89b89dd39e9679cf0c1f7ee7f5ec7168356d3ae558e04d7c",
+          "bytes": 208105
+        },
+        "is_yudong_filter_mode-light-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-light-on.png",
+          "sha256": "e367b8431f556a8c08a78fc0374e3e04e94a7c4de5d0c5fc04c05ee22e763005",
+          "bytes": 226857
+        },
+        "is_yudong_filter_mode-light-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-light-off.png",
+          "sha256": "dbe46e0fd276c1075802a9fb39cf1038030e42421b211650688d8446e6d62824",
+          "bytes": 178935
+        },
+        "tab-dark-top": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/tab-dark-top.png",
+          "sha256": "df606f134aecf9fe3f0ba99960814521b223fa08025ef1937e202a88b8777c81",
+          "bytes": 196001
+        },
+        "bypass-keywords-dark": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bypass-keywords-dark.png",
+          "sha256": "c15f78c14f0c00248f9c8e773c98ad2187649e5b0b77f40476af90bd94cd37b5",
+          "bytes": 143030
+        },
+        "bump-dark": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bump-dark.png",
+          "sha256": "08e91eccc7ccf706dd5062d0be35b73d163bd8d9b48e11b8d62fc644f2912d05",
+          "bytes": 102949
+        },
+        "is_word_filter_mode-dark-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-dark-on.png",
+          "sha256": "b43183be2314c1a1013e29c9a477424356fdedce3053128de35c4baa348e5e48",
+          "bytes": 251177
+        },
+        "is_word_filter_mode-dark-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-dark-off.png",
+          "sha256": "5c615e4d6c62fa25db21d26f5b89408824adf5832a43729094d15e7dc3d8b85d",
+          "bytes": 198526
+        },
+        "is_yudong_filter_mode-dark-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-dark-on.png",
+          "sha256": "e00488326860c60085fd8a06fbc9b6661653092b74dccd710d114726dbce3fee",
+          "bytes": 224910
+        },
+        "is_yudong_filter_mode-dark-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-dark-off.png",
+          "sha256": "dbd68c2dbab1037f302f164beccc83a0e88724c45556cbc31534fb97d32acfcf",
+          "bytes": 182757
+        }
+      },
+      "server_writes": 0,
+      "passed": true
+    },
+    {
+      "api": "35",
+      "apk_sha256": "be15c4bee19e7481704dbcd3f386ef48b19599b644b6184ad7e28f6afb5fb172",
+      "checks": {
+        "beta1_upgrade_preferences_preserved": true,
+        "exact_signed_apk_installed": true,
+        "live_tabs_multiline_lists_saved_and_legacy_rule_preserved": true,
+        "both_lists_survive_restart_and_reentry": true,
+        "rule_edit_cancel_preserves_both_lists": true,
+        "manager_refresh_still_works": true,
+        "is_word_filter_mode_light_off_on_reentry_and_disabled_children": true,
+        "is_yudong_filter_mode_light_off_on_reentry_and_disabled_children": true,
+        "is_word_filter_mode_dark_off_on_reentry_and_disabled_children": true,
+        "is_yudong_filter_mode_dark_off_on_reentry_and_disabled_children": true,
+        "disabled_automation_and_filter_subsettings_preserved": true,
+        "bot_service_never_started": true,
+        "room_row_and_snapshot_preserved": true,
+        "no_runtime_crash": true
+      },
+      "screenshots": {
+        "tab-light-top": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/tab-light-top.png",
+          "sha256": "e7f93bb9b2f095347743d56d4f3ec42536ab2b275328e1613d6e2c48d33b0204",
+          "bytes": 57450
+        },
+        "normal-keywords-light": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/normal-keywords-light.png",
+          "sha256": "1849dbcf137c42d273cfb029a72f1b2215473b005d5e3884b08e6be2673889d3",
+          "bytes": 18913
+        },
+        "bypass-keywords-light": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bypass-keywords-light.png",
+          "sha256": "b07cc5734bc455ec76f7c51e15a673b865260585971cc5e015756f77750421b7",
+          "bytes": 17425
+        },
+        "tab-light-rules": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/tab-light-rules.png",
+          "sha256": "b5a50910604deb2257e12b24bd2183073b81d066049ee95aebf93663f2a2180a",
+          "bytes": 54323
+        },
+        "bump-light": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bump-light.png",
+          "sha256": "7b783400ac53b45acaf67f8ecb8f6b126c45e852a6947aa991718453c28a8ca7",
+          "bytes": 27667
+        },
+        "is_word_filter_mode-light-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-light-on.png",
+          "sha256": "daa0c6e38a010664cd5c730e6c59a9ea4c7e98245b6b77b3ecb220087323432f",
+          "bytes": 68302
+        },
+        "is_word_filter_mode-light-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-light-off.png",
+          "sha256": "07d42520c1194f732b708f41c93bf1281698f5394fec469e60798df1dbd481b4",
+          "bytes": 60940
+        },
+        "is_yudong_filter_mode-light-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-light-on.png",
+          "sha256": "45b71558b788d3d4753bf552fa89719e73458c38cc73027236d34c09f29789bf",
+          "bytes": 59657
+        },
+        "is_yudong_filter_mode-light-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-light-off.png",
+          "sha256": "09eb40a40eb2e1c2c49125b8a680e70f3c45c00adb48baa44434b535e731bf8a",
+          "bytes": 52741
+        },
+        "tab-dark-top": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/tab-dark-top.png",
+          "sha256": "ed1f8dc04d774ed80fde37fa29f655300288aaf67ceb19a0062dcbca444ce11a",
+          "bytes": 57665
+        },
+        "bypass-keywords-dark": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bypass-keywords-dark.png",
+          "sha256": "e0fbebfd1ca0f83f4343696c5336ec7f57b91b504781a305649cc496d6513985",
+          "bytes": 18297
+        },
+        "bump-dark": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bump-dark.png",
+          "sha256": "846021276ee060c92754e7e617747a8320f0997ff851eaee0af48747efbe48a3",
+          "bytes": 27254
+        },
+        "is_word_filter_mode-dark-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-dark-on.png",
+          "sha256": "02fbf8379c056f31e6a0a7183b07f8ab67040984509b1c997289091a1ac87270",
+          "bytes": 67557
+        },
+        "is_word_filter_mode-dark-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-dark-off.png",
+          "sha256": "9512bfe00ed5c772c9295f3bd5e214dd50be84a2fabb4720755f4ef5008d14a9",
+          "bytes": 59757
+        },
+        "is_yudong_filter_mode-dark-on": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-dark-on.png",
+          "sha256": "70cd113c61aef3d0ac7fc9d97672bb534b24d32609da0860fd6e835070462ddc",
+          "bytes": 59835
+        },
+        "is_yudong_filter_mode-dark-off": {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-dark-off.png",
+          "sha256": "f00cbef37772fcd3f25af2bfedf9d37d743c6c4be4a0aefa0058c8e420a71582",
+          "bytes": 53251
+        }
+      },
+      "server_writes": 0,
+      "passed": true
+    }
+  ],
+  "lint_debug": {
+    "errors": 0,
+    "warnings": 52,
+    "information": 28
+  },
+  "lint_release": {
+    "errors": 0,
+    "warnings": 47,
+    "information": 28
+  },
+  "dex": {
+    "apk": "releases/완장봇_v1.6.0-beta2.apk",
+    "dex_count": 5,
+    "dex": [
+      {
+        "dex": "classes.dex",
+        "methods": 65466,
+        "method_headroom": 70,
+        "fields": 35009,
+        "field_headroom": 30527,
+        "classes": 17981,
+        "max_parameter_words": 175,
+        "max_words_with_receiver_upper_bound": 176,
+        "invoke_range_word_headroom_upper_bound": 79
+      },
+      {
+        "dex": "classes2.dex",
+        "methods": 15,
+        "method_headroom": 65521,
+        "fields": 0,
+        "field_headroom": 65536,
+        "classes": 14,
+        "max_parameter_words": 0,
+        "max_words_with_receiver_upper_bound": 1,
+        "invoke_range_word_headroom_upper_bound": 254
+      },
+      {
+        "dex": "classes3.dex",
+        "methods": 2145,
+        "method_headroom": 63391,
+        "fields": 547,
+        "field_headroom": 64989,
+        "classes": 175,
+        "max_parameter_words": 10,
+        "max_words_with_receiver_upper_bound": 11,
+        "invoke_range_word_headroom_upper_bound": 244
+      },
+      {
+        "dex": "classes4.dex",
+        "methods": 65472,
+        "method_headroom": 64,
+        "fields": 22282,
+        "field_headroom": 43254,
+        "classes": 7945,
+        "max_parameter_words": 247,
+        "max_words_with_receiver_upper_bound": 248,
+        "invoke_range_word_headroom_upper_bound": 7
+      },
+      {
+        "dex": "classes5.dex",
+        "methods": 13238,
+        "method_headroom": 52298,
+        "fields": 4716,
+        "field_headroom": 60820,
+        "classes": 1673,
+        "max_parameter_words": 22,
+        "max_words_with_receiver_upper_bound": 23,
+        "invoke_range_word_headroom_upper_bound": 232
+      }
+    ],
+    "minimum_method_headroom": 64,
+    "minimum_field_headroom": 30527,
+    "maximum_parameter_words": 247,
+    "maximum_words_with_receiver_upper_bound": 248
+  },
+  "lint_warning_notes": [
+    "기존 경고 외 새 공유 UI API에 ModifierParameter 스타일 경고 2개가 있다. 오류는 두 variant 모두 0이다."
+  ],
+  "test_provenance": "앱 구현 후 Debug/Release 전체 JVM 699개씩 실행했다. 이후 Android 테스트 fixture/입력 동기화만 수정했으며, 변경되지 않은 JVM/release 빌드 작업은 성공 결과를 재사용했다. 최종 Android 테스트 APK로 양 API 21개씩 재검증했다.",
+  "apk_signature": {
+    "verified": true,
+    "accepted_scheme": "v2",
+    "certificate_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f"
+  },
+  "regression_coverage": [
+    "legacy 단일 키워드의 리터럴 의미와 순서 보존",
+    "일반/우회 목록 OR 판정과 보호 정책",
+    "팝업 취소 및 규칙 취소, 갤러리 변경 시 초안 격리",
+    "필터 off/on의 로컬·원격 목록과 유동 옵션 보존",
+    "설정 migration·copy·import와 재검사 revision",
+    "실제 BotDetailScreen 비활성 컨트롤과 BotService 구성"
+  ],
+  "live_scope": {
+    "gallery": "laboratory1",
+    "account": "기존 승인된 시험 관리자",
+    "reads_only": true,
+    "gallery_mutations": 0,
+    "manager_session_tabs_and_local_rule": true,
+    "anonymous_public_tabs_rejected": true
+  },
+  "limitations": [
+    "실서버 관리자 계정 조회는 승인된 laboratory1 마이너갤 범위다. 다른 갤러리는 기존 DOM/갤러리 분리 회귀로 검증했다.",
+    "실제 게시글 이동·끌올·차단·삭제·장시간 서비스 운용은 이번 검증에서 실행하지 않았다. 키워드 판정·서비스 구성·화면 저장과 재진입을 검증했다."
+  ],
+  "validation_retries": [
+    "전체 JVM 첫 실행에서 기존 PUM UI 순서 검사가 변경된 금지어 컴포넌트 이름을 찾지 못했다. 동일한 필터 순서 계약을 새 컴포넌트로 검사하도록 수정한 뒤 Debug/Release 전체를 재실행했다.",
+    "API35 첫 계측 실행은 19/21 통과. 실제 BotDetailScreen 테스트 2개가 saved_cookie 없는 fixture로 로그인 화면에 머물러 실패했다. 네트워크를 호출하지 않는 로컬 UI fixture 상태를 추가하여 최종 21/21 통과했다.",
+    "Debug lint 첫 분석은 BUILD SUCCESSFUL 및 현재 XML 생성 후 shell 종료 143으로 끝났다. 원본 로그를 보존하고 테스트 준비 수정 후 수정된 테스트 입력으로 정상 종료(0)를 확인했다.",
+    "API35 두 번째 계측은 새 필터 화면을 포함해 20/21 통과. 예약 시각 연속 추가 테스트에서 [09:00,18:30] 대신 [18:30]만 관찰했다. 키보드를 닫고 시각 추가 버튼의 semantics click을 명시하며 각 단계에서 09:00/18:30 chip 존재를 검증하도록 테스트를 보강했다. 시간 선택/저장 앱 코드는 변경하지 않았다.",
+    "API35 최종 계측 21/21 통과 후 signed UI 검증의 구름 아이콘 enabled 검사에서 중단됐다. 원본 XML의 아이콘은 enabled=true이고 실제 클릭 부모는 enabled=false임을 확인했다. 클릭 조상 비활성 상태를 검사하도록 native 도구만 수정하고 동일 APK의 signed 검증을 새 guest에서 재실행하여 모든 시나리오를 통과했다."
+  ],
+  "visual_review": {
+    "api35": {
+      "tab-light-top": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/tab-light-top.png",
+        "sha256": "e7f93bb9b2f095347743d56d4f3ec42536ab2b275328e1613d6e2c48d33b0204",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "normal-keywords-light": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/normal-keywords-light.png",
+        "sha256": "1849dbcf137c42d273cfb029a72f1b2215473b005d5e3884b08e6be2673889d3",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "bypass-keywords-light": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bypass-keywords-light.png",
+        "sha256": "b07cc5734bc455ec76f7c51e15a673b865260585971cc5e015756f77750421b7",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "tab-light-rules": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/tab-light-rules.png",
+        "sha256": "b5a50910604deb2257e12b24bd2183073b81d066049ee95aebf93663f2a2180a",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "bump-light": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bump-light.png",
+        "sha256": "7b783400ac53b45acaf67f8ecb8f6b126c45e852a6947aa991718453c28a8ca7",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_word_filter_mode-light-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-light-on.png",
+        "sha256": "daa0c6e38a010664cd5c730e6c59a9ea4c7e98245b6b77b3ecb220087323432f",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_word_filter_mode-light-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-light-off.png",
+        "sha256": "07d42520c1194f732b708f41c93bf1281698f5394fec469e60798df1dbd481b4",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_yudong_filter_mode-light-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-light-on.png",
+        "sha256": "45b71558b788d3d4753bf552fa89719e73458c38cc73027236d34c09f29789bf",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_yudong_filter_mode-light-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-light-off.png",
+        "sha256": "09eb40a40eb2e1c2c49125b8a680e70f3c45c00adb48baa44434b535e731bf8a",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "tab-dark-top": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/tab-dark-top.png",
+        "sha256": "ed1f8dc04d774ed80fde37fa29f655300288aaf67ceb19a0062dcbca444ce11a",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "bypass-keywords-dark": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bypass-keywords-dark.png",
+        "sha256": "e0fbebfd1ca0f83f4343696c5336ec7f57b91b504781a305649cc496d6513985",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "bump-dark": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/bump-dark.png",
+        "sha256": "846021276ee060c92754e7e617747a8320f0997ff851eaee0af48747efbe48a3",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_word_filter_mode-dark-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-dark-on.png",
+        "sha256": "02fbf8379c056f31e6a0a7183b07f8ab67040984509b1c997289091a1ac87270",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_word_filter_mode-dark-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_word_filter_mode-dark-off.png",
+        "sha256": "9512bfe00ed5c772c9295f3bd5e214dd50be84a2fabb4720755f4ef5008d14a9",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_yudong_filter_mode-dark-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-dark-on.png",
+        "sha256": "70cd113c61aef3d0ac7fc9d97672bb534b24d32609da0860fd6e835070462ddc",
+        "pixels": [
+          432,
+          960
+        ]
+      },
+      "is_yudong_filter_mode-dark-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api35-native/signed/is_yudong_filter_mode-dark-off.png",
+        "sha256": "f00cbef37772fcd3f25af2bfedf9d37d743c6c4be4a0aefa0058c8e420a71582",
+        "pixels": [
+          432,
+          960
+        ]
+      }
+    },
+    "observations": [
+      "기존 상세 화면과 자동화 화면의 상단 배경·제목·뒤로가기 일치",
+      "432×960에서 두 키워드 입력 카드와 저장 버튼 확인",
+      "큰 줄바꿈 편집창 및 취소/확인 버튼 확인",
+      "light/dark 마스터 off 시 하위 카드/스위치 흐림과 disabled 상태 확인",
+      "API24 원본 PNG에는 emulator 표시 비율에 따른 검은 여백이 있으며, 앱 논리 화면 배치와 입력은 정상이다."
+    ],
+    "native_pngs_unmodified": true,
+    "api24": {
+      "tab-light-top": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/tab-light-top.png",
+        "sha256": "440269f7add0af389c274413569271f5ce0114c64f5d38c71d0adc95822bf956",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "normal-keywords-light": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/normal-keywords-light.png",
+        "sha256": "254b6efd0a4d03fcde5f69ba16325ae246dceedbced8034b78a53e96ae9af53e",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "bypass-keywords-light": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bypass-keywords-light.png",
+        "sha256": "491ca111fe7f454f92cc611d27dc9e2e95b332bce62499feccab8647b9d2c7e4",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "tab-light-rules": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/tab-light-rules.png",
+        "sha256": "636a30085ed1611a5ecf3cd889217dda3772f4d5fabdfae2c2ab11a4d08d2340",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "bump-light": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bump-light.png",
+        "sha256": "e335250107f5e21f0218541b8631df6defb96343ae74e282a75116772274cb81",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_word_filter_mode-light-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-light-on.png",
+        "sha256": "199a495b36dead181d1e1474fd69f4681d6191fceaf21caa765fbf93dbce73ff",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_word_filter_mode-light-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-light-off.png",
+        "sha256": "181bd8b62065a06f89b89dd39e9679cf0c1f7ee7f5ec7168356d3ae558e04d7c",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_yudong_filter_mode-light-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-light-on.png",
+        "sha256": "e367b8431f556a8c08a78fc0374e3e04e94a7c4de5d0c5fc04c05ee22e763005",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_yudong_filter_mode-light-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-light-off.png",
+        "sha256": "dbe46e0fd276c1075802a9fb39cf1038030e42421b211650688d8446e6d62824",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "tab-dark-top": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/tab-dark-top.png",
+        "sha256": "df606f134aecf9fe3f0ba99960814521b223fa08025ef1937e202a88b8777c81",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "bypass-keywords-dark": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bypass-keywords-dark.png",
+        "sha256": "c15f78c14f0c00248f9c8e773c98ad2187649e5b0b77f40476af90bd94cd37b5",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "bump-dark": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/bump-dark.png",
+        "sha256": "08e91eccc7ccf706dd5062d0be35b73d163bd8d9b48e11b8d62fc644f2912d05",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_word_filter_mode-dark-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-dark-on.png",
+        "sha256": "b43183be2314c1a1013e29c9a477424356fdedce3053128de35c4baa348e5e48",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_word_filter_mode-dark-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_word_filter_mode-dark-off.png",
+        "sha256": "5c615e4d6c62fa25db21d26f5b89408824adf5832a43729094d15e7dc3d8b85d",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_yudong_filter_mode-dark-on": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-dark-on.png",
+        "sha256": "e00488326860c60085fd8a06fbc9b6661653092b74dccd710d114726dbce3fee",
+        "pixels": [
+          1080,
+          1920
+        ]
+      },
+      "is_yudong_filter_mode-dark-off": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2/api24/signed/is_yudong_filter_mode-dark-off.png",
+        "sha256": "dbd68c2dbab1037f302f164beccc83a0e88724c45556cbc31534fb97d32acfcf",
+        "pixels": [
+          1080,
+          1920
+        ]
+      }
+    }
+  },
+  "evidence_directory": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0-beta2",
+  "drive": {
+    "apk": {
+      "id": "1fM50P7kBvPAtFlVzPiMgwK8OXUvmJfyz",
+      "name": "완장봇_v1.6.0-beta2.apk",
+      "parent": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+      "url": "https://drive.google.com/file/d/1fM50P7kBvPAtFlVzPiMgwK8OXUvmJfyz/view?usp=drivesdk",
+      "size": 13387950,
+      "downloaded_sha256": "be15c4bee19e7481704dbcd3f386ef48b19599b644b6184ad7e28f6afb5fb172",
+      "metadata_and_download_verified": true
+    },
+    "guide": {
+      "id": "1iNt9e7ojXFHogs-iViQn3jByJoy4DgdK",
+      "name": "완장봇_v1.6.0-beta2_사용안내.txt",
+      "parent": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+      "url": "https://drive.google.com/file/d/1iNt9e7ojXFHogs-iViQn3jByJoy4DgdK/view?usp=drivesdk",
+      "size": 3681,
+      "downloaded_sha256": "57b883dba49cd9da8ed58eb5314e7c28d891fa1954a98c114629a937e83d82d1",
+      "metadata_and_download_verified": true
+    }
+  },
+  "communications": {
+    "telegram": "not_requested",
+    "public_announcement": "not_requested"
+  }
+}
