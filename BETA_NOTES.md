@@ -1,3 +1,9 @@
+## 1.6.0-beta1
+
+- 자동 탭 분류의 권한 판정을 보완해, 관리 버튼과 말머리 변경 메뉴가 있어도 권한 확인에 실패하던 경우를 수정했습니다.
+- 새 기능을 포함한 개발 버전을 1.6.0으로 변경했습니다. 이전 베타의 설정·규칙·DB를 유지하며 업데이트합니다.
+- [APK 다운로드](https://drive.google.com/file/d/13OyI0NYFcvo46jOSfN7bTwNsRh1cnye2/view?usp=drivesdk) · [사용 안내](https://drive.google.com/file/d/1sVLlr2FElDWixkgHjqMyHxfmKKH9DAjL/view?usp=drivesdk)
+
 ## 1.5.4-beta3
 
 - 모바일 주소도 같은 방식으로 인식하고, 한 봇의 여러 갤러리에 자동 탭 분류 규칙을 따로 설정할 수 있습니다.
