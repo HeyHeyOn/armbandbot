@@ -1,0 +1,470 @@
+{
+  "version": "1.5.4-beta3",
+  "version_code": 179,
+  "source_commit": "e30d1e042f61e30b6ab480e29ed7b964ecc5a48f",
+  "source_inputs_unchanged_after_tests": true,
+  "artifacts": [
+    {
+      "name": "완장봇_v1.5.4-beta3.apk",
+      "bytes": 13371566,
+      "sha256": "860129ef846c8a0c17965d3f3eec4d961fe7b2cf32a422497e78d22459751b29"
+    },
+    {
+      "name": "완장봇_v1.5.4-beta3_사용안내.txt",
+      "bytes": 2177,
+      "sha256": "29ef33394443eaa2a1bccd3e9c0395d41085c810c504536829142d0ae9163d95"
+    }
+  ],
+  "jvm": {
+    "Debug": {
+      "tests": 688,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 688,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "instrumentation": {
+    "api24": {
+      "unchanged_apks_installed_and_precompiled": true,
+      "instrumentation_AutomationGalleryUiTest": {
+        "completed": 13,
+        "expected": 13,
+        "declared": [
+          13
+        ],
+        "skipped": 0,
+        "failed": 0,
+        "log": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/api24-evidence/AutomationGalleryUiTest.log"
+      },
+      "instrumentation_RemoteListClientTest": {
+        "completed": 4,
+        "expected": 4,
+        "declared": [
+          4
+        ],
+        "skipped": 0,
+        "failed": 0,
+        "log": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/api24-evidence/RemoteListClientTest.log"
+      }
+    },
+    "api35": {
+      "unchanged_apks_precompiled": true,
+      "instrumentation_AutomationGalleryUiTest": {
+        "completed": 13,
+        "expected": 13,
+        "declared": [
+          13
+        ],
+        "skipped": 0,
+        "failed": 0,
+        "log": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/AutomationGalleryUiTest.log"
+      },
+      "instrumentation_RemoteListClientTest": {
+        "completed": 4,
+        "expected": 4,
+        "declared": [
+          4
+        ],
+        "skipped": 0,
+        "failed": 0,
+        "log": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/RemoteListClientTest.log"
+      },
+      "instrumentation_PostAutomationLiveTest#ownedGithubJsonAndCsvUseNativeClientAndLocalKeys": {
+        "completed": 1,
+        "expected": 1,
+        "declared": [
+          1
+        ],
+        "skipped": 0,
+        "failed": 0,
+        "log": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/PostAutomationLiveTest-ownedGithubJsonAndCsvUseNativeClientAndLocalKeys.log"
+      }
+    }
+  },
+  "real_owned_service": {
+    "scope": "laboratory1",
+    "post_no": "2371",
+    "real_bot_service": true,
+    "mock_transport": false,
+    "mock_claims": false,
+    "exempt_post_unchanged_after_real_cycle": true,
+    "native_move_readback": true,
+    "disabled_first_bot_no_conflicting_move": true,
+    "scheduled_epoch_ms": 1791173100000,
+    "scheduled_local": "2026-10-05T13:05+09:00[Asia/Seoul]",
+    "not_executed_before_scheduled_time": true,
+    "scheduled_bump_success": true,
+    "actual_claimed_epoch_ms": 1791173102099,
+    "server_top_post_verified": true,
+    "service_restart_no_duplicate_claims": true,
+    "only_owned_post_actions": true,
+    "claims": [
+      [
+        "2371",
+        "BUMP:2026-10-05T13:05",
+        "SUCCEEDED",
+        "owned154_a_1791172969222",
+        "1791173102099",
+        "1791173102428"
+      ],
+      [
+        "2371",
+        "MOVE:17594b718499ca923d38fe05",
+        "SUCCEEDED",
+        "owned154_a_1791172969222",
+        "1791172998160",
+        "1791172999349"
+      ]
+    ],
+    "passed": true,
+    "owned_tab_restored": true,
+    "guest_session_files_removed": true
+  },
+  "real_service_debug_apk_sha256": "24b87a2d2c4d87b60ad1c71a777d75d753a21227fb093efc6de95cf67426a8a3",
+  "signed_release_acceptance": {
+    "setup": {
+      "phase": "setup",
+      "artifact_sha256": "860129ef846c8a0c17965d3f3eec4d961fe7b2cf32a422497e78d22459751b29",
+      "api": 35,
+      "mock_network": false,
+      "gates": {
+        "beta2_upgrade_exact_preferences_preserved": true,
+        "exact_signed_release_installed": true,
+        "unchanged_release_precompiled": true
+      },
+      "screenshots": {},
+      "passed": true,
+      "emulator_stopped": true
+    },
+    "ui": {
+      "phase": "ui",
+      "artifact_sha256": "860129ef846c8a0c17965d3f3eec4d961fe7b2cf32a422497e78d22459751b29",
+      "api": 35,
+      "mock_network": false,
+      "gates": {
+        "native_time_selection_and_rule_save": true,
+        "mobile_gallery_real_tabs_and_scoped_rule_save": true,
+        "restart_retains_selected_time": true,
+        "bot_service_stopped": {
+          "is_running": false,
+          "service_absent": true
+        }
+      },
+      "screenshots": {
+        "basic": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/01-basic-settings.png",
+          "sha256": "01890e99e9d9418e1a4da6b6d5ba901b7e75b33342391811322e79e205955a0b",
+          "bytes": 59136,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/01-basic-settings-ui.json"
+        },
+        "management": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/02-management-automation.png",
+          "sha256": "f2c2c975a57025f5a9a69ba28307d2d26f54cbcfa32242a64143a8356352cffe",
+          "bytes": 58967,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/02-management-automation-ui.json"
+        },
+        "timepicker": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/03-native-time-picker.png",
+          "sha256": "48a574c766056b2a9250c03d8d5b780b11bb68e6fcfa2cf2ca2798392fd9e0dc",
+          "bytes": 44943,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/03-native-time-picker-ui.json"
+        },
+        "bump": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/04-scheduled-bump.png",
+          "sha256": "b3c0f94440b73bf370f7b64602c5cd5afd2f96f0634c360526172f2fb0ca24be",
+          "bytes": 27995,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/04-scheduled-bump-ui.json"
+        },
+        "tab": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/05-auto-tab-classification.png",
+          "sha256": "237b571dd2fc49b0fe6a70cff4312b50708fcda7aed025adaeacd33874abdc4b",
+          "bytes": 37134,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/05-auto-tab-classification-ui.json"
+        }
+      },
+      "observed_os_recoveries": [
+        {
+          "modal": "System UI isn't responding",
+          "windows": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/release-ui-observed-systemui-anr.txt"
+        }
+      ],
+      "passed": true,
+      "emulator_stopped": true
+    },
+    "remote": {
+      "phase": "remote",
+      "artifact_sha256": "860129ef846c8a0c17965d3f3eec4d961fe7b2cf32a422497e78d22459751b29",
+      "api": 35,
+      "mock_network": false,
+      "gates": {
+        "actual_one_column_sheets_normal": true,
+        "actual_one_column_sheets_bypass": true,
+        "actual_one_column_sheets_user_blacklist": true,
+        "actual_one_column_sheets_user_whitelist": true,
+        "actual_one_column_sheets_nickname_blacklist": true,
+        "actual_one_column_sheets_nickname_bypass_blacklist": true,
+        "actual_one_column_sheets_nickname_whitelist": true,
+        "mixed_sheets_and_immutable_github_plain_list": true,
+        "seven_independent_sources_and_local_lists_retained": true,
+        "bot_service_stopped": {
+          "is_running": false,
+          "service_absent": true
+        }
+      },
+      "screenshots": {
+        "clouds": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/06-filter-cloud-icons.png",
+          "sha256": "62ba7b0a4dcd3780c663b005c2fde6545f6b24527ed41ed4bf22cfadb1e1caa0",
+          "bytes": 70854,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/06-filter-cloud-icons-ui.json"
+        },
+        "remote": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/07-independent-remote-list.png",
+          "sha256": "77cbdda62ef00ae9aec836ec325b21456ca3bbb99cda605d8b5cc243acd8fa26",
+          "bytes": 63869,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/07-independent-remote-list-ui.json"
+        },
+        "help": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/08-remote-help.png",
+          "sha256": "f0e42543bd892371dc00222a1427ab8009444b9b27ecbbe7a6e2576a20af6dfd",
+          "bytes": 97450,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/08-remote-help-ui.json"
+        },
+        "interrupted": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/release-remote-interrupted.png",
+          "sha256": "14664f076417c80137394f0d6fc8a2f62e5b97fe35622035e93c45ca6eee6033",
+          "bytes": 61663,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/release-remote-interrupted-ui.json"
+        },
+        "github": {
+          "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/09-github-independent-source.png",
+          "sha256": "41ab5cf75e9eba6423e6ab38e442c1bb5bd2bea1bbdb16d969cef5da7798968b",
+          "bytes": 62221,
+          "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/09-github-independent-source-ui.json"
+        }
+      },
+      "observed_os_recoveries": [
+        {
+          "modal": "System UI isn't responding",
+          "windows": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/release-remote-observed-systemui-anr.txt"
+        }
+      ],
+      "resumed_from_verified_partial_gates": true,
+      "emulator_stopped": true,
+      "passed": true,
+      "guest_preserved_for_automatic_poll_gate": true
+    },
+    "poll": {
+      "phase": "poll",
+      "artifact_sha256": "860129ef846c8a0c17965d3f3eec4d961fe7b2cf32a422497e78d22459751b29",
+      "api": 35,
+      "mock_network": false,
+      "gates": {
+        "actual_sheet_edit_detected_by_natural_service_poll": true,
+        "bot_service_stopped": {
+          "is_running": false,
+          "service_absent": true
+        },
+        "only_added_dummy_sheet_cell_restored": true
+      },
+      "screenshots": {},
+      "poll_setup": {
+        "empty_gallery_targets": true,
+        "all_moderation_and_automation_disabled": true,
+        "real_signed_bot_service": true,
+        "mock_network": false,
+        "initial_attempt_reset_only": true,
+        "refresh_minutes": 5,
+        "first_real_attempt_epoch_ms": 1791179037654
+      },
+      "natural_poll": {
+        "first_attempt_epoch_ms": 1791179037654,
+        "next_attempt_epoch_ms": 1791179341357,
+        "actual_attempt_interval_ms": 303703,
+        "observed_wait_seconds": 304.99,
+        "manual_refresh_after_edit": false,
+        "clock_changed": false,
+        "received_third_string": true,
+        "local_list_retained": true
+      },
+      "passed": true,
+      "guest_application_data_cleared": true,
+      "emulator_stopped": true
+    }
+  },
+  "screenshots": {
+    "basic": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/01-basic-settings.png",
+      "sha256": "01890e99e9d9418e1a4da6b6d5ba901b7e75b33342391811322e79e205955a0b",
+      "bytes": 59136,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/01-basic-settings-ui.json"
+    },
+    "management": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/02-management-automation.png",
+      "sha256": "f2c2c975a57025f5a9a69ba28307d2d26f54cbcfa32242a64143a8356352cffe",
+      "bytes": 58967,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/02-management-automation-ui.json"
+    },
+    "timepicker": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/03-native-time-picker.png",
+      "sha256": "48a574c766056b2a9250c03d8d5b780b11bb68e6fcfa2cf2ca2798392fd9e0dc",
+      "bytes": 44943,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/03-native-time-picker-ui.json"
+    },
+    "bump": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/04-scheduled-bump.png",
+      "sha256": "b3c0f94440b73bf370f7b64602c5cd5afd2f96f0634c360526172f2fb0ca24be",
+      "bytes": 27995,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/04-scheduled-bump-ui.json"
+    },
+    "tab": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/05-auto-tab-classification.png",
+      "sha256": "237b571dd2fc49b0fe6a70cff4312b50708fcda7aed025adaeacd33874abdc4b",
+      "bytes": 37134,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/05-auto-tab-classification-ui.json"
+    },
+    "clouds": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/06-filter-cloud-icons.png",
+      "sha256": "62ba7b0a4dcd3780c663b005c2fde6545f6b24527ed41ed4bf22cfadb1e1caa0",
+      "bytes": 70854,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/06-filter-cloud-icons-ui.json"
+    },
+    "remote": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/07-independent-remote-list.png",
+      "sha256": "77cbdda62ef00ae9aec836ec325b21456ca3bbb99cda605d8b5cc243acd8fa26",
+      "bytes": 63869,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/07-independent-remote-list-ui.json"
+    },
+    "help": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/08-remote-help.png",
+      "sha256": "f0e42543bd892371dc00222a1427ab8009444b9b27ecbbe7a6e2576a20af6dfd",
+      "bytes": 97450,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/08-remote-help-ui.json"
+    },
+    "github": {
+      "path": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/09-github-independent-source.png",
+      "sha256": "41ab5cf75e9eba6423e6ab38e442c1bb5bd2bea1bbdb16d969cef5da7798968b",
+      "bytes": 62221,
+      "ui_text_evidence": "/home/haeon/.hermes/workspace/armband-gallery-research/beta3-20261005/09-github-independent-source-ui.json"
+    }
+  },
+  "lint_release": {
+    "errors": 0,
+    "warnings": 45,
+    "information": 28
+  },
+  "dex": {
+    "apk": "releases/완장봇_v1.5.4-beta3.apk",
+    "dex_count": 5,
+    "dex": [
+      {
+        "dex": "classes.dex",
+        "methods": 65466,
+        "method_headroom": 70,
+        "fields": 35009,
+        "field_headroom": 30527,
+        "classes": 17981,
+        "max_parameter_words": 175,
+        "max_words_with_receiver_upper_bound": 176,
+        "invoke_range_word_headroom_upper_bound": 79
+      },
+      {
+        "dex": "classes2.dex",
+        "methods": 15,
+        "method_headroom": 65521,
+        "fields": 0,
+        "field_headroom": 65536,
+        "classes": 14,
+        "max_parameter_words": 0,
+        "max_words_with_receiver_upper_bound": 1,
+        "invoke_range_word_headroom_upper_bound": 254
+      },
+      {
+        "dex": "classes3.dex",
+        "methods": 2145,
+        "method_headroom": 63391,
+        "fields": 547,
+        "field_headroom": 64989,
+        "classes": 175,
+        "max_parameter_words": 10,
+        "max_words_with_receiver_upper_bound": 11,
+        "invoke_range_word_headroom_upper_bound": 244
+      },
+      {
+        "dex": "classes4.dex",
+        "methods": 65409,
+        "method_headroom": 127,
+        "fields": 22119,
+        "field_headroom": 43417,
+        "classes": 7921,
+        "max_parameter_words": 247,
+        "max_words_with_receiver_upper_bound": 248,
+        "invoke_range_word_headroom_upper_bound": 7
+      },
+      {
+        "dex": "classes5.dex",
+        "methods": 13146,
+        "method_headroom": 52390,
+        "fields": 4701,
+        "field_headroom": 60835,
+        "classes": 1663,
+        "max_parameter_words": 22,
+        "max_words_with_receiver_upper_bound": 23,
+        "invoke_range_word_headroom_upper_bound": 232
+      }
+    ],
+    "minimum_method_headroom": 70,
+    "minimum_field_headroom": 30527,
+    "maximum_parameter_words": 247,
+    "maximum_words_with_receiver_upper_bound": 248
+  },
+  "limitations": [
+    "Apps Script format and source handling tested by policy/client/UI cases; no new live Apps Script deployment created.",
+    "Tests do not guarantee indefinite operation or punctual execution under forced stop, power saving, network failure or session expiry."
+  ],
+  "drive": {
+    "apk": {
+      "id": "1MPb2VZimN8869KOGt1MfANtWdqKKNsWX",
+      "name": "완장봇_v1.5.4-beta3.apk",
+      "parent": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+      "url": "https://drive.google.com/file/d/1MPb2VZimN8869KOGt1MfANtWdqKKNsWX/view?usp=drivesdk",
+      "size": 13371566,
+      "downloaded_sha256": "860129ef846c8a0c17965d3f3eec4d961fe7b2cf32a422497e78d22459751b29",
+      "metadata_and_download_verified": true
+    },
+    "guide": {
+      "id": "181VXnNdqmWvottHSPBCD46IfGqy8LdGt",
+      "name": "완장봇_v1.5.4-beta3_사용안내.txt",
+      "parent": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+      "url": "https://drive.google.com/file/d/181VXnNdqmWvottHSPBCD46IfGqy8LdGt/view?usp=drivesdk",
+      "size": 2177,
+      "downloaded_sha256": "29ef33394443eaa2a1bccd3e9c0395d41085c810c504536829142d0ae9163d95",
+      "metadata_and_download_verified": true
+    }
+  },
+  "telegram": {
+    "native_photo_count": 8,
+    "native_photo_readback_verified": true,
+    "artifacts_byte_verified": [
+      {
+        "name": "완장봇_v1.5.4-beta3.apk",
+        "sha256": "860129ef846c8a0c17965d3f3eec4d961fe7b2cf32a422497e78d22459751b29"
+      },
+      {
+        "name": "완장봇_v1.5.4-beta3_사용안내.txt",
+        "sha256": "29ef33394443eaa2a1bccd3e9c0395d41085c810c504536829142d0ae9163d95"
+      }
+    ]
+  },
+  "apk_signature": {
+    "verified": true,
+    "accepted_scheme": "v2",
+    "certificate_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f"
+  }
+}

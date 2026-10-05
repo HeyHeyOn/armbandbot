@@ -1,3 +1,10 @@
+## 1.5.4-beta3
+
+- 모바일 주소도 같은 방식으로 인식하고, 한 봇의 여러 갤러리에 자동 탭 분류 규칙을 따로 설정할 수 있습니다.
+- 각 필터의 연필 왼쪽 구름 버튼에서 원격 목록을 따로 연결합니다. 목록별로 주소·유형·사용 여부를 정하고, 구분 열 없이 단순 문자열 목록을 불러옵니다.
+- 예약 끌올 시각을 직접 입력하는 대신 시계 선택창에서 추가·변경합니다.
+- [APK 다운로드](https://drive.google.com/file/d/1MPb2VZimN8869KOGt1MfANtWdqKKNsWX/view) · [사용 안내](https://drive.google.com/file/d/181VXnNdqmWvottHSPBCD46IfGqy8LdGt/view)
+
 ## 1.5.2-beta3 배포 완료
 
 - 독립 검사 기록·작동 시간대 설정을 주변 설정과 같은 카드·스위치 형태로 정리했습니다.
