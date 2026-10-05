@@ -37,6 +37,7 @@ class FilterMasterUiTest {
     }
     @Test fun actualWordPageDisablesLocalCloudAndSubOptionsAndRestoresThem() {
         compose.setContent { MaterialTheme {BotDetailScreen(bot,false,{},{})} }
+        compose.onNodeWithTag("bot-tab-filters").performClick()
         compose.onNodeWithText("금지어 필터").performScrollTo().performClick()
         compose.onNodeWithTag("word-filter-master").assertIsOn().performClick().assertIsOff()
         compose.onNodeWithTag("remote-cloud-normal").assertIsNotEnabled()
@@ -50,6 +51,7 @@ class FilterMasterUiTest {
     }
     @Test fun actualYudongPageDisablesEverySubSwitchAndReenablesWithoutLosingValues() {
         compose.setContent { MaterialTheme {BotDetailScreen(bot,false,{},{})} }
+        compose.onNodeWithTag("bot-tab-filters").performClick()
         compose.onNodeWithText("유동 필터").performScrollTo().performClick()
         compose.onNodeWithTag("yudong-filter-master").assertIsOn().performClick().assertIsOff()
         compose.onAllNodes(hasAnyAncestor(hasTestTag("yudong-filter-options")) and SemanticsMatcher.expectValue(SemanticsProperties.Role,Role.Switch),useUnmergedTree=true)

@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
+import com.heyheyon.armbandbot.ui.modernSwitchColors
 import com.heyheyon.armbandbot.ui.ReadOnlyTextCard
 import com.heyheyon.armbandbot.ui.botColors
 
@@ -65,17 +66,12 @@ fun PumFilterSettingsPanel(
         context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
     }
     val isDarkMode = LocalIsDarkMode.current
-    val cardColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
-    val dialogBgColor = if (isDarkMode) Color(0xFF2C323A) else Color.White
-    val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
-    val subTextColor = if (isDarkMode) Color(0xFFAAAEB3) else Color.Gray
-    val dividerColor = if (isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE)
-    val switchColors = SwitchDefaults.colors(
-        checkedThumbColor = Color.White,
-        checkedTrackColor = PastelNavy,
-        uncheckedThumbColor = if (isDarkMode) Color.LightGray else Color.White,
-        uncheckedTrackColor = if (isDarkMode) Color(0xFF555555) else Color.LightGray,
-    )
+    val cardColor = botColors(isDarkMode).card
+    val dialogBgColor = botColors(isDarkMode).dialogBg
+    val textColor = botColors(isDarkMode).text
+    val subTextColor = botColors(isDarkMode).subText
+    val dividerColor = botColors(isDarkMode).divider
+    val switchColors = modernSwitchColors(botColors(isDarkMode))
 
     var blockAllPosts by remember(botId) {
         mutableStateOf(botPref.getBoolean("pum_block_all_posts", false))
@@ -115,7 +111,7 @@ fun PumFilterSettingsPanel(
     Column {
         Card(
             colors = CardDefaults.cardColors(containerColor = cardColor),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -139,14 +135,14 @@ fun PumFilterSettingsPanel(
 
         Text(
             "개별 차단 설정",
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp,
-            color = PastelNavy,
+            color = botColors(isDarkMode).accent,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp).alpha(childAlpha),
         )
         Card(
             colors = CardDefaults.cardColors(containerColor = cardColor),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).alpha(childAlpha),
         ) {
             PumSwitchRow(
@@ -167,7 +163,7 @@ fun PumFilterSettingsPanel(
         val actionSettingsEnabled = blockAllPosts && useCustomAction
         Card(
             colors = CardDefaults.cardColors(containerColor = cardColor),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 .alpha(if (actionSettingsEnabled) 1f else 0.4f),
         ) {
@@ -191,7 +187,7 @@ fun PumFilterSettingsPanel(
                                 },
                                 color = textColor,
                             )
-                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = botColors(isDarkMode).accent)
                         }
                         DropdownMenu(
                             expanded = processMenuExpanded,
@@ -233,7 +229,7 @@ fun PumFilterSettingsPanel(
                                 onClick = { durationMenuExpanded = true },
                             ) {
                                 Text(durationOptions[blockDurationHours] ?: "${blockDurationHours}시간", color = textColor)
-                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = botColors(isDarkMode).accent)
                             }
                             DropdownMenu(
                                 expanded = durationMenuExpanded,

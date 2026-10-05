@@ -25,14 +25,15 @@ internal fun ManagementAutomationSettings(
     p:SharedPreferences, colors:BotColorScheme, refreshEnabled:Boolean,
     onRefreshEnabledChange:(Boolean)->Unit, onOpen:(String)->Unit
 ) {
-    Text("관리 자동화",fontWeight=FontWeight.Bold,fontSize=13.sp,color=PastelNavy,
-        modifier=Modifier.padding(start=4.dp,bottom=4.dp))
-    Box(Modifier.testTag("gallery-refresh-entry")) {
-        ModernSettingItem("갤러리 설정 자동 갱신","VPN·통신사·첨부 제한 유지",Icons.Default.Refresh,
-            colors,refreshEnabled,onRefreshEnabledChange) { onOpen("GALLERY_REFRESH") }
+    SettingsSectionHeader("관리 자동화",colors)
+    SettingsGroup(colors) {
+        Box(Modifier.testTag("gallery-refresh-entry")) {
+            ModernSettingItem("갤러리 설정 자동 갱신","VPN·통신사·첨부 제한 유지",Icons.Default.Refresh,
+                colors,refreshEnabled,onRefreshEnabledChange) { onOpen("GALLERY_REFRESH") }
+        }
+        AutomationFeatureSettingItem(p,colors,AutomationSettingsPage.BUMP,onOpen)
+        AutomationFeatureSettingItem(p,colors,AutomationSettingsPage.TAB,onOpen)
     }
-    AutomationFeatureSettingItem(p,colors,AutomationSettingsPage.BUMP,onOpen)
-    AutomationFeatureSettingItem(p,colors,AutomationSettingsPage.TAB,onOpen)
 }
 
 @Composable
@@ -51,7 +52,7 @@ private fun AutomationFeatureSettingItem(p:SharedPreferences,colors:BotColorSche
         AutomationSettingsPage.TAB->runCatching { "분류 규칙 ${parseTabMoveRules(p.getString(MOVE_RULES_KEY,"[]")!!).size}개" }.getOrDefault("분류 규칙 확인")
     } }
     var error by remember(p,page) { mutableStateOf<String?>(null) }
-    val icon=when(page) { AutomationSettingsPage.BUMP->Icons.Default.Schedule;AutomationSettingsPage.TAB->Icons.Default.SwapHoriz }
+    val icon=when(page) { AutomationSettingsPage.BUMP->Icons.Default.Upgrade;AutomationSettingsPage.TAB->Icons.Default.SwapHoriz }
     Box(Modifier.testTag(tag)) {
         ModernSettingItem(page.title,summary,icon,colors,checked,{next ->
             try {
@@ -64,9 +65,9 @@ private fun AutomationFeatureSettingItem(p:SharedPreferences,colors:BotColorSche
         }) { onOpen(page.route) }
     }
     if(error!=null) AlertDialog(onDismissRequest={error=null},modifier=Modifier.testTag("automation-enable-error"),
-        containerColor=colors.card,titleContentColor=colors.text,textContentColor=colors.subText,
+        containerColor=colors.dialogBg,titleContentColor=colors.text,textContentColor=colors.subText,
         title={Text(page.title)},text={Text(error.orEmpty())},
-        confirmButton={TextButton(onClick={error=null;onOpen(page.route)}) { Text("설정하기",color=PastelNavy) }},
+        confirmButton={TextButton(onClick={error=null;onOpen(page.route)}) { Text("설정하기",color=colors.accent) }},
         dismissButton={TextButton(onClick={error=null}) { Text("닫기",color=colors.text) }})
 }
 
@@ -80,5 +81,5 @@ internal fun AutomationSettingsHelp(page:AutomationSettingsPage,colors:BotColorS
         titleContentColor=colors.text,textContentColor=colors.subText,title={Text("${page.title} 도움말")},
         text={androidx.compose.foundation.rememberScrollState().let { scroll ->
             Column(Modifier.heightIn(max=400.dp).then(Modifier.verticalScroll(scroll))) { Text(guidance) }
-        }},confirmButton={TextButton(onClick=onDismiss) { Text("닫기",color=PastelNavy) }})
+        }},confirmButton={TextButton(onClick=onDismiss) { Text("닫기",color=colors.accent) }})
 }

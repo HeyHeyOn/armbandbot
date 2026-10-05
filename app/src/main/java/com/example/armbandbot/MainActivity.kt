@@ -69,6 +69,9 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
+import androidx.activity.SystemBarStyle
+import com.heyheyon.armbandbot.ui.botColors
+import com.heyheyon.armbandbot.ui.theme.ArmbandMaterialTheme
 import com.heyheyon.armbandbot.ui.theme.MyFirstAppTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -575,10 +578,8 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            MyFirstAppTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) { MainApp() }
-                }
+            MyFirstAppTheme(dynamicColor = false) {
+                MainApp()
             }
         }
     }
@@ -655,8 +656,22 @@ fun MainApp() {
         onDispose { appContext.unregisterReceiver(receiver) }
     }
 
+    // 상태바·내비게이션바 아이콘 색을 앱 테마에 맞춘다.
+    LaunchedEffect(isGlobalDarkMode) {
+        val transparent = android.graphics.Color.TRANSPARENT
+        val barStyle = if (isGlobalDarkMode) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
+        activity?.enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
+    }
+
     // 🌟 전역으로 다크모드 상태를 주입
     CompositionLocalProvider(LocalIsDarkMode provides isGlobalDarkMode) {
+        ArmbandMaterialTheme(isGlobalDarkMode) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(if (currentScreen == "LOBBY") botColors(isGlobalDarkMode).bg else botColors(isGlobalDarkMode).topBar)
+                .windowInsetsPadding(WindowInsets.systemBars)
+        ) {
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
@@ -686,6 +701,8 @@ fun MainApp() {
                     )
                 }
             }
+        }
+        }
         }
     }
 }

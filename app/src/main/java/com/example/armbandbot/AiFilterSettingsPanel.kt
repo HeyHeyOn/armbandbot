@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
+import com.heyheyon.armbandbot.ui.botColors
+import com.heyheyon.armbandbot.ui.modernSwitchColors
 import com.heyheyon.armbandbot.ui.PastelNavyLight
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,11 +57,11 @@ fun AiFilterSettingsPanel(botId: String) {
     val context = LocalContext.current
     val botPref = remember(botId) { context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE) }
     val isDarkMode = LocalIsDarkMode.current
-    val cardColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
-    val dialogBgColor = if (isDarkMode) Color(0xFF2C323A) else Color.White
-    val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
-    val subTextColor = if (isDarkMode) Color(0xFFAAAEB3) else Color.Gray
-    val dividerColor = if (isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE)
+    val cardColor = botColors(isDarkMode).card
+    val dialogBgColor = botColors(isDarkMode).dialogBg
+    val textColor = botColors(isDarkMode).text
+    val subTextColor = botColors(isDarkMode).subText
+    val dividerColor = botColors(isDarkMode).divider
 
     val buttonContainerColor = if (isDarkMode) Color(0xFF37474F) else PastelNavyLight
     val buttonContentColor = if (isDarkMode) Color.White else PastelNavy
@@ -105,17 +107,17 @@ fun AiFilterSettingsPanel(botId: String) {
     }
 
     Column {
-        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(16.dp), modifier = Modifier.padding(bottom = 16.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("AI 필터", fontWeight = FontWeight.Bold, color = textColor)
                     Text("LLM 기반 2차 보조 필터입니다.", fontSize = 12.sp, color = subTextColor)
                 }
-                Switch(checked = isEnabled, onCheckedChange = { isEnabled = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy))
+                Switch(checked = isEnabled, onCheckedChange = { isEnabled = it; botPref.edit().putBoolean("is_ai_filter_mode", it).apply() }, colors = modernSwitchColors(botColors(isDarkMode)))
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("기본 설정", fontWeight = FontWeight.Bold, color = textColor)
                 Text("큰 글은 생략하지 않고 단독 전체 검사로 전환됩니다.", fontSize = 12.sp, color = subTextColor)
@@ -150,7 +152,7 @@ fun AiFilterSettingsPanel(botId: String) {
                         Text("Endpoint 직접 입력", fontWeight = FontWeight.Bold, color = textColor)
                         Text(if (provider == "lm_studio") "PC IP만 입력해도 자동 보정됩니다." else "필요할 때만 켜세요.", fontSize = 12.sp, color = subTextColor)
                     }
-                    Switch(checked = useCustomEndpoint, onCheckedChange = { useCustomEndpoint = it; botPref.edit().putBoolean("ai_filter_use_custom_endpoint", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy))
+                    Switch(checked = useCustomEndpoint, onCheckedChange = { useCustomEndpoint = it; botPref.edit().putBoolean("ai_filter_use_custom_endpoint", it).apply() }, colors = modernSwitchColors(botColors(isDarkMode)))
                 }
                 if (useCustomEndpoint) {
                     OutlinedTextField(value = endpoint, onValueChange = { endpoint = it; saveString("ai_filter_endpoint", it.trim()) }, label = { Text(if (provider == "lm_studio") "PC IP 또는 Endpoint" else "Endpoint") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
@@ -160,7 +162,7 @@ fun AiFilterSettingsPanel(botId: String) {
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Text("모델 직접 입력", fontWeight = FontWeight.Bold, color = textColor)
-                    Switch(checked = useCustomModel, onCheckedChange = { useCustomModel = it; botPref.edit().putBoolean("ai_filter_use_custom_model", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy))
+                    Switch(checked = useCustomModel, onCheckedChange = { useCustomModel = it; botPref.edit().putBoolean("ai_filter_use_custom_model", it).apply() }, colors = modernSwitchColors(botColors(isDarkMode)))
                 }
                 OutlinedTextField(value = model, onValueChange = { model = it; saveString("ai_filter_model", it.trim()) }, label = { Text("모델") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
 
@@ -187,7 +189,7 @@ fun AiFilterSettingsPanel(botId: String) {
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("배치 기준", fontWeight = FontWeight.Bold, color = textColor)
                 NumberField("최대 글 수", maxPosts, textColor) { maxPosts = it; if (it.isNotBlank()) maxPosts = saveIntText("ai_filter_batch_max_posts", it, 5) }
@@ -198,20 +200,20 @@ fun AiFilterSettingsPanel(botId: String) {
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("개별 차단 설정", fontWeight = FontWeight.Bold, color = textColor)
                         Text("AI block 결과에만 적용됩니다.", fontSize = 12.sp, color = subTextColor)
                     }
-                    Switch(checked = useCustomAction, onCheckedChange = { useCustomAction = it; botPref.edit().putBoolean("ai_use_custom_action_config", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy))
+                    Switch(checked = useCustomAction, onCheckedChange = { useCustomAction = it; botPref.edit().putBoolean("ai_use_custom_action_config", it).apply() }, colors = modernSwitchColors(botColors(isDarkMode)))
                 }
                 Divider(color = dividerColor)
                 Box {
                     OutlinedButton(onClick = { actionExpanded = true }) {
                         Text(mapOf("block" to "차단", "delete" to "삭제만", "hold" to "보류")[actionMode] ?: "차단", color = textColor)
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = botColors(isDarkMode).accent)
                     }
                     DropdownMenu(expanded = actionExpanded, onDismissRequest = { actionExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
                         listOf("block" to "차단", "delete" to "삭제만", "hold" to "보류").forEach { (mode, label) ->
@@ -230,7 +232,7 @@ fun AiFilterSettingsPanel(botId: String) {
                     Box {
                         OutlinedButton(onClick = { durationExpanded = true }) {
                             Text("${blockDuration}시간", color = textColor)
-                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = PastelNavy)
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = botColors(isDarkMode).accent)
                         }
                         DropdownMenu(expanded = durationExpanded, onDismissRequest = { durationExpanded = false }, modifier = Modifier.background(dialogBgColor)) {
                             listOf(1, 6, 12, 24, 72, 168, 720).forEach { hours ->
@@ -240,7 +242,7 @@ fun AiFilterSettingsPanel(botId: String) {
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         Text("차단 시 글/댓글 함께 삭제", color = textColor)
-                        Switch(checked = deletePost, onCheckedChange = { deletePost = it; botPref.edit().putBoolean("ai_delete_post_on_block", it).apply() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy))
+                        Switch(checked = deletePost, onCheckedChange = { deletePost = it; botPref.edit().putBoolean("ai_delete_post_on_block", it).apply() }, colors = modernSwitchColors(botColors(isDarkMode)))
                     }
                     OutlinedTextField(value = blockReason, onValueChange = { blockReason = it; saveString("ai_block_reason_text", it) }, label = { Text("차단 사유") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor))
                 }

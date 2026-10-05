@@ -91,8 +91,8 @@ internal fun PostAutomationSettingsScreen(p:SharedPreferences,colors:BotColorSch
     BackHandler(onBack=onBack)
     Column(Modifier.fillMaxSize().background(colors.bg).testTag("automation-page")) {
         SettingsDetailHeader(page.title,colors,onBack,Modifier.testTag("automation-back")) {
-            IconButton(onClick={showHelp=true},modifier=Modifier.size(24.dp).testTag("automation-help")) {
-                Icon(Icons.Default.HelpOutline,"도움말",tint=PastelNavy)
+            IconButton(onClick={showHelp=true},modifier=Modifier.size(44.dp).testTag("automation-help")) {
+                Icon(Icons.Default.HelpOutline,"도움말",tint=colors.accent)
             }
         }
         Column(Modifier.weight(1f).verticalScroll(scroll).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -106,7 +106,7 @@ internal fun PostAutomationSettingsScreen(p:SharedPreferences,colors:BotColorSch
                 bumps.forEach {rule->
                     Text("${strictAutomationPost(rule.url).key.postNo} · ${rule.minutes.joinToString {formatMinuteOfDay(it)}}",color=colors.text)
                     Row {
-                        TextButton(onClick={bumpEditId=rule.id;bumpUrl=rule.url;bumpTimes=rule.minutes}) {Text("수정",color=PastelNavy)}
+                        TextButton(onClick={bumpEditId=rule.id;bumpUrl=rule.url;bumpTimes=rule.minutes}) {Text("수정",color=colors.accent)}
                         TextButton(onClick={attempt {val next=bumps.filterNot {it.id==rule.id};check(p.edit().putString(BUMP_RULES_KEY,encodeBumpRules(next)).commit());bumps=next}}) {Text("삭제",color=colors.subText)}
                     }
                 }
@@ -116,7 +116,7 @@ internal fun PostAutomationSettingsScreen(p:SharedPreferences,colors:BotColorSch
                     OutlinedButton(onClick={pickTime(minute)},modifier=Modifier.weight(1f).testTag("bump-time-$minute")) {Text(formatMinuteOfDay(minute),color=colors.text)}
                     IconButton(onClick={bumpTimes=updateBumpTimeSelection(bumpTimes,minute,null)},modifier=Modifier.testTag("bump-time-remove-$minute")) {Icon(Icons.Default.Close,"시각 삭제",tint=colors.subText)}
                 }}
-                TextButton(enabled=bumpTimes.size<24,onClick={pickTime(null)},modifier=Modifier.testTag("bump-time-add")) {Text("시각 추가",color=PastelNavy)}
+                TextButton(enabled=bumpTimes.size<24,onClick={pickTime(null)},modifier=Modifier.testTag("bump-time-add")) {Text("시각 추가",color=colors.accent)}
                 Row {
                     TextButton(onClick={attempt {
                         val key=strictAutomationPost(bumpUrl.trim()).key
@@ -126,7 +126,7 @@ internal fun PostAutomationSettingsScreen(p:SharedPreferences,colors:BotColorSch
                         val next=if(bumpEditId==null)bumps+rule else bumps.map {if(it.id==rule.id)rule else it}
                         require(next.size<=64);check(p.edit().putString(BUMP_RULES_KEY,encodeBumpRules(next)).commit())
                         bumps=next;bumpEditId=null;bumpUrl="";bumpTimes=listOf(540)
-                    }},modifier=Modifier.testTag("bump-save")) {Text(if(bumpEditId==null)"예약 추가" else "수정 저장",color=PastelNavy)}
+                    }},modifier=Modifier.testTag("bump-save")) {Text(if(bumpEditId==null)"예약 추가" else "수정 저장",color=colors.accent)}
                     if(bumpEditId!=null)TextButton(onClick={bumpEditId=null;bumpUrl="";bumpTimes=listOf(540)}) {Text("취소",color=colors.text)}
                 }
                 Text(p.getString("automation_last_status","").orEmpty(),color=colors.subText)
@@ -219,7 +219,7 @@ private fun <T> AutomationMenu(label:String,value:String,options:List<Pair<T,Str
     if(label.isNotEmpty())Text(label,color=colors.subText)
     Box {
         OutlinedButton(onClick={open=true},modifier=Modifier.fillMaxWidth().testTag(tag)) {Text(value,color=colors.text,modifier=Modifier.weight(1f));Icon(Icons.Default.ArrowDropDown,null,tint=colors.subText)}
-        DropdownMenu(expanded=open,onDismissRequest={open=false},containerColor=colors.card) {
+        DropdownMenu(expanded=open,onDismissRequest={open=false},containerColor=colors.dialogBg) {
             options.forEach {(option,title)->DropdownMenuItem(text={Text(title,color=colors.text)},onClick={open=false;onSelect(option)})}
         }
     }
@@ -227,12 +227,12 @@ private fun <T> AutomationMenu(label:String,value:String,options:List<Pair<T,Str
 @Composable
 private fun AutomationField(value:String,onChange:(String)->Unit,label:String,colors:BotColorScheme,tag:String) {
     OutlinedTextField(value,onChange,label={Text(label)},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).testTag(tag),singleLine=true,
-        colors=OutlinedTextFieldDefaults.colors(focusedTextColor=colors.text,unfocusedTextColor=colors.text,focusedLabelColor=colors.text,unfocusedLabelColor=colors.subText,focusedBorderColor=PastelNavy,unfocusedBorderColor=colors.subText))
+        colors=OutlinedTextFieldDefaults.colors(focusedTextColor=colors.text,unfocusedTextColor=colors.text,focusedLabelColor=colors.text,unfocusedLabelColor=colors.subText,focusedBorderColor=colors.accent,unfocusedBorderColor=colors.divider))
 }
 
 @Composable
 private fun AutomationCard(colors:BotColorScheme,modifier:Modifier=Modifier,content:@Composable ColumnScope.()->Unit) {
-    Card(modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp),colors=CardDefaults.cardColors(containerColor=colors.card)) {
+    Card(modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=colors.card),elevation=CardDefaults.cardElevation(defaultElevation=0.dp)) {
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(4.dp),content=content)
     }
 }

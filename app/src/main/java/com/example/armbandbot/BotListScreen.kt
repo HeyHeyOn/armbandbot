@@ -50,6 +50,9 @@ import androidx.compose.ui.zIndex
 import com.heyheyon.armbandbot.ui.LocalIsDarkMode
 import com.heyheyon.armbandbot.ui.PastelNavy
 import com.heyheyon.armbandbot.ui.botColors
+import com.heyheyon.armbandbot.ui.BotColorScheme
+import com.heyheyon.armbandbot.ui.SettingIconBadge
+import com.heyheyon.armbandbot.ui.modernSwitchColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -67,11 +70,12 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     val botIds = remember { mutableStateListOf<String>() }
 
     val isDarkMode = LocalIsDarkMode.current
-    val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF8F9FA)
-    val cardColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
-    val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
-    val subTextColor = if (isDarkMode) Color(0xFFAAAEB3) else Color.DarkGray
-    val iconColor = if (isDarkMode) Color(0xFF90A4AE) else PastelNavy
+    val colors = botColors(isDarkMode)
+    val bgColor = colors.bg
+    val cardColor = colors.dialogBg
+    val textColor = colors.text
+    val subTextColor = colors.subText
+    val iconColor = colors.iconTint
 
     LaunchedEffect(Unit) {
         var botIdsStr = masterPref.getString("bot_ids_list", null)
@@ -158,30 +162,25 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
     Scaffold(
         containerColor = bgColor,
         bottomBar = {
-            Surface(color = if (isDarkMode) Color(0xFF1A1A1A) else Color.White) {
-                val actionIconColor = if (isDarkMode) Color.White else PastelNavy
+            Column(Modifier.background(colors.topBar)) {
+                HorizontalDivider(color = colors.divider)
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { showAddDialog = true }.padding(vertical = 2.dp)) {
-                        Icon(Icons.Filled.Add, contentDescription = "봇 추가", tint = actionIconColor, modifier = Modifier.size(30.dp))
-                        Text("봇 추가", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }.padding(vertical = 2.dp)) {
-                        Icon(Icons.Filled.FileDownload, contentDescription = "불러오기", tint = actionIconColor, modifier = Modifier.size(30.dp))
-                        Text("불러오기", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(64.dp).clip(RoundedCornerShape(12.dp)).clickable { showDbDashboard = true }.padding(vertical = 2.dp)) {
-                        Icon(Icons.Filled.Save, contentDescription = "DB", tint = actionIconColor, modifier = Modifier.size(30.dp))
-                        Text("DB", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp).clip(RoundedCornerShape(12.dp)).clickable { onThemeToggle(!isDarkMode) }.padding(vertical = 2.dp)) {
-                        Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = "다크/라이트모드 전환", tint = actionIconColor, modifier = Modifier.size(30.dp))
-                        Text(if (isDarkMode) "라이트 모드" else "다크 모드", color = actionIconColor, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1)
+                    LobbyActionButton(Icons.Filled.FileDownload, "불러오기", colors) { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }
+                    LobbyActionButton(Icons.Filled.Storage, "DB 기록", colors) { showDbDashboard = true }
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = { showAddDialog = true },
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PastelNavy, contentColor = Color.White)
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("봇 추가", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -198,23 +197,40 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     indication = null
                 ) { swipedBotId = null }
         ) {
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = PastelNavy), shape = RoundedCornerShape(16.dp)) {
-                Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.White)
-                        Text("버전: $ARMBANDBOT_APP_VERSION", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
-                    }
-                    IconButton(onClick = { showHelpDialog = true }) {
-                        Icon(Icons.Filled.HelpOutline, contentDescription = "도움말", tint = Color.White, modifier = Modifier.size(28.dp))
-                    }
+            Row(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("완장봇", fontWeight = FontWeight.Bold, fontSize = 28.sp, color = textColor)
+                    Text("버전 $ARMBANDBOT_APP_VERSION", fontSize = 13.sp, color = subTextColor)
+                }
+                IconButton(onClick = { onThemeToggle(!isDarkMode) }) {
+                    Icon(imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = if (isDarkMode) "라이트 모드" else "다크 모드", tint = colors.accent)
+                }
+                IconButton(onClick = { showHelpDialog = true }) {
+                    Icon(Icons.Filled.HelpOutline, contentDescription = "도움말", tint = colors.accent)
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            val runningCount = botIds.count { id -> context.getSharedPreferences("bot_prefs_$id", Context.MODE_PRIVATE).getBoolean("is_running", false) }
+            Text(
+                if (botIds.isEmpty()) "아직 만든 봇이 없습니다" else "봇 ${botIds.size}개 · 실행 중 ${runningCount}개",
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = subTextColor,
+                modifier = Modifier.padding(start = 6.dp, top = 16.dp, bottom = 8.dp)
+            )
 
             if (botIds.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("생성된 봇이 없습니다.", color = subTextColor) }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp, horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        SettingIconBadge(Icons.Filled.SmartToy, colors)
+                        Spacer(Modifier.height(14.dp))
+                        Text("생성된 봇이 없습니다.", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = textColor)
+                        Spacer(Modifier.height(4.dp))
+                        Text("아래 ‘봇 추가’를 눌러 첫 봇을 만들어 보세요.", fontSize = 13.sp, color = subTextColor, textAlign = TextAlign.Center)
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
@@ -332,7 +348,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showHelpDialog = false }) { Text("확인", color = PastelNavy) } }
+                confirmButton = { TextButton(onClick = { showHelpDialog = false }) { Text("확인", color = colors.accent) } }
             )
         }
 
@@ -463,9 +479,11 @@ fun BotListItem(
     val statusText = botScheduleStatus(isLoggedIn, isRunning, nowEpochMillis, ZoneId.systemDefault(), runSchedule)
 
     val isDarkMode = LocalIsDarkMode.current
-    val cardBgColor = if (isDarkMode) Color(0xFF1E2329) else Color.White
-    val textColor = if (isDarkMode) Color(0xFFE0E0E0) else Color(0xFF2C3E50)
-    val dividerColor = if (isDarkMode) Color(0xFF333333) else Color(0xFFEEEEEE)
+    val colors = botColors(isDarkMode)
+    val cardBgColor = colors.card
+    val textColor = colors.text
+    val dividerColor = colors.divider
+    val status = BotRunStatus(statusText, botRunTone(statusText, isLoggedIn))
 
     val isDragging = draggingIndex == index
     val yOffset = if (isDragging) with(LocalDensity.current) { dragDy.toDp() } else 0.dp
@@ -485,7 +503,7 @@ fun BotListItem(
 
     Box(modifier = Modifier.fillMaxWidth().offset(y = yOffset).zIndex(zIndex)) {
         Row(modifier = Modifier.matchParentSize().padding(end = buttonGap).background(Color.Transparent), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(12.dp)).background(Color(0xFF2E7D6F)).clickable { onExportRequest() }, contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(16.dp)).background(Color(0xFF2E7D6F)).clickable { onExportRequest() }, contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(androidx.compose.material.icons.Icons.Filled.FileUpload, contentDescription = "내보내기", tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(2.dp))
@@ -493,7 +511,7 @@ fun BotListItem(
                 }
             }
             Spacer(modifier = Modifier.width(buttonGap))
-            Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(12.dp)).background(Color(0xFF4A6583)).clickable { onDuplicateRequest() }, contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(16.dp)).background(Color(0xFF4A6583)).clickable { onDuplicateRequest() }, contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(androidx.compose.material.icons.Icons.Filled.ContentCopy, contentDescription = "복사", tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(2.dp))
@@ -501,7 +519,7 @@ fun BotListItem(
                 }
             }
             Spacer(modifier = Modifier.width(buttonGap))
-            Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(12.dp)).background(if(isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F)).clickable { onDeleteRequest() }, contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(buttonSize).clip(RoundedCornerShape(16.dp)).background(if(isDarkMode) Color(0xFFEF5350) else Color(0xFFD32F2F)).clickable { onDeleteRequest() }, contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(androidx.compose.material.icons.Icons.Filled.Delete, contentDescription = "삭제", tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.height(2.dp))
@@ -530,18 +548,26 @@ fun BotListItem(
                         onHorizontalDrag = { change, dragAmount -> change.consume(); coroutineScope.launch { swipeOffset.snapTo((swipeOffset.value + dragAmount).coerceIn(maxSwipePx, 0f)) } }
                     )
                 },
-            elevation = CardDefaults.cardElevation(defaultElevation = if (isDragging) 8.dp else 1.dp), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = cardBgColor)
+            elevation = CardDefaults.cardElevation(defaultElevation = if (isDragging) 8.dp else 0.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = cardBgColor)
         ) {
             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable { if (isSwipedOpen) onSwipeStateChange(false) else onSettingsClick() }, verticalAlignment = Alignment.CenterVertically) {
-                Spacer(modifier = Modifier.width(20.dp))
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().padding(vertical = 14.dp), contentAlignment = Alignment.CenterStart) {
+                Spacer(modifier = Modifier.width(16.dp))
+                Box(
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(colors.accentContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(botName.trim().take(1).ifEmpty { "봇" }, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = colors.accent)
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().padding(vertical = 16.dp), contentAlignment = Alignment.CenterStart) {
                     Column {
-                        Text(botName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
-                        Text(statusText, fontSize = 11.sp, color = if (statusText == "실행 중") PastelNavy else Color.Gray)
+                        Text(botName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(modifier = Modifier.height(5.dp))
+                        BotRunStatusPill(status, colors)
                     }
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().padding(vertical = 12.dp).background(dividerColor))
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight().padding(vertical = 16.dp).background(dividerColor))
+                Box(modifier = Modifier.padding(horizontal = 12.dp)) {
                     Switch(
                         checked = isRunning,
                         onCheckedChange = {
@@ -549,11 +575,22 @@ fun BotListItem(
                             val serviceIntent = Intent(context, BotService::class.java).apply { putExtra("BOT_ID", botId); putExtra("COOKIE", botPref.getString("saved_cookie", "")); action = if (isRunning) "START" else "STOP" }
                             if (isRunning && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(serviceIntent) else context.startService(serviceIntent)
                         },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PastelNavy, uncheckedThumbColor = if(isDarkMode) Color.LightGray else Color.White, uncheckedTrackColor = if(isDarkMode) Color(0xFF555555) else Color.LightGray, uncheckedBorderColor = Color.Transparent),
-                        modifier = Modifier.scale(0.8f)
+                        colors = modernSwitchColors(colors),
+                        modifier = Modifier.scale(0.85f)
                     )
                 }
             }
         }
+    }
+}
+@Composable
+private fun LobbyActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, colors: BotColorScheme, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(colors.accentContainer).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = colors.accent, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = colors.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }

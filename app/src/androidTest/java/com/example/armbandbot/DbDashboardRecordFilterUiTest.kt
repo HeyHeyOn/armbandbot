@@ -158,11 +158,11 @@ class DbDashboardRecordFilterUiTest {
             if (dark != null) assertRenderedColor("record-filter-button", if (dark) Color(0xFFAAAEB3) else Color.Gray)
             compose.onNodeWithTag("record-filter-button").performClick()
             if (dark != null) {
-                assertRenderedColor("record-filter-dialog", if (dark) Color(0xFF2C323A) else Color.White, 500)
-                assertRenderedColor("record-filter-gallery-ALL", if (dark) Color(0xFFE0E0E0) else Color(0xFF2C3E50))
-                assertRenderedColor("record-filter-gallery-ALL", if (dark) Color(0xFF90A4AE) else Color(0xFF4A6583))
+                assertRenderedColor("record-filter-dialog", if (dark) Color(0xFF222A33) else Color.White, 500)
+                assertRenderedColor("record-filter-gallery-ALL", if (dark) Color(0xFFE6E9ED) else Color(0xFF1C2733))
+                assertRenderedColor("record-filter-gallery-ALL", if (dark) Color(0xFF9DB4CF) else Color(0xFF4A6583))
                 compose.onNodeWithTag("record-filter-gallery-applied-gallery").performClick().assertIsOff()
-                assertRenderedColor("record-filter-gallery-applied-gallery", if (dark) Color(0xFFAAAEB3) else Color.DarkGray)
+                assertRenderedColor("record-filter-gallery-applied-gallery", if (dark) Color(0xFFA0A8B3) else Color(0xFF66717E))
             }
             saveBeta4UiEvidence("filter-local-theme-$dark")
             compose.selectOnlyRecordFilter("gallery", "applied-gallery")

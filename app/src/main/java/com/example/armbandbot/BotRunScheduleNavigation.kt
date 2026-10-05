@@ -27,7 +27,7 @@ internal fun BotRunScheduleSettingsScreen(preferences: SharedPreferences, colors
 internal fun BotRunScheduleSettingsScreen(state: BotRunScheduleEditorState, colors: BotColorScheme, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize().background(colors.bg).testTag("schedule-page")) {
-        TextButton(onClick = onBack, modifier = Modifier.testTag("schedule-back")) { Text("뒤로", color = colors.text) }
+        SettingsDetailHeader("작동 시간대", colors, onBack, backModifier = Modifier.testTag("schedule-back"))
         Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) { BotRunScheduleSettingsPage(state, colors) }
     }
 }
@@ -45,7 +45,9 @@ internal fun BotRunScheduleSettingsCard(state: BotRunScheduleEditorState, colors
         BotRunScheduleSettingsScreen(state, colors) { editing = false }
     } else {
         ModernSettingsBlock(
-            title = "작동 시간대", subtitle = "작동할 시간대 설정", icon = Icons.Filled.Schedule, colors = colors,
+            title = "작동 시간대",
+            subtitle = if (state.enabled) "시간대 ${state.windows.size}개 적용 중" else "꺼져 있으면 시간 제한 없이 작동",
+            icon = Icons.Filled.Schedule, colors = colors,
             modifier = Modifier.testTag("schedule-card").clickable { onOpenSettings?.invoke() ?: run { editing = true } },
             trailing = {
                 Row {

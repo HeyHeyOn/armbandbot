@@ -34,7 +34,7 @@ internal fun RemoteListTextCard(title:String,content:String,colors:BotColorSchem
     val active=remember(p,channel,revision) {p.getBoolean(remoteListPrefKey(channel,"enabled"),false)}
     ReadOnlyTextCard(title,content,colors,enabled=enabled,headerAction={
         IconButton(enabled=enabled,onClick={open=true},modifier=Modifier.testTag("remote-cloud-$channel")) {
-            Icon(Icons.Default.Cloud,"${remoteListLabel(channel)} 원격 목록${if(active)" 사용 중" else " 설정"}",tint=if(active)PastelNavy else colors.subText)
+            Icon(Icons.Default.Cloud,"${remoteListLabel(channel)} 원격 목록${if(active)" 사용 중" else " 설정"}",tint=if(active)colors.accent else colors.subText)
         }
     },onClick=onEdit)
     if(open && enabled)RemoteListSettingsDialog(p,channel,colors) {open=false}
@@ -74,7 +74,7 @@ internal fun RemoteListSettingsDialog(p:SharedPreferences,channel:String,colors:
                 ModernSettingsSwitch(enabled,{enabled=it},colors,Modifier.testTag("remote-list-enabled"))
             }
             RemoteSourceKind.entries.forEach {value->Row(verticalAlignment=Alignment.CenterVertically) {
-                RadioButton(kind==value,{kind=value},colors=RadioButtonDefaults.colors(selectedColor=PastelNavy,unselectedColor=colors.subText))
+                RadioButton(kind==value,{kind=value},colors=RadioButtonDefaults.colors(selectedColor=colors.accent,unselectedColor=colors.subText))
                 Text(when(value) {RemoteSourceKind.GITHUB->"GitHub";RemoteSourceKind.SHEETS->"Google Sheets";RemoteSourceKind.JSON->"Apps Script"},color=colors.text)
             }}
             RemoteInput(url,{url=it},"목록 주소",colors,"remote-list-url")
@@ -84,14 +84,14 @@ internal fun RemoteListSettingsDialog(p:SharedPreferences,channel:String,colors:
             if(status.isNotBlank())Text(status,color=colors.subText,modifier=Modifier.testTag("remote-list-status"))
             TextButton(enabled=enabled && !busy,onClick={if(save()) {
                 busy=true;scope.launch {try {RemoteListClient().syncList(p,channel,force=true);status=p.getString(k("status"),"").orEmpty()}finally {busy=false}}
-            }},modifier=Modifier.testTag("remote-list-refresh")) {Text(if(busy)"확인 중" else "저장 후 지금 갱신",color=PastelNavy)}
+            }},modifier=Modifier.testTag("remote-list-refresh")) {Text(if(busy)"확인 중" else "저장 후 지금 갱신",color=colors.accent)}
         }},
-        confirmButton={TextButton(enabled=!busy,onClick={if(save())onDismiss()},modifier=Modifier.testTag("remote-list-save")) {Text("저장",color=PastelNavy)}},
+        confirmButton={TextButton(enabled=!busy,onClick={if(save())onDismiss()},modifier=Modifier.testTag("remote-list-save")) {Text("저장",color=colors.accent)}},
         dismissButton={TextButton(onClick=onDismiss) {Text("취소",color=colors.text)}})
     if(help)AlertDialog(onDismissRequest={help=false},modifier=Modifier.testTag("remote-list-help-dialog"),containerColor=colors.card,titleContentColor=colors.text,textContentColor=colors.subText,
         title={Text("원격 목록 도움말")},text={Column(Modifier.heightIn(max=360.dp).verticalScroll(rememberScrollState())) {
             Text("이 목록에 적용할 문자열만 한 줄에 하나씩 적어 주세요. Google Sheets는 제목 없이 한 열에 작성합니다. GitHub는 텍스트 목록, Apps Script는 텍스트 목록 또는 문자열 배열을 반환하면 됩니다.\n\n각 목록은 서로 다른 주소를 사용할 수 있습니다. 직접 입력한 목록과 함께 적용되며, 해당 필터가 켜져 있어야 작동합니다.\n\n로그인 없이 읽을 수 있는 전용 목록만 지원합니다. 수신 실패 시 같은 원본의 마지막 정상 목록을 유지하며, 끄면 직접 입력한 목록만 사용합니다. 기존 통합 연결은 주소를 바꾸기 전까지 그대로 유지됩니다.")
-        }},confirmButton={TextButton(onClick={help=false}) {Text("닫기",color=PastelNavy)}})
+        }},confirmButton={TextButton(onClick={help=false}) {Text("닫기",color=colors.accent)}})
 }
 
 @Composable

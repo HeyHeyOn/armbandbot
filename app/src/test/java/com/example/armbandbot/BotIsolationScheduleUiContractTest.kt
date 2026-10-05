@@ -9,16 +9,20 @@ class BotIsolationScheduleUiContractTest {
 
     @Test fun remoteCloudIsFilterScopedAndManagementFollowsIndependentAndSchedule() {
         val source=source("BotDetailScreen.kt")
-        val detail=source.substringAfter("Text(\"기본 탐색 설정\"")
-        val independent=detail.indexOf("IndependentDbSettingsCard(")
-        val schedule=detail.indexOf("BotRunScheduleSettingsCard(")
-        val management=detail.indexOf("ManagementAutomationSettings(")
-        val followup=detail.indexOf("Text(\"차단 후속 동작\"")
-        assertTrue(independent>=0 && schedule>independent && management>schedule && followup>management)
+        // 설정 탭: 기본 탐색 설정 안에 개별 DB가 있고, 그 다음에 차단 후속 동작이 온다.
+        val settings=source.substringAfter("BotTabIntro(\"설정\"")
+        val independent=settings.indexOf("IndependentDbSettingsCard(")
+        val followup=settings.indexOf("SettingsSectionHeader(\"차단 후속 동작\"")
+        assertTrue(settings.indexOf("SettingsSectionHeader(\"기본 탐색 설정\"") in 0 until independent && followup>independent)
+        // 자동화 탭: 작동 시간대 다음에 관리 자동화가 온다.
+        val automation=source.substringAfter("BotTabIntro(\"자동화\"").substringBefore("BOT_TAB_LOG")
+        val schedule=automation.indexOf("BotRunScheduleSettingsCard(")
+        val management=automation.indexOf("ManagementAutomationSettings(")
+        assertTrue(schedule>=0 && management>schedule)
         assertFalse(source.contains("RemoteListSettingItem("))
         assertEquals(7,Regex("RemoteListTextCard\\(").findAll(source).count())
         val entries=source("AutomationSettingsEntries.kt")
-        assertTrue(entries.contains("Text(\"관리 자동화\""))
+        assertTrue(entries.contains("SettingsSectionHeader(\"관리 자동화\""))
         assertTrue(entries.contains("ModernSettingItem(\"갤러리 설정 자동 갱신\""))
         assertFalse(entries.contains("REMOTE_LISTS"))
     }
@@ -33,7 +37,7 @@ class BotIsolationScheduleUiContractTest {
             assertTrue("Missing block token: $it", block.contains(it))
         }
         assertFalse(block.contains("clickable"))
-        val detail = source("BotDetailScreen.kt").substringAfter("Text(\"기본 탐색 설정\"")
+        val detail = source("BotDetailScreen.kt")
         assertTrue(detail.contains("IndependentDbSettingsCard(botId, botPref, isRunning, colors)"))
         assertTrue(detail.contains("BotRunScheduleSettingsCard(botPref, colors)"))
         val schedule = source("BotRunScheduleSettingsCard.kt")
