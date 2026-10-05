@@ -1,0 +1,83 @@
+{
+ "version": "1.6.0",
+ "version_code": 183,
+ "previous_formal": "1.5.3 (code 176)",
+ "last_beta": "1.6.0-beta3 (code 182)",
+ "release_branch": "release/1.6.0",
+ "merged_master_history": "09f459d (1.5.3 distribution record) merged without rewriting history",
+ "artifact": {
+  "name": "완장봇_v1.6.0.apk",
+  "bytes": 13420706,
+  "sha256": "65582967c63919a038c3fa58318294db79ddca70b6421e0850195b7a2c84ef8d",
+  "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f"
+ },
+ "jvm": {
+  "Debug": {
+   "tests": 699,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  "Release": {
+   "tests": 699,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  "clean_build": true,
+  "rerun_tasks": true
+ },
+ "lint": {
+  "Debug": {
+   "errors": 0,
+   "warnings": 52
+  },
+  "Release": {
+   "errors": 0,
+   "warnings": 47
+  }
+ },
+ "dex": "invoke-range gate passed (max ins=245, headroom=10)",
+ "signed_update_checks": {
+  "api35-from-1.5.3": {
+   "api": "35",
+   "bot_kept": true,
+   "not_debuggable": true,
+   "no_crash": true,
+   "passed": true
+  },
+  "api24-from-1.5.3": {
+   "api": "24",
+   "bot_kept": true,
+   "not_debuggable": true,
+   "no_crash": true,
+   "passed": true
+  },
+  "api35-from-beta3": {
+   "api": "35",
+   "bot_kept": true,
+   "not_debuggable": true,
+   "no_crash": true,
+   "passed": true
+  }
+ },
+ "drive": {
+  "formal_apk": {
+   "id": "1xU0t_13B1gCtMF3Wm3NEYntE5RJ9eVAr",
+   "url": "https://drive.google.com/file/d/1xU0t_13B1gCtMF3Wm3NEYntE5RJ9eVAr/view?usp=drivesdk",
+   "download_sha256": "65582967c63919a038c3fa58318294db79ddca70b6421e0850195b7a2c84ef8d"
+  },
+  "previous_formal_archived_to": "구버전 (1yuw4n3wGyMcJxjq-S14z1HjaVQCK-Cj1)"
+ },
+ "docs": {
+  "manual_and_patch_notes": "1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU",
+  "guide": "1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE",
+  "changes": "1.6.0 기준으로 위치 안내·화면 구성·관리 자동화·원격 목록 절 갱신, 패치노트 v1.6.0 추가, 스크린샷 매뉴얼 14장·가이드 6장을 1.6.0 정식 APK로 새로 촬영(번호 표시 포함), 백업·PDF 렌더 확인",
+  "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0/docs"
+ },
+ "not_performed": [
+  "실서버 게시·차단·끌올·탭 이동",
+  "로그인한 관리자 세션 검증",
+  "장시간 운용"
+ ]
+}

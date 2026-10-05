@@ -1,3 +1,12 @@
+## 1.6.0 정식 배포 완료
+
+- 1.5.3 이후 정식판 변경: 봇 화면 하단 탭(홈·필터·자동화·로그·설정)과 홈 요약, 예약 끌올·자동 탭 분류, 목록별 원격 목록 연결, 금지어·유동 필터 켜기/끄기, 전체 디자인·다크 모드 정리.
+- versionCode 183 / versionName 1.6.0. 정식 APK: `releases/완장봇_v1.6.0.apk`. master의 1.5.3 배포 기록을 병합한 `release/1.6.0`에서 승격했습니다.
+- Debug·Release JVM 테스트 각 699개(clean 빌드), 양쪽 lint 오류 0, DEX 검사 통과. 정식 APK로 1.5.3→1.6.0(API 24·35)·beta3→1.6.0(API 35) 덮어 설치, 봇 유지·크래시 없음 확인.
+- APK SHA-256: `65582967c63919a038c3fa58318294db79ddca70b6421e0850195b7a2c84ef8d` (Drive 정식 폴더 재다운로드본 일치). 1.5.3 APK는 `구버전` 폴더로 옮겼습니다.
+- [정식 APK 다운로드](https://drive.google.com/file/d/1xU0t_13B1gCtMF3Wm3NEYntE5RJ9eVAr/view?usp=drivesdk) · [매뉴얼/패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit). 두 문서의 위치 안내·새 기능 절·패치노트를 갱신하고 스크린샷을 1.6.0 화면으로 교체했습니다.
+- 검증 기록: `releases/완장봇_v1.6.0_검증.json`. 실서버 조치·장시간 운영 검증은 하지 않았습니다.
+
 ## 1.6.0-beta3
 
 - 화면 구성을 새로 정리했습니다. 기능과 저장된 설정은 그대로입니다.
