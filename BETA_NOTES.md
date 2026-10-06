@@ -6,6 +6,7 @@
 - APK SHA-256: `65582967c63919a038c3fa58318294db79ddca70b6421e0850195b7a2c84ef8d` (Drive 정식 폴더 재다운로드본 일치). 1.5.3 APK는 `구버전` 폴더로 옮겼습니다.
 - [정식 APK 다운로드](https://drive.google.com/file/d/1xU0t_13B1gCtMF3Wm3NEYntE5RJ9eVAr/view?usp=drivesdk) · [매뉴얼/패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit). 두 문서의 위치 안내·새 기능 절·패치노트를 갱신하고 스크린샷을 1.6.0 화면으로 교체했습니다.
 - 검증 기록: `releases/완장봇_v1.6.0_검증.json`. 실서버 조치·장시간 운영 검증은 하지 않았습니다.
+- [완장봇 갤러리 패치노트](https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=296): 비로그인 작성, 관리자 권한으로 해당 글만 일반→패치 분류 변경, 로그아웃 화면에서 확인.
 
 ## 1.6.0-beta3
 

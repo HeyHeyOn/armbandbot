@@ -79,5 +79,28 @@
   "실서버 게시·차단·끌올·탭 이동",
   "로그인한 관리자 세션 검증",
   "장시간 운용"
- ]
+ ],
+ "gallery_announcement": {
+  "date": "2026-10-06",
+  "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=296",
+  "post_id": 296,
+  "title": "1.6.0",
+  "anonymous_author": "완갤러",
+  "category_transition": [
+   "일반",
+   "패치"
+  ],
+  "logged_out_verification": {
+   "category": "패치",
+   "title_body_unchanged": true,
+   "anonymous_author_uid_empty": true,
+   "body_links": 0,
+   "new_patch_ids": [
+    296
+   ],
+   "existing_patch_ids_preserved": true
+  },
+  "method": "비로그인 UI 게시 후, 브라우저 확인창 정지로 정상 인증된 공식 분류 변경 요청 사용. 공개 화면과 패치 목록 재조회로 확인.",
+  "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.0/announcement/acceptance.json"
+ }
 }
