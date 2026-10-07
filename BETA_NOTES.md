@@ -1,3 +1,13 @@
+## 1.6.1 정식 배포 완료
+
+- 봇을 끈 직후 같은 봇이나 다른 봇을 켰을 때 실행되지 않던 문제를 수정했습니다. 실행 스위치·실행 중인 봇 수와 목록 재정렬 후 상태 표시도 보완했습니다.
+- versionCode 185 / versionName 1.6.1. beta1 전체 이력을 이어받아 승격했습니다.
+- Debug·Release JVM 각 699개, 양쪽 lint 오류 0, DEX·서명 검사 통과. Android 7(API24)·15(API35) 격리 에뮬레이터에서 각 16개 계측 검사와 재시작 24사례(중지→시작 간격 20조합 포함)가 통과했습니다.
+- 서명된 정식 APK로 1.6.0→1.6.1(API24), 1.6.1-beta1→1.6.1(API35) 업데이트 및 각 18개 검사 통과. 라이트·다크 화면, 실행 수 2→1→0, 설정·DB 행·스냅샷 보존을 확인했습니다.
+- APK SHA-256: `2379a720321da4c5ee99cab910051fd290201cbc18f7220c1abbbb284003738e` (정식 Drive 재다운로드본 일치). 1.6.0은 구버전 폴더에 보관했습니다.
+- [정식 APK 다운로드](https://drive.google.com/file/d/1MvowyPIuRrDLlx2t96jO1gOE0qhFvGzD/view?usp=drivesdk) · [매뉴얼/패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit). 문서 기준 버전과 새 패치노트를 갱신하고 기존 내용·사진·스타일 보존 및 PDF를 확인했습니다.
+- 검증 원장: `releases/완장봇_v1.6.1_검증.json`. 정식 검증 중 발견한 검사 타이밍 문제 2건은 테스트 보완 후 양 API 전체 재검증을 통과했습니다. 실서버 조치·로그인 계정 장시간 운영·물리 기기 검증은 하지 않았습니다.
+
 ## 1.6.1-beta1
 
 - 봇을 끈 직후 같은 봇이나 다른 봇을 켰을 때 실행되지 않던 문제를 수정했습니다.

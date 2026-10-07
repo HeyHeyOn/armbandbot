@@ -64,14 +64,21 @@ class BotRestartServiceTest {
                 pref(b).edit().putString("target_urls", if(sameGallery) gallery else "https://gall.dcinside.com/mini/board/lists/?id=offline_other_fixture").commit()
                 start(a);assertTrue(await { running(a) })
                 val to=if(sameBot)a else b
+                val precedingJob = job(a)
                 if(gap==0L) {
                     scenario.onActivity { it.startService(command(a,"STOP"));ContextCompat.startForegroundService(it,command(to,"START")) }
                 } else {
                     stop(a);SystemClock.sleep(gap);start(to)
                 }
-                // Observe a stable state after queued onDestroy, not a transient run-loop entry.
+                // Intent dispatch can exceed 750ms under device boot/CPU load.
+                // Wait for a new generation first (the old job may still run on return),
+                // then require that same service/job to survive
+                // queued onDestroy rather than accepting a transient start.
+                val entered = await { running(to) && job(to) !== precedingJob }
+                val startedService = current()
+                val startedJob = job(to)
                 SystemClock.sleep(750)
-                val success=running(to)
+                val success=entered && running(to) && current() === startedService && job(to) === startedJob
                 record("handoff_gallery_${sameGallery}_same_${sameBot}_gap_${gap}ms",JSONObject().put("running",success).put("phase",pref(to).getString("last_startup_phase", "")).put("pref_running",pref(to).getBoolean("is_running",false)).put("service_exists",current()!=null))
                 assertTrue("START survives preceding STOP (sameGallery=$sameGallery, sameBot=$sameBot, gap=$gap): $rows",success)
                 assertTrue(pref(to).getBoolean("is_running", false))

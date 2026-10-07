@@ -1,0 +1,390 @@
+{
+  "version": "1.6.1",
+  "version_code": 185,
+  "previous_formal": "1.6.0 (code183)",
+  "artifact": {
+    "name": "완장봇_v1.6.1.apk",
+    "bytes": 13420706,
+    "sha256": "2379a720321da4c5ee99cab910051fd290201cbc18f7220c1abbbb284003738e",
+    "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f"
+  },
+  "jvm": {
+    "Debug": {
+      "tests": 699,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 699,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "Debug": {
+      "errors": 0,
+      "warnings": 52
+    },
+    "Release": {
+      "errors": 0,
+      "warnings": 47
+    }
+  },
+  "android_instrumentation": {
+    "24": {
+      "api": "24",
+      "classes": "com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest",
+      "passed": true,
+      "declared": 16,
+      "completed": 16,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "8ccca8435dfe527390717485c172b72eccbdb5eea07a6fb91cfbc3a9d7f56cd9",
+      "test_apk_sha256": "db3a8e423557422e868deab4957309ab749b92194bdffa2502c306f029679f4c",
+      "evidence_directory": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/formal-api24"
+    },
+    "35": {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest",
+      "passed": true,
+      "declared": 16,
+      "completed": 16,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "8ccca8435dfe527390717485c172b72eccbdb5eea07a6fb91cfbc3a9d7f56cd9",
+      "test_apk_sha256": "db3a8e423557422e868deab4957309ab749b92194bdffa2502c306f029679f4c",
+      "evidence_directory": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/formal-api35-r3"
+    }
+  },
+  "signed_update_checks": {
+    "formal-signed24-previous": {
+      "api": "24",
+      "previous": "releases/완장봇_v1.6.0.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "both_bots_preserved",
+        "light_both_jobs_started",
+        "light_running_count_two",
+        "light_running_count_one",
+        "light_all_stopped_count",
+        "dark_both_jobs_started",
+        "dark_running_count_two",
+        "dark_running_count_one",
+        "dark_all_stopped_count",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "passed": true
+    },
+    "formal-signed35-beta": {
+      "api": "35",
+      "previous": "releases/완장봇_v1.6.1-beta1.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "both_bots_preserved",
+        "light_both_jobs_started",
+        "light_running_count_two",
+        "light_running_count_one",
+        "light_all_stopped_count",
+        "dark_both_jobs_started",
+        "dark_running_count_two",
+        "dark_running_count_one",
+        "dark_all_stopped_count",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "passed": true
+    }
+  },
+  "evidence_root": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1",
+  "dex": {
+    "incoming_gate": "DEX invoke-range safety check passed: releases/완장봇_v1.6.1.apk (max ins=245, headroom=10, method=Lcom/heyheyon/armbandbot/BotDetailScreenKt$BotDetailScreen$12;.<init>)",
+    "capacity": {
+      "apk": "releases/완장봇_v1.6.1.apk",
+      "dex_count": 5,
+      "dex": [
+        {
+          "dex": "classes.dex",
+          "methods": 65466,
+          "method_headroom": 70,
+          "fields": 35009,
+          "field_headroom": 30527,
+          "classes": 17981,
+          "max_parameter_words": 175,
+          "max_words_with_receiver_upper_bound": 176,
+          "invoke_range_word_headroom_upper_bound": 79
+        },
+        {
+          "dex": "classes2.dex",
+          "methods": 15,
+          "method_headroom": 65521,
+          "fields": 0,
+          "field_headroom": 65536,
+          "classes": 14,
+          "max_parameter_words": 0,
+          "max_words_with_receiver_upper_bound": 1,
+          "invoke_range_word_headroom_upper_bound": 254
+        },
+        {
+          "dex": "classes3.dex",
+          "methods": 2145,
+          "method_headroom": 63391,
+          "fields": 547,
+          "field_headroom": 64989,
+          "classes": 175,
+          "max_parameter_words": 10,
+          "max_words_with_receiver_upper_bound": 11,
+          "invoke_range_word_headroom_upper_bound": 244
+        },
+        {
+          "dex": "classes4.dex",
+          "methods": 65380,
+          "method_headroom": 156,
+          "fields": 22449,
+          "field_headroom": 43087,
+          "classes": 7971,
+          "max_parameter_words": 244,
+          "max_words_with_receiver_upper_bound": 245,
+          "invoke_range_word_headroom_upper_bound": 10
+        },
+        {
+          "dex": "classes5.dex",
+          "methods": 13591,
+          "method_headroom": 51945,
+          "fields": 4761,
+          "field_headroom": 60775,
+          "classes": 1706,
+          "max_parameter_words": 22,
+          "max_words_with_receiver_upper_bound": 23,
+          "invoke_range_word_headroom_upper_bound": 232
+        }
+      ],
+      "minimum_method_headroom": 70,
+      "minimum_field_headroom": 30527,
+      "maximum_parameter_words": 244,
+      "maximum_words_with_receiver_upper_bound": 245
+    }
+  },
+  "prior_test_attempts": [
+    {
+      "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/formal-api35",
+      "result": "15 passed / 1 failed: start dispatch exceeded fixed 750ms wait under emulator load"
+    },
+    {
+      "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/formal-api35-r2",
+      "result": "15 passed / 1 failed: same-bot test captured preceding job before STOP dispatch"
+    }
+  ],
+  "test_timing_resolution": "Wait for a new job distinct from the preceding generation, then require the same service and job to remain alive for 750ms. Production APK unchanged. Both API24/35 full suites passed with this test.",
+  "changes": [
+    "중지 직후 시작 요청이 들어오면 기존 종료 요청이 새 봇 서비스를 종료하지 않도록 수정",
+    "실행 상태 저장값 변경을 목록·상세 스위치 및 실행 수에 반영",
+    "봇 ID 기준 목록·상세 상태 분리 및 재정렬 후 드래그 위치 갱신",
+    "제품 호출자가 없는 스냅샷 큐와 워커 제거(실제 스냅샷 저장 경로 변경 없음)"
+  ],
+  "not_performed": [
+    "실서버 게시·삭제·차단·끌올·탭 이동을 통한 동작 검증",
+    "로그인한 관리자 계정의 봇 장시간 운용",
+    "물리 Android 기기 검증"
+  ],
+  "test_scope": "API24/35 격리 SDK 에뮬레이터. debug instrumentation과 signed release APK native UI/update 검증을 구분한다. 서비스 재시작은 예약 대기 상태로 재현하여 네트워크·서버 조치 없이 검사했다.",
+  "release_date": "2026-10-08",
+  "beta_commit": "e1f7f410eb29d95b394eb01052b28a032948ba8e",
+  "drive": {
+    "staging": {
+      "status": "uploaded",
+      "folder": {
+        "id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+        "name": "완장봇(개발중)",
+        "mimeType": "application/vnd.google-apps.folder",
+        "webViewLink": "https://drive.google.com/drive/folders/1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+      },
+      "local": {
+        "path": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.6.1.apk",
+        "size": 13420706,
+        "sha256": "2379a720321da4c5ee99cab910051fd290201cbc18f7220c1abbbb284003738e"
+      },
+      "uploaded": {
+        "id": "1MvowyPIuRrDLlx2t96jO1gOE0qhFvGzD",
+        "name": "완장봇_v1.6.1.apk",
+        "mimeType": "application/vnd.android.package-archive",
+        "parents": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1MvowyPIuRrDLlx2t96jO1gOE0qhFvGzD/view?usp=drivesdk",
+        "modifiedTime": "2026-10-07T15:07:24.148Z",
+        "md5Checksum": "350144bc7c78c516f2a22dd5da04b991",
+        "size": "13420706"
+      },
+      "downloaded": {
+        "path": null,
+        "size": 13420706,
+        "sha256": "2379a720321da4c5ee99cab910051fd290201cbc18f7220c1abbbb284003738e"
+      },
+      "size_matches": true,
+      "parent_matches": true,
+      "download_sha_matches": true,
+      "existing_exact_name_before": 0
+    },
+    "formal": {
+      "metadata": {
+        "id": "1MvowyPIuRrDLlx2t96jO1gOE0qhFvGzD",
+        "name": "완장봇_v1.6.1.apk",
+        "trashed": false,
+        "parents": [
+          "1zyy7Yl8nmAge83JOaFBONm438432rxA3"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1MvowyPIuRrDLlx2t96jO1gOE0qhFvGzD/view?usp=drivesdk",
+        "md5Checksum": "350144bc7c78c516f2a22dd5da04b991",
+        "size": "13420706"
+      },
+      "download_sha256": "2379a720321da4c5ee99cab910051fd290201cbc18f7220c1abbbb284003738e",
+      "bytes_match": true,
+      "parent_matches": true
+    },
+    "previous_formal_archived": {
+      "metadata": {
+        "id": "1xU0t_13B1gCtMF3Wm3NEYntE5RJ9eVAr",
+        "name": "완장봇_v1.6.0.apk",
+        "trashed": false,
+        "parents": [
+          "1yuw4n3wGyMcJxjq-S14z1HjaVQCK-Cj1"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1xU0t_13B1gCtMF3Wm3NEYntE5RJ9eVAr/view?usp=drivesdk",
+        "md5Checksum": "413d87708e98426097c7e3ccfe99f7a7",
+        "size": "13420706"
+      },
+      "download_sha256": "65582967c63919a038c3fa58318294db79ddca70b6421e0850195b7a2c84ef8d",
+      "bytes_match": true,
+      "parent_matches": true
+    }
+  },
+  "docs": {
+    "manual_url": "https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit",
+    "guide_url": "https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit",
+    "structural_verification": {
+      "manual": {
+        "tabs": [
+          {
+            "id": "t.0",
+            "title": "매뉴얼",
+            "images": 20
+          },
+          {
+            "id": "t.qvnp48gaes2n",
+            "title": "패치노트",
+            "images": 0
+          }
+        ],
+        "preserved": true,
+        "date_chip": {
+          "dateId": "kix.9z2hoch0zip9",
+          "textStyle": {},
+          "dateElementProperties": {
+            "timestamp": "2026-10-08T00:00:00Z",
+            "locale": "ko",
+            "dateFormat": "DATE_FORMAT_ISO8601",
+            "timeFormat": "TIME_FORMAT_DISABLED",
+            "displayText": "2026-10-08"
+          }
+        }
+      },
+      "guide": {
+        "tabs": [
+          {
+            "id": "t.0",
+            "title": "Tab 1",
+            "images": 7
+          }
+        ],
+        "preserved": true
+      }
+    },
+    "visual_verification": {
+      "passed": true,
+      "manual_pages_reviewed": [
+        2,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "guide_pages_reviewed": [
+        1
+      ],
+      "manual_total_pages": 44,
+      "guide_total_pages": 6,
+      "observations": [
+        "1.6.1 기준 버전과 날짜 2026-10-08이 정확히 표시됨",
+        "새 패치 제목과 본문 계층/간격 정상",
+        "기존 패치 흐름에 잘림/겹침/빈 bullet 없음",
+        "매뉴얼·가이드 기존 사진/안내/링크 배치 유지"
+      ],
+      "pdf_sha256": {
+        "manual": "904946e204ce2a73362289578d84fd6fcff1de0266ddb3ca8f95334836bc0697",
+        "guide": "18545b8a42f6ab8589007d4739eada312324dfbc4a588bbd19f4048485efaf6f"
+      }
+    }
+  },
+  "restart_cases": {
+    "formal-api35-r3": {
+      "passed": true,
+      "restart_cases": 24,
+      "handoff_combinations": 20
+    },
+    "formal-api24": {
+      "passed": true,
+      "restart_cases": 24,
+      "handoff_combinations": 20
+    }
+  },
+  "native_ui_visual_verification": {
+    "passed": true,
+    "scope": "최종 signed 1.6.1 APK 화면 직접 확인",
+    "api35": [
+      "light-one-running.png",
+      "light-detail-restarted.png",
+      "dark-two-running.png",
+      "dark-detail-restarted.png"
+    ],
+    "api24": [
+      "light-two-running.png",
+      "light-detail-restarted.png",
+      "dark-two-running.png",
+      "dark-detail-restarted.png"
+    ],
+    "observations": [
+      "1.6.1 버전 표시 확인",
+      "목록 실행 수/스위치 상태 일치",
+      "상세 재시작 후 예약 대기와 스위치 켜짐 유지",
+      "두 테마의 주요 화면 레이아웃 유지"
+    ]
+  }
+}
