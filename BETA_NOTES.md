@@ -8,6 +8,8 @@
 - [정식 APK 다운로드](https://drive.google.com/file/d/1MvowyPIuRrDLlx2t96jO1gOE0qhFvGzD/view?usp=drivesdk) · [매뉴얼/패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit). 문서 기준 버전과 새 패치노트를 갱신하고 기존 내용·사진·스타일 보존 및 PDF를 확인했습니다.
 - 검증 원장: `releases/완장봇_v1.6.1_검증.json`. 정식 검증 중 발견한 검사 타이밍 문제 2건은 테스트 보완 후 양 API 전체 재검증을 통과했습니다. 실서버 조치·로그인 계정 장시간 운영·물리 기기 검증은 하지 않았습니다.
 
+- 갤러리 공지는 첫 등록 클릭 후 브라우저가 응답하지 않아 완료하지 못했습니다. 별도 공개 목록에서 새 글이 없는 것을 확인했으며, 중복 등록하지 않고 작성 화면의 확인창 확인을 기다리고 있습니다. Drive·Docs·GitHub 정식 반영은 완료했습니다.
+
 ## 1.6.1-beta1
 
 - 봇을 끈 직후 같은 봇이나 다른 봇을 켰을 때 실행되지 않던 문제를 수정했습니다.

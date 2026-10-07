@@ -386,5 +386,19 @@
       "상세 재시작 후 예약 대기와 스위치 켜짐 유지",
       "두 테마의 주요 화면 레이아웃 유지"
     ]
+  },
+  "git": {
+    "release_commit": "0023c9b74c23a512b46df23a3eb4a7253101b782",
+    "tag": "v1.6.1",
+    "history_preserved": true,
+    "transport": "Git data API exact-object import after git push server 500; release ref creation/master fast-forward(force=false), annotated tag normal git push",
+    "remote_verified": true
+  },
+  "announcement": {
+    "requested": true,
+    "complete": false,
+    "state": "first submit click stalled browser; independent public list has no new post; awaiting visible dialog details from user",
+    "draft_evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/announcement/body.txt",
+    "post_id": null
   }
 }
