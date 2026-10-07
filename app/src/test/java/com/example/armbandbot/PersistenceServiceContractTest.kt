@@ -123,7 +123,7 @@ class PersistenceServiceContractTest {
         val registerIndex = service.indexOf("activeBots[botId] = job")
         val startIndex = service.indexOf("job.start()", registerIndex)
         val runLoopFunctionIndex = service.indexOf("private suspend fun CoroutineScope.runBotLoop(")
-        val initializationIndex = service.indexOf("GlobalBotState.startSnapshotWorker(this)", runLoopFunctionIndex)
+        val initializationIndex = service.indexOf("GlobalBotState.initDb(this@BotService)", runLoopFunctionIndex)
         val enteredIndex = service.indexOf("runLoopEnteredJobs[botId] = currentJob", initializationIndex)
         val acknowledgeIndex = service.indexOf("acknowledgeRestoreSuccess(botId)", enteredIndex)
         val loopIndex = service.indexOf("while (isActive)", acknowledgeIndex)

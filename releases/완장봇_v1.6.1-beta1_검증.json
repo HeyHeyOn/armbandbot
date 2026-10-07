@@ -1,0 +1,222 @@
+{
+  "version": "1.6.1-beta1",
+  "version_code": 184,
+  "previous_formal": "1.6.0 (code183)",
+  "artifact": {
+    "name": "완장봇_v1.6.1-beta1.apk",
+    "bytes": 13420718,
+    "sha256": "f99efade973572e38316d96e310fc89910c508d1706d9b0d0a434017ba264f00",
+    "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f"
+  },
+  "jvm": {
+    "Debug": {
+      "tests": 699,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 699,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "Debug": {
+      "errors": 0,
+      "warnings": 52
+    },
+    "Release": {
+      "errors": 0,
+      "warnings": 47
+    }
+  },
+  "android_instrumentation": {
+    "24": {
+      "api": "24",
+      "classes": "com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest",
+      "passed": true,
+      "declared": 16,
+      "completed": 16,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "90e08fb527ec29aefa4e8a6676737d128908fe633cdb41aaaf995c0776361a30"
+    },
+    "35": {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest",
+      "passed": true,
+      "declared": 16,
+      "completed": 16,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "90e08fb527ec29aefa4e8a6676737d128908fe633cdb41aaaf995c0776361a30"
+    }
+  },
+  "signed_update_checks": {
+    "beta1-signed24-r5": {
+      "api": "24",
+      "previous": "releases/완장봇_v1.6.0.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "both_bots_preserved",
+        "light_both_jobs_started",
+        "light_running_count_two",
+        "light_running_count_one",
+        "light_all_stopped_count",
+        "dark_both_jobs_started",
+        "dark_running_count_two",
+        "dark_running_count_one",
+        "dark_all_stopped_count",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "passed": true
+    },
+    "beta1-signed35-r2": {
+      "api": "35",
+      "previous": "releases/완장봇_v1.6.0.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "both_bots_preserved",
+        "light_both_jobs_started",
+        "light_running_count_two",
+        "light_running_count_one",
+        "light_all_stopped_count",
+        "dark_both_jobs_started",
+        "dark_running_count_two",
+        "dark_running_count_one",
+        "dark_all_stopped_count",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "passed": true
+    }
+  },
+  "evidence_root": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1",
+  "dex": {
+    "incoming_gate": "DEX invoke-range safety check passed: releases/완장봇_v1.6.1-beta1.apk (max ins=245, headroom=10, method=Lcom/heyheyon/armbandbot/BotDetailScreenKt$BotDetailScreen$12;.<init>)",
+    "capacity": {
+      "apk": "releases/완장봇_v1.6.1-beta1.apk",
+      "dex_count": 5,
+      "dex": [
+        {
+          "dex": "classes.dex",
+          "methods": 65466,
+          "method_headroom": 70,
+          "fields": 35009,
+          "field_headroom": 30527,
+          "classes": 17981,
+          "max_parameter_words": 175,
+          "max_words_with_receiver_upper_bound": 176,
+          "invoke_range_word_headroom_upper_bound": 79
+        },
+        {
+          "dex": "classes2.dex",
+          "methods": 15,
+          "method_headroom": 65521,
+          "fields": 0,
+          "field_headroom": 65536,
+          "classes": 14,
+          "max_parameter_words": 0,
+          "max_words_with_receiver_upper_bound": 1,
+          "invoke_range_word_headroom_upper_bound": 254
+        },
+        {
+          "dex": "classes3.dex",
+          "methods": 2145,
+          "method_headroom": 63391,
+          "fields": 547,
+          "field_headroom": 64989,
+          "classes": 175,
+          "max_parameter_words": 10,
+          "max_words_with_receiver_upper_bound": 11,
+          "invoke_range_word_headroom_upper_bound": 244
+        },
+        {
+          "dex": "classes4.dex",
+          "methods": 65380,
+          "method_headroom": 156,
+          "fields": 22449,
+          "field_headroom": 43087,
+          "classes": 7971,
+          "max_parameter_words": 244,
+          "max_words_with_receiver_upper_bound": 245,
+          "invoke_range_word_headroom_upper_bound": 10
+        },
+        {
+          "dex": "classes5.dex",
+          "methods": 13591,
+          "method_headroom": 51945,
+          "fields": 4761,
+          "field_headroom": 60775,
+          "classes": 1706,
+          "max_parameter_words": 22,
+          "max_words_with_receiver_upper_bound": 23,
+          "invoke_range_word_headroom_upper_bound": 232
+        }
+      ],
+      "minimum_method_headroom": 70,
+      "minimum_field_headroom": 30527,
+      "maximum_parameter_words": 244,
+      "maximum_words_with_receiver_upper_bound": 245
+    }
+  },
+  "changes": [
+    "중지 직후 시작 요청이 들어오면 기존 종료 요청이 새 봇 서비스를 종료하지 않도록 수정",
+    "실행 상태 저장값 변경을 목록·상세 스위치 및 실행 수에 반영",
+    "봇 ID 기준 목록·상세 상태 분리 및 재정렬 후 드래그 위치 갱신",
+    "제품 호출자가 없는 스냅샷 큐와 워커 제거(실제 스냅샷 저장 경로 변경 없음)"
+  ],
+  "not_performed": [
+    "실서버 게시·삭제·차단·끌올·탭 이동을 통한 동작 검증",
+    "로그인한 관리자 계정의 봇 장시간 운용",
+    "물리 Android 기기 검증"
+  ],
+  "test_scope": "API24/35 격리 SDK 에뮬레이터. debug instrumentation과 signed release APK native UI/update 검증을 구분한다. 서비스 재시작은 예약 대기 상태로 재현하여 네트워크·서버 조치 없이 검사했다.",
+  "drive": {
+    "apk": {
+      "id": "1wBNiNUAFDmmaKVO77U6m5YCbSzBuMqH4",
+      "name": "완장봇_v1.6.1-beta1.apk",
+      "size": 13420718,
+      "parents": [
+        "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+      ],
+      "url": "https://drive.google.com/file/d/1wBNiNUAFDmmaKVO77U6m5YCbSzBuMqH4/view?usp=drivesdk",
+      "downloaded_sha256": "f99efade973572e38316d96e310fc89910c508d1706d9b0d0a434017ba264f00"
+    },
+    "guide": {
+      "id": "1v5b5GugcuqWZ4loMGg4DSr-35nlliJWI",
+      "name": "완장봇_v1.6.1-beta1_사용안내.txt",
+      "size": 1626,
+      "parents": [
+        "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+      ],
+      "url": "https://drive.google.com/file/d/1v5b5GugcuqWZ4loMGg4DSr-35nlliJWI/view?usp=drivesdk",
+      "downloaded_sha256": "cc167ca57045b06bfb26566e59662f5a51a01603f56b22b1769506eb8b49fc89"
+    }
+  },
+  "branch": "feature/1.6.1-beta1",
+  "base_commit": "60cdcb716fa91b9ffa8c6c17d5f47e17762382b8"
+}

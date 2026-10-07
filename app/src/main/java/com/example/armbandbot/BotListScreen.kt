@@ -209,7 +209,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     Icon(Icons.Filled.HelpOutline, contentDescription = "도움말", tint = colors.accent)
                 }
             }
-            val runningCount = botIds.count { id -> context.getSharedPreferences("bot_prefs_$id", Context.MODE_PRIVATE).getBoolean("is_running", false) }
+            val runningCount = rememberRunningBotCount(context, botIds.toList())
             Text(
                 if (botIds.isEmpty()) "아직 만든 봇이 없습니다" else "봇 ${botIds.size}개 · 실행 중 ${runningCount}개",
                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = subTextColor,
@@ -237,7 +237,7 @@ fun BotListScreen(onNavigateToSettings: (String) -> Unit, onThemeToggle: (Boolea
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 8.dp)
                 ) {
-                    items(botIds.size) { index ->
+                    items(botIds.size, key = { botIds[it] }) { index ->
                         val botId = botIds[index]
                         BotListItem(
                             index = index,
@@ -466,7 +466,7 @@ fun BotListItem(
 
     val botPref = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
     val botName = botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇"
-    var isRunning by remember { mutableStateOf(botPref.getBoolean("is_running", false)) }
+    var isRunning by rememberBotRunning(botPref)
     var nowEpochMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -485,6 +485,7 @@ fun BotListItem(
     val dividerColor = colors.divider
     val status = BotRunStatus(statusText, botRunTone(statusText, isLoggedIn))
 
+    val currentIndex by rememberUpdatedState(index)
     val isDragging = draggingIndex == index
     val yOffset = if (isDragging) with(LocalDensity.current) { dragDy.toDp() } else 0.dp
     val zIndex = if (isDragging) 1f else 0f
@@ -532,7 +533,7 @@ fun BotListItem(
             modifier = Modifier.fillMaxWidth().offset { androidx.compose.ui.unit.IntOffset(swipeOffset.value.roundToInt(), 0) }
                 .pointerInput(Unit) {
                     detectDragGesturesAfterLongPress(
-                        onDragStart = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onDragStart(index) },
+                        onDragStart = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onDragStart(currentIndex) },
                         onDragEnd = { onDragEnd() }, onDragCancel = { onDragEnd() },
                         onDrag = { change, dragAmount -> change.consume(); onDrag(dragAmount.y) }
                     )

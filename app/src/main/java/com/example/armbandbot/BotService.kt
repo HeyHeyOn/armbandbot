@@ -86,6 +86,8 @@ class BotService : Service() {
     private val remoteListClient = RemoteListClient()
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private val activeBots = ConcurrentHashMap<String, Job>()
+    // Main-thread lifecycle state; includes STOP intents as well as START intents.
+    private var latestStartId = 0
     private val runLoopEnteredJobs = ConcurrentHashMap<String, Job>()
     private val aiBatchQueues = ConcurrentHashMap<String, AiBatchQueue>()
     private val aiBatchResults = ConcurrentHashMap<String, ConcurrentHashMap<PostKey, AiBatchResult>>()
@@ -652,13 +654,15 @@ class BotService : Service() {
 
     private fun stopServiceWhenNoActiveBots(botId: String) {
         if (activeBots.isNotEmpty()) return
+        // Android also knows about START requests still queued for onStartCommand.
+        // An older STOP must not tear down their service or foreground notification.
+        if (!stopSelfResult(latestStartId)) return
         sendLog("[복구 점검] 남은 활성 Job 없음, 서비스 종료 절차 진행", botId)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {
             stopForeground(true)
         }
-        stopSelf()
     }
 
     private fun finalizeBot(
@@ -746,7 +750,7 @@ class BotService : Service() {
         val aiCommentPlans = pendingAiCommentPlans[botId]?.size ?: 0
         val spamEvents = spamBurstRecentEvents.values.sumOf { it.size }
         val inMemoryLogs = GlobalBotState.logs[botId]?.size ?: 0
-        sendLog("[헬스] mem=${usedMb}/${totalMb}MB max=${maxMb}MB / threads=$threadCount / activeBots=${activeBots.size} / snapshotQueue=${GlobalBotState.getSnapshotQueuePending()} / aiResults=$aiResults / aiPlans=${aiPostPlans + aiCommentPlans} / spamEvents=$spamEvents / logs=$inMemoryLogs", botId)
+        sendLog("[헬스] mem=${usedMb}/${totalMb}MB max=${maxMb}MB / threads=$threadCount / activeBots=${activeBots.size} / aiResults=$aiResults / aiPlans=${aiPostPlans + aiCommentPlans} / spamEvents=$spamEvents / logs=$inMemoryLogs", botId)
 
         val lastGc = runtimeProtectionLastGcAt[botId] ?: 0L
         if (now - lastGc > runtimeProtectionGcIntervalMs && usedMb > maxMb * 0.70) {
@@ -768,6 +772,7 @@ class BotService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        latestStartId = startId
         try {
             val notification = buildForegroundNotification()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -783,7 +788,7 @@ class BotService : Service() {
             val botIdForCrash = intent?.getStringExtra("BOT_ID") ?: "SYSTEM"
             markStartupPhase(botIdForCrash, "startForeground_failed", e.javaClass.simpleName + ": " + (e.message ?: ""))
             runCatching { sendLog("[시작 보호] startForeground 실패: ${e.javaClass.simpleName} / ${e.message ?: "알 수 없는 오류"}", botIdForCrash) }
-            stopSelf()
+            stopSelfResult(startId)
             return START_NOT_STICKY
         }
 
@@ -1399,7 +1404,6 @@ class BotService : Service() {
     ) {
         var currentCookie = cookie.ifBlank { botPref.getString("saved_cookie", "") ?: "" }
         GlobalBotState.initDb(this@BotService)
-        GlobalBotState.startSnapshotWorker(this)
         sendLog("[복구 점검] runBotLoop 시작 완료", botId)
         val currentJob = RuntimeRequestGate.requireCurrent().owner
         if (activeBots[botId] !== currentJob) {

@@ -1,3 +1,9 @@
+## 1.6.1-beta1
+
+- 봇을 끈 직후 같은 봇이나 다른 봇을 켰을 때 실행되지 않던 문제를 수정했습니다.
+- 목록·상세 화면의 실행 스위치와 실행 중인 봇 수가 변경된 상태를 반영하고, 목록 순서를 바꿔도 봇별 실행 상태를 유지합니다.
+- [APK 다운로드](https://drive.google.com/file/d/1wBNiNUAFDmmaKVO77U6m5YCbSzBuMqH4/view?usp=drivesdk) · [사용 안내](https://drive.google.com/file/d/1v5b5GugcuqWZ4loMGg4DSr-35nlliJWI/view?usp=drivesdk)
+
 ## 1.6.0 정식 배포 완료
 
 - 1.5.3 이후 정식판 변경: 봇 화면 하단 탭(홈·필터·자동화·로그·설정)과 홈 요약, 예약 끌올·자동 탭 분류, 목록별 원격 목록 연결, 금지어·유동 필터 켜기/끄기, 전체 디자인·다크 모드 정리.

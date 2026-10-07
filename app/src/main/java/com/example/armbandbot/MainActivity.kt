@@ -99,44 +99,6 @@ object GlobalBotState {
     private val generalSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val blockSnapshotInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
-    // 스냅샷 큐 워커: 장시간 운용 중 무제한 누적을 막기 위해 보수적으로 제한
-    private const val MAX_SNAPSHOT_QUEUE_PENDING = 80
-    private val snapshotPendingCount = java.util.concurrent.atomic.AtomicInteger(0)
-    private val snapshotChannel = kotlinx.coroutines.channels.Channel<suspend () -> Unit>(
-        capacity = MAX_SNAPSHOT_QUEUE_PENDING
-    )
-    private var snapshotWorkerStarted = false
-
-    fun enqueueSnapshot(task: suspend () -> Unit): Boolean {
-        val pending = snapshotPendingCount.incrementAndGet()
-        if (pending > MAX_SNAPSHOT_QUEUE_PENDING) {
-            snapshotPendingCount.decrementAndGet()
-            return false
-        }
-        val result = snapshotChannel.trySend(task)
-        if (result.isFailure) snapshotPendingCount.decrementAndGet()
-        return result.isSuccess
-    }
-
-    fun getSnapshotQueuePending(): Int = snapshotPendingCount.get().coerceAtLeast(0)
-
-    fun startSnapshotWorker(scope: kotlinx.coroutines.CoroutineScope) {
-        if (snapshotWorkerStarted) return
-        snapshotWorkerStarted = true
-        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            for (task in snapshotChannel) {
-                try {
-                    task()
-                } catch (e: Exception) {
-                    // 스냅샷 실패해도 큐 계속 처리
-                } finally {
-                    snapshotPendingCount.decrementAndGet()
-                }
-                kotlinx.coroutines.delay(2000L)
-            }
-        }
-    }
-
     fun tryLockGeneralSnapshot(scopeId: String, actorBotId: String, gallType: String, gallId: String, postNum: String): Boolean {
         return generalSnapshotInProgress.add(snapshotLockKey(scopeId, actorBotId, gallType, gallId, postNum))
     }
@@ -693,12 +655,14 @@ fun MainApp() {
                     }
                 )
                 "SETTINGS" -> if (currentBotId != null) {
-                    BotDetailScreen(
-                        botId = currentBotId!!,
-                        openBlockLogTrigger = openBlockLogTrigger,
-                        onTriggerConsumed = { openBlockLogTrigger = false },
-                        onBack = { currentScreen = "LOBBY" }
-                    )
+                    key(currentBotId) {
+                        BotDetailScreen(
+                            botId = currentBotId!!,
+                            openBlockLogTrigger = openBlockLogTrigger,
+                            onTriggerConsumed = { openBlockLogTrigger = false },
+                            onBack = { currentScreen = "LOBBY" }
+                        )
+                    }
                 }
             }
         }

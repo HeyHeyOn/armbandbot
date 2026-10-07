@@ -588,7 +588,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
         }
 
         val logMessages = GlobalBotState.logs.getOrPut(botId) { mutableStateListOf() }
-        var isRunning by remember { mutableStateOf(botPref.getBoolean("is_running", false)) }
+        var isRunning by rememberBotRunning(botPref)
 
         var showEditNameDialog by remember { mutableStateOf(false) }
         var newBotNameInput by remember { mutableStateOf(botName) }
