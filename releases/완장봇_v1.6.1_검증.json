@@ -396,9 +396,25 @@
   },
   "announcement": {
     "requested": true,
-    "complete": false,
-    "state": "first submit click stalled browser; independent public list has no new post; awaiting visible dialog details from user",
-    "draft_evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/announcement/body.txt",
-    "post_id": null
+    "complete": true,
+    "state": "published anonymously, moved only post 298 from General to Patch, logged-out public title/body/author and Patch-list delta verified",
+    "post_id": 298,
+    "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=298",
+    "category": "Patch",
+    "headtext": 10,
+    "anonymous": true,
+    "body_matches_approved_draft": true,
+    "body_links": 0,
+    "logged_out_public_verified": true,
+    "existing_patch_posts_preserved": 24,
+    "patch_list_delta": {
+      "added": [
+        "298"
+      ],
+      "removed": []
+    },
+    "verified_at": "2026-10-08T06:36:28.497Z",
+    "acceptance_evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/announcement/acceptance.json",
+    "screenshot_evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.6.1/announcement/public-patch-proof.png"
   }
 }
