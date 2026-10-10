@@ -309,17 +309,30 @@
     "실제 IP/계정 이용 제한(차단) 조치"
   ],
   "announcement": {
-    "requested": true,
-    "complete": false,
+    "version": "1.6.2",
     "post_id": 302,
     "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=302",
-    "title": "1.6.2",
-    "anonymous": true,
-    "created_general_verified": true,
-    "body_verified": true,
-    "category_change": "General → Patch confirmation pending",
-    "state": "Posted once. Browser documented dialog API cannot detect the native category confirmation. User action requested; do not resubmit or repeat category click before server readback.",
-    "existing_patch_count_before": 25
+    "status": "complete",
+    "anonymous_author": "완갤러",
+    "category_transition": [
+      "일반",
+      "패치"
+    ],
+    "title_body_unchanged": true,
+    "body_links": 0,
+    "logged_out_readback": true,
+    "previous_patch_entries_preserved": true,
+    "previous_patch_count": 25,
+    "patch_count_after": 26,
+    "patch_added_ids": [
+      302
+    ],
+    "method": "UI anonymous post; independent first-party authenticated official category endpoint fallback after native confirm stalled; no browser session extraction",
+    "temporary_http_session_persisted": false,
+    "browser_admin_logged_out": true,
+    "verified_at": "2026-10-10T11:40:46.421Z",
+    "requested": true,
+    "complete": true
   },
   "runner_cleanup_notes": [
     "Formal signed24 completed all22 checks and wrote passed=true, then wrapper returned143 during shutdown. Emulator absence and guest removal verified. Signed35 launched separately with emulator process-session isolation. Product APK unchanged.",
