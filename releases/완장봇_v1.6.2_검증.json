@@ -309,9 +309,17 @@
     "실제 IP/계정 이용 제한(차단) 조치"
   ],
   "announcement": {
-    "requested": false,
+    "requested": true,
     "complete": false,
-    "state": "Optional 1.6.2 gallery announcement question has no user response; no post made. Draft prepared locally. Prior1.6.1 approval is not reused."
+    "post_id": 302,
+    "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=302",
+    "title": "1.6.2",
+    "anonymous": true,
+    "created_general_verified": true,
+    "body_verified": true,
+    "category_change": "General → Patch confirmation pending",
+    "state": "Posted once. Browser documented dialog API cannot detect the native category confirmation. User action requested; do not resubmit or repeat category click before server readback.",
+    "existing_patch_count_before": 25
   },
   "runner_cleanup_notes": [
     "Formal signed24 completed all22 checks and wrote passed=true, then wrapper returned143 during shutdown. Emulator absence and guest removal verified. Signed35 launched separately with emulator process-session isolation. Product APK unchanged.",

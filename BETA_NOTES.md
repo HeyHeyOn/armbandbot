@@ -7,6 +7,8 @@
 - [정식 APK 다운로드](https://drive.google.com/file/d/19NFkjqC2RWkFs3OSfvzvZ_RanzzTx7-0/view?usp=drivesdk) · [매뉴얼/패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit). 문서 내용·서식·사진 보존과 PDF를 확인했고, 이전 1.6.1은 구버전으로 보관했습니다.
 - APK SHA256: `0385f14e67f473c1171f1f18b03d223224d37d1173f4ff08a69a358c4985443b` (정식 Drive 재다운로드본 일치). 상세 결과: `releases/완장봇_v1.6.2_검증.json`.
 
+- [완장봇 갤러리 공지](https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=302): 익명 일반글로 등록하고 제목·본문을 확인했습니다. 패치 말머리 변경은 브라우저 확인창에서 사용자 확인을 기다리고 있습니다. 재등록하지 않습니다.
+
 ## 1.6.2-beta1
 
 - ID/IP 목록·필터 사용 여부를 바꾼 뒤 기존 글과 댓글을 다시 검사하지 않던 문제를 수정했습니다. 화이트리스트나 처리 방식 변경도 현재 탐색 범위에 반영됩니다.
