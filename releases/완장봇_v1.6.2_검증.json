@@ -310,10 +310,12 @@
   ],
   "announcement": {
     "requested": false,
-    "complete": false
+    "complete": false,
+    "state": "Optional 1.6.2 gallery announcement question has no user response; no post made. Draft prepared locally. Prior1.6.1 approval is not reused."
   },
   "runner_cleanup_notes": [
-    "Formal signed24 completed all22 checks and wrote passed=true, then wrapper returned143 during shutdown. Emulator absence and guest removal verified. Signed35 launched separately with emulator process-session isolation. Product APK unchanged."
+    "Formal signed24 completed all22 checks and wrote passed=true, then wrapper returned143 during shutdown. Emulator absence and guest removal verified. Signed35 launched separately with emulator process-session isolation. Product APK unchanged.",
+    "Standalone signed35 runner with emulator session isolation exited0 after all22 checks; no guest remained."
   ],
   "release_date": "2026-10-10",
   "beta_commit": "dacd95cffb745e8afe0e856b4a75579353805e2e",
@@ -502,5 +504,12 @@
       }
     }
   },
-  "git_publication": "Prepared for release branch/master fast-forward and existing annotated-tag convention; exact source commit is recorded after publication."
+  "git": {
+    "release_commit": "b69fe21d6a623675e41fc9c79dc0790bf26a6079",
+    "tag": "v1.6.2",
+    "tag_target": "b69fe21d6a623675e41fc9c79dc0790bf26a6079",
+    "history_preserved": true,
+    "release_and_master_atomic_push": true,
+    "remote_source_commit_verified": true
+  }
 }
