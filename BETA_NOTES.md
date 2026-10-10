@@ -1,3 +1,12 @@
+## 1.6.2 정식 배포 완료
+
+- ID/IP 목록·필터 사용 여부·화이트리스트·처리 방식 변경 후 현재 탐색 범위의 기존 글과 댓글을 다시 검사하도록 수정했습니다. 설정이 그대로인 주기의 반복 상세 조회는 방지합니다.
+- versionCode 187 / versionName 1.6.2. 검증된 beta1의 전체 이력을 보존하고 기능 코드 변경 없이 승격했습니다.
+- Debug·Release JVM 각 705개, lint 오류 0, Android 7·15 계측 각 17개, 서명 APK 업데이트 각 22개 통과. 1.6.1→정식(API24)과 beta1→정식(API35)의 설정·DB 행·스냅샷 및 밝은·어두운 화면을 확인했습니다.
+- 같은 베타 소스의 Debug BotService로 완장봇 미니갤 테스트 탭에서 화이트리스트 보호, 보류 후 삭제 전환, 대상 댓글만 삭제·정상 댓글 보존을 검증했습니다. 소유 시험 자료는 모두 정리했습니다. 실제 이용 제한(차단), 물리 기기, 장시간 상시 운영은 검증하지 않았습니다.
+- [정식 APK 다운로드](https://drive.google.com/file/d/19NFkjqC2RWkFs3OSfvzvZ_RanzzTx7-0/view?usp=drivesdk) · [매뉴얼/패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU/edit) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE/edit). 문서 내용·서식·사진 보존과 PDF를 확인했고, 이전 1.6.1은 구버전으로 보관했습니다.
+- APK SHA256: `0385f14e67f473c1171f1f18b03d223224d37d1173f4ff08a69a358c4985443b` (정식 Drive 재다운로드본 일치). 상세 결과: `releases/완장봇_v1.6.2_검증.json`.
+
 ## 1.6.2-beta1
 
 - ID/IP 목록·필터 사용 여부를 바꾼 뒤 기존 글과 댓글을 다시 검사하지 않던 문제를 수정했습니다. 화이트리스트나 처리 방식 변경도 현재 탐색 범위에 반영됩니다.
