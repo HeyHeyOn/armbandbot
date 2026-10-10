@@ -1,3 +1,10 @@
+## 1.6.2-beta1
+
+- ID/IP 목록·필터 사용 여부를 바꾼 뒤 기존 글과 댓글을 다시 검사하지 않던 문제를 수정했습니다. 화이트리스트나 처리 방식 변경도 현재 탐색 범위에 반영됩니다.
+- 완장봇 미니갤 테스트 탭에서 실제 서비스로 보호·보류·대상 댓글 삭제·정상 댓글 보존을 확인했습니다. 시험 자료는 정리했습니다.
+- Debug·Release JVM 각 705개, Android 7·15 계측 각 17개와 서명 APK 업데이트 각 22개 검사 통과. 상세 범위는 검증 JSON을 참고하세요.
+- [APK 다운로드](https://drive.google.com/file/d/1ULoJPPO2v4KqKwpYVl_O7J8uWtfw-HKg/view?usp=drivesdk) · [사용 안내](https://drive.google.com/file/d/1rZow10qlZ7J8LYukJKYCjHGnLQtNEosw/view?usp=drivesdk)
+
 ## 1.6.1 정식 배포 완료
 
 - 봇을 끈 직후 같은 봇이나 다른 봇을 켰을 때 실행되지 않던 문제를 수정했습니다. 실행 스위치·실행 중인 봇 수와 목록 재정렬 후 상태 표시도 보완했습니다.

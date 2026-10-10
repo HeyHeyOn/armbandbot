@@ -1424,8 +1424,9 @@ class BotService : Service() {
             } catch (_: SchedulePausedException) {
                 continue
             }
-            automationRechecks.getOrPut(botId) { AutomationRecheckState() }.update(automationPolicyRevision(botPref))
-            val config = loadBotConfig(botId, botPref).copy(scanScopeId = scanScopeId)
+            val scanPreferences = snapshotScanPreferences(botPref)
+            automationRechecks.getOrPut(botId) { AutomationRecheckState() }.update(automationPolicyRevision(scanPreferences))
+            val config = loadBotConfig(botId, scanPreferences).copy(scanScopeId = scanScopeId)
             val blockDuration = config.blockDurationHours.toString()
             val blockReason = config.blockReason
             val delChk = if (config.deletePostOnBlock) "1" else "0"
@@ -1790,7 +1791,7 @@ class BotService : Service() {
                     effectiveActionIsHold = yudongDcMediaAction?.mode == ModerationActionMode.HOLD,
                     alreadyHeld = yudongDcMediaAction?.mode == ModerationActionMode.HOLD &&
                         GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
-                    otherForcedRecheck = hasPumListMarker && (config.pumBlockAllPosts || config.pumRecheckEveryCycle),
+                    otherForcedRecheck = automationRecheck || interruptedAiRetry || (hasPumListMarker && (config.pumBlockAllPosts || config.pumRecheckEveryCycle)),
                 )) {
                 if (config.isDebugMode) {
                     sendLog("[디버그][유동 디시 동영상][보류중복] 변경 없는 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
@@ -1805,7 +1806,7 @@ class BotService : Service() {
                     effectiveActionIsHold = pumBlockAllAction?.mode == ModerationActionMode.HOLD,
                     alreadyHeld = pumBlockAllAction?.mode == ModerationActionMode.HOLD &&
                         GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
-                    otherForcedRecheck = (config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker,
+                    otherForcedRecheck = automationRecheck || interruptedAiRetry || ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker),
                 )) {
                 if (config.isDebugMode) {
                     sendLog("[디버그][PUM][보류중복] 변경 없는 펌 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
@@ -1819,6 +1820,7 @@ class BotService : Service() {
                     savedCommentCount != currentCommentCount && titleChanged -> "댓글 수/제목 변경"
                     savedCommentCount != currentCommentCount -> "댓글 수 변경"
                     titleChanged -> "제목 변경"
+                    automationRecheck -> "필터·자동화 설정 재검사"
                     snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
                     config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker -> "유동 디시 동영상 필터 활성화 1회 재검사"
                     config.kkangDcMediaActivationRecheckPending && hasDcMediaListMarker -> "깡계 디시 동영상 필터 활성화 1회 재검사"
@@ -1831,6 +1833,7 @@ class BotService : Service() {
             try {
                 requireActiveScheduleForRequest(botId)
                 val postHandled = processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
+                RuntimeRequestGate.requireCurrent().check()
                 if (postHandled) automationRechecks[botId]?.mark(PostKey(gallType, gallId, postNumStr))
                 if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker && !postHandled) {
                     activationRecheckComplete = false
@@ -1841,6 +1844,8 @@ class BotService : Service() {
                 throw cancelled
             } catch (e: Exception) {
                 if (DeletedPostHandling.isDeletedOrUnavailablePost(e)) {
+                    RuntimeRequestGate.requireCurrent().check()
+                    automationRechecks[botId]?.mark(PostKey(gallType, gallId, postNumStr))
                     GlobalBotState.savePost(
                 scopeId = config.scanScopeId,
                         gallType = gallType,
