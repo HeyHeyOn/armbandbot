@@ -1,0 +1,136 @@
+{
+ "version": "1.7.0-beta2",
+ "version_code": 189,
+ "previous_version": "1.7.0-beta1",
+ "previous_commit": "d8380e4",
+ "source_commit": "1ed16771de3ff8280285ceaef0024588217e75e9",
+ "change_scope": "도배 방지 UI/UX 개편(−/+ 즉시 저장, 한 문장 요약, 감지 기준/검사 대상/개별 차단 설정 구분, 대상 없음 경고, 현재 깡계 기준 표시, 도움말 정리, 목록 아이콘 교체)과 처리 방식을 다른 필터와 같은 개별 차단 설정(삭제·차단·보류) 블록으로 통일. 반복 판정 로직은 변경 없음. 키가 없으면 기존 동작(개별 설정 켜짐·삭제, 감지 기록만 사용자는 보류) 유지.",
+ "artifacts": [
+  {
+   "name": "완장봇_v1.7.0-beta2.apk",
+   "bytes": 13469870,
+   "sha256": "0767f9445d0b7c6f9d8fcde8492e0b23cd8c16619273b9d1e04fb82fd9a4f1d1"
+  },
+  {
+   "name": "완장봇_v1.7.0-beta2_사용안내.txt",
+   "bytes": 3558,
+   "sha256": "d3103e806635fab3d686334099f7fe7f745a31a759f7f663d75eb45d4af53217"
+  }
+ ],
+ "package": {
+  "application_id": "com.heyheyon.armbandbot",
+  "version_code": 189,
+  "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f"
+ },
+ "jvm": {
+  "Debug": {
+   "tests": 744,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  "Release": {
+   "tests": 744,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  "clean_build": true,
+  "rerun_tasks": true
+ },
+ "lint": {
+  "Debug": {
+   "errors": 0,
+   "warnings": 52
+  },
+  "Release": {
+   "errors": 0,
+   "warnings": 47
+  }
+ },
+ "dex": {
+  "invoke_range_gate": "passed (max ins=240, headroom=15)",
+  "minimum_method_headroom": 70,
+  "maximum_words_with_receiver_upper_bound": 240
+ },
+ "instrumentation": [
+  {
+   "api": "35",
+   "scope": "all androidTest classes except opt-in PostAutomationServiceLiveTest",
+   "completed": 91,
+   "failed": 0,
+   "skipped": 6,
+   "skipped_tests": [
+    "ManagedGalleryTabsLiveTest.anonymousSessionCannotUsePublicTabChoices",
+    "ManagedGalleryTabsLiveTest.savedManagerSessionLoadsTabsAndSavesDisabledRule",
+    "PostAutomationLiveTest.ownedGithubJsonAndCsvUseNativeClientAndLocalKeys",
+    "PostAutomationLiveTest.ownedFixtureNativeMoveAndBumpReadbackAreNotRepeated",
+    "RepeatSpamLiveTest.ownedRepeatsDeleteIncludingFirstWhileControlAndProtectionsSurvive",
+    "UserFilterRecheckLiveTest.rechecksIdWhitelistAndHoldToDeleteOnOwnedMiniFixture"
+   ]
+  },
+  {
+   "api": "24",
+   "scope": "all androidTest classes except opt-in PostAutomationServiceLiveTest",
+   "completed": 89,
+   "failed": 0,
+   "skipped": 6,
+   "skipped_tests": [
+    "ManagedGalleryTabsLiveTest.anonymousSessionCannotUsePublicTabChoices",
+    "ManagedGalleryTabsLiveTest.savedManagerSessionLoadsTabsAndSavesDisabledRule",
+    "PostAutomationLiveTest.ownedGithubJsonAndCsvUseNativeClientAndLocalKeys",
+    "PostAutomationLiveTest.ownedFixtureNativeMoveAndBumpReadbackAreNotRepeated",
+    "RepeatSpamLiveTest.ownedRepeatsDeleteIncludingFirstWhileControlAndProtectionsSurvive",
+    "UserFilterRecheckLiveTest.rechecksIdWhitelistAndHoldToDeleteOnOwnedMiniFixture"
+   ]
+  }
+ ],
+ "signed_release_acceptance": {
+  "api35-from-1.6.2": {
+   "api": "35",
+   "apk_sha256": "0767f9445d0b7c6f9d8fcde8492e0b23cd8c16619273b9d1e04fb82fd9a4f1d1",
+   "upgrade_bot_kept": true,
+   "not_debuggable": true,
+   "no_crash": true,
+   "repeat_screen_ok": true,
+   "passed": true,
+   "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.0-beta2/signed/api35-from-1.6.2"
+  },
+  "api24-from-beta1": {
+   "api": "24",
+   "apk_sha256": "0767f9445d0b7c6f9d8fcde8492e0b23cd8c16619273b9d1e04fb82fd9a4f1d1",
+   "upgrade_bot_kept": true,
+   "not_debuggable": true,
+   "no_crash": true,
+   "repeat_screen_ok": true,
+   "passed": true,
+   "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.0-beta2/signed/api24-from-beta1"
+  }
+ },
+ "drive": {
+  "folder": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+  "apk": {
+   "id": "1A4jlKEaoW0Z9_zTK5plE-D48N39g45WD",
+   "url": "https://drive.google.com/file/d/1A4jlKEaoW0Z9_zTK5plE-D48N39g45WD/view?usp=drivesdk",
+   "size": 13469870,
+   "downloaded_sha256": "0767f9445d0b7c6f9d8fcde8492e0b23cd8c16619273b9d1e04fb82fd9a4f1d1",
+   "verified": true
+  },
+  "guide": {
+   "id": "1g5nSD5Ow1SADxuuk8eRHP7TnG7diGqc0",
+   "url": "https://drive.google.com/file/d/1g5nSD5Ow1SADxuuk8eRHP7TnG7diGqc0/view?usp=drivesdk",
+   "size": 3558,
+   "downloaded_sha256": "d3103e806635fab3d686334099f7fe7f745a31a759f7f663d75eb45d4af53217",
+   "verified": true
+  }
+ },
+ "notes": [
+  "검증 스크립트 초기 실행 2회는 스크립트의 데모 봇 이름 불일치와 목록 스크롤 누락으로 중단되어 수정 후 재실행함(앱 문제 아님).",
+  "1.6.2 화면에서 봇 이름 입력이 끝나기 전에 생성이 눌려 \"Upgra\"로 저장된 실행이 있었고, 업데이트 후에도 그대로 남아 있었음. 입력 대기 시간을 늘린 재실행에서 UpgradeBot 보존 확인."
+ ],
+ "not_performed": [
+  "실서버 반복 글 삭제·차단·보류 재시험(판정 로직은 beta1 실서버 검증과 동일, 처리 경로는 다른 필터 공용 경로)",
+  "물리 기기",
+  "장시간 운영"
+ ]
+}
