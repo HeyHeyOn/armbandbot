@@ -3590,19 +3590,17 @@ img.written_dccon{max-width:80px;max-height:80px}
                 null -> if (shouldRunAiStage) AiStageOutcome.ERROR else AiStageOutcome.SKIPPED
             },
         )
+        val baseActionConfig = resolveDefaultModerationActionConfig(config)
+        val repeatActionConfig = repeatMatch?.let { resolveRepeatSpamActionConfig(baseActionConfig, botPrefs, it.reason) }
         val repeatAction = repeatMatch.takeIf {
-            shouldApplyRepeatSpamAction(it != null, config.repeatSpam.observeOnly, moderationWinner != ModerationWinner.ALLOW)
+            shouldApplyRepeatSpamAction(it != null, repeatActionConfig?.mode == ModerationActionMode.HOLD, moderationWinner != ModerationWinner.ALLOW)
         }
         if (repeatAction != null || moderationWinner != ModerationWinner.ALLOW) {
             if (config.isDebugMode && !postAnalysis.debugDetail.isNullOrBlank()) {
                 sendLog("[디버그][게시글 차단 상세] 번호: $postNumStr / ${postAnalysis.debugDetail}", botId)
             }
             val actionPrefix = PumRuntimeRouting.actionPrefix(moderationWinner, runtimeRoute)
-            val baseActionConfig = resolveDefaultModerationActionConfig(config)
-            val routedActionConfig = if (repeatAction != null) ModerationActionConfig(
-                mode = if (config.repeatSpam.observeOnly) ModerationActionMode.HOLD else ModerationActionMode.DELETE_ONLY,
-                blockDurationHours = 0, blockReasonText = repeatAction.reason, deletePostOnBlock = true, sourceLabel = "repeat_spam",
-            ) else actionPrefix?.let { prefix ->
+            val routedActionConfig = if (repeatAction != null) checkNotNull(repeatActionConfig) else actionPrefix?.let { prefix ->
                 resolveModerationActionConfig(
                     baseConfig = baseActionConfig,
                     override = getActionOverride(prefix),
@@ -3651,7 +3649,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             if (repeatMatch != null && postBlockResult.success &&
                 (isModerationActionSuccess(postBlockResult.response) || postBlockResult.response.contains("duplicate_hold"))) {
                 repeatTracker?.complete(postKey)
-                if (repeatAction != null) sendLog("[도배 방지] ${if (config.repeatSpam.observeOnly) "감지 기록" else "삭제"} 완료 / ${repeatAction.reason}", botId)
+                if (repeatAction != null) sendLog("[도배 방지] ${when (routedActionConfig.mode) { ModerationActionMode.HOLD -> "감지 기록(보류)"; ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.BLOCK -> "차단" }} 완료 / ${repeatAction.reason}", botId)
             }
 
             if (!AiExecutionPolicy.shouldRetry(postBlockResult.success, postBlockResult.response)) {
@@ -4257,6 +4255,24 @@ img.written_dccon{max-width:80px;max-height:80px}
             deleteOnlyMode = deleteOnlyMode,
             processMode = normalizedPum?.processMode ?: rawProcessMode,
         )
+    }
+
+    /**
+     * Repeat spam follows its own 개별 차단 설정 like every other filter. Missing keys keep the pre-1.7.0-beta2
+     * behaviour (custom on, DELETE or HOLD for observe-only) instead of falling back to a possibly BLOCK default.
+     * Delete/hold records keep the detailed match reason; a block shows the user-facing reason.
+     */
+    private fun resolveRepeatSpamActionConfig(
+        baseConfig: ModerationActionConfig,
+        botPref: android.content.SharedPreferences,
+        matchReason: String,
+    ): ModerationActionConfig {
+        val custom = repeatUsesCustomAction(botPref)
+        val override = loadModerationActionOverride(botPref, REPEAT_ACTION_PREFIX)
+            .copy(enabled = custom, processMode = if (custom) repeatCustomProcessMode(botPref) else null)
+        val resolved = resolveModerationActionConfig(baseConfig, override, "repeat_spam")
+        return if (resolved.mode == ModerationActionMode.BLOCK) resolved.copy(sourceLabel = "repeat_spam")
+        else resolved.copy(blockReasonText = matchReason, sourceLabel = "repeat_spam")
     }
 
     private fun resolveModerationActionConfig(

@@ -25,11 +25,13 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
     "block_reason_text",
     "kkang_detection_mode",
     "pum_block_process_mode",
-    "pum_block_reason_text"
+    "pum_block_reason_text",
+    REPEAT_PROCESS_MODE_KEY, REPEAT_REASON_KEY
 ) + ORDERED_MULTILINE_SETTING_KEYS.map(::orderedMultilineTextKey) + REMOTE_CHANNEL_EXPORT_STRING_KEYS
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     REPEAT_ENABLED_KEY, REPEAT_OBSERVE_KEY, REPEAT_YUDONG_KEY, REPEAT_KKANG_KEY,
+    REPEAT_CUSTOM_ACTION_KEY, REPEAT_DELETE_POST_KEY,
     WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY,
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block",
@@ -46,7 +48,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
 ) + REMOTE_CHANNEL_EXPORT_BOOLEAN_KEYS
 
 internal val EXPORTABLE_INT_KEYS = listOf(
-    REPEAT_WINDOW_KEY, REPEAT_COUNT_KEY, REPEAT_SIMILARITY_KEY,
+    REPEAT_WINDOW_KEY, REPEAT_COUNT_KEY, REPEAT_SIMILARITY_KEY, REPEAT_DURATION_KEY,
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
     "run_schedule_start_minute", "run_schedule_end_minute", "remote_lists_interval_minutes"
@@ -259,7 +261,7 @@ private inline fun <T> Iterable<String>.associateWithNotNull(valueSelector: (Str
     }
 
 internal fun defaultBooleanValue(key: String): Boolean = when (key) {
-    REPEAT_YUDONG_KEY, REPEAT_KKANG_KEY -> true
+    REPEAT_YUDONG_KEY, REPEAT_KKANG_KEY, REPEAT_CUSTOM_ACTION_KEY, REPEAT_DELETE_POST_KEY -> true
     WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY -> true
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block", "is_snapshot_blocked",
@@ -276,6 +278,7 @@ internal fun defaultIntValue(key: String): Int = when (key) {
     REPEAT_WINDOW_KEY -> 10
     REPEAT_COUNT_KEY -> 4
     REPEAT_SIMILARITY_KEY -> 85
+    REPEAT_DURATION_KEY -> 6
     "block_duration_hours" -> 6
     "kkang_post_min" -> 5
     "kkang_comment_min" -> 10

@@ -1820,7 +1820,7 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
                                     FilterMasterEntry(botPref, colors, YUDONG_FILTER_ENABLED_KEY) { currentSubScreen = "YUDONG" }
                                     ModernSettingItem("해외 IP 필터", "한국 할당 대역이 아닌 유동 IP 차단", Icons.Filled.Public, colors, isOverseasIpFilterMode, { isOverseasIpFilterMode = it; botPref.edit().putBoolean("is_overseas_ip_filter_mode", it).apply() }) { currentSubScreen = "OVERSEAS_IP" }
                                     ModernSettingItem("깡계 필터", "글/댓글 수 미달 유저 차단", Icons.Filled.Info, colors, isKkangFilterMode, { isKkangFilterMode = it; botPref.edit().putBoolean("is_kkang_filter_mode", it).apply() }) { currentSubScreen = "KKANG" }
-                                    ModernSettingItem("도배 방지", "같은 작성자 정보의 반복 글만 삭제", Icons.Filled.Warning, colors, isSpamBurstProtectionEnabled, { isSpamBurstProtectionEnabled = it; botPref.edit().putBoolean(REPEAT_ENABLED_KEY, it).repeatSpamChanged().apply() }) { currentSubScreen = "SPAM_BURST" }
+                                    ModernSettingItem("도배 방지", "같은 작성자의 반복 글 삭제", Icons.Filled.Repeat, colors, isSpamBurstProtectionEnabled, { isSpamBurstProtectionEnabled = it; botPref.edit().putBoolean(REPEAT_ENABLED_KEY, it).repeatSpamChanged().apply() }) { currentSubScreen = "SPAM_BURST" }
                                 }
 
                                 SettingsSectionHeader("고급 미디어 필터", colors)

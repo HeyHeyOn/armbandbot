@@ -23,6 +23,23 @@ class RepeatSpamSettingsTest {
         assertTrue(decoded.booleans[REPEAT_YUDONG_KEY]!!); assertTrue(decoded.booleans[REPEAT_KKANG_KEY]!!)
         assertFalse(export.toJson().toString().contains(REPEAT_REVISION_KEY))
     }
+    @Test fun repeatActionSettingsRoundTrip() {
+        val p=MemoryPreferences()
+        p.edit().putBoolean(REPEAT_CUSTOM_ACTION_KEY,true).putString(REPEAT_PROCESS_MODE_KEY,"BLOCK").putInt(REPEAT_DURATION_KEY,168)
+            .putBoolean(REPEAT_DELETE_POST_KEY,false).putString(REPEAT_REASON_KEY,"도배 금지").commit()
+        val export=BotSettingsExport(botName="test",
+            strings=EXPORTABLE_STRING_KEYS.mapNotNull { k -> p.getString(k,null)?.let { k to it } }.toMap(),
+            booleans=EXPORTABLE_BOOLEAN_KEYS.associateWith { p.getBoolean(it,defaultBooleanValue(it)) },
+            ints=EXPORTABLE_INT_KEYS.associateWith { p.getInt(it,defaultIntValue(it)) }, floats=emptyMap(),stringSets=emptyMap())
+        val decoded=parseAndMigrateBotSettingsExport(export.toJson())
+        assertEquals("BLOCK",decoded.strings[REPEAT_PROCESS_MODE_KEY]); assertEquals("도배 금지",decoded.strings[REPEAT_REASON_KEY])
+        assertEquals(168,decoded.ints[REPEAT_DURATION_KEY]); assertEquals(false,decoded.booleans[REPEAT_DELETE_POST_KEY])
+        assertEquals(true,decoded.booleans[REPEAT_CUSTOM_ACTION_KEY])
+    }
+    @Test fun untouchedActionDefaultsExportAsCustomOn() {
+        assertTrue(defaultBooleanValue(REPEAT_CUSTOM_ACTION_KEY)); assertTrue(defaultBooleanValue(REPEAT_DELETE_POST_KEY))
+        assertEquals(6, defaultIntValue(REPEAT_DURATION_KEY))
+    }
     @Test fun protectionAndSettingsChangesInvalidateScanAndPendingPolicy() {
         val p=MemoryPreferences()
         val changes=listOf<()->Unit>(
