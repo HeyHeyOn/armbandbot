@@ -94,10 +94,10 @@ class BotService : Service() {
     private val aiBatchFailureBackoffUntil = ConcurrentHashMap<String, Long>()
     private val pendingAiPostPlans = ConcurrentHashMap<String, MutableList<AiPostExecutionPlan>>()
     private val pendingAiCommentPlans = ConcurrentHashMap<String, MutableList<AiCommentExecutionPlan>>()
-    private val spamBurstRecentEvents = ConcurrentHashMap<String, MutableList<SpamBurstEvent>>()
+    private val repeatSpamTrackers = ConcurrentHashMap<String, RepeatSpamTracker>()
     private val recentModerationFailures = ConcurrentHashMap<String, Long>()
     private val recentPumResolutionFailures = ConcurrentHashMap<String, Long>()
-    private val spamBurstStates = ConcurrentHashMap<String, SpamBurstState>()
+
     private val lastHealthLogAt = ConcurrentHashMap<String, Long>()
     private val runtimeProtectionLastGcAt = ConcurrentHashMap<String, Long>()
     private var wakeLock: PowerManager.WakeLock? = null
@@ -108,7 +108,7 @@ class BotService : Service() {
     private val runtimeProtectionGcIntervalMs = 6 * 60 * 60 * 1000L
     private val maxAiBatchResultEntriesPerBot = 120
     private val maxPendingAiPlansPerBot = 200
-    private val maxSpamBurstEventsPerKey = 300
+
     private val moderationFailureRetrySuppressMs = 10 * 60 * 1000L
     private val pumResolutionFailureLogIntervalMs = 10 * 60 * 1000L
 
@@ -192,13 +192,8 @@ class BotService : Service() {
         val gallerySettingImageBlockMobile: Boolean,
         val gallerySettingImageBlockAll: Boolean,
 
-        val isSpamBurstProtectionEnabled: Boolean,
-        val spamBurstWindowMinutes: Int,
-        val spamBurstYudongThreshold: Int,
-        val spamBurstKkangThreshold: Int,
-        val spamBurstDurationMinutes: Int,
-        val spamBurstTargetYudong: Boolean,
-        val spamBurstTargetKkang: Boolean,
+        val repeatSpam: RepeatSpamSettings,
+        val repeatSpamRevision: String,
 
         val isUrlFilterMode: Boolean,
         val urlWhitelistList: List<String>,
@@ -706,10 +701,10 @@ class BotService : Service() {
                 aiBatchResults.remove(botId)
                 pendingAiPostPlans.remove(botId)
                 pendingAiCommentPlans.remove(botId)
-                removeSpamBurstEventsForBot(spamBurstRecentEvents, botId)
+                repeatSpamTrackers.remove(botId)?.clear()
+                if (getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE).getBoolean(REPEAT_ENABLED_KEY, false)) automationRechecks.remove(botId)
                 recentModerationFailures.keys.filter { it.startsWith("$botId:") }.forEach { recentModerationFailures.remove(it) }
                 recentPumResolutionFailures.keys.filter { it.startsWith("$botId:") }.forEach { recentPumResolutionFailures.remove(it) }
-                spamBurstStates.keys.filter { it.startsWith("$botId:") || it.startsWith("${botId}_") }.forEach { spamBurstStates.remove(it) }
                 lastHealthLogAt.remove(botId)
                 runtimeProtectionLastGcAt.remove(botId)
                 return@runCatching
@@ -726,11 +721,7 @@ class BotService : Service() {
             pendingAiCommentPlans[botId]?.let { plans ->
                 if (plans.size > maxPendingAiPlansPerBot) plans.subList(0, plans.size - maxPendingAiPlansPerBot).clear()
             }
-            spamBurstRecentEvents.values.forEach { events ->
-                synchronized(events) {
-                    retainNewestEntries(events, maxSpamBurstEventsPerKey)
-                }
-            }
+
         }
     }
 
@@ -748,7 +739,7 @@ class BotService : Service() {
         val aiResults = aiBatchResults[botId]?.size ?: 0
         val aiPostPlans = pendingAiPostPlans[botId]?.size ?: 0
         val aiCommentPlans = pendingAiCommentPlans[botId]?.size ?: 0
-        val spamEvents = spamBurstRecentEvents.values.sumOf { it.size }
+        val spamEvents = repeatSpamTrackers.values.sumOf { it.size() }
         val inMemoryLogs = GlobalBotState.logs[botId]?.size ?: 0
         sendLog("[헬스] mem=${usedMb}/${totalMb}MB max=${maxMb}MB / threads=$threadCount / activeBots=${activeBots.size} / aiResults=$aiResults / aiPlans=${aiPostPlans + aiCommentPlans} / spamEvents=$spamEvents / logs=$inMemoryLogs", botId)
 
@@ -1427,6 +1418,7 @@ class BotService : Service() {
             val scanPreferences = snapshotScanPreferences(botPref)
             automationRechecks.getOrPut(botId) { AutomationRecheckState() }.update(automationPolicyRevision(scanPreferences))
             val config = loadBotConfig(botId, scanPreferences).copy(scanScopeId = scanScopeId)
+            repeatSpamTrackers.getOrPut(botId) { RepeatSpamTracker() }.updatePolicy(config.repeatSpamRevision, config.repeatSpam)
             val blockDuration = config.blockDurationHours.toString()
             val blockReason = config.blockReason
             val delChk = if (config.deletePostOnBlock) "1" else "0"
@@ -1740,7 +1732,8 @@ class BotService : Service() {
             val interruptedAiRetry = aiBatchQueues[botId]?.needsInterruptedRetry(
                 PostKey(gallType, gallId, postNumStr)
             ) == true
-            val automationRecheck = automationRechecks[botId]?.needs(PostKey(gallType, gallId, postNumStr)) == true
+            val automationRecheck = automationRechecks[botId]?.needs(PostKey(gallType, gallId, postNumStr)) == true ||
+                repeatSpamTrackers[botId]?.needsRecheck(PostKey(gallType, gallId, postNumStr), System.currentTimeMillis()) == true
             if (!automationRecheck && !interruptedAiRetry && !shouldRecheckPost(
                     savedCommentCount = savedCommentCount,
                     currentCommentCount = currentCommentCount,
@@ -2748,6 +2741,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             pendingAiPostPlans[botId]?.removeAll { it.postKey == postKey }
             pendingAiCommentPlans[botId]?.removeAll { it.postKey == postKey }
             aiBatchResults[botId]?.remove(postKey)
+            repeatSpamTrackers[botId]?.forget(postKey)
             if (config.isDebugMode) {
                 sendLog("[디버그][차단 예외 글] 번호: $postNumStr / 게시글과 댓글 차단 검사 건너뜀", botId)
             }
@@ -2923,116 +2917,20 @@ img.written_dccon{max-width:80px;max-height:80px}
                 sendLog("[디버그][게시글] 번호: $postNumStr / 분석 결과: 정상${if (postAnalysis.isWhitelistedUser) " (화이트리스트 통과)" else ""}", botId)
             }
         }
-        val spamBurstCandidateSource = when {
-            config.spamBurstTargetYudong && postUid.isBlank() -> ModerationFilterSource.YUDONG
-            config.spamBurstTargetKkang && postUid.isNotBlank() -> {
-                val (isKkangCandidate, kkangDetail) = isKkangByConfiguredMode(
-                    config = config,
-                    uid = postUid,
-                    dcNewNicknameMarked = isDcNewNicknameMarked(postWriterHtml),
-                    gallogCache = gallogCache,
-                    tokenToUse = tokenToUse,
-                    cookie = cookie,
-                    botId = botId,
-                    logTag = "도배 방지 후보 gallog 조회 실패"
-                )
-                if (config.isDebugMode) {
-                    sendLog(
-                        "[디버그][도배 방지/깡계 후보] userId=$postUid / $kkangDetail / 결과=${if (isKkangCandidate) "KKANG" else "UNKNOWN"}",
-                        botId
-                    )
-                }
-                if (isKkangCandidate) {
-                    ModerationFilterSource.KKANG
-                } else {
-                    ModerationFilterSource.UNKNOWN
-                }
-            }
-            else -> ModerationFilterSource.UNKNOWN
+        val repeatTracker = repeatSpamTrackers[botId]
+        val repeatEligible = config.repeatSpam.enabled && postDoc.select(".write_div").isNotEmpty() &&
+            (contentText.isNotBlank() || postDoc.select(".write_div img, .write_div video, .write_div audio, .write_div iframe").isEmpty()) &&
+            !outerAnalysis.isWhitelistedUser && when {
+            postUid.isBlank() -> config.repeatSpam.yudong && postAuthor.isNotBlank()
+            !config.repeatSpam.kkang -> false
+            else -> isKkangByConfiguredMode(config, postUid, isDcNewNicknameMarked(postWriterHtml),
+                gallogCache, tokenToUse, cookie, botId, "반복 글 깡계 판정").isKkang
         }
-        val triggeredSpamBurstState = if (spamBurstCandidateSource == ModerationFilterSource.YUDONG || spamBurstCandidateSource == ModerationFilterSource.KKANG) {
-            recordSpamBurstEvent(
-                config = config,
-                botId = botId,
-                filterSource = spamBurstCandidateSource,
-                postNo = postNumStr,
-                postDate = postDate
-            )
-        } else null
-
-        triggeredSpamBurstState?.let { state ->
-            state.samplePostNos
-                .filter { it != postNumStr }
-                .sortedByDescending { it.toIntOrNull() ?: Int.MIN_VALUE }
-                .forEach { samplePostNo ->
-                    val listRefererUrl = buildStableListUrl(
-                        ParsedTargetUrl(gallId = gallId, gallType = gallType, listQueryOptions = ListQueryOptions()),
-                        isSearchMode = false
-                    )
-                    val response = executeClaimedModerationAction(
-                        botId = botId,
-                        gallType = gallType,
-                        gallId = gallId,
-                        postNum = samplePostNo,
-                        targetType = "POST",
-                        targetNo = samplePostNo,
-                        actionKind = spamBurstDeleteClaimActionKind("POST"),
-                    ) {
-                        executeDeletePostRequest(
-                            cookie = cookie,
-                            listRefererUrl = listRefererUrl,
-                            gallId = gallId,
-                            targetNo = samplePostNo,
-                            gallType = gallType,
-                            botId = botId,
-                            isDebugMode = config.isDebugMode
-                        )
-                    }
-                    val succeeded = isModerationActionSuccess(response)
-                    if (succeeded) {
-                        state.samplePostNos.remove(samplePostNo)
-                    }
-                    sendLog("[도배 방지] 감지 샘플 삭제 / 글번호: $samplePostNo / 응답: $response", botId)
-                }
-        }
-        val spamBurstDeleteActive = shouldDeletePostBySpamBurst(
-            config = config,
-            botId = botId,
-            filterSource = if (spamBurstCandidateSource != ModerationFilterSource.UNKNOWN) spamBurstCandidateSource else postAnalysis.filterSource,
-            postNo = postNumStr,
-            postDate = postDate
+        val repeatMatch = repeatTracker?.observe(
+            RepeatSpamPost(postKey, if (postAuthor.isBlank()) "" else (if (postUid.isBlank()) "ip:" else "uid:") + postAuthor,
+                parseRepeatCreationDateMillis(postDate) ?: Long.MIN_VALUE, postDoc.select(".title_subject").text().ifBlank { text }, contentText),
+            repeatEligible, System.currentTimeMillis(),
         )
-        if (spamBurstDeleteActive) {
-            val deleteListRefererUrl = buildStableListUrl(
-                ParsedTargetUrl(gallId = gallId, gallType = gallType, listQueryOptions = ListQueryOptions()),
-                isSearchMode = false
-            )
-            val deleteResponse = executeClaimedModerationAction(
-                botId = botId,
-                gallType = gallType,
-                gallId = gallId,
-                postNum = postNumStr,
-                targetType = "POST",
-                targetNo = postNumStr,
-                actionKind = spamBurstDeleteClaimActionKind("POST"),
-            ) {
-                executeDeletePostRequest(
-                    cookie = cookie,
-                    listRefererUrl = deleteListRefererUrl,
-                    gallId = gallId,
-                    targetNo = postNumStr,
-                    gallType = gallType,
-                    botId = botId,
-                    isDebugMode = config.isDebugMode
-                )
-            }
-            val spamBurstDeleteSucceeded = isModerationActionSuccess(deleteResponse)
-            if (spamBurstDeleteSucceeded) {
-                spamBurstStates[botId]?.samplePostNos?.remove(postNumStr)
-            }
-            sendLog("[도배 방지] 신규 글 삭제 / 글번호: $postNumStr / 유형: ${postAnalysis.filterSource.name} / 응답: $deleteResponse", botId)
-            return spamBurstDeleteSucceeded
-        }
 
         val isBlacklistedUserId = postAnalysis.isBlacklistedUserId
         val isBlacklistedUserNick = postAnalysis.isBlacklistedUserNick
@@ -3692,13 +3590,19 @@ img.written_dccon{max-width:80px;max-height:80px}
                 null -> if (shouldRunAiStage) AiStageOutcome.ERROR else AiStageOutcome.SKIPPED
             },
         )
-        if (moderationWinner != ModerationWinner.ALLOW) {
+        val repeatAction = repeatMatch.takeIf {
+            shouldApplyRepeatSpamAction(it != null, config.repeatSpam.observeOnly, moderationWinner != ModerationWinner.ALLOW)
+        }
+        if (repeatAction != null || moderationWinner != ModerationWinner.ALLOW) {
             if (config.isDebugMode && !postAnalysis.debugDetail.isNullOrBlank()) {
                 sendLog("[디버그][게시글 차단 상세] 번호: $postNumStr / ${postAnalysis.debugDetail}", botId)
             }
             val actionPrefix = PumRuntimeRouting.actionPrefix(moderationWinner, runtimeRoute)
             val baseActionConfig = resolveDefaultModerationActionConfig(config)
-            val routedActionConfig = actionPrefix?.let { prefix ->
+            val routedActionConfig = if (repeatAction != null) ModerationActionConfig(
+                mode = if (config.repeatSpam.observeOnly) ModerationActionMode.HOLD else ModerationActionMode.DELETE_ONLY,
+                blockDurationHours = 0, blockReasonText = repeatAction.reason, deletePostOnBlock = true, sourceLabel = "repeat_spam",
+            ) else actionPrefix?.let { prefix ->
                 resolveModerationActionConfig(
                     baseConfig = baseActionConfig,
                     override = getActionOverride(prefix),
@@ -3721,24 +3625,34 @@ img.written_dccon{max-width:80px;max-height:80px}
                 pcPostDetailUrl = pcPostDetailUrl,
                 tokenToUse = tokenToUse,
                 actionConfig = routedActionConfig,
-                isBlacklistedUserId = isBlacklistedUserId,
-                isBlacklistedUserNick = isBlacklistedUserNick,
-                blockReasonPrefix = blockReasonPrefix,
-                notiType = notiType,
+                isBlacklistedUserId = repeatAction == null && isBlacklistedUserId,
+                isBlacklistedUserNick = repeatAction == null && isBlacklistedUserNick,
+                blockReasonPrefix = if (repeatAction != null) "반복 글 감지" else blockReasonPrefix,
+                notiType = if (repeatAction != null) "spam" else notiType,
                 matchedVoiceIdPost = matchedVoiceIdPost,
                 matchedImageAlt = matchedImageAlt,
                 matchedDcconToken = postAnalysis.matchedDcconToken,
-                aiDecision = aiDecision.takeIf { moderationWinner == ModerationWinner.AI },
-                aiReviewReason = aiReviewReason.takeIf { moderationWinner == ModerationWinner.AI },
+                aiDecision = aiDecision.takeIf { repeatAction == null && moderationWinner == ModerationWinner.AI },
+                aiReviewReason = aiReviewReason.takeIf { repeatAction == null && moderationWinner == ModerationWinner.AI },
                 suspiciousUrlInPost = suspiciousUrlInPost,
                 spamCodeMatchPost = spamCodeMatchPost,
                 notifyIfEnabled = notifyIfEnabled,
-                debugDetail = postAnalysis.debugDetail,
+                debugDetail = repeatAction?.reason ?: postAnalysis.debugDetail,
+                beforeAction = if (repeatAction == null) null else ({
+                    repeatSpamPolicyRevision(snapshotScanPreferences(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))) == config.repeatSpamRevision &&
+                        repeatTracker?.canAct(postKey, System.currentTimeMillis()) == true
+                }),
                 saveSnapshotFn = {
                     val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                     saveSnapshotFromDoc(postDoc, commentsArray, blockedTs = ts)
                 }
             )
+
+            if (repeatMatch != null && postBlockResult.success &&
+                (isModerationActionSuccess(postBlockResult.response) || postBlockResult.response.contains("duplicate_hold"))) {
+                repeatTracker?.complete(postKey)
+                if (repeatAction != null) sendLog("[도배 방지] ${if (config.repeatSpam.observeOnly) "감지 기록" else "삭제"} 완료 / ${repeatAction.reason}", botId)
+            }
 
             if (!AiExecutionPolicy.shouldRetry(postBlockResult.success, postBlockResult.response)) {
                 if (postBlockResult.mode != ModerationActionMode.HOLD) {
@@ -4380,23 +4294,6 @@ img.written_dccon{max-width:80px;max-height:80px}
         )
     }
 
-    private fun pruneSpamBurstState(botId: String, now: Long = System.currentTimeMillis()): SpamBurstState? {
-        val current = spamBurstStates[botId] ?: return null
-        if (current.isActive(now)) return current
-        spamBurstStates.remove(botId)
-        if (botId.isNotEmpty()) {
-            sendLog("[도배 방지] 감지 종료 / 지속 시간 만료", botId)
-        }
-        return null
-    }
-
-    private fun parseCreationDateMillis(postDate: String): Long? {
-        if (postDate.isBlank()) return null
-        return runCatching {
-            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(postDate)?.time
-        }.getOrNull()
-    }
-
     private fun isDcNewNicknameMarked(rawHtml: String): Boolean {
         return rawHtml.contains("newnik.gif", ignoreCase = true) ||
             rawHtml.contains("fix_newnik.gif", ignoreCase = true)
@@ -4442,85 +4339,6 @@ img.written_dccon{max-width:80px;max-height:80px}
                 "글=$pCount/${config.kkangPostMin}, 댓글=$cCount/${config.kkangCommentMin}",
             )
         }
-    }
-
-    private fun recordSpamBurstEvent(
-        config: BotConfig,
-        botId: String,
-        filterSource: ModerationFilterSource,
-        postNo: String,
-        postDate: String,
-        now: Long = System.currentTimeMillis()
-    ): SpamBurstState? {
-        if (!config.isSpamBurstProtectionEnabled) return null
-        if (filterSource != ModerationFilterSource.YUDONG && filterSource != ModerationFilterSource.KKANG) return null
-        val createdAtMillis = parseCreationDateMillis(postDate) ?: return null
-
-        val events = spamBurstRecentEvents.getOrPut(botId) { mutableListOf() }
-        synchronized(events) {
-            events.removeAll { it.postNo == postNo }
-            events.add(SpamBurstEvent(createdAtMillis, filterSource, postNo))
-            events.sortByDescending { it.createdAtMillis }
-
-            val sampleSize = config.spamBurstWindowMinutes.coerceAtLeast(2)
-            val targetEvents = events.filter {
-                (it.type == ModerationFilterSource.YUDONG && config.spamBurstTargetYudong) ||
-                    (it.type == ModerationFilterSource.KKANG && config.spamBurstTargetKkang)
-            }.take(sampleSize)
-            if (targetEvents.size < sampleSize) return null
-
-            val existing = pruneSpamBurstState(botId, now)
-            if (existing != null) return existing
-
-            val sortedAscending = targetEvents.sortedBy { it.createdAtMillis }
-            val intervals = sortedAscending.zipWithNext { a, b -> (b.createdAtMillis - a.createdAtMillis) / 1000.0 }
-            if (intervals.isEmpty()) return null
-
-            val averageIntervalSec = intervals.average()
-            val thresholdSeconds = config.spamBurstYudongThreshold.coerceAtLeast(1).toDouble()
-            if (averageIntervalSec > thresholdSeconds) return null
-
-            val anchorEvent = sortedAscending.last()
-            val reason = "최근 ${targetEvents.size}개 글 평균 간격 ${"%.1f".format(Locale.US, averageIntervalSec)}초"
-            val state = SpamBurstState(
-                startedAt = now,
-                endsAt = now + (config.spamBurstDurationMinutes.coerceAtLeast(1) * 60_000L),
-                reason = reason,
-                targetYudong = config.spamBurstTargetYudong,
-                targetKkang = config.spamBurstTargetKkang,
-                anchorPostNo = anchorEvent.postNo,
-                anchorCreatedAtMillis = anchorEvent.createdAtMillis,
-                samplePostNos = targetEvents.map { it.postNo }.toMutableSet()
-            )
-            spamBurstStates[botId] = state
-            sendLog("[도배 방지] 감지 시작 / 사유: $reason / anchor=${anchorEvent.postNo} / 지속=${config.spamBurstDurationMinutes}분", botId)
-            return state
-        }
-    }
-
-    private fun shouldDeletePostBySpamBurst(
-        config: BotConfig,
-        botId: String,
-        filterSource: ModerationFilterSource,
-        postNo: String,
-        postDate: String,
-        now: Long = System.currentTimeMillis()
-    ): Boolean {
-        if (!config.isSpamBurstProtectionEnabled) return false
-        val state = pruneSpamBurstState(botId, now) ?: return false
-        val createdAtMillis = parseCreationDateMillis(postDate) ?: return false
-        val isTarget = when (filterSource) {
-            ModerationFilterSource.YUDONG -> state.targetYudong
-            ModerationFilterSource.KKANG -> state.targetKkang
-            else -> false
-        }
-        if (!isTarget) return false
-        if (state.samplePostNos.contains(postNo)) return true
-        if (createdAtMillis < state.anchorCreatedAtMillis) return false
-        val currentPostNo = postNo.toIntOrNull() ?: Int.MIN_VALUE
-        val anchorPostNo = state.anchorPostNo.toIntOrNull() ?: Int.MIN_VALUE
-        if (createdAtMillis == state.anchorCreatedAtMillis && currentPostNo < anchorPostNo) return false
-        return currentPostNo > anchorPostNo || createdAtMillis > state.anchorCreatedAtMillis
     }
 
     private fun executeModerationAction(
@@ -4970,13 +4788,8 @@ img.written_dccon{max-width:80px;max-height:80px}
             gallerySettingImageBlockMobile = botPref.getBoolean("gallery_setting_image_block_mobile", false),
             gallerySettingImageBlockAll = botPref.getBoolean("gallery_setting_image_block_all", false),
 
-            isSpamBurstProtectionEnabled = botPref.getBoolean("is_spam_burst_protection_enabled", false),
-            spamBurstWindowMinutes = safePrefInt("spam_burst_window_minutes", 3),
-            spamBurstYudongThreshold = safePrefInt("spam_burst_yudong_threshold", 10),
-            spamBurstKkangThreshold = safePrefInt("spam_burst_kkang_threshold", 10),
-            spamBurstDurationMinutes = safePrefInt("spam_burst_duration_minutes", 10),
-            spamBurstTargetYudong = botPref.getBoolean("spam_burst_target_yudong", true),
-            spamBurstTargetKkang = botPref.getBoolean("spam_burst_target_kkang", true),
+            repeatSpam = repeatSpamSettings(botPref),
+            repeatSpamRevision = repeatSpamPolicyRevision(botPref),
 
             isUrlFilterMode = botPref.getBoolean("is_url_filter_mode", false),
             urlWhitelistList = orderedMultilineValues("url_whitelist").map(String::lowercase),
@@ -5784,6 +5597,7 @@ img.written_dccon{max-width:80px;max-height:80px}
         notifyIfEnabled: (String, String, String) -> Unit,
         debugDetail: String?,
         saveSnapshotFn: (() -> String?)? = null,
+        beforeAction: (() -> Boolean)? = null,
     ): BlockExecutionResult {
         var dbSnapshotPath: String? = null
         var blockHistorySnapshotPath: String? = null
@@ -5860,7 +5674,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             targetNo = postNumStr,
             actionKind = moderationClaimActionKind(actionConfig.mode.name, "POST", actionConfig.deletePostOnBlock),
         ) {
-            executeModerationAction(
+            if (beforeAction?.invoke() == false) "{\"result\":\"skipped\",\"reason\":\"repeat_policy_changed\"}" else executeModerationAction(
                 actionConfig = actionConfig,
                 cookie = cookie,
                 pcPostDetailUrl = pcPostDetailUrl,
@@ -5995,25 +5809,6 @@ img.written_dccon{max-width:80px;max-height:80px}
         val gallType: String,
         val listQueryOptions: ListQueryOptions = ListQueryOptions()
     )
-
-    private data class SpamBurstEvent(
-        val createdAtMillis: Long,
-        val type: ModerationFilterSource,
-        val postNo: String
-    )
-
-    private data class SpamBurstState(
-        val startedAt: Long,
-        val endsAt: Long,
-        val reason: String,
-        val targetYudong: Boolean,
-        val targetKkang: Boolean,
-        val anchorPostNo: String,
-        val anchorCreatedAtMillis: Long,
-        val samplePostNos: MutableSet<String>
-    ) {
-        fun isActive(now: Long): Boolean = now < endsAt
-    }
 
     private data class GallogStats(
         val postCount: Int,

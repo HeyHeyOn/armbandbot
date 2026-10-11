@@ -33,7 +33,7 @@ internal fun automationPolicyRevision(p:SharedPreferences):String {
     val remote=effectiveRemoteLists(p)?.revision.orEmpty()
     val masters=p.getString(FILTER_MASTER_REVISION_KEY, "").orEmpty()
     val user = userFilterPolicyRevision(p)
-    return policyHash("$move|$remote|$masters|$user")
+    return policyHash("$move|$remote|$masters|$user|${repeatSpamPolicyRevision(p)}")
 }
 internal fun policyHash(text:String):String=MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString(""){"%02x".format(it)}
 internal fun configuredAutomationGalleries(p:SharedPreferences):Set<Pair<String,String>> = p.getString("target_urls","").orEmpty().lineSequence().mapNotNull { line->parseManagedGalleryUrl(line) }.toSet()

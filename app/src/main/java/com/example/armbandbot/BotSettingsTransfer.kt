@@ -29,6 +29,7 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
 ) + ORDERED_MULTILINE_SETTING_KEYS.map(::orderedMultilineTextKey) + REMOTE_CHANNEL_EXPORT_STRING_KEYS
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
+    REPEAT_ENABLED_KEY, REPEAT_OBSERVE_KEY, REPEAT_YUDONG_KEY, REPEAT_KKANG_KEY,
     WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY,
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block",
@@ -45,6 +46,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
 ) + REMOTE_CHANNEL_EXPORT_BOOLEAN_KEYS
 
 internal val EXPORTABLE_INT_KEYS = listOf(
+    REPEAT_WINDOW_KEY, REPEAT_COUNT_KEY, REPEAT_SIMILARITY_KEY,
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
     "run_schedule_start_minute", "run_schedule_end_minute", "remote_lists_interval_minutes"
@@ -257,6 +259,7 @@ private inline fun <T> Iterable<String>.associateWithNotNull(valueSelector: (Str
     }
 
 internal fun defaultBooleanValue(key: String): Boolean = when (key) {
+    REPEAT_YUDONG_KEY, REPEAT_KKANG_KEY -> true
     WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY -> true
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
     "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block", "is_snapshot_blocked",
@@ -270,6 +273,9 @@ internal fun defaultStringValue(key: String): String? = when (key) {
 }
 
 internal fun defaultIntValue(key: String): Int = when (key) {
+    REPEAT_WINDOW_KEY -> 10
+    REPEAT_COUNT_KEY -> 4
+    REPEAT_SIMILARITY_KEY -> 85
     "block_duration_hours" -> 6
     "kkang_post_min" -> 5
     "kkang_comment_min" -> 10
