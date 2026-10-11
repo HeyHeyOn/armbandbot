@@ -49,7 +49,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
 ) + REMOTE_CHANNEL_EXPORT_BOOLEAN_KEYS
 
 internal val EXPORTABLE_INT_KEYS = listOf(
-    REPEAT_WINDOW_KEY, REPEAT_COUNT_KEY, REPEAT_SIMILARITY_KEY, REPEAT_DURATION_KEY,
+    REPEAT_WINDOW_KEY, REPEAT_COUNT_KEY, REPEAT_SIMILARITY_KEY, REPEAT_MIN_LENGTH_KEY, REPEAT_DURATION_KEY,
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
     "run_schedule_start_minute", "run_schedule_end_minute", "remote_lists_interval_minutes"
@@ -290,6 +290,7 @@ internal fun defaultIntValue(key: String): Int = when (key) {
     REPEAT_WINDOW_KEY -> 10
     REPEAT_COUNT_KEY -> 4
     REPEAT_SIMILARITY_KEY -> 85
+    REPEAT_MIN_LENGTH_KEY -> REPEAT_DEFAULT_MIN_LENGTH
     REPEAT_DURATION_KEY -> 6
     "block_duration_hours" -> 6
     "kkang_post_min" -> 5

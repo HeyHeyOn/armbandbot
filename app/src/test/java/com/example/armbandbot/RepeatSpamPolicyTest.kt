@@ -25,9 +25,9 @@ class RepeatSpamPolicyTest {
     @Test fun unrelatedFastAuthorsCannotTrigger() {
         val t = tracker(); repeat(6) { assertNull(t.observe(post(it, author="ip:$it.2"), true, now)) }
     }
-    @Test fun differentBodyWithSameTitleAndIpIsPreserved() {
+    @Test fun differentBodyWithSameTitleAndIpStillMatches() {
         val t = tracker(); fill(t)
-        assertNull(t.observe(post(5, body="이번 이벤트 보상에 대해 궁금해서 질문 드립니다"), true, now))
+        assertNotNull(t.observe(post(5, body="이번 이벤트 보상에 대해 궁금해서 질문 드립니다"), true, now))
     }
     @Test fun galleriesAndGalleryTypesNeverShareEvidenceOrIds() {
         val t = tracker(); (1..3).forEach { t.observe(post(it), true, now) }
@@ -69,7 +69,7 @@ class RepeatSpamPolicyTest {
     }
     @Test fun editedNormalPostWithdrawsPendingAndOldEvidence() {
         val t = tracker(); val p = fill(t)
-        assertNull(t.observe(p.first().copy(body="정상적인 장비 질문을 새로 작성한 내용입니다"),true,now))
+        assertNull(t.observe(p.first().copy(title="정상적인 장비 질문", body="정상적인 장비 질문을 새로 작성한 내용입니다"),true,now))
         assertFalse(t.canAct(p.last().key,now))
     }
     @Test fun retentionKeepsNewestAndDropsOldPending() {
@@ -91,23 +91,23 @@ class RepeatSpamPolicyTest {
         val a=post(1,title="ㅋㅋㅋ",body="")
         assertFalse(RepeatSpamText.matches(a,a,85))
     }
-    @Test fun shortDifferentSentencesNeverUseFuzzyMatching() {
+    @Test fun shortNegatedSentencesRemainDifferent() {
         val a=post(1,title="바람 영자 유기 영자 유기 했네",body="")
         assertFalse(RepeatSpamText.matches(a,a.copy(title="바람 영자 유기 영자 유기 안해"),85))
     }
     @Test fun numericValuesAndNegationAreNotStrippedAway() {
-        val a=post(1,body="이번 검증 기준은 버전 1.5 항목이며 확인을 허용합니다")
+        val a=post(1,title="",body="이번 검증 기준은 버전 1.5 항목이며 확인을 허용합니다")
         assertFalse(RepeatSpamText.matches(a,a.copy(body=a.body.replace("1.5","15")),85))
         assertFalse(RepeatSpamText.matches(a,a.copy(body=a.body.replace("허용","금지")),85))
     }
     @Test fun exactSettingRejectsChangedWordsButAcceptsSpacing() {
-        val a=post(1)
+        val a=post(1,title="")
         assertFalse(RepeatSpamText.matches(a,a.copy(body=a.body+"추가"),100))
         assertTrue(RepeatSpamText.matches(a,a.copy(body=a.body.replace(" ","*")),100))
     }
     @Test fun longTextIsNotComparedUsingTruncatedPrefix() {
-        val a=post(1,body="내용".repeat(5000))
-        assertFalse(RepeatSpamText.matches(a,a.copy(body=a.body+"다름"),85))
+        val a=post(1,title="",body="내용".repeat(5000))
+        assertFalse(RepeatSpamText.matches(a,a.copy(body=a.body+"다름"),100))
     }
     @Test fun creationDateIsStrictKoreanTimeRegardlessOfDeviceZone() {
         val before=TimeZone.getDefault()

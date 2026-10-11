@@ -136,7 +136,7 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
 )
 
 private val INT_PREF_DEFAULTS: Map<String, Int> = mapOf(
-    REPEAT_WINDOW_KEY to 10, REPEAT_COUNT_KEY to 4, REPEAT_SIMILARITY_KEY to 85,
+    REPEAT_WINDOW_KEY to 10, REPEAT_COUNT_KEY to 4, REPEAT_SIMILARITY_KEY to 85, REPEAT_MIN_LENGTH_KEY to REPEAT_DEFAULT_MIN_LENGTH,
     "ai_block_duration_hours" to -1,
     "auto_login_failure_count" to 0,
     "block_duration_hours" to 6,

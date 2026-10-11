@@ -17,6 +17,8 @@ internal fun parseRepeatCreationDateMillis(value: String): Long? {
 internal const val REPEAT_WINDOW_KEY = "repeat_spam_window_minutes"
 internal const val REPEAT_COUNT_KEY = "repeat_spam_count"
 internal const val REPEAT_SIMILARITY_KEY = "repeat_spam_similarity_percent"
+internal const val REPEAT_MIN_LENGTH_KEY = "repeat_spam_min_length"
+internal const val REPEAT_DEFAULT_MIN_LENGTH = 8
 internal const val REPEAT_OBSERVE_KEY = "repeat_spam_observe_only"
 internal const val REPEAT_REVISION_KEY = "repeat_spam_settings_revision"
 internal const val REPEAT_ENABLED_KEY = "is_spam_burst_protection_enabled"
@@ -34,10 +36,11 @@ internal data class RepeatSpamSettings(
     val observeOnly: Boolean = false,
     val yudong: Boolean = true,
     val kkang: Boolean = true,
+    val minimumLength: Int = REPEAT_DEFAULT_MIN_LENGTH,
 ) {
     val windowMillis: Long get() = windowMinutes * 60_000L
     fun bounded() = copy(windowMinutes = windowMinutes.coerceIn(1, 60), count = count.coerceIn(2, 20),
-        similarityPercent = similarityPercent.coerceIn(85, 100))
+        similarityPercent = similarityPercent.coerceIn(85, 100), minimumLength = minimumLength.coerceAtLeast(0))
 }
 
 internal data class RepeatSpamPost(
@@ -54,24 +57,32 @@ internal object RepeatSpamText {
     private val negations = Regex("않|없|아니|금지|허용|(?:^|\\s)(?:안|못)(?=\\s)")
     private fun normalized(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC)
         .lowercase(Locale.ROOT).filterNot { Character.getType(it) == Character.FORMAT.toInt() || it in '\uFE00'..'\uFE0F' }
-    private fun compact(value: String) = normalized(value).filter { it.isLetterOrDigit() }
-    private fun comparable(a: String, b: String, percent: Int): Boolean {
+    private fun comparable(a: String, b: String, percent: Int, minimumLength: Int): Boolean {
         val na = normalized(a); val nb = normalized(b)
+        val ca = na.filter { it.isLetterOrDigit() }; val cb = nb.filter { it.isLetterOrDigit() }
+        if (minOf(ca.length, cb.length) < minimumLength.coerceAtLeast(0)) return false
+        // A missing/blank body is not repetition evidence. With no length limit, actual symbol-only
+        // text can match exactly; do not collapse unrelated symbols (or empty bodies) into one value.
+        if (ca.isEmpty() || cb.isEmpty()) {
+            val symbolsA = na.filterNot { it.isWhitespace() }
+            val symbolsB = nb.filterNot { it.isWhitespace() }
+            return minimumLength <= 0 && ca.isEmpty() && cb.isEmpty() &&
+                symbolsA.isNotEmpty() && symbolsA == symbolsB
+        }
         if (numbers.findAll(na).map { it.value }.toList() != numbers.findAll(nb).map { it.value }.toList()) return false
         if (negations.findAll(na).map { it.value.trim() }.toList() != negations.findAll(nb).map { it.value.trim() }.toList()) return false
-        val ca = compact(a); val cb = compact(b)
         if (ca == cb) return true
-        if (minOf(ca.length, cb.length) < 20 || percent == 100) return false
+        if (percent == 100) return false
         if (minOf(ca.length, cb.length).toDouble() / maxOf(ca.length, cb.length) < .8) return false
-        val sa = ca.windowed(3).toSet(); val sb = cb.windowed(3).toSet()
+        val gramSize = minOf(3, ca.length, cb.length)
+        val sa = ca.windowedSequence(gramSize).toSet(); val sb = cb.windowedSequence(gramSize).toSet()
         return sa.intersect(sb).size * 100.0 / sa.union(sb).size >= percent
     }
-    fun matches(a: RepeatSpamPost, b: RepeatSpamPost, percent: Int): Boolean {
-        if (listOf(a.title, a.body, b.title, b.body).any { it.length > 8192 }) return false
-        if (minOf(compact(a.title + a.body).length, compact(b.title + b.body).length) < 8) return false
-        // Both fields must agree; a generic title alone never overrides a different body.
-        return comparable(a.title, b.title, percent) && comparable(a.body, b.body, percent)
-    }
+    fun matches(a: RepeatSpamPost, b: RepeatSpamPost, percent: Int, minimumLength: Int = REPEAT_DEFAULT_MIN_LENGTH): Boolean =
+        matchesField(a, b, percent, minimumLength, title = true) || matchesField(a, b, percent, minimumLength, title = false)
+
+    fun matchesField(a: RepeatSpamPost, b: RepeatSpamPost, percent: Int, minimumLength: Int, title: Boolean): Boolean =
+        if (title) comparable(a.title, b.title, percent, minimumLength) else comparable(a.body, b.body, percent, minimumLength)
 }
 
 /** One instance per bot; gallery and author are part of every comparison and PostKey of every action. */
@@ -119,15 +130,22 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
         pending.clear()
         if (!settings.enabled) return
         events.values.groupBy { Triple(it.key.gallType, it.key.gallId, it.author) }.values.forEach { sameAuthor ->
-            val clusters = mutableListOf<MutableList<RepeatSpamPost>>()
-            sameAuthor.sortedWith(compareBy<RepeatSpamPost> { it.createdAt }.thenBy { it.key.postNo.toLongOrNull() ?: 0 }).forEach { post ->
-                // Compare against a fixed representative, never a transitive chain.
-                val group = clusters.firstOrNull { RepeatSpamText.matches(it.first(), post, settings.similarityPercent) }
-                if (group == null) clusters.add(mutableListOf(post)) else group.add(post)
-            }
-            clusters.filter { it.size >= settings.count }.forEach { group ->
-                val match = RepeatSpamMatch(group.map { it.key }.toSet(), settings.windowMinutes)
-                group.filterNot { it.key in completed }.forEach { pending[it.key] = match }
+            val ordered = sameAuthor.sortedWith(compareBy<RepeatSpamPost> { it.createdAt }.thenBy { it.key.postNo.toLongOrNull() ?: 0 })
+            // Each field must independently reach the repeat count. Mixing two matching titles
+            // with two matching bodies must not manufacture a four-post repetition.
+            for (title in listOf(true, false)) {
+                val clusters = mutableListOf<MutableList<RepeatSpamPost>>()
+                ordered.forEach { post ->
+                    // Compare against a fixed representative, never a transitive chain.
+                    val group = clusters.firstOrNull {
+                        RepeatSpamText.matchesField(it.first(), post, settings.similarityPercent, settings.minimumLength, title)
+                    }
+                    if (group == null) clusters.add(mutableListOf(post)) else group.add(post)
+                }
+                clusters.filter { it.size >= settings.count }.forEach { group ->
+                    val match = RepeatSpamMatch(group.map { it.key }.toSet(), settings.windowMinutes)
+                    group.filterNot { it.key in completed }.forEach { pending[it.key] = match }
+                }
             }
         }
     }

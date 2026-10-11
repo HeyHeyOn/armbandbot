@@ -2919,7 +2919,6 @@ img.written_dccon{max-width:80px;max-height:80px}
         }
         val repeatTracker = repeatSpamTrackers[botId]
         val repeatEligible = config.repeatSpam.enabled && postDoc.select(".write_div").isNotEmpty() &&
-            (contentText.isNotBlank() || postDoc.select(".write_div img, .write_div video, .write_div audio, .write_div iframe").isEmpty()) &&
             !outerAnalysis.isWhitelistedUser && when {
             postUid.isBlank() -> config.repeatSpam.yudong && postAuthor.isNotBlank()
             !config.repeatSpam.kkang -> false

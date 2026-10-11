@@ -24,6 +24,7 @@ class RepeatSpamBackupTest {
             restoredId = importBotSettingsAsNewBot(context, Uri.fromFile(file).toString())
             val restored = context.getSharedPreferences("bot_prefs_$restoredId", Context.MODE_PRIVATE)
             assertEquals(expected, repeatActionView(restored))
+            assertEquals(repeatSpamSettings(source).minimumLength, repeatSpamSettings(restored).minimumLength)
             assertFalse(restored.contains(REPEAT_DURATION_KEY))
             assertFalse(restored.contains(REPEAT_DELETE_POST_KEY))
             assertFalse(restored.getBoolean("is_running", true))
@@ -34,6 +35,13 @@ class RepeatSpamBackupTest {
             restoredId?.let { context.getSharedPreferences("bot_prefs_$it", Context.MODE_PRIVATE).edit().clear().commit() }
             master.edit().apply { if (originalIds == null) remove("bot_ids_list") else putString("bot_ids_list", originalIds) }.commit()
             file.delete()
+        }
+    }
+
+    @Test fun minimumLengthZeroAndCustomValueSurviveActualFileImport() {
+        for (minimum in listOf(0, 17, 8193)) roundTrip {
+            putString(REPEAT_PROCESS_MODE_KEY, "BLOCK")
+            putInt(REPEAT_MIN_LENGTH_KEY, minimum)
         }
     }
 

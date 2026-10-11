@@ -41,6 +41,7 @@ class RepeatSpamUiTest {
     private fun exercise(dark: Boolean) {
         screen(dark)
         // Master off: every control is present but disabled, nothing can change.
+        compose.onNodeWithTag("repeat-min-length").assertIsNotEnabled()
         compose.onNodeWithTag("repeat-minutes-plus").assertIsNotEnabled()
         compose.onNodeWithTag("repeat_spam-action-mode").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("repeat-enabled").performScrollTo().performClick()
@@ -55,7 +56,7 @@ class RepeatSpamUiTest {
         compose.onNodeWithTag("repeat-minutes").assertTextEquals("20분")
         compose.onNodeWithTag("repeat-count-minus").assertIsNotEnabled()     // lower bound 2
         compose.onNodeWithTag("repeat-similarity-plus").assertIsNotEnabled() // upper bound 100
-        compose.onNodeWithTag("repeat-summary").assert(hasText("20분 안에 비슷한 글을 2개 이상", substring = true))
+        compose.onNodeWithTag("repeat-summary").assert(hasText("20분 안에 제목이나 본문이 비슷한 글을 2개 이상", substring = true))
         // Whole target rows are toggleable.
         compose.onNodeWithTag("repeat-yudong").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
         // The same 개별 차단 설정 block as other filters: 삭제 by default, then 보류 / 차단.
@@ -68,12 +69,31 @@ class RepeatSpamUiTest {
         compose.onNodeWithTag("repeat_spam-block-reason").performScrollTo().assertExists()
         compose.onNodeWithTag("repeat-summary").assert(hasText("차단하고 첫 글까지 모두 삭제", substring = true))
         compose.runOnIdle { assertEquals("BLOCK", repeatActionView(p).mode); assertFalse(repeatSpamSettings(p).observeOnly) }
+        // Direct input accepts zero, saves only on confirmation, and rejects malformed values.
+        tap("repeat-min-length")
+        compose.onNodeWithTag("repeat-min-length-input").performTextReplacement("0")
+        compose.onNodeWithTag("repeat-min-length-save").performClick()
+        compose.runOnIdle { assertEquals(0, repeatSpamSettings(p).minimumLength) }
+        tap("repeat-min-length")
+        compose.onNodeWithTag("repeat-min-length-input").assertTextContains("0")
+        for (invalid in listOf("", "-1", "1.5", "2147483648", "abc")) {
+            compose.onNodeWithTag("repeat-min-length-input").performTextReplacement(invalid)
+            compose.onNodeWithTag("repeat-min-length-save").assertIsNotEnabled()
+        }
+        compose.onNodeWithTag("repeat-min-length-input").performTextReplacement("17")
+        compose.onNodeWithText("취소").performClick()
+        compose.runOnIdle { assertEquals(0, repeatSpamSettings(p).minimumLength) }
+        tap("repeat-min-length")
+        compose.onNodeWithTag("repeat-min-length-input").performTextReplacement("17")
+        compose.onNodeWithTag("repeat-min-length-save").performClick()
+        compose.runOnIdle { assertEquals(17, repeatSpamSettings(p).minimumLength) }
         // Defaults button restores and saves at once.
         tap("repeat-defaults")
-        compose.runOnIdle { val s = repeatSpamSettings(p); assertEquals(Triple(10, 4, 85), Triple(s.windowMinutes, s.count, s.similarityPercent)) }
+        compose.runOnIdle { val s = repeatSpamSettings(p); assertEquals(Triple(10, 4, 85), Triple(s.windowMinutes, s.count, s.similarityPercent)); assertEquals(8, s.minimumLength) }
         compose.onNodeWithTag("repeat-defaults").assertIsNotEnabled()
         // Master off again keeps values and disables the controls.
         compose.onNodeWithTag("repeat-enabled").performScrollTo().performClick()
+        compose.onNodeWithTag("repeat-min-length").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("repeat-count-plus").performScrollTo().assertIsNotEnabled()
         compose.runOnIdle { assertFalse(repeatSpamSettings(p).enabled); assertEquals("BLOCK", repeatActionView(p).mode) }
         compose.onNodeWithTag("repeat_spam-action-mode").performScrollTo().assertIsNotEnabled()

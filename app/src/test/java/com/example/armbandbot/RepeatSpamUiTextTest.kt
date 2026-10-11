@@ -26,7 +26,7 @@ class RepeatSpamUiTextTest {
     }
     @Test fun summaryDescribesTheCurrentCombination() {
         val delete = RepeatActionView("DELETE", 6, true, false)
-        assertEquals("같은 작성자가 10분 안에 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.", repeatSpamSummary(RepeatSpamSettings(), delete))
+        assertEquals("같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.", repeatSpamSummary(RepeatSpamSettings(), delete))
         assertTrue(repeatSpamSummary(RepeatSpamSettings(), delete.copy(mode = "HOLD")).endsWith("지우지 않고 보류 기록으로 남깁니다."))
         assertTrue(repeatSpamSummary(RepeatSpamSettings(), delete.copy(mode = "BLOCK", durationHours = 24)).endsWith("작성자를 1일 차단하고 첫 글까지 모두 삭제합니다."))
         assertTrue(repeatSpamSummary(RepeatSpamSettings(), delete.copy(mode = "BLOCK", deletePost = false)).endsWith("작성자를 6시간 차단합니다. 글은 지우지 않습니다."))
@@ -64,5 +64,13 @@ class RepeatSpamUiTextTest {
         val before = repeatSpamPolicyRevision(snapshotScanPreferences(p))
         p.edit().putString(REPEAT_PROCESS_MODE_KEY, "BLOCK").commit()
         assertNotEquals(before, repeatSpamPolicyRevision(snapshotScanPreferences(p)))
+    }
+    @Test fun directLengthInputAcceptsZeroAndRejectsInvalidOrOverflow() {
+        assertEquals(0, parseRepeatMinimumLength("0"))
+        assertEquals(17, parseRepeatMinimumLength("17"))
+        assertEquals(Int.MAX_VALUE, parseRepeatMinimumLength("2147483647"))
+        listOf("", " ", "-1", "+1", "1.5", "1e3", "2147483648", "가나다").forEach {
+            assertNull(it, parseRepeatMinimumLength(it))
+        }
     }
 }

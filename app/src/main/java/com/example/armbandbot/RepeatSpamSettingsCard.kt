@@ -1,6 +1,8 @@
 package com.heyheyon.armbandbot
 
 import android.content.SharedPreferences
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +24,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heyheyon.armbandbot.ui.*
@@ -54,7 +57,7 @@ internal fun repeatSpamSummary(s: RepeatSpamSettings, action: RepeatActionView):
                    else "작성자를 ${repeatDurationLabel(action.durationHours)} 차단합니다. 글은 지우지 않습니다."
         else -> "첫 글까지 모두 삭제합니다."
     }
-    return "같은 작성자가 ${s.windowMinutes}분 안에 비슷한 글을 ${s.count}개 이상 올리면 $result"
+    return "같은 작성자가 ${s.windowMinutes}분 안에 제목이나 본문이 비슷한 글을 ${s.count}개 이상 올리면 $result"
 }
 
 internal fun repeatSpamTargets(s: RepeatSpamSettings): String? =
@@ -74,6 +77,7 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
     var settings by remember(p) { mutableStateOf(repeatSpamSettings(p)) }
     var action by remember(p) { mutableStateOf(repeatActionView(p)) }
     var help by remember { mutableStateOf(false) }
+    var editMinimum by remember { mutableStateOf(false) }
     fun refresh() { settings = repeatSpamSettings(p); action = repeatActionView(p) }
     fun save(edit: SharedPreferences.Editor.() -> Unit) {
         p.edit().apply(edit).repeatSpamChanged().apply()
@@ -81,7 +85,7 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
     }
     val defaults = RepeatSpamSettings()
     val isDefaultCriteria = settings.windowMinutes == defaults.windowMinutes && settings.count == defaults.count &&
-        settings.similarityPercent == defaults.similarityPercent
+        settings.similarityPercent == defaults.similarityPercent && settings.minimumLength == defaults.minimumLength
     val targets = repeatSpamTargets(settings)
 
     ModernSettingsBlock("도배 방지 사용", "끄면 설정을 보관하고 감지를 멈춥니다.", Icons.Filled.Repeat, colors,
@@ -109,12 +113,13 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
 
         RepeatSectionLabel("감지 기준", colors, trailing = {
             TextButton(onClick = {
-                save { putInt(REPEAT_WINDOW_KEY, defaults.windowMinutes).putInt(REPEAT_COUNT_KEY, defaults.count).putInt(REPEAT_SIMILARITY_KEY, defaults.similarityPercent) }
+                save { putInt(REPEAT_WINDOW_KEY, defaults.windowMinutes).putInt(REPEAT_COUNT_KEY, defaults.count).putInt(REPEAT_SIMILARITY_KEY, defaults.similarityPercent).putInt(REPEAT_MIN_LENGTH_KEY, defaults.minimumLength) }
             }, enabled = enabled && !isDefaultCriteria, modifier = Modifier.testTag("repeat-defaults")) {
                 Text("기본값으로", color = if (enabled && !isDefaultCriteria) colors.accent else colors.subText, fontSize = 13.sp)
             }
         })
         SettingsGroup(colors) {
+            RepeatMinimumLengthRow(settings.minimumLength, enabled, colors) { editMinimum = true }
             RepeatStepperRow(Icons.Filled.Schedule, "확인 시간", "이 시간 안의 글끼리 비교", "${settings.windowMinutes}분",
                 "repeat-minutes", enabled, settings.windowMinutes > 1, settings.windowMinutes < 60, colors,
                 onMinus = { save { putInt(REPEAT_WINDOW_KEY, repeatStep(settings.windowMinutes, REPEAT_MINUTE_STEPS, false)) } },
@@ -128,7 +133,7 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
                 onMinus = { save { putInt(REPEAT_SIMILARITY_KEY, repeatStep(settings.similarityPercent, REPEAT_SIMILARITY_STEPS, false)) } },
                 onPlus = { save { putInt(REPEAT_SIMILARITY_KEY, repeatStep(settings.similarityPercent, REPEAT_SIMILARITY_STEPS, true)) } })
         }
-        Text("기본값: 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+        Text("기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
             color = colors.subText, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 8.dp))
 
         RepeatSectionLabel("검사 대상", colors)
@@ -158,15 +163,20 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
         }
     }
     Spacer(Modifier.height(24.dp))
+    if (editMinimum) RepeatMinimumLengthDialog(settings.minimumLength, colors, onDismiss = { editMinimum = false }) {
+        save { putInt(REPEAT_MIN_LENGTH_KEY, it) }
+        editMinimum = false
+    }
     if (help) AlertDialog(onDismissRequest = { help = false }, modifier = Modifier.testTag("repeat-help-dialog"),
         containerColor = colors.dialogBg, titleContentColor = colors.text, textContentColor = colors.subText,
         title = { Text("도배 방지 도움말") },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                HelpParagraph("어떤 글을 묶나요?", "같은 갤러리에서 회원은 같은 ID, 유동은 같은 표시 IP로 올린 게시글을 묶습니다. 정한 시간 안에 제목·본문이 비슷한 글이 반복 횟수만큼 쌓이면 도배로 봅니다.", colors)
+                HelpParagraph("어떤 글을 묶나요?", "같은 갤러리에서 회원은 같은 ID, 유동은 같은 표시 IP로 올린 게시글을 묶습니다. 정한 시간 안에 제목 또는 본문 중 어느 한쪽이 비슷한 글이 반복 횟수만큼 쌓이면 도배로 봅니다. 제목끼리, 본문끼리 따로 세며 둘 다 같을 필요는 없습니다.", colors)
                 HelpParagraph("무엇을 하나요?", "첫 글을 포함해 반복된 글을 ‘개별 차단 설정’의 처리 방식(처음에는 삭제)대로 처리합니다. 다른 필터처럼 삭제·차단·보류 중에서 고르고, 끄면 차단 기본 설정을 따릅니다. 이미 검사한 앞선 글은 다음 검사 때 다시 확인한 뒤 처리하므로 처리 시점이 조금 늦을 수 있습니다.", colors)
-                HelpParagraph("비슷한 정도는 어떻게 보나요?", "공백·기호·보이지 않는 문자를 정리한 뒤 비교합니다. 숫자나 ‘안·않·없’ 같은 부정 표현이 다르면 다른 글로 봅니다. 짧은 글은 정리한 뒤 완전히 같아야 하고, 의미 있는 글자가 8개 미만인 글은 제외합니다.", colors)
-                HelpParagraph("검사하지 않는 글", "댓글, 일반 회원의 글, 화이트리스트로 보호된 작성자, 차단 예외 글, 글자 없이 이미지·동영상만 있는 글은 제외합니다. 봇이 탐색하는 페이지와 작동 시간 안에서 본 글만 셉니다.", colors)
+                HelpParagraph("비슷한 정도는 어떻게 보나요?", "공백·기호·보이지 않는 문자를 정리한 뒤 비교합니다. 숫자나 ‘안·않·없’ 같은 부정 표현이 다르면 다른 글로 봅니다. 설정한 최소 글자 수는 제목과 본문에 각각 적용합니다. 짧은 글에도 선택한 유사도를 적용하고, 100%면 정리한 뒤 같아야 합니다.", colors)
+                HelpParagraph("최소 글자 수가 0이면?", "길이 제한 없이 비교합니다. 기호만 있는 내용도 공백을 정리한 뒤 같으면 감지합니다. 단, 빈 본문끼리 같다는 이유로 도배로 판단하지는 않습니다. 이미지 속 글자는 읽지 않지만 제목이 반복되면 감지할 수 있습니다.", colors)
+                HelpParagraph("검사하지 않는 글", "댓글, 일반 회원의 글, 화이트리스트로 보호된 작성자, 차단 예외 글은 제외합니다. 봇이 탐색하는 페이지와 작동 시간 안에서 본 글만 셉니다.", colors)
                 HelpParagraph("놓치거나 잘못 볼 수 있는 경우", "표시 IP가 같아도 다른 사람일 수 있습니다. IP를 바꾸거나 내용을 크게 바꾼 도배, 이미지 속 글자로만 반복하는 도배는 놓칠 수 있습니다. 처음에는 처리 방식을 ‘보류’로 두고 결과를 확인해 보세요.", colors)
             }
         },
@@ -232,4 +242,51 @@ private fun RepeatSwitchRow(icon: ImageVector, title: String, subtitle: String, 
         Spacer(Modifier.width(8.dp))
         ModernSettingsSwitch(value, null, colors, enabled = enabled)
     }
+}
+
+internal fun parseRepeatMinimumLength(text: String): Int? =
+    text.takeIf { it.isNotEmpty() && it.all { c -> c in '0'..'9' } }?.toIntOrNull()
+
+@Composable
+private fun RepeatMinimumLengthRow(value: Int, enabled: Boolean, colors: BotColorScheme, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).testTag("repeat-min-length")
+        .padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        SettingIconBadge(Icons.Filled.TextFields, colors)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("최소 글자 수", color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text("제목·본문 각각 적용 · 눌러서 입력", color = colors.subText, fontSize = 12.sp)
+        }
+        Text(if (value == 0) "0자 · 제한 없음" else "${value}자", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Spacer(Modifier.width(8.dp))
+        Icon(Icons.Filled.Edit, contentDescription = null, tint = colors.subText, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun RepeatMinimumLengthDialog(value: Int, colors: BotColorScheme, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
+    var draft by remember { mutableStateOf(value.toString()) }
+    val parsed = parseRepeatMinimumLength(draft)
+    AlertDialog(onDismissRequest = onDismiss, modifier = Modifier.testTag("repeat-min-length-dialog"),
+        containerColor = colors.dialogBg, titleContentColor = colors.text, textContentColor = colors.subText,
+        title = { Text("최소 글자 수") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("공백·기호를 제외한 글자 수를 제목과 본문에 각각 적용합니다. 0이면 길이에 상관없이 검사합니다.", fontSize = 14.sp)
+                OutlinedTextField(value = draft, onValueChange = { draft = it }, singleLine = true,
+                    label = { Text("최소 글자 수") }, suffix = { Text("자") },
+                    supportingText = { Text(if (parsed == null) "0 이상의 정수를 입력해 주세요." else "0 = 길이 제한 없음") },
+                    isError = parsed == null, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth().testTag("repeat-min-length-input"),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = colors.text, unfocusedTextColor = colors.text,
+                        focusedBorderColor = colors.accent, cursorColor = colors.accent,
+                        focusedLabelColor = colors.accent, unfocusedLabelColor = colors.subText,
+                        focusedSuffixColor = colors.subText, unfocusedSuffixColor = colors.subText,
+                        focusedSupportingTextColor = colors.subText, unfocusedSupportingTextColor = colors.subText))
+            }
+        },
+        confirmButton = { TextButton(onClick = { parsed?.let(onSave) }, enabled = parsed != null, modifier = Modifier.testTag("repeat-min-length-save")) {
+            Text("저장", color = if (parsed != null) colors.accent else colors.subText)
+        } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소", color = colors.subText) } })
 }

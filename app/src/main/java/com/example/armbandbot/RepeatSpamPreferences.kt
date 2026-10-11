@@ -48,6 +48,7 @@ internal fun repeatSpamSettings(p: SharedPreferences) = RepeatSpamSettings(
     enabled = p.getBoolean(REPEAT_ENABLED_KEY, false),
     windowMinutes = p.getInt(REPEAT_WINDOW_KEY, 10), count = p.getInt(REPEAT_COUNT_KEY, 4),
     similarityPercent = p.getInt(REPEAT_SIMILARITY_KEY, 85),
+    minimumLength = p.getInt(REPEAT_MIN_LENGTH_KEY, REPEAT_DEFAULT_MIN_LENGTH),
     // HOLD keeps the earlier "감지 기록만" semantics: another filter that acts on the same post wins.
     observeOnly = repeatActionView(p).mode == "HOLD",
     yudong = p.getBoolean(REPEAT_YUDONG_KEY, true), kkang = p.getBoolean(REPEAT_KKANG_KEY, true),

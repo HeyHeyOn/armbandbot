@@ -49,6 +49,7 @@ class RepeatSpamSettingsTest {
     @Test fun legacySampleCountIsNotMigratedAsMinutes() {
         val migrated=migrateBotSettingsSnapshot(mapOf("spam_burst_window_minutes" to 19, REPEAT_ENABLED_KEY to true))
         assertEquals(19,migrated["spam_burst_window_minutes"])
+        assertEquals(8,migrated[REPEAT_MIN_LENGTH_KEY])
         assertEquals(10,migrated[REPEAT_WINDOW_KEY]); assertEquals(4,migrated[REPEAT_COUNT_KEY])
         assertEquals(true,migrated[REPEAT_ENABLED_KEY])
     }
@@ -87,6 +88,7 @@ class RepeatSpamSettingsTest {
         val changes=listOf<()->Unit>(
             {p.edit().putInt(REPEAT_COUNT_KEY,2).commit();Unit},
             {p.edit().putInt(REPEAT_WINDOW_KEY,20).commit();Unit},
+            {p.edit().putInt(REPEAT_MIN_LENGTH_KEY,0).commit();Unit},
             {p.edit().putBoolean(REPEAT_ENABLED_KEY,true).commit();Unit},
             {p.edit().putBoolean(REPEAT_OBSERVE_KEY,true).commit();Unit},
             {persistOrderedMultilineText(p,"nickname_whitelist","보호닉");Unit},
@@ -102,5 +104,14 @@ class RepeatSpamSettingsTest {
         p.edit().putBoolean(REPEAT_ENABLED_KEY,false).repeatSpamChanged().commit()
         p.edit().putBoolean(REPEAT_ENABLED_KEY,true).repeatSpamChanged().commit()
         assertNotEquals(before,repeatSpamPolicyRevision(snapshotScanPreferences(p)))
+    }
+    @Test fun minimumLengthSurvivesExportImportAndBotCopyIncludingZero() {
+        for (minimum in listOf(0, 1, 17, 8193, Int.MAX_VALUE)) {
+            val p = MemoryPreferences()
+            p.edit().putInt(REPEAT_MIN_LENGTH_KEY, minimum).commit()
+            assertEquals(minimum, repeatSpamSettings(restore(exportBotSettings(p))).minimumLength)
+        }
+        assertEquals(8, repeatSpamSettings(MemoryPreferences()).minimumLength)
+        assertEquals(8, repeatSpamSettings(restore(exportBotSettings(MemoryPreferences()))).minimumLength)
     }
 }
