@@ -259,6 +259,10 @@ internal fun migrateBotSettingsSnapshot(values: Map<String, Any?>): Map<String, 
     STRING_PREF_DEFAULTS.forEach { (key, default) ->
         migrated[key] = coerceString(migrated[key], default)
     }
+    // Preserve the legacy delete-only choice before defaults materialize BLOCK.
+    if (!values.containsKey("block_process_mode") && coerceBoolean(values["delete_only_mode"], false)) {
+        migrated["block_process_mode"] = "DELETE"
+    }
     migrated["ai_filter_model"] = migrateRetiredGroqModel(
         provider = migrated.getValue("ai_filter_provider") as String,
         model = migrated.getValue("ai_filter_model") as String,

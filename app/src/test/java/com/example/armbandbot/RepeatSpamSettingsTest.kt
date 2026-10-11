@@ -4,6 +4,48 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RepeatSpamSettingsTest {
+    private fun restore(export: BotSettingsExport): MemoryPreferences = MemoryPreferences().apply {
+        val values = prepareImportedSettingsForNewBot(parseAndMigrateBotSettingsExport(export.toJson()))
+        edit().apply {
+            values.forEach { (key, value) -> when (value) {
+                is String -> putString(key, value)
+                is Boolean -> putBoolean(key, value)
+                is Int -> putInt(key, value)
+                is Long -> putLong(key, value)
+                is Float -> putFloat(key, value)
+                is Set<*> -> @Suppress("UNCHECKED_CAST") putStringSet(key, value as Set<String>)
+            } }
+        }.commit()
+    }
+    @Test fun inheritedBlockSettingsSurviveRealExportAndImport() {
+        val p = MemoryPreferences()
+        p.edit().putString(REPEAT_PROCESS_MODE_KEY, "BLOCK")
+            .putInt("block_duration_hours", 168).putBoolean("delete_post_on_block", false).commit()
+        val expected = repeatActionView(p)
+        val restored = restore(exportBotSettings(p))
+        assertEquals(expected, repeatActionView(restored))
+        assertFalse(restored.contains(REPEAT_DURATION_KEY))
+        assertFalse(restored.contains(REPEAT_DELETE_POST_KEY))
+        restored.edit().putInt("block_duration_hours", 24).commit()
+        assertEquals(24, repeatActionView(restored).durationHours)
+    }
+    @Test fun defaultActionChoiceSurvivesRealExportAndImport() {
+        listOf("HOLD", "DELETE", "BLOCK", "LEGACY_DELETE").forEach { mode ->
+            val p = MemoryPreferences()
+            p.edit().putBoolean(REPEAT_CUSTOM_ACTION_KEY, false).apply {
+                if (mode == "LEGACY_DELETE") putBoolean("delete_only_mode", true)
+                else putString("block_process_mode", mode)
+            }.commit()
+            val expected = repeatActionView(p)
+            assertEquals(mode, expected, repeatActionView(restore(exportBotSettings(p))))
+        }
+    }
+    @Test fun oldFilesDoNotInventRepeatBlockOverrides() {
+        val export = BotSettingsExport(botName = "old", strings = mapOf(REPEAT_PROCESS_MODE_KEY to "BLOCK"),
+            booleans = mapOf("delete_post_on_block" to false), ints = mapOf("block_duration_hours" to 24),
+            floats = emptyMap(), stringSets = emptyMap())
+        assertEquals(RepeatActionView("BLOCK", 24, false, false), repeatActionView(restore(export)))
+    }
     @Test fun legacySampleCountIsNotMigratedAsMinutes() {
         val migrated=migrateBotSettingsSnapshot(mapOf("spam_burst_window_minutes" to 19, REPEAT_ENABLED_KEY to true))
         assertEquals(19,migrated["spam_burst_window_minutes"])

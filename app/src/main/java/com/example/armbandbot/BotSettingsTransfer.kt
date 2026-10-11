@@ -22,6 +22,7 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
     BUMP_RULES_KEY, MOVE_RULES_KEY, "remote_lists_kind", "remote_lists_url",
     "target_urls",
     "search_type",
+    "block_process_mode",
     "block_reason_text",
     "kkang_detection_mode",
     "pum_block_process_mode",
@@ -34,7 +35,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     REPEAT_CUSTOM_ACTION_KEY, REPEAT_DELETE_POST_KEY,
     WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY,
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
-    "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block",
+    "noti_url", "noti_image", "noti_voice", "noti_spam", "delete_post_on_block", "delete_only_mode",
     "is_search_mode", "is_user_filter_mode", "is_nickname_filter_mode",
     "is_yudong_post_block", "is_yudong_comment_block", "is_yudong_image_block", "is_yudong_dc_media_block", "is_yudong_voice_block",
     "is_kkang_filter_mode", "is_kkang_post_block", "is_kkang_comment_block", "is_kkang_image_block", "is_kkang_dc_media_block", "is_kkang_voice_block",
@@ -53,6 +54,9 @@ internal val EXPORTABLE_INT_KEYS = listOf(
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
     "run_schedule_start_minute", "run_schedule_end_minute", "remote_lists_interval_minutes"
 ) + REMOTE_CHANNEL_EXPORT_INT_KEYS
+
+// Absence means inherit the bot's defaults; writing a fixed value changes future behaviour.
+private val INHERITED_ACTION_KEYS = setOf(REPEAT_DURATION_KEY, REPEAT_DELETE_POST_KEY)
 
 internal val EXPORTABLE_FLOAT_KEYS = listOf(
     "delay_post_min_sec", "delay_post_max_sec", "delay_page_min_sec",
@@ -88,12 +92,18 @@ internal fun exportStringSetValues(key: String, storedValues: Set<String>?): Lis
 
 fun exportBotSettings(context: Context, botId: String): BotSettingsExport {
     val botPref = context.getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+    return exportBotSettings(botPref)
+}
+
+internal fun exportBotSettings(botPref: SharedPreferences): BotSettingsExport {
     migrateBotSettingsToCurrentVersion(botPref)
     return BotSettingsExport(
         botName = botPref.getString("bot_name", "이름 없는 봇") ?: "이름 없는 봇",
         strings = EXPORTABLE_STRING_KEYS.associateWithNotNull { key -> botPref.getString(key, null) },
-        booleans = EXPORTABLE_BOOLEAN_KEYS.associateWith { key -> botPref.getBoolean(key, defaultBooleanValue(key)) },
-        ints = EXPORTABLE_INT_KEYS.associateWith { key -> botPref.getInt(key, defaultIntValue(key)) },
+        booleans = EXPORTABLE_BOOLEAN_KEYS.filter { it !in INHERITED_ACTION_KEYS || botPref.contains(it) }
+            .associateWith { key -> botPref.getBoolean(key, defaultBooleanValue(key)) },
+        ints = EXPORTABLE_INT_KEYS.filter { it !in INHERITED_ACTION_KEYS || botPref.contains(it) }
+            .associateWith { key -> botPref.getInt(key, defaultIntValue(key)) },
         floats = EXPORTABLE_FLOAT_KEYS.associateWith { key -> botPref.getFloat(key, defaultFloatValue(key)) },
         stringSets = EXPORTABLE_STRING_SET_KEYS.associateWith { key ->
             exportStringSetValues(key, botPref.getStringSet(key, null))
@@ -229,10 +239,12 @@ internal fun JSONObject?.toStringMap(keys: List<String>): Map<String, String> =
     }.toMap()
 
 internal fun JSONObject?.toBooleanMap(keys: List<String>): Map<String, Boolean> =
-    keys.associateWith { key -> this?.optBoolean(key, defaultBooleanValue(key)) ?: defaultBooleanValue(key) }
+    keys.filter { it !in INHERITED_ACTION_KEYS || (this?.has(it) == true && !isNull(it)) }
+        .associateWith { key -> this?.optBoolean(key, defaultBooleanValue(key)) ?: defaultBooleanValue(key) }
 
 internal fun JSONObject?.toIntMap(keys: List<String>): Map<String, Int> =
-    keys.associateWith { key -> this?.optInt(key, defaultIntValue(key)) ?: defaultIntValue(key) }
+    keys.filter { it !in INHERITED_ACTION_KEYS || (this?.has(it) == true && !isNull(it)) }
+        .associateWith { key -> this?.optInt(key, defaultIntValue(key)) ?: defaultIntValue(key) }
 
 internal fun JSONObject?.toFloatMap(keys: List<String>): Map<String, Float> =
     keys.associateWith { key -> (this?.optDouble(key, defaultFloatValue(key).toDouble()) ?: defaultFloatValue(key).toDouble()).toFloat() }
