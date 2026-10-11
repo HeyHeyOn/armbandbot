@@ -1,9 +1,11 @@
 ## 1.7.0 정식 릴리즈
 
+- 정식 소스·태그 `v1.7.0`: `60a5275f8fb826a85529959fec9cc51d5330d091`. 배포와 공지 전체 완료.
+
 - 같은 작성자 정보의 반복 내용을 감지하며 첫 글까지 함께 처리합니다. 확인 시간·반복 횟수·유사도는 조절할 수 있고 기본값은 10분·4개·85%입니다.
 - 도배 방지 화면을 현재 동작 요약·감지 기준·검사 대상·개별 차단 설정으로 정리했습니다. 삭제·차단·보류 중에서 고르고, 기존 베타 보류 설정과 백업·복원 시 기본 처리 설정 상속을 유지합니다.
 - versionCode190. Debug·Release JVM 각747개, lint 오류0, DEX·기존 서명 유지 검증 통과. Android7/15 계측 각35개 통과(실패·건너뜀0). 정확한 서명 APK로 이전 정식/API24 및 beta2/API35 업데이트, 설정·DB 행·스냅샷 보존과 밝은/어두운 UI·재시작 확인.
-- [정식 APK](https://drive.google.com/file/d/1MIxnOLZfT8sf3ts8G1Rdf-qBz0smIfjk/view?usp=drivesdk) · 공식 매뉴얼·패치노트·처음 사용 가이드 갱신 완료. 이전1.6.2는 구버전 보관. 갤러리 공지 게시 예정.
+- [정식 APK](https://drive.google.com/file/d/1MIxnOLZfT8sf3ts8G1Rdf-qBz0smIfjk/view?usp=drivesdk) · 공식 매뉴얼·패치노트·처음 사용 가이드 갱신 완료. 이전1.6.2는 구버전 보관. [갤러리 공지307번](https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=307) 익명 등록·해당 글만 일반→패치 변경·로그아웃 공개 검증 완료. 기존 패치26개 보존.
 - 상세 검증·범위: `releases/완장봇_v1.7.0_검증.json`. beta1의 실제 삭제 시험을 이어받았으며 이번 정식 APK의 추가 실서버 차단/삭제 시험은 하지 않았습니다.
 
 ## 1.7.0-beta2

@@ -346,8 +346,55 @@
     }
   },
   "announcement": {
-    "requested": true,
-    "status": "pending"
+    "version": "1.7.0",
+    "post_id": 307,
+    "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=307",
+    "category": "[📝패치]",
+    "anonymous_author": "완갤러",
+    "author_uid_empty": true,
+    "body_exact_normalized": true,
+    "body_links": 0,
+    "logged_out": true,
+    "previous_patch_entries_preserved": true,
+    "previous_patch_count": 26,
+    "patch_count_after": 27,
+    "patch_added_ids": [
+      307
+    ],
+    "status": "completed",
+    "general_creation": {
+      "version": "1.7.0",
+      "post_id": 307,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=307",
+      "category": "[💬일반]",
+      "anonymous_author": "완갤러",
+      "author_uid_empty": true,
+      "body_exact_normalized": true,
+      "body_links": 0,
+      "logged_out": true
+    },
+    "category_change": {
+      "post_id": 307,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=307",
+      "method": "official_category_handler_authenticated_http",
+      "before": "[💬일반]",
+      "attempted": true,
+      "started_at": "2026-10-11T06:09:16.218239+00:00",
+      "http_status": 200,
+      "result": "success",
+      "public_after": "[📝패치]",
+      "verified_patch": true,
+      "verified_at": "2026-10-11T06:09:16.426110+00:00"
+    },
+    "screenshot": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.0/announcement/public-patch307.png",
+    "screenshot_sha256": "2476de99ca5b35380d4f710282db3f1716f5ee5b887d1ea3762a0947843a912c"
   },
-  "evidence_directory": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.0"
+  "evidence_directory": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.0",
+  "git": {
+    "release_commit": "60a5275f8fb826a85529959fec9cc51d5330d091",
+    "tag": "v1.7.0",
+    "tag_target": "60a5275f8fb826a85529959fec9cc51d5330d091",
+    "remote_release_branch": "release/1.7.0",
+    "remote_master_promoted": true
+  }
 }
