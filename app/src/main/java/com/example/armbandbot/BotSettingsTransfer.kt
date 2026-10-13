@@ -40,7 +40,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_yudong_post_block", "is_yudong_comment_block", "is_yudong_image_block", "is_yudong_dc_media_block", "is_yudong_voice_block",
     "is_kkang_filter_mode", "is_kkang_post_block", "is_kkang_comment_block", "is_kkang_image_block", "is_kkang_dc_media_block", "is_kkang_voice_block",
     "is_url_filter_mode", "is_image_filter_mode", "is_dccon_filter_mode", "is_voice_filter_mode", "is_spam_code_filter_mode", "is_special_char_filter_mode",
-    "is_pum_source_filter_mode", "pum_recheck_every_cycle",
+    "is_pum_source_filter_mode", "pum_recheck_every_cycle", ALL_POSTS_RECHECK_KEY,
     "pum_block_all_posts", "pum_use_custom_action_config", "pum_delete_only_mode", "pum_delete_post_on_block",
     "independent_scan_state_enabled", "run_schedule_enabled",
     BUMP_ENABLED_KEY, MOVE_ENABLED_KEY, REMOTE_ENABLED_KEY,

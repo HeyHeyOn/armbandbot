@@ -230,6 +230,7 @@ class BotService : Service() {
         val aiFilterTimeoutSec: Int,
 
         val scanPageCount: Int,
+        val allPostsRecheckEveryCycle: Boolean,
         val postMinMs: Long,
         val postMaxMs: Long,
         val pageMinMs: Long,
@@ -1747,6 +1748,7 @@ class BotService : Service() {
                     yudongDcMediaActivationRecheckPending = config.yudongDcMediaActivationRecheckPending,
                     kkangDcMediaActivationRecheckPending = config.kkangDcMediaActivationRecheckPending,
                     hasDcMediaListMarker = hasDcMediaListMarker,
+                    allPostsRecheckEveryCycle = config.allPostsRecheckEveryCycle,
                 )) {
                 if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
                 continue
@@ -1784,7 +1786,7 @@ class BotService : Service() {
                     effectiveActionIsHold = yudongDcMediaAction?.mode == ModerationActionMode.HOLD,
                     alreadyHeld = yudongDcMediaAction?.mode == ModerationActionMode.HOLD &&
                         GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
-                    otherForcedRecheck = automationRecheck || interruptedAiRetry || (hasPumListMarker && (config.pumBlockAllPosts || config.pumRecheckEveryCycle)),
+                    otherForcedRecheck = config.allPostsRecheckEveryCycle || automationRecheck || interruptedAiRetry || (hasPumListMarker && (config.pumBlockAllPosts || config.pumRecheckEveryCycle)),
                 )) {
                 if (config.isDebugMode) {
                     sendLog("[디버그][유동 디시 동영상][보류중복] 변경 없는 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
@@ -1799,7 +1801,7 @@ class BotService : Service() {
                     effectiveActionIsHold = pumBlockAllAction?.mode == ModerationActionMode.HOLD,
                     alreadyHeld = pumBlockAllAction?.mode == ModerationActionMode.HOLD &&
                         GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
-                    otherForcedRecheck = automationRecheck || interruptedAiRetry || ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker),
+                    otherForcedRecheck = config.allPostsRecheckEveryCycle || automationRecheck || interruptedAiRetry || ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker),
                 )) {
                 if (config.isDebugMode) {
                     sendLog("[디버그][PUM][보류중복] 변경 없는 펌 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
@@ -1810,6 +1812,7 @@ class BotService : Service() {
                 val titleChanged = savedCommentCount != -1 && savedTitle?.trim().orEmpty() != text.trim()
                 val reason = when {
                     savedCommentCount == -1 -> "신규 글"
+                    config.allPostsRecheckEveryCycle -> "모든 게시물 매 사이클 검사"
                     savedCommentCount != currentCommentCount && titleChanged -> "댓글 수/제목 변경"
                     savedCommentCount != currentCommentCount -> "댓글 수 변경"
                     titleChanged -> "제목 변경"
@@ -4855,6 +4858,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             aiFilterTimeoutSec = safePrefInt("ai_filter_timeout_sec", 20),
 
             scanPageCount = safePrefInt("scan_page_count", 1),
+            allPostsRecheckEveryCycle = botPref.getBoolean(ALL_POSTS_RECHECK_KEY, false),
             postMinMs = postMinMs,
             postMaxMs = postMaxMs,
             pageMinMs = pageMinMs,

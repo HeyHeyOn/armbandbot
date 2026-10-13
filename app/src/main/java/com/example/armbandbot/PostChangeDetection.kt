@@ -1,5 +1,7 @@
 package com.heyheyon.armbandbot
 
+internal const val ALL_POSTS_RECHECK_KEY = "all_posts_recheck_every_cycle"
+
 fun shouldRecheckPost(
     savedCommentCount: Int,
     currentCommentCount: Int,
@@ -13,7 +15,9 @@ fun shouldRecheckPost(
     yudongDcMediaActivationRecheckPending: Boolean = false,
     kkangDcMediaActivationRecheckPending: Boolean = false,
     hasDcMediaListMarker: Boolean = false,
+    allPostsRecheckEveryCycle: Boolean = false,
 ): Boolean {
+    if (allPostsRecheckEveryCycle) return true
     if (savedCommentCount == -1) return true
     if (savedCommentCount != currentCommentCount) return true
     if (normalizePostTitle(savedTitle) != normalizePostTitle(currentTitle)) return true
