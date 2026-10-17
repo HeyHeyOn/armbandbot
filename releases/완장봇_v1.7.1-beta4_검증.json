@@ -1,0 +1,951 @@
+{
+  "version": "1.7.1-beta4",
+  "version_code": 194,
+  "source_commit": "84127fec64f0c91db37ddbaed2a5cd132a973c98",
+  "branch": "feature/1.7.1-beta4",
+  "created_at": "2026-10-17T10:21:29.218208+00:00",
+  "artifact": {
+    "path": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.7.1-beta4.apk",
+    "size": 13502638,
+    "sha256": "20d841a811e33c5ae412035ae94a71390b5e4d5b9da1437c7f3762348b3f915a",
+    "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+    "version": "1.7.1-beta4",
+    "code": 194,
+    "package": "com.heyheyon.armbandbot"
+  },
+  "jvm": {
+    "Debug": {
+      "tests": 798,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 798,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "debug": {
+      "Fatal": 0,
+      "Error": 0,
+      "Warning": 52,
+      "Information": 29
+    },
+    "release": {
+      "Fatal": 0,
+      "Error": 0,
+      "Warning": 47,
+      "Information": 29
+    }
+  },
+  "changes": [
+    "마이너 갤러리 공식 관리 템플릿의 개념글 버튼 인식 오류 수정",
+    "게시물·갤러리 일치/본문 가짜 버튼 배제/모호성 거부/미니갤 호환 유지",
+    "베타1~3 기능과 설정·DB·스냅샷 유지"
+  ],
+  "dex_invoke": "DEX invoke-range safety check passed: /home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.7.1-beta4.apk (max ins=240, headroom=15, method=Lcom/heyheyon/armbandbot/BotDetailScreenKt$BotDetailScreen$12;.<init>)",
+  "dex_capacity": {
+    "apk": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.7.1-beta4.apk",
+    "dex_count": 5,
+    "dex": [
+      {
+        "dex": "classes.dex",
+        "methods": 65466,
+        "method_headroom": 70,
+        "fields": 35009,
+        "field_headroom": 30527,
+        "classes": 17981,
+        "max_parameter_words": 175,
+        "max_words_with_receiver_upper_bound": 176,
+        "invoke_range_word_headroom_upper_bound": 79
+      },
+      {
+        "dex": "classes2.dex",
+        "methods": 15,
+        "method_headroom": 65521,
+        "fields": 0,
+        "field_headroom": 65536,
+        "classes": 14,
+        "max_parameter_words": 0,
+        "max_words_with_receiver_upper_bound": 1,
+        "invoke_range_word_headroom_upper_bound": 254
+      },
+      {
+        "dex": "classes3.dex",
+        "methods": 2145,
+        "method_headroom": 63391,
+        "fields": 547,
+        "field_headroom": 64989,
+        "classes": 175,
+        "max_parameter_words": 10,
+        "max_words_with_receiver_upper_bound": 11,
+        "invoke_range_word_headroom_upper_bound": 244
+      },
+      {
+        "dex": "classes4.dex",
+        "methods": 65051,
+        "method_headroom": 485,
+        "fields": 22728,
+        "field_headroom": 42808,
+        "classes": 8068,
+        "max_parameter_words": 239,
+        "max_words_with_receiver_upper_bound": 240,
+        "invoke_range_word_headroom_upper_bound": 15
+      },
+      {
+        "dex": "classes5.dex",
+        "methods": 14924,
+        "method_headroom": 50612,
+        "fields": 5005,
+        "field_headroom": 60531,
+        "classes": 1791,
+        "max_parameter_words": 22,
+        "max_words_with_receiver_upper_bound": 23,
+        "invoke_range_word_headroom_upper_bound": 232
+      }
+    ],
+    "minimum_method_headroom": 70,
+    "minimum_field_headroom": 30527,
+    "maximum_parameter_words": 239,
+    "maximum_words_with_receiver_upper_bound": 240
+  },
+  "android_instrumentation": {
+    "api24": {
+      "api": "24",
+      "classes": "com.heyheyon.armbandbot.RepeatSpamUiTest,com.heyheyon.armbandbot.RepeatSpamBackupTest,com.heyheyon.armbandbot.UserFilterRecheckAndroidTest,com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.AppDatabaseMigration8To9Test,com.heyheyon.armbandbot.AppDatabaseV9DaoTest,com.heyheyon.armbandbot.RepeatSpamPolicyAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckUiTest,com.heyheyon.armbandbot.RecommendationGuardAndroidTest,com.heyheyon.armbandbot.RecommendationGuardUiTest",
+      "passed": true,
+      "declared": 48,
+      "completed": 48,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "64a08ff4f1c91eed04d85f4680bfb17f15cfb0d70cb08f4f720b7f2047a094c4"
+    },
+    "api35": {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.RepeatSpamUiTest,com.heyheyon.armbandbot.RepeatSpamBackupTest,com.heyheyon.armbandbot.UserFilterRecheckAndroidTest,com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.AppDatabaseMigration8To9Test,com.heyheyon.armbandbot.AppDatabaseV9DaoTest,com.heyheyon.armbandbot.RepeatSpamPolicyAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckUiTest,com.heyheyon.armbandbot.RecommendationGuardAndroidTest,com.heyheyon.armbandbot.RecommendationGuardUiTest",
+      "passed": true,
+      "declared": 48,
+      "completed": 48,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "64a08ff4f1c91eed04d85f4680bfb17f15cfb0d70cb08f4f720b7f2047a094c4"
+    }
+  },
+  "signed_update_checks": {
+    "api24": {
+      "api": "24",
+      "apk_sha256": "20d841a811e33c5ae412035ae94a71390b5e4d5b9da1437c7f3762348b3f915a",
+      "previous": "releases/완장봇_v1.7.0.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "exact_beta4_version",
+        "both_bots_preserved",
+        "new_feature_defaults_off",
+        "enabled_from_detail",
+        "criteria_saved",
+        "cancel_preserves_criteria",
+        "retained_after_reentry",
+        "other_bot_remains_default",
+        "disabled_keeps_criteria",
+        "enabled_and_criteria_survive_restart",
+        "existing_recheck_options_preserved",
+        "repeat_spam_existing_minimum_preserved",
+        "scan_limits_and_delays_preserved",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "screenshots": [
+        {
+          "name": "before-upgrade",
+          "sha256": "31d386ab3a5f9acd239272838e09b3eb81a2ab571dd5663345eb5bdc86ef2db2",
+          "text": [
+            "완장봇",
+            "버전 1.7.0",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "after-upgrade",
+          "sha256": "6cdcfb9cd5817e0f6829223bdc9ad1f625ea1783520efceb619289fd610866bb",
+          "text": [
+            "완장봇",
+            "버전 1.7.1-beta4",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "recommend-default-light",
+          "sha256": "dc6849837dd337f31899e429c7733d78bc5a1815f4a14c7c90b7e3768d60719f",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-light",
+          "sha256": "2c28a8d9e927f44377c51fdc5faa966333b4296556797261cd9e50b95c132dcd",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-light",
+          "sha256": "b4e27730f049d7b06173bc6402742975f17d91aa42bcacab4567f18cbb5176ee",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "180",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "10",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-saved-light",
+          "sha256": "4fc3ce41d306c6aed660847cc162a551eacd7e26ae8b7628ae0347c88dee92a9",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-help-light",
+          "sha256": "007305359f320977d8d9253b59614a32384e54a92c9acc5871de3cee619d0a2b",
+          "text": [
+            "추천수 조작 방지 도움말",
+            "기준 시간 안에 관측한 추천 증가량으로 판단합니다. 예를 들어 3분·10개이면 2분 동안 10개가 늘어도 감지합니다. 4분 동안의 증가를 3분으로 환산하지 않습니다.\n\n처음 발견한 추천 수는 기준점으로만 사용합니다. 기준 시간을 넘긴 관측 공백, 추천 감소, 설정 변경 후에는 새로 관찰합니다.\n\n일반 글도 관찰하고, 감지 후 기준 시간 안에 개념글로 올라오면 해제합니다. 해제 성공한 글은 다시 해제하지 않으며, 결과 미확인 시 중복 요청을 보류합니다.\n\n봇의 계정·탐색 범위·운영 시간대를 공유합니다. 봇 중지나 기능 OFF 시 보조 작업도 멈춥니다. 개념글 전용 목록만 감시하면 진입 전 증가량은 알 수 없습니다.\n\n추천 급증만으로 조작을 확정할 수는 없습니다. 갤러리에 맞게 기준을 정하고 활동 로그에서 감지 근거와 해제 결과를 확인해 주세요.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "recommend-reentered-light",
+          "sha256": "4fc3ce41d306c6aed660847cc162a551eacd7e26ae8b7628ae0347c88dee92a9",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-other-bot-light",
+          "sha256": "5dac72c2931a3528d197413189f8b4c38ca52478311cdeba9554f7b6be374e8a",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-dark",
+          "sha256": "c450195ba8795b830b95c93cddfcd51a19415d2bff99e5a475d932cd8a02c393",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-dark",
+          "sha256": "d95285237a4f34a2e99e8d45d8891eb7f9c4c928fae7c7b83623f620a77c1599",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "125",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "23",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-disabled-dark",
+          "sha256": "cf809c93df7de7cad3836cdac153087b0776da15d3511ef81c2c5a40911ca034",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-cold-restart-dark",
+          "sha256": "c450195ba8795b830b95c93cddfcd51a19415d2bff99e5a475d932cd8a02c393",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        }
+      ],
+      "server_writes": 0,
+      "version": [
+        "versionCode=194 minSdk=24 targetSdk=35",
+        "versionName=1.7.1-beta4"
+      ],
+      "passed": true
+    },
+    "api35": {
+      "api": "35",
+      "apk_sha256": "20d841a811e33c5ae412035ae94a71390b5e4d5b9da1437c7f3762348b3f915a",
+      "previous": "releases/완장봇_v1.7.1-beta3.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "exact_beta4_version",
+        "both_bots_preserved",
+        "existing_guard_enabled_and_criteria_retained",
+        "other_bot_default_retained",
+        "existing_guard_can_disable",
+        "enabled_from_detail",
+        "criteria_saved",
+        "cancel_preserves_criteria",
+        "retained_after_reentry",
+        "other_bot_remains_default",
+        "disabled_keeps_criteria",
+        "enabled_and_criteria_survive_restart",
+        "existing_recheck_options_preserved",
+        "repeat_spam_existing_minimum_preserved",
+        "scan_limits_and_delays_preserved",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "screenshots": [
+        {
+          "name": "before-upgrade",
+          "sha256": "798c59b18cd5d0f06b9f8aa88502f07a6f76f30fd2a380f91a7a9efd84bd37a6",
+          "text": [
+            "완장봇",
+            "버전 1.7.1-beta3",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "after-upgrade",
+          "sha256": "22c7e57e7787d9df070e255667720234db6f941e17112bde9329242a6f1ecd6f",
+          "text": [
+            "완장봇",
+            "버전 1.7.1-beta4",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "recommend-retained-light",
+          "sha256": "847f64cbe600c28c3bab4f0321e3b33c6d262b6983d652bb47757addf42a0106",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-default-light",
+          "sha256": "25d62516bc0af538664fde251ef7587f6484ca2b85c6a86d67cf90be7b689e28",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-light",
+          "sha256": "847f64cbe600c28c3bab4f0321e3b33c6d262b6983d652bb47757addf42a0106",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-light",
+          "sha256": "32b6317bb6acd3b7da8b1e31a245d48e51da7f5d31dbe0ab251199fb11fc419e",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "75",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "14",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-saved-light",
+          "sha256": "3ee78d30a17acbaa16fa8ad181e0173cd6ee6f5941d37a39e8c3fcc694cf1fc8",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-help-light",
+          "sha256": "d867ed697d233b6a45996785c9285eede5fd37def39e6ea6e967cf702bd0d712",
+          "text": [
+            "추천수 조작 방지 도움말",
+            "기준 시간 안에 관측한 추천 증가량으로 판단합니다. 예를 들어 3분·10개이면 2분 동안 10개가 늘어도 감지합니다. 4분 동안의 증가를 3분으로 환산하지 않습니다.\n\n처음 발견한 추천 수는 기준점으로만 사용합니다. 기준 시간을 넘긴 관측 공백, 추천 감소, 설정 변경 후에는 새로 관찰합니다.\n\n일반 글도 관찰하고, 감지 후 기준 시간 안에 개념글로 올라오면 해제합니다. 해제 성공한 글은 다시 해제하지 않으며, 결과 미확인 시 중복 요청을 보류합니다.\n\n봇의 계정·탐색 범위·운영 시간대를 공유합니다. 봇 중지나 기능 OFF 시 보조 작업도 멈춥니다. 개념글 전용 목록만 감시하면 진입 전 증가량은 알 수 없습니다.\n\n추천 급증만으로 조작을 확정할 수는 없습니다. 갤러리에 맞게 기준을 정하고 활동 로그에서 감지 근거와 해제 결과를 확인해 주세요.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "recommend-reentered-light",
+          "sha256": "413bb2232d40b4d53e00c26e0b6a04f18782f0e0213e8f7a4bb0116e1e59e98d",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-other-bot-light",
+          "sha256": "21e8c43bbea091f598c5fd629f5f1ed49165ef9430eb64deed2807d2124ccc23",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-dark",
+          "sha256": "e821f833015f0c8919d72ed467f817046e7aa74a1e2d47f75d122d41c7aabb0e",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-dark",
+          "sha256": "53c8895858acdab28b9a1a1fb8dff104e717d67e3f6c8de16a79350d33889ae4",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "125",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "23",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-disabled-dark",
+          "sha256": "8535732405c325db9a79666a4d97611b06b2c81c5e58d76d69c63ae509a8bb95",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-cold-restart-dark",
+          "sha256": "f548490d3111363c16b220d350564eec4c5d075c87ceb73aa461a4dbe854607c",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        }
+      ],
+      "server_writes": 0,
+      "version": [
+        "versionCode=194 minSdk=24 targetSdk=35",
+        "versionName=1.7.1-beta4"
+      ],
+      "passed": true
+    }
+  },
+  "visual_verification": {
+    "passed": true,
+    "api24": {
+      "api": 24,
+      "passed": true,
+      "checked": "배포 버전 표시·봇2개 보존·양테마·125초/23개 기준·다크 입력 팝업·OFF 하위dim·헤더/텍스트 가독성 및 잘림 없음",
+      "images": [
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api24/after-upgrade.png",
+          "name": "after-upgrade",
+          "sha256": "6cdcfb9cd5817e0f6829223bdc9ad1f625ea1783520efceb619289fd610866bb",
+          "width": 1080,
+          "height": 1920
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api24/recommend-enabled-light.png",
+          "name": "recommend-enabled-light",
+          "sha256": "2c28a8d9e927f44377c51fdc5faa966333b4296556797261cd9e50b95c132dcd",
+          "width": 1080,
+          "height": 1920
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api24/recommend-saved-light.png",
+          "name": "recommend-saved-light",
+          "sha256": "4fc3ce41d306c6aed660847cc162a551eacd7e26ae8b7628ae0347c88dee92a9",
+          "width": 1080,
+          "height": 1920
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api24/recommend-dialog-dark.png",
+          "name": "recommend-dialog-dark",
+          "sha256": "d95285237a4f34a2e99e8d45d8891eb7f9c4c928fae7c7b83623f620a77c1599",
+          "width": 1080,
+          "height": 1920
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api24/recommend-disabled-dark.png",
+          "name": "recommend-disabled-dark",
+          "sha256": "cf809c93df7de7cad3836cdac153087b0776da15d3511ef81c2c5a40911ca034",
+          "width": 1080,
+          "height": 1920
+        }
+      ]
+    },
+    "api35": {
+      "api": 35,
+      "passed": true,
+      "checked": "배포 버전 표시·봇2개 보존·기존활성/75초14개 유지·125초23개 저장·양테마·다크 입력 팝업·OFF 하위dim·헤더/텍스트 가독성 및 잘림 없음",
+      "images": [
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api35/after-upgrade.png",
+          "name": "after-upgrade",
+          "sha256": "22c7e57e7787d9df070e255667720234db6f941e17112bde9329242a6f1ecd6f",
+          "width": 432,
+          "height": 960
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api35/recommend-retained-light.png",
+          "name": "recommend-retained-light",
+          "sha256": "847f64cbe600c28c3bab4f0321e3b33c6d262b6983d652bb47757addf42a0106",
+          "width": 432,
+          "height": 960
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api35/recommend-saved-light.png",
+          "name": "recommend-saved-light",
+          "sha256": "3ee78d30a17acbaa16fa8ad181e0173cd6ee6f5941d37a39e8c3fcc694cf1fc8",
+          "width": 432,
+          "height": 960
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api35/recommend-dialog-dark.png",
+          "name": "recommend-dialog-dark",
+          "sha256": "53c8895858acdab28b9a1a1fb8dff104e717d67e3f6c8de16a79350d33889ae4",
+          "width": 432,
+          "height": 960
+        },
+        {
+          "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/signed-api35/recommend-disabled-dark.png",
+          "name": "recommend-disabled-dark",
+          "sha256": "8535732405c325db9a79666a4d97611b06b2c81c5e58d76d69c63ae509a8bb95",
+          "width": 432,
+          "height": 960
+        }
+      ]
+    }
+  },
+  "live": {
+    "gallery": "laboratory1",
+    "type": "M",
+    "post": "2375",
+    "api": "35",
+    "apk_sha256": "20d841a811e33c5ae412035ae94a71390b5e4d5b9da1437c7f3762348b3f915a",
+    "apk_path": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.7.1-beta4.apk",
+    "criteria_seconds": 180,
+    "criteria_increase": 1,
+    "counts_synthetic": false,
+    "clock_injected": false,
+    "manual_client_invocation": false,
+    "claims": [],
+    "observed_service_log": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/live-api35/service-log.txt",
+    "server_success_claims": 0,
+    "app_stopped": true,
+    "actual_recommended_release_tested": false,
+    "actual_rel_successes": 0,
+    "actual_rel_claims": 0,
+    "actual_service_observations": 3,
+    "actual_main_cycles": 1,
+    "state_errors": 0,
+    "native_stop": {
+      "time": "2026-10-17T09:49:21.181650+00:00",
+      "method": "native main screen running toggle",
+      "verified_at": "2026-10-17T09:50:16.973843+00:00",
+      "wait_seconds": 55.791727,
+      "observation_count": 3,
+      "main_cycle_count": 1,
+      "after_stop_observations": []
+    },
+    "recommendation_clicks": 1,
+    "real_count_before": 0,
+    "real_count_after": 1,
+    "promotion_attempt": {
+      "before": {
+        "time": "2026-10-17T09:48:42.228225+00:00",
+        "post": "2375",
+        "gallery": "laboratory1",
+        "type": "M",
+        "recommend_count": 1,
+        "native_modes": [
+          "SET"
+        ],
+        "recommended": false
+      },
+      "response": {
+        "result": "fail",
+        "msg": "개념글 기준에 미달되어 개념글로 등록할 수 없습니다."
+      },
+      "after": {
+        "time": "2026-10-17T09:48:42.685104+00:00",
+        "post": "2375",
+        "gallery": "laboratory1",
+        "type": "M",
+        "recommend_count": 1,
+        "native_modes": [
+          "SET"
+        ],
+        "recommended": false
+      }
+    },
+    "beta3_actual_page_state": "UNKNOWN",
+    "beta4_actual_page_state": "ORDINARY",
+    "user_authorized_beta_with_unverified_rel": true,
+    "scoped_read_observe_stop_checks_passed": true,
+    "limits": [
+      "디시 개념글 기준10개에 미달(실제1개)하여 SET 거절, 실제 REL 성공 미검증",
+      "일반 글 매칭은 별도 감지 로그를 남기지 않으므로 관측 완료 로그를 REL 성공 또는 감지 성공 로그로 취급하지 않음"
+    ],
+    "observations_during_main_wait": 2
+  },
+  "live_cleanup": {
+    "gallery": "laboratory1",
+    "type": "M",
+    "post": "2375",
+    "headtext": 10,
+    "votes_submitted": 1,
+    "state": "cleaned",
+    "time": "2026-10-17T09:50:40.871655+00:00",
+    "delete_result": "success",
+    "public_status": 404,
+    "public_absent": true,
+    "private_material_removed": true,
+    "unrelated_posts_modified": 0,
+    "duplicate_delete_sent": false
+  },
+  "drive": {
+    "apk": {
+      "status": "uploaded_and_verified",
+      "uploaded": {
+        "accepted_input": "file_uri",
+        "success": true,
+        "id": "1MoCb0IVFDkbgaElW9zXid8YIaEs_Z4y9",
+        "title": "완장봇_v1.7.1-beta4.apk",
+        "file_name": "완장봇_v1.7.1-beta4.apk",
+        "mime_type": "application/vnd.android.package-archive",
+        "url": "https://drive.google.com/file/d/1MoCb0IVFDkbgaElW9zXid8YIaEs_Z4y9/view?usp=drivesdk",
+        "parent_id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+        "structuredContent": {
+          "accepted_input": "file_uri",
+          "success": true,
+          "id": "1MoCb0IVFDkbgaElW9zXid8YIaEs_Z4y9",
+          "title": "완장봇_v1.7.1-beta4.apk",
+          "file_name": "완장봇_v1.7.1-beta4.apk",
+          "mime_type": "application/vnd.android.package-archive",
+          "url": "https://drive.google.com/file/d/1MoCb0IVFDkbgaElW9zXid8YIaEs_Z4y9/view?usp=drivesdk",
+          "parent_id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        }
+      },
+      "metadata": {
+        "id": "1MoCb0IVFDkbgaElW9zXid8YIaEs_Z4y9",
+        "title": "완장봇_v1.7.1-beta4.apk",
+        "mime_type": "application/vnd.android.package-archive",
+        "size": "13502638",
+        "url": "https://drive.google.com/file/d/1MoCb0IVFDkbgaElW9zXid8YIaEs_Z4y9/view?usp=drivesdk",
+        "display_url": "https://drive.google.com/file/d/1MoCb0IVFDkbgaElW9zXid8YIaEs_Z4y9/view?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": null,
+        "modified_time": null,
+        "parent_ids": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "drive_id": null,
+        "current_user_can_share": null,
+        "has_augmented_permissions": null,
+        "shared": null,
+        "permissions": null,
+        "source_visibility_status": "access_not_verified"
+      },
+      "local": {
+        "path": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.7.1-beta4.apk",
+        "size": 13502638,
+        "sha256": "20d841a811e33c5ae412035ae94a71390b5e4d5b9da1437c7f3762348b3f915a"
+      },
+      "downloaded": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/drive-download.apk",
+        "size": 13502638,
+        "sha256": "20d841a811e33c5ae412035ae94a71390b5e4d5b9da1437c7f3762348b3f915a"
+      },
+      "size_matches": true,
+      "parent_matches": true,
+      "download_sha_matches": true,
+      "existing_exact_name_before": 0,
+      "permissions_modified": false
+    },
+    "guide": {
+      "status": "uploaded_and_verified",
+      "uploaded": {
+        "accepted_input": "file_uri",
+        "success": true,
+        "id": "1Xi7PZEUHQ6Jf-um7bfb1DfMoYO6rwsp1",
+        "title": "완장봇_v1.7.1-beta4_사용안내.txt",
+        "file_name": "완장봇_v1.7.1-beta4_사용안내.txt",
+        "mime_type": "text/plain",
+        "url": "https://drive.google.com/file/d/1Xi7PZEUHQ6Jf-um7bfb1DfMoYO6rwsp1/view?usp=drivesdk",
+        "parent_id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9",
+        "structuredContent": {
+          "accepted_input": "file_uri",
+          "success": true,
+          "id": "1Xi7PZEUHQ6Jf-um7bfb1DfMoYO6rwsp1",
+          "title": "완장봇_v1.7.1-beta4_사용안내.txt",
+          "file_name": "완장봇_v1.7.1-beta4_사용안내.txt",
+          "mime_type": "text/plain",
+          "url": "https://drive.google.com/file/d/1Xi7PZEUHQ6Jf-um7bfb1DfMoYO6rwsp1/view?usp=drivesdk",
+          "parent_id": "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        }
+      },
+      "metadata": {
+        "id": "1Xi7PZEUHQ6Jf-um7bfb1DfMoYO6rwsp1",
+        "title": "완장봇_v1.7.1-beta4_사용안내.txt",
+        "mime_type": "text/plain",
+        "size": "4571",
+        "url": "https://drive.google.com/file/d/1Xi7PZEUHQ6Jf-um7bfb1DfMoYO6rwsp1/view?usp=drivesdk",
+        "display_url": "https://drive.google.com/file/d/1Xi7PZEUHQ6Jf-um7bfb1DfMoYO6rwsp1/view?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": null,
+        "modified_time": null,
+        "parent_ids": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "drive_id": null,
+        "current_user_can_share": null,
+        "has_augmented_permissions": null,
+        "shared": null,
+        "permissions": null,
+        "source_visibility_status": "access_not_verified"
+      },
+      "local": {
+        "path": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.7.1-beta4_사용안내.txt",
+        "size": 4571,
+        "sha256": "e43e8d90c9b11b85c222fcdac94efc1eaa74b15673fe806f68f819af1068239c"
+      },
+      "downloaded": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4/drive-download-guide.txt",
+        "size": 4571,
+        "sha256": "e43e8d90c9b11b85c222fcdac94efc1eaa74b15673fe806f68f819af1068239c"
+      },
+      "size_matches": true,
+      "parent_matches": true,
+      "download_sha_matches": true,
+      "existing_exact_name_before": 0,
+      "permissions_modified": false
+    }
+  },
+  "validation_retry": {
+    "api": 35,
+    "first_attempt": "api35-startup-failed",
+    "tests_started": 0,
+    "failure": "Process failed to complete startup / ANR",
+    "evidence": [
+      "Google Play services concurrent ANR",
+      "CPU pressure avg10 87.39; total CPU98%; memory pressure avg10 12.40",
+      "crash buffer empty, instrumentation declared null/completed0"
+    ],
+    "next_step": "after build finishes, stop owned build daemon and run same APK in fresh guest",
+    "product_change_after_failure": false,
+    "resolved": true,
+    "retry": "api35",
+    "same_apk_sha256": "64a08ff4f1c91eed04d85f4680bfb17f15cfb0d70cb08f4f720b7f2047a094c4",
+    "retry_completed": 48,
+    "retry_failed": 0,
+    "retry_skipped": 0,
+    "method": "fresh guest after owned build processes ended"
+  },
+  "signed_validation_retry": {
+    "interrupted_attempt": "signed-api35-interrupted",
+    "process_exit_code": 143,
+    "completed_checks": 12,
+    "passed": false,
+    "reason": "Host validation process ended by SIGTERM without final results; no product failure recorded. Clean isolated guest rerun required.",
+    "apk_unchanged": true,
+    "resolved": true,
+    "retry": "signed-api35",
+    "retry_completed_checks": 24,
+    "retry_passed": true,
+    "same_apk_sha256": "20d841a811e33c5ae412035ae94a71390b5e4d5b9da1437c7f3762348b3f915a",
+    "startup_refused": "A restart was safely refused while the owned emulator was still disconnecting; started only after it exited."
+  },
+  "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1-beta4",
+  "limits": [
+    "물리 기기·장시간 운용은 미실시",
+    "디시 개념글 기준10개에 미달(실제1개)하여 SET 거절, 실제 REL 성공 미검증",
+    "일반 글 매칭은 별도 감지 로그를 남기지 않으므로 관측 완료 로그를 REL 성공 또는 감지 성공 로그로 취급하지 않음",
+    "사용자가 실제 해제 미검증 명시 후 베타4 배포를 승인함"
+  ],
+  "formal": "unchanged 1.7.0/code190/master7dd347d/notice307",
+  "announcement": "not requested",
+  "preferred_live_test_gallery": "laboratory1 M / Test10"
+}
