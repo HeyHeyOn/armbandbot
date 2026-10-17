@@ -33,6 +33,7 @@ internal fun ManagementAutomationSettings(
         }
         AutomationFeatureSettingItem(p,colors,AutomationSettingsPage.BUMP,onOpen)
         AutomationFeatureSettingItem(p,colors,AutomationSettingsPage.TAB,onOpen)
+        RecommendationSettingsEntry(p, colors, onOpen)
     }
 }
 

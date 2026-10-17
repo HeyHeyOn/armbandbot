@@ -114,7 +114,7 @@ internal fun parseGalleryCategories(html:String):List<GalleryCategory> {
     return categories.values.sortedBy{it.id}
 }
 internal fun nativeActionUrl(key:PostKey,action:String):String {
-    require(key.gallType in setOf("M","MI"));require(action in setOf("update_bump","chg_headtext"))
+    require(key.gallType in setOf("M","MI"));require(action in setOf("update_bump","chg_headtext","set_recommend"))
     return "https://gall.dcinside.com/ajax/${if(key.gallType=="M")"minor" else "mini"}_manager_board_ajax/$action"
 }
 internal fun nativeBumpPayload(key:PostKey,token:String):Map<String,String> = linkedMapOf("ci_t" to token,"id" to key.gallId,"_GALLTYPE_" to key.gallType,"nos[]" to key.postNo)

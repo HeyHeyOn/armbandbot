@@ -23,6 +23,7 @@ private fun migrateRetiredGroqModel(provider: String, model: String): String {
 }
 
 private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
+    RECOMMEND_GUARD_ENABLED to false,
     ALL_POSTS_RECHECK_KEY to false,
     WORD_FILTER_ENABLED_KEY to true,
     YUDONG_FILTER_ENABLED_KEY to true,
@@ -137,6 +138,7 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
 )
 
 private val INT_PREF_DEFAULTS: Map<String, Int> = mapOf(
+    RECOMMEND_GUARD_SECONDS to 180, RECOMMEND_GUARD_COUNT to 10,
     REPEAT_WINDOW_KEY to 10, REPEAT_COUNT_KEY to 4, REPEAT_SIMILARITY_KEY to 85, REPEAT_MIN_LENGTH_KEY to REPEAT_DEFAULT_MIN_LENGTH,
     "ai_block_duration_hours" to -1,
     "auto_login_failure_count" to 0,

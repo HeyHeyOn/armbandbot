@@ -919,6 +919,8 @@ fun BotDetailScreen(botId: String, openBlockLogTrigger: Boolean, onTriggerConsum
             if (activeSubScreen != null) {
                 if (activeSubScreen == "SCHEDULE") {
                     BotRunScheduleSettingsScreen(botPref, colors) { currentSubScreen = null }
+                } else if (activeSubScreen == RECOMMEND_GUARD_ROUTE) {
+                    RecommendationSettingsScreen(botPref, colors) { currentSubScreen = null }
                 } else if (AutomationSettingsPage.forRoute(activeSubScreen) != null) {
                     PostAutomationSettingsScreen(botPref, colors, checkNotNull(AutomationSettingsPage.forRoute(activeSubScreen))) { currentSubScreen = null }
                 } else if (activeSubScreen == "DB_DASHBOARD") {

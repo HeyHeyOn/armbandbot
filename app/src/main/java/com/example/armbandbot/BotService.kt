@@ -82,6 +82,59 @@ internal fun cycleDelayAfterScheduleOutcome(
 ): Long? = if (outcome == ScheduleCycleOutcome.PAUSED_BY_SCHEDULE) null else plannedDelayMillis
 
 class BotService : Service() {
+    private data class RecommendationPageSample(val cookie: String, val at: Long, val rows: List<RecommendationRow>,
+        val result: PageProcessResult, val spacing: BotRequestSpacing? = RuntimeRequestGate.requireCurrent().spacing)
+    private val recommendationPages = ConcurrentHashMap<String, LinkedHashMap<String, RecommendationPageSample>>()
+
+    private fun recommendationProtected(config: BotConfig, row: RecommendationRow): Boolean =
+        row.key.postNo in config.blockExemptPostNumbers ||
+            evaluateUserFilter(config, row.uid.ifBlank { row.ip }, row.nickname).isWhitelistedUser ||
+            GlobalBotState.getSavedPost(config.scanScopeId, row.key.gallType, row.key.gallId, row.key.postNo)?.isBlocked == true ||
+            GlobalBotState.hasHoldHistory(row.key.gallType, row.key.gallId, row.key.postNo, "POST", row.key.postNo)
+
+    private fun consumeRecommendationPage(botId: String, config: BotConfig, monitor: RecommendationMonitor, sample: RecommendationPageSample) {
+        monitor.consume(sample.rows, sample.at) { recommendationProtected(config, it) }
+    }
+
+    private suspend fun runRecommendationMonitor(botId: String, p: android.content.SharedPreferences, initialCookie: String) {
+        val monitor = RecommendationMonitor(p,
+            allowed = { p.getBoolean("is_running", false) && !p.getBoolean("session_login_required", false) &&
+                !p.getBoolean("session_webview_fallback_pending", false) && isScheduleActiveNow(botId) },
+            scan = { observer ->
+                val config = loadBotConfig(botId, snapshotScanPreferences(p))
+                val cookie = p.getString("saved_cookie", "").orEmpty().ifBlank { initialCookie }
+                require(cookie.isNotBlank()) { "관리 계정으로 로그인해 주세요." }
+                for (url in config.targetUrls) {
+                    observer.check()
+                    val outcome = processTargetUrl(config, botId, cookie, url, mutableMapOf(), "0", "", "0", null, { _, _, _ -> }, observer)
+                    check(outcome == UrlProcessOutcome.CONTINUE) { "대상 목록·권한·연결 상태를 확인해 주세요." }
+                }
+                if (config.isDebugMode) sendLog("[디버그][추천수] 독립 관측 완료", botId)
+            },
+            release = { match, verify ->
+                val cookie = p.getString("saved_cookie", "").orEmpty().ifBlank { initialCookie }
+                val verifyCurrent = {
+                    verify()
+                    check(match.key.gallType to match.key.gallId in configuredAutomationGalleries(p))
+                    val config = loadBotConfig(botId, snapshotScanPreferences(p))
+                    if (recommendationProtected(config, RecommendationRow(match.key, match.to, "", "", ""))) {
+                        throw RecommendationSettingsChanged()
+                    }
+                }
+                val client = RecommendationReleaseClient(cookie,
+                    beforeRequest = { verifyCurrent(); RuntimeRequestGate.requireCurrent().beforeRequest(); verifyCurrent() },
+                    claim = { key, kind, action -> executeClaimedModerationAction(botId, key.gallType, key.gallId, key.postNo, "POST", key.postNo, kind, action) })
+                client.release(match.key, verifyPolicy = verifyCurrent, protected = { document ->
+                    val writer = document.selectFirst(".gallview_head .gall_writer")
+                    val config = loadBotConfig(botId, snapshotScanPreferences(p))
+                    writer == null || document.select(".title_headtext").text().contains(Regex("공지|고정")) ||
+                        recommendationProtected(config, RecommendationRow(match.key, match.to,
+                            writer.attr("data-uid"), writer.attr("data-ip"), writer.attr("data-nick")))
+                })
+            }, log = { sendLog(it, botId) })
+        monitor.run()
+    }
+
     private val automationRechecks = java.util.concurrent.ConcurrentHashMap<String, AutomationRecheckState>()
     private val remoteListClient = RemoteListClient()
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
@@ -400,7 +453,7 @@ class BotService : Service() {
 
 
     private fun Connection.gatedExecute(): Connection.Response =
-        executeGatedJsoup(this, RuntimeRequestGate.requireCurrent()::check)
+        executeGatedJsoup(this, RuntimeRequestGate.requireCurrent()::beforeRequest)
 
     private fun Connection.gatedGet(): org.jsoup.nodes.Document =
         method(Connection.Method.GET).gatedExecute().parse()
@@ -864,7 +917,8 @@ class BotService : Service() {
 
         val job = serviceScope.launch(start = CoroutineStart.LAZY) {
             try {
-                val gate = RuntimeRequestGate(currentCoroutineContext().job) { isScheduleActiveNow(botId) }
+                val spacing = BotRequestSpacing(enabled = { botPref.getBoolean(RECOMMEND_GUARD_ENABLED, false) })
+                val gate = RuntimeRequestGate(currentCoroutineContext().job, spacing) { isScheduleActiveNow(botId) }
                 withContext(RuntimeRequestGate.context.asContextElement(gate)) {
                     runBotLoop(botId, botName, cookie, botPref)
                 }
@@ -1409,10 +1463,20 @@ class BotService : Service() {
             independent = botPref.getBoolean("independent_scan_state_enabled", false),
         )
 
+        val recommendationJob = launch {
+            val parentGate = RuntimeRequestGate.requireCurrent()
+            val sideGate = RuntimeRequestGate(currentCoroutineContext().job, parentGate.spacing) {
+                isScheduleActiveNow(botId) && botPref.getBoolean("is_running", false) && botPref.getBoolean(RECOMMEND_GUARD_ENABLED, false)
+            }
+            withContext(RuntimeRequestGate.context.asContextElement(sideGate)) {
+                runRecommendationMonitor(botId, botPref, cookie)
+            }
+        }
+        try {
         while (isActive) {
             awaitActiveSchedule(botId, botPref)
             try {
-                remoteListClient.sync(botPref, beforeRequest = { RuntimeRequestGate.requireCurrent().check() })
+                remoteListClient.sync(botPref, beforeRequest = { RuntimeRequestGate.requireCurrent().beforeRequest() })
             } catch (_: SchedulePausedException) {
                 continue
             }
@@ -1520,7 +1584,7 @@ class BotService : Service() {
             // normalized-source cache intentionally live for one scan cycle only.
             val pumSourceResolver = PumSourceResolver(
                 http = UrlConnectionPumHttpClient(),
-                beforeRequest = RuntimeRequestGate.requireCurrent()::check,
+                beforeRequest = RuntimeRequestGate.requireCurrent()::beforeRequest,
                 cookies = { currentCookie },
                 userAgent = dcUserAgent,
             )
@@ -1631,6 +1695,10 @@ class BotService : Service() {
             sendLog("[$botName] 사이클 완료! ${String.format("%.1f", cycleDelay / 1000f)}초 대기.", botId)
             delay(cycleDelay)
         }
+        } finally {
+            withContext(NonCancellable) { recommendationJob.cancelAndJoin() }
+            recommendationPages.remove(botId)
+        }
     }
 
     private suspend fun processPage(
@@ -1648,10 +1716,19 @@ class BotService : Service() {
         blockReason: String,
         delChk: String,
         pumSourceResolver: PumSourceResolver?,
-        notifyIfEnabled: (String, String, String) -> Unit
+        notifyIfEnabled: (String, String, String) -> Unit,
+        recommendationOnly: RecommendationMonitor? = null,
     ): PageProcessResult {
         if (config.isDebugMode) {
             sendLog("[디버그][페이지] 처리 URL 접근 시작: $pageUrl", botId)
+        }
+        recommendationOnly?.check()
+        if (recommendationOnly != null) {
+            val cached = synchronized(recommendationPages) { recommendationPages[botId]?.get(pageUrl) }
+            if (cached != null && cached.cookie == cookie && cached.spacing === RuntimeRequestGate.requireCurrent().spacing && android.os.SystemClock.elapsedRealtime() - cached.at in 0..5_000) {
+                consumeRecommendationPage(botId, config, recommendationOnly, cached)
+                return cached.result
+            }
         }
         requireActiveScheduleForRequest(botId)
         val pageFetchStartedAt = System.currentTimeMillis()
@@ -1677,6 +1754,27 @@ class BotService : Service() {
             return PageProcessResult("", true, "", managerPermissionStatus = managerPermissionStatus)
         }
 
+        if (getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE).getBoolean(RECOMMEND_GUARD_ENABLED, false)) {
+            val navigation = if (ciTokenFallbackAllowed && searchBaseUrl != null && searchKeyword != null)
+                extractSearchNavigation(document, searchBaseUrl, config.searchType, searchKeyword) else null
+            val rows = parseRecommendationRows(document, gallType, gallId)
+            val sample = RecommendationPageSample(cookie, android.os.SystemClock.elapsedRealtime(), rows,
+                PageProcessResult(rows.firstOrNull()?.key?.postNo.orEmpty(), rows.isEmpty(), navigation?.currentSearchPos.orEmpty(),
+                    nextPageUrl = navigation?.nextPageUrl, nextSearchChunkUrl = navigation?.nextSearchChunkUrl, currentPageUrl = navigation?.currentPageUrl))
+            if (managerPermissionStatus == ManagerPermissionStatus.CONFIRMED) {
+                synchronized(recommendationPages) {
+                    val cache = recommendationPages.getOrPut(botId) { LinkedHashMap() }
+                    cache[pageUrl] = sample
+                    while (cache.size > 16) cache.remove(cache.keys.first())
+                }
+            }
+            if (recommendationOnly != null) {
+                check(managerPermissionStatus == ManagerPermissionStatus.CONFIRMED) { "목록 관리 권한을 확인할 수 없습니다." }
+                consumeRecommendationPage(botId, config, recommendationOnly, sample)
+                return sample.result
+            }
+        }
+        recommendationOnly?.check()
         val ciToken = document.select("input[name=ci_t]").attr("value")
         val postRows = document.select(".ub-content")
         if (config.isDebugMode) {
@@ -1918,7 +2016,8 @@ class BotService : Service() {
         blockReason: String,
         delChk: String,
         pumSourceResolver: PumSourceResolver?,
-        notifyIfEnabled: (String, String, String) -> Unit
+        notifyIfEnabled: (String, String, String) -> Unit,
+        recommendationOnly: RecommendationMonitor? = null,
     ): UrlProcessOutcome {
         currentCoroutineContext().ensureActive()
         if (!isScheduleActiveNow(botId)) return UrlProcessOutcome.PAUSED_BY_SCHEDULE
@@ -1973,7 +2072,8 @@ class BotService : Service() {
                         blockReason = blockReason,
                         delChk = delChk,
                         pumSourceResolver = pumSourceResolver,
-                        notifyIfEnabled = notifyIfEnabled
+                        notifyIfEnabled = notifyIfEnabled,
+                        recommendationOnly = recommendationOnly,
                     )
                     if (!pageResult.activationRecheckComplete) {
                         activationRecheckComplete = false
@@ -2019,6 +2119,8 @@ class BotService : Service() {
                             currentSearchPos = parseQueryParams(nextPageUrl)["search_pos"].orEmpty()
                         }
                     }
+                } catch (changed: RecommendationSettingsChanged) {
+                    throw changed
                 } catch (paused: SchedulePausedException) {
                     return UrlProcessOutcome.PAUSED_BY_SCHEDULE
                 } catch (cancelled: CancellationException) {
@@ -2033,11 +2135,12 @@ class BotService : Service() {
                     currentPage++
                     currentPageUrl = "$cleanBaseUrl&page=$currentPage"
                 }
-                if (logicalPageCount < config.scanPageCount) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
+                if (recommendationOnly == null && logicalPageCount < config.scanPageCount) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
             }
 
-            if (config.isSearchMode && keywordIndex < activeKeywords.size - 1) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
+            if (recommendationOnly == null && config.isSearchMode && keywordIndex < activeKeywords.size - 1) delay(randomDelay(config.pageMinMs, config.pageMaxMs))
         }
+        if (recommendationOnly != null && !activationRecheckComplete) return UrlProcessOutcome.INCOMPLETE
         return if (shouldMarkDcMediaActivationTargetIncomplete(
                 config.yudongDcMediaActivationRecheckPending,
                 config.kkangDcMediaActivationRecheckPending,
@@ -3090,7 +3193,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                     }
                     requireActiveScheduleForRequest(botId)
                     val aiBatchEvaluation = AiFilterClient(
-                        beforeRequest = RuntimeRequestGate.requireCurrent()::check,
+                        beforeRequest = RuntimeRequestGate.requireCurrent()::beforeRequest,
                         config = AiFilterConfig(
                             enabled = true,
                             provider = when {

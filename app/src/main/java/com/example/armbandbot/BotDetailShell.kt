@@ -283,6 +283,7 @@ internal fun BotHomeTab(
                 "갤러리 설정 자동 갱신" to p.getBoolean("gallery_setting_refresh_enabled", false),
                 "예약 끌올" to p.getBoolean(BUMP_ENABLED_KEY, false),
                 "자동 탭 분류" to p.getBoolean(MOVE_ENABLED_KEY, false),
+                "추천수 조작 방지" to p.getBoolean(RECOMMEND_GUARD_ENABLED, false),
             )
         }
         HomeSummaryCard(

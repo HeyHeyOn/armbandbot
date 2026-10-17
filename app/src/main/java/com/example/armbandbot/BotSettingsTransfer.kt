@@ -43,12 +43,13 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
     "is_pum_source_filter_mode", "pum_recheck_every_cycle", ALL_POSTS_RECHECK_KEY,
     "pum_block_all_posts", "pum_use_custom_action_config", "pum_delete_only_mode", "pum_delete_post_on_block",
     "independent_scan_state_enabled", "run_schedule_enabled",
-    BUMP_ENABLED_KEY, MOVE_ENABLED_KEY, REMOTE_ENABLED_KEY,
+    BUMP_ENABLED_KEY, MOVE_ENABLED_KEY, REMOTE_ENABLED_KEY, RECOMMEND_GUARD_ENABLED,
     "bypass_ignore_case_enabled", "bypass_unicode_normalization_enabled",
     "is_debug_mode", "is_expert_mode", "is_snapshot_blocked", "is_snapshot_all"
 ) + REMOTE_CHANNEL_EXPORT_BOOLEAN_KEYS
 
 internal val EXPORTABLE_INT_KEYS = listOf(
+    RECOMMEND_GUARD_SECONDS, RECOMMEND_GUARD_COUNT,
     REPEAT_WINDOW_KEY, REPEAT_COUNT_KEY, REPEAT_SIMILARITY_KEY, REPEAT_MIN_LENGTH_KEY, REPEAT_DURATION_KEY,
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
@@ -198,6 +199,7 @@ internal fun prepareImportedSettingsForNewBot(imported: BotSettingsExport): Map<
             this["independent_scan_state_enabled"] = false
             this["is_running"] = false
             this["should_restore_after_restart"] = false
+            this[RECOMMEND_GUARD_ENABLED] = false
             this[BUMP_ENABLED_KEY] = false
             this[MOVE_ENABLED_KEY] = false
             this[REMOTE_ENABLED_KEY] = false

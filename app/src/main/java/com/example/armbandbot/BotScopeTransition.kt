@@ -14,6 +14,7 @@ internal fun prepareCopiedBotSettingsSnapshot(
         this["independent_scan_state_enabled"] = false
         this["is_running"] = false
         this["should_restore_after_restart"] = false
+        this[RECOMMEND_GUARD_ENABLED] = false
         this[BUMP_ENABLED_KEY] = false
         this[MOVE_ENABLED_KEY] = false
         this[REMOTE_ENABLED_KEY] = false

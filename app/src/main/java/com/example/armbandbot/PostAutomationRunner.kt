@@ -12,7 +12,7 @@ import java.time.ZoneId
 internal class PostAutomationRunner(private val context:Context,private val botId:String,private val p:SharedPreferences,private val cookie:String,private val claim:(PostKey,String,()->String)->String,private val log:(String)->Unit) {
     private fun gate(){RuntimeRequestGate.requireCurrent().check()}
     private fun targetAllowed(key:PostKey)=key.gallType to key.gallId in configuredAutomationGalleries(p)
-    private fun fetch(url:String):Document { gate();return Jsoup.connect(url).userAgent("Mozilla/5.0").header("Cookie",cookie).followRedirects(false).timeout(15000).maxBodySize(524288).also { gate() }.get() }
+    private fun fetch(url:String):Document { gate();return Jsoup.connect(url).userAgent("Mozilla/5.0").header("Cookie",cookie).followRedirects(false).timeout(15000).maxBodySize(524288).also { RuntimeRequestGate.requireCurrent().beforeRequest() }.get() }
     private fun detail(key:PostKey):Document {
         val d=fetch(DcinsidePostUrls.canonicalDetailUrl(key))
         require(d.select(".write_div").isNotEmpty() && automationTabs(d).isNotEmpty()){ "관리 권한 또는 게시글을 확인할 수 없습니다." }
@@ -21,7 +21,7 @@ internal class PostAutomationRunner(private val context:Context,private val botI
     }
     private fun post(key:PostKey,action:String,payload:Map<String,String>):String {
         gate();require(targetAllowed(key))
-        val r=Jsoup.connect(nativeActionUrl(key,action)).userAgent("Mozilla/5.0").header("Cookie",cookie).header("Referer",DcinsidePostUrls.canonicalDetailUrl(key)).header("X-Requested-With","XMLHttpRequest").followRedirects(false).timeout(MODERATION_REQUEST_TIMEOUT_MS).ignoreContentType(true).data(payload).method(org.jsoup.Connection.Method.POST).also { gate() }.execute()
+        val r=Jsoup.connect(nativeActionUrl(key,action)).userAgent("Mozilla/5.0").header("Cookie",cookie).header("Referer",DcinsidePostUrls.canonicalDetailUrl(key)).header("X-Requested-With","XMLHttpRequest").followRedirects(false).timeout(MODERATION_REQUEST_TIMEOUT_MS).ignoreContentType(true).data(payload).method(org.jsoup.Connection.Method.POST).also { RuntimeRequestGate.requireCurrent().beforeRequest() }.execute()
         return r.body()
     }
     fun runDueBumps(now:Long=System.currentTimeMillis()) {
