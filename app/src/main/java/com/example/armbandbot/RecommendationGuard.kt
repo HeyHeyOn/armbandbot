@@ -96,13 +96,17 @@ internal fun recommendationState(document: Document, key: PostKey): Recommendati
     val templates = document.select("script#minor_manager_view_buttons-tmpl,script#mini_manager_view_buttons-tmpl")
         .filter { it.parents().none { parent -> parent.hasClass("write_div") } }
         .map { Jsoup.parseBodyFragment(it.data(), document.baseUri()) }
-    val modes = (listOf(document) + templates).flatMap { fragment ->
-        fragment.select(".mng_subject_sel [onclick]").filter { element ->
-            element.parents().none { it.hasClass("write_div") }
-        }.mapNotNull { element ->
-            Regex("""^\s*update_recom\(\s*['"](REL|SET)['"]\s*,\s*${Regex.escape(key.postNo)}\s*\)\s*;?\s*$""")
-                .matchEntire(element.attr("onclick"))?.groupValues?.get(1)
-        }
+    val legacyControls = (listOf(document) + templates).flatMap { it.select(".mng_subject_sel [onclick]") }
+    // Minor galleries put recommendation buttons beside, not inside, the subject selector.
+    // Accept that layout only inside the first-party management template.
+    val nativeButtons = templates.flatMap {
+        it.select(".mng_setbox .user_control > button.btn_user_control[onclick]")
+    }
+    val modes = (legacyControls + nativeButtons).filter { element ->
+        element.parents().none { it.hasClass("write_div") }
+    }.mapNotNull { element ->
+        Regex("""^\s*update_recom\(\s*['"](REL|SET)['"]\s*,\s*${Regex.escape(key.postNo)}\s*\)\s*;?\s*$""")
+            .matchEntire(element.attr("onclick"))?.groupValues?.get(1)
     }.toSet()
     return when (modes) {
         setOf("REL") -> RecommendationState.RECOMMENDED

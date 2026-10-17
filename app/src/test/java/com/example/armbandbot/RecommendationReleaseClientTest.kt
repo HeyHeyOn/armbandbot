@@ -7,7 +7,10 @@ import org.junit.Test
 internal fun recommendationDetail(mode: String, type: String = "MI", no: String = "123") = Jsoup.parse("""
     <input id="no" value="$no"><input id="gallery_id" value="fixture"><div class="write_div">본문</div>
     <script id="${if(type == "M") "minor" else "mini"}_manager_view_buttons-tmpl" type="text/x-jquery-tmpl">
-    <div class="mng_subject_sel"><li onclick="update_recom('$mode', $no);">관리</li></div></script>
+    ${if (type == "M") """<div class="mng_setbox block"><div class="user_control">
+        <button class="btn_user_control" data-headtype="general" onclick="update_recom('$mode', $no);">관리</button>
+        </div><div class="mng_subject_sel"><li onclick="chg_headtext(this)">테스트</li></div></div>"""
+    else """<div class="mng_subject_sel"><li onclick="update_recom('$mode', $no);">관리</li></div>"""}</script>
 """, "https://gall.dcinside.com/")
 
 class RecommendationReleaseClientTest {
@@ -24,6 +27,37 @@ class RecommendationReleaseClientTest {
         assertEquals(RecommendationState.UNKNOWN, recommendationState(doc, key))
         doc.selectFirst(".write_div")!!.append("""<div class="mng_subject_sel"><li onclick="update_recom('REL', 123)">가짜</li></div>""")
         assertEquals(RecommendationState.UNKNOWN, recommendationState(doc, key))
+    }
+    @Test fun minorNativeButtonSupportsReleaseAndOrdinaryReadback() {
+        val minor = key.copy(gallType = "M")
+        var gets = 0; var posts = 0
+        val client = RecommendationReleaseClient("ci_c=fixture", {}, { _, _, call -> call() },
+            get = { recommendationDetail(if (gets++ == 0) "REL" else "SET", "M") },
+            post = { target, payload -> assertEquals(minor, target); assertEquals("REL", payload["mode"]); posts++; "{\"result\":\"success\"}" })
+        assertEquals("개념글 해제 성공", client.release(minor, {}) { false })
+        assertEquals(2, gets); assertEquals(1, posts)
+    }
+    @Test fun minorButtonsOutsideOfficialTemplateOrInsideUserBodyAreIgnored() {
+        val minor = key.copy(gallType = "M")
+        val doc = recommendationDetail("REL", "M")
+        val template = doc.selectFirst("script")!!.also { it.remove() }
+        doc.selectFirst(".write_div")!!.appendChild(template)
+        assertEquals(RecommendationState.UNKNOWN, recommendationState(doc, minor))
+        doc.body().append("""<div class="mng_setbox"><div class="user_control"><button class="btn_user_control" onclick="update_recom('REL', 123)">가짜</button></div></div>""")
+        assertEquals(RecommendationState.UNKNOWN, recommendationState(doc, minor))
+    }
+    @Test fun minorMissingNativeWrapperAndWrongTargetFailClosed() {
+        val minor = key.copy(gallType = "M")
+        val withoutWrapper = recommendationDetail("REL", "M").outerHtml().replace("mng_setbox block", "untrusted")
+        assertEquals(RecommendationState.UNKNOWN, recommendationState(Jsoup.parse(withoutWrapper), minor))
+        val wrongTarget = recommendationDetail("REL", "M").outerHtml().replace("update_recom('REL', 123)", "update_recom('REL', 124)")
+        assertEquals(RecommendationState.UNKNOWN, recommendationState(Jsoup.parse(wrongTarget), minor))
+    }
+    @Test fun contradictoryNativeModesFailClosed() {
+        val minor = key.copy(gallType = "M")
+        val doc = recommendationDetail("REL", "M")
+        doc.body().append("""<div class="mng_subject_sel"><li onclick="update_recom('SET', 123)">관리</li></div>""")
+        assertEquals(RecommendationState.UNKNOWN, recommendationState(doc, minor))
     }
     @Test fun successfulReleaseRequiresPositiveResponseAndOrdinaryReadback() {
         var gets = 0; var posts = 0; var claims = 0
