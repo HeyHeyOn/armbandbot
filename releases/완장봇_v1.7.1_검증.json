@@ -477,6 +477,12 @@
     "tag": "v1.7.1",
     "tag_target": "102e624b60fb4dcaa46e5505d5f02b4ac913aa7c",
     "release_branch": "release/1.7.1",
-    "promotion_state": "pending_remote_verification"
+    "promotion_state": "completed",
+    "release_commit": "931721d7699bd727598f0b582d3105ab7884f9ec",
+    "remote_master_promoted": true,
+    "remote_release_verified": true,
+    "tag_verified": true,
+    "original_dirty_master_untouched": true,
+    "push_mode": "normal atomic push, preserving previous master ancestry"
   }
 }
