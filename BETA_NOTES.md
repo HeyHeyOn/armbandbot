@@ -8,7 +8,7 @@
 - [정식 APK](https://drive.google.com/file/d/1CGV-7LXujYeZ_xoWB0c3jQFM5VCuV2an/view) · [공식 매뉴얼·패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE)
 - versionCode195. JVM Debug/Release 각798개, Android7·15 계측 각48개, lint 오류0, 기존 서명·DEX 검사 통과. 정확한 APK로 이전 정식/API24·beta4/API35 덮어 설치와 양 테마·설정·DB·스냅샷 보존을 확인했습니다.
 - Drive 정식 파일 재다운로드 SHA256 일치, 1.7.0은 구버전 보관. 공식 Docs 서식·사진·PDF 검수 완료. 상세 결과: `releases/완장봇_v1.7.1_검증.json`.
-- 갤러리 공지는 별도 승인 답변을 기다리는 상태이며 아직 게시하지 않았습니다.
+- [갤러리 공지319번](https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=319) 게시 완료(2026-10-24). 익명 일반 작성 후 해당 글만 패치로 변경했으며, 비로그인 본문 일치·기존 패치27개 보존·319번만 추가를 확인했습니다.
 
 ---
 

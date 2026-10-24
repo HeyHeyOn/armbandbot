@@ -467,9 +467,56 @@
     }
   },
   "announcement": {
-    "status": "awaiting_explicit_authorization",
-    "posted": false,
-    "draft": "announcement/body.txt"
+    "version": "1.7.1",
+    "post_id": 319,
+    "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=319",
+    "category": "[📝패치]",
+    "anonymous_author": "완갤러",
+    "author_uid_empty": true,
+    "body_exact_normalized": true,
+    "body_links": 0,
+    "logged_out": true,
+    "previous_patch_entries_preserved": true,
+    "previous_patch_count": 27,
+    "patch_count_after": 28,
+    "patch_added_ids": [
+      319
+    ],
+    "status": "completed",
+    "posted": true,
+    "completed_at": "2026-10-24T07:28:38.062662+00:00",
+    "authorized_by": "2026-10-24 user: 갤러리 공지까지 진행해줘.",
+    "general_creation": {
+      "version": "1.7.1",
+      "post_id": 319,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=319",
+      "category": "[💬일반]",
+      "anonymous_author": "완갤러",
+      "author_uid_empty": true,
+      "body_exact_normalized": true,
+      "body_links": 0,
+      "logged_out": true
+    },
+    "category_change": {
+      "post_id": 319,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=319",
+      "method": "official_category_handler_authenticated_http",
+      "before": "[💬일반]",
+      "attempted": true,
+      "started_at": "2026-10-24T07:28:11.747118+00:00",
+      "http_status": 200,
+      "result": "success",
+      "public_after": "[📝패치]",
+      "verified_patch": true,
+      "verified_at": "2026-10-24T07:28:11.954358+00:00"
+    },
+    "body_sha256": "b085f34caa3fb070ee41284e5f290f03597c77244212641a097d937b27c65bd6",
+    "screenshot": {
+      "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1/announcement/public-patch-319.png",
+      "sha256": "e2659cf6f677eafb3db13c1e67b9726913f018f4eefe2daa9d33fdef3c563c3d"
+    },
+    "actual_live_recommendation_release_limitation_disclosed": true,
+    "authenticated_http_session_closed": true
   },
   "evidence_directory": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.7.1",
   "git": {
