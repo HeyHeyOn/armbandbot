@@ -1645,5 +1645,57 @@
       ],
       "heading_repair": true
     }
+  },
+  "announcement": {
+    "version": "1.8.0",
+    "post_id": 322,
+    "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=322",
+    "category": "[📝패치]",
+    "anonymous_author": "완갤러",
+    "author_uid_empty": true,
+    "body_exact_normalized": true,
+    "body_links": 0,
+    "logged_out": true,
+    "previous_patch_entries_preserved": true,
+    "previous_patch_count": 28,
+    "patch_count_after": 29,
+    "patch_added_ids": [
+      322
+    ],
+    "status": "completed",
+    "posted": true,
+    "completed_at": "2026-10-25T01:35:01.776544+09:00",
+    "authorized_by": "User requested next version, beta real environment testing, formal release and announcement; continue authorized",
+    "general_creation": {
+      "version": "1.8.0",
+      "post_id": 322,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=322",
+      "category": "[💬일반]",
+      "anonymous_author": "완갤러",
+      "author_uid_empty": true,
+      "body_exact_normalized": true,
+      "body_links": 0,
+      "logged_out": true
+    },
+    "category_change": {
+      "post_id": 322,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=322",
+      "method": "official_category_handler_authenticated_http",
+      "before": "[💬일반]",
+      "attempted": true,
+      "started_at": "2026-10-24T16:34:24.581110+00:00",
+      "http_status": 200,
+      "result": "success",
+      "public_after": "[📝패치]",
+      "verified_patch": true,
+      "verified_at": "2026-10-24T16:34:24.793735+00:00"
+    },
+    "body_sha256": "d08f98555d81c562d2ed4a9d18e853b7f13b17ab7cff33a495e0d7281510980e",
+    "authenticated_http_session_closed": true,
+    "actual_live_recommendation_release_limitation_disclosed": true,
+    "screenshot": {
+      "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.0/announcement/public-patch-322-detail.png",
+      "sha256": "157dd1fb70f80d1b67af42059a9940a8b942235aec73d5782b39c1f0b143b07b"
+    }
   }
 }
