@@ -37,18 +37,25 @@ internal data class RepeatSpamSettings(
     val yudong: Boolean = true,
     val kkang: Boolean = true,
     val minimumLength: Int = REPEAT_DEFAULT_MIN_LENGTH,
+    val contentEnabled: Boolean = true,
+    val postingRate: PostingRateSettings = PostingRateSettings(),
 ) {
     val windowMillis: Long get() = windowMinutes * 60_000L
     fun bounded() = copy(windowMinutes = windowMinutes.coerceIn(1, 60), count = count.coerceIn(2, 20),
-        similarityPercent = similarityPercent.coerceIn(85, 100), minimumLength = minimumLength.coerceAtLeast(0))
+        similarityPercent = similarityPercent.coerceIn(85, 100), minimumLength = minimumLength.coerceAtLeast(0),
+        postingRate = postingRate.bounded())
 }
 
 internal data class RepeatSpamPost(
     val key: PostKey, val author: String, val createdAt: Long, val title: String, val body: String,
 )
 
-internal data class RepeatSpamMatch(val keys: Set<PostKey>, val windowMinutes: Int) {
-    val reason: String get() = "같은 작성자 정보의 반복 내용 ${keys.size}개 / 최근 ${windowMinutes}분 / 글번호 ${keys.map { it.postNo }.sorted().joinToString(",")}"
+internal data class RepeatSpamMatch(val keys: Set<PostKey>, val windowMinutes: Int,
+    val kind: SpamMatchKind = SpamMatchKind.CONTENT, val windowSeconds: Int = windowMinutes * 60) {
+    val label: String get() = if (kind == SpamMatchKind.CONTENT) "반복 글 감지" else "연속 작성 감지"
+    val reason: String get() = (if (kind == SpamMatchKind.CONTENT) "같은 작성자 정보의 반복 내용 ${keys.size}개 / 최근 ${windowMinutes}분"
+        else "같은 작성자 정보의 연속 작성 ${keys.size}개 / 최근 ${windowSeconds}초") +
+        " / 글번호 ${keys.map { it.postNo }.sorted().joinToString(",")}"
 }
 
 /** Local lexical comparison. Never truncate a long document into a false exact match. */
@@ -90,7 +97,9 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
     private var revision: String? = null
     private var settings = RepeatSpamSettings()
     private val events = linkedMapOf<PostKey, RepeatSpamPost>()
-    private val completed = mutableSetOf<PostKey>()
+    private val completed = mutableSetOf<Pair<PostKey, SpamMatchKind>>()
+    private val contentEligible = mutableSetOf<PostKey>()
+    private val rateEligible = mutableSetOf<PostKey>()
     private val pending = linkedMapOf<PostKey, RepeatSpamMatch>()
     private var dirty = true
     private var nextExpiryAt = Long.MAX_VALUE
@@ -101,36 +110,60 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
             clear(); revision = nextRevision; settings = nextSettings.bounded()
         }
     }
-    @Synchronized fun clear() { events.clear(); completed.clear(); pending.clear(); dirty = true; nextExpiryAt = Long.MAX_VALUE }
+    @Synchronized fun clear() { events.clear(); completed.clear(); pending.clear(); contentEligible.clear(); rateEligible.clear(); dirty = true; nextExpiryAt = Long.MAX_VALUE }
     @Synchronized fun size(): Int = events.size
-    @Synchronized fun forget(key: PostKey) { if (events.remove(key) != null) dirty = true; completed.remove(key); pending.remove(key) }
-    @Synchronized fun complete(key: PostKey) { completed.add(key); pending.remove(key) }
+    @Synchronized fun forget(key: PostKey) { if (events.remove(key) != null) dirty = true; completed.removeAll { it.first == key }; pending.remove(key); contentEligible.remove(key); rateEligible.remove(key) }
+    @Synchronized fun complete(key: PostKey, kind: SpamMatchKind = SpamMatchKind.CONTENT, allKinds: Boolean = false) {
+        if (allKinds) SpamMatchKind.entries.forEach { completed.add(key to it) } else completed.add(key to kind)
+        pending.remove(key)
+        // A completed HOLD must not suppress a different detector's later destructive decision.
+        dirty = true
+    }
     @Synchronized fun needsRecheck(key: PostKey, now: Long): Boolean {
         rebuild(now); return key in pending
     }
-    @Synchronized fun observe(post: RepeatSpamPost, eligible: Boolean, now: Long): RepeatSpamMatch? {
-        if (!settings.enabled || !eligible || post.author.isBlank() || post.createdAt < 0 || post.createdAt > now || now - post.createdAt > settings.windowMillis) {
+    @Synchronized fun observe(post: RepeatSpamPost, eligible: Boolean, now: Long, postingRateEligible: Boolean = false): RepeatSpamMatch? {
+        val content = eligible && settings.contentEnabled
+        val rate = postingRateEligible && settings.postingRate.enabled && settings.postingRate.includes(post.author)
+        val retention = maxOf(if (content) settings.windowMillis else 0L,
+            if (rate) settings.postingRate.seconds(post.author) * 1000L else 0L)
+        if (!settings.enabled || (!content && !rate) || post.author.isBlank() || post.createdAt < 0 || post.createdAt > now || now - post.createdAt > retention) {
             forget(post.key); rebuild(now); return null
         }
-        if (events[post.key] != post) { completed.remove(post.key); dirty = true }
+        if (events[post.key] != post || (post.key in contentEligible) != content || (post.key in rateEligible) != rate) {
+            completed.removeAll { it.first == post.key }; dirty = true
+        }
+        if (content) contentEligible.add(post.key) else contentEligible.remove(post.key)
+        if (rate) rateEligible.add(post.key) else rateEligible.remove(post.key)
         events[post.key] = post
         rebuild(now)
         return pending[post.key]
     }
-    @Synchronized fun canAct(key: PostKey, now: Long): Boolean { rebuild(now); return key in pending }
+    @Synchronized fun canAct(key: PostKey, now: Long, kind: SpamMatchKind? = null): Boolean {
+        rebuild(now); return pending[key]?.let { kind == null || kind == it.kind } == true
+    }
     private fun rebuild(now: Long) {
         if (now < lastEvaluatedAt) dirty = true
         lastEvaluatedAt = now
         if (!dirty && now < nextExpiryAt) return
         dirty = false
-        events.entries.removeAll { now - it.value.createdAt !in 0..settings.windowMillis }
+        fun expires(post: RepeatSpamPost): Long = post.createdAt + maxOf(
+            if (post.key in contentEligible) settings.windowMillis else 0L,
+            if (post.key in rateEligible) settings.postingRate.seconds(post.author) * 1000L else 0L)
+        events.entries.removeAll { now < it.value.createdAt || now > expires(it.value) }
         if (events.size > maxEvents) events.values.sortedByDescending { it.createdAt }.drop(maxEvents).forEach { events.remove(it.key) }
-        completed.retainAll(events.keys)
-        nextExpiryAt = events.values.minOfOrNull { it.createdAt + settings.windowMillis + 1 } ?: Long.MAX_VALUE
+        completed.removeAll { it.first !in events }
+        contentEligible.retainAll(events.keys); rateEligible.retainAll(events.keys)
+        // Re-evaluate at either detector's boundary, even when the other retains the event longer.
+        nextExpiryAt = events.values.flatMap { post -> listOfNotNull(
+            (post.createdAt + settings.windowMillis + 1).takeIf { post.key in contentEligible && it > now },
+            (post.createdAt + settings.postingRate.seconds(post.author) * 1000L + 1).takeIf { post.key in rateEligible && it > now })
+        }.minOrNull() ?: Long.MAX_VALUE
         pending.clear()
         if (!settings.enabled) return
         events.values.groupBy { Triple(it.key.gallType, it.key.gallId, it.author) }.values.forEach { sameAuthor ->
-            val ordered = sameAuthor.sortedWith(compareBy<RepeatSpamPost> { it.createdAt }.thenBy { it.key.postNo.toLongOrNull() ?: 0 })
+            val ordered = sameAuthor.filter { it.key in contentEligible && now - it.createdAt <= settings.windowMillis }
+                .sortedWith(compareBy<RepeatSpamPost> { it.createdAt }.thenBy { it.key.postNo.toLongOrNull() ?: 0 })
             // Each field must independently reach the repeat count. Mixing two matching titles
             // with two matching bodies must not manufacture a four-post repetition.
             for (title in listOf(true, false)) {
@@ -144,7 +177,16 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
                 }
                 clusters.filter { it.size >= settings.count }.forEach { group ->
                     val match = RepeatSpamMatch(group.map { it.key }.toSet(), settings.windowMinutes)
-                    group.filterNot { it.key in completed }.forEach { pending[it.key] = match }
+                    group.filterNot { (it.key to SpamMatchKind.CONTENT) in completed }.forEach { pending[it.key] = match }
+                }
+            }
+            val author = sameAuthor.first().author
+            val ratePosts = sameAuthor.filter { it.key in rateEligible && now - it.createdAt <= settings.postingRate.seconds(author) * 1000L }
+            if (settings.postingRate.enabled && ratePosts.size >= settings.postingRate.count(author)) {
+                val match = RepeatSpamMatch(ratePosts.map { it.key }.toSet(), 0, SpamMatchKind.POSTING_RATE, settings.postingRate.seconds(author))
+                ratePosts.filterNot { (it.key to SpamMatchKind.POSTING_RATE) in completed }.forEach {
+                    // Existing content action wins ties. A HOLD never hides an active delete/block.
+                    if (it.key !in pending || (settings.observeOnly && !settings.postingRate.observeOnly)) pending[it.key] = match
                 }
             }
         }

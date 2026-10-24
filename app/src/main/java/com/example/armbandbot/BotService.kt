@@ -3024,17 +3024,23 @@ img.written_dccon{max-width:80px;max-height:80px}
             }
         }
         val repeatTracker = repeatSpamTrackers[botId]
-        val repeatEligible = config.repeatSpam.enabled && postDoc.select(".write_div").isNotEmpty() &&
+        val repeatSettings = config.repeatSpam
+        val rateSettings = repeatSettings.postingRate
+        val spamEligible = repeatSettings.enabled && postDoc.select(".write_div").isNotEmpty() &&
             !outerAnalysis.isWhitelistedUser && when {
-            postUid.isBlank() -> config.repeatSpam.yudong && postAuthor.isNotBlank()
-            !config.repeatSpam.kkang -> false
-            else -> isKkangByConfiguredMode(config, postUid, isDcNewNicknameMarked(postWriterHtml),
-                gallogCache, tokenToUse, cookie, botId, "반복 글 깡계 판정").isKkang
-        }
+                postUid.isBlank() -> postAuthor.isNotBlank()
+                !(repeatSettings.contentEnabled && repeatSettings.kkang) && !(rateSettings.enabled && rateSettings.kkang) -> false
+                else -> isKkangByConfiguredMode(config, postUid, isDcNewNicknameMarked(postWriterHtml),
+                    gallogCache, tokenToUse, cookie, botId, "도배 대상 깡계 판정").isKkang
+            }
+        val repeatEligible = spamEligible && repeatSettings.contentEnabled &&
+            (if (postUid.isBlank()) repeatSettings.yudong else repeatSettings.kkang)
+        val rateEligible = spamEligible && rateSettings.enabled &&
+            (if (postUid.isBlank()) rateSettings.yudong else rateSettings.kkang)
         val repeatMatch = repeatTracker?.observe(
             RepeatSpamPost(postKey, if (postAuthor.isBlank()) "" else (if (postUid.isBlank()) "ip:" else "uid:") + postAuthor,
                 parseRepeatCreationDateMillis(postDate) ?: Long.MIN_VALUE, postDoc.select(".title_subject").text().ifBlank { text }, contentText),
-            repeatEligible, System.currentTimeMillis(),
+            repeatEligible, System.currentTimeMillis(), postingRateEligible = rateEligible,
         )
 
         val isBlacklistedUserId = postAnalysis.isBlacklistedUserId
@@ -3696,7 +3702,7 @@ img.written_dccon{max-width:80px;max-height:80px}
             },
         )
         val baseActionConfig = resolveDefaultModerationActionConfig(config)
-        val repeatActionConfig = repeatMatch?.let { resolveRepeatSpamActionConfig(baseActionConfig, botPrefs, it.reason) }
+        val repeatActionConfig = repeatMatch?.let { resolveRepeatSpamActionConfig(baseActionConfig, botPrefs, it.reason, it.kind) }
         val repeatAction = repeatMatch.takeIf {
             shouldApplyRepeatSpamAction(it != null, repeatActionConfig?.mode == ModerationActionMode.HOLD, moderationWinner != ModerationWinner.ALLOW)
         }
@@ -3730,7 +3736,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 actionConfig = routedActionConfig,
                 isBlacklistedUserId = repeatAction == null && isBlacklistedUserId,
                 isBlacklistedUserNick = repeatAction == null && isBlacklistedUserNick,
-                blockReasonPrefix = if (repeatAction != null) "반복 글 감지" else blockReasonPrefix,
+                blockReasonPrefix = repeatAction?.label ?: blockReasonPrefix,
                 notiType = if (repeatAction != null) "spam" else notiType,
                 matchedVoiceIdPost = matchedVoiceIdPost,
                 matchedImageAlt = matchedImageAlt,
@@ -3743,7 +3749,7 @@ img.written_dccon{max-width:80px;max-height:80px}
                 debugDetail = repeatAction?.reason ?: postAnalysis.debugDetail,
                 beforeAction = if (repeatAction == null) null else ({
                     repeatSpamPolicyRevision(snapshotScanPreferences(getSharedPreferences("bot_prefs_$botId", MODE_PRIVATE))) == config.repeatSpamRevision &&
-                        repeatTracker?.canAct(postKey, System.currentTimeMillis()) == true
+                        repeatTracker?.canAct(postKey, System.currentTimeMillis(), repeatAction.kind) == true
                 }),
                 saveSnapshotFn = {
                     val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -3753,7 +3759,7 @@ img.written_dccon{max-width:80px;max-height:80px}
 
             if (repeatMatch != null && postBlockResult.success &&
                 (isModerationActionSuccess(postBlockResult.response) || postBlockResult.response.contains("duplicate_hold"))) {
-                repeatTracker?.complete(postKey)
+                repeatTracker?.complete(postKey, repeatMatch.kind, allKinds = routedActionConfig.mode != ModerationActionMode.HOLD)
                 if (repeatAction != null) sendLog("[도배 방지] ${when (routedActionConfig.mode) { ModerationActionMode.HOLD -> "감지 기록(보류)"; ModerationActionMode.DELETE_ONLY -> "삭제"; ModerationActionMode.BLOCK -> "차단" }} 완료 / ${repeatAction.reason}", botId)
             }
 
@@ -4371,13 +4377,17 @@ img.written_dccon{max-width:80px;max-height:80px}
         baseConfig: ModerationActionConfig,
         botPref: android.content.SharedPreferences,
         matchReason: String,
+        kind: SpamMatchKind = SpamMatchKind.CONTENT,
     ): ModerationActionConfig {
-        val custom = repeatUsesCustomAction(botPref)
-        val override = loadModerationActionOverride(botPref, REPEAT_ACTION_PREFIX)
-            .copy(enabled = custom, processMode = if (custom) repeatCustomProcessMode(botPref) else null)
-        val resolved = resolveModerationActionConfig(baseConfig, override, "repeat_spam")
-        return if (resolved.mode == ModerationActionMode.BLOCK) resolved.copy(sourceLabel = "repeat_spam")
-        else resolved.copy(blockReasonText = matchReason, sourceLabel = "repeat_spam")
+        val isRate = kind == SpamMatchKind.POSTING_RATE
+        val prefix = if (isRate) RATE_ACTION_PREFIX else REPEAT_ACTION_PREFIX
+        val custom = if (isRate) botPref.getBoolean(RATE_CUSTOM_KEY, true) else repeatUsesCustomAction(botPref)
+        val mode = if (isRate) postingRateCustomMode(botPref) else repeatCustomProcessMode(botPref)
+        val override = loadModerationActionOverride(botPref, prefix)
+            .copy(enabled = custom, processMode = if (custom) mode else null)
+        val resolved = resolveModerationActionConfig(baseConfig, override, prefix)
+        return if (resolved.mode == ModerationActionMode.BLOCK) resolved.copy(sourceLabel = prefix)
+        else resolved.copy(blockReasonText = matchReason, sourceLabel = prefix)
     }
 
     private fun resolveModerationActionConfig(

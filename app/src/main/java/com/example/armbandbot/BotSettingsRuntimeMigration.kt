@@ -74,7 +74,8 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
     "is_snapshot_all" to false,
     "is_snapshot_blocked" to true,
     "is_spam_burst_protection_enabled" to false,
-    REPEAT_OBSERVE_KEY to false,
+    REPEAT_OBSERVE_KEY to false, REPEAT_CONTENT_ENABLED_KEY to true,
+    RATE_ENABLED_KEY to false, RATE_YUDONG_KEY to true, RATE_KKANG_KEY to true, RATE_CUSTOM_KEY to true,
     "is_spam_code_filter_mode" to false,
     "is_special_char_filter_mode" to false,
     "is_url_filter_mode" to false,
@@ -139,6 +140,7 @@ private val BOOLEAN_PREF_DEFAULTS: Map<String, Boolean> = mapOf(
 
 private val INT_PREF_DEFAULTS: Map<String, Int> = mapOf(
     RECOMMEND_GUARD_SECONDS to 180, RECOMMEND_GUARD_COUNT to 10,
+    RATE_IP_SECONDS_KEY to 60, RATE_UID_SECONDS_KEY to 60, RATE_IP_COUNT_KEY to 10, RATE_UID_COUNT_KEY to 5,
     REPEAT_WINDOW_KEY to 10, REPEAT_COUNT_KEY to 4, REPEAT_SIMILARITY_KEY to 85, REPEAT_MIN_LENGTH_KEY to REPEAT_DEFAULT_MIN_LENGTH,
     "ai_block_duration_hours" to -1,
     "auto_login_failure_count" to 0,

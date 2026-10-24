@@ -93,7 +93,10 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
             ModernSettingsSwitch(enabled, onEnabled, colors, Modifier.testTag("repeat-enabled"))
         })
     Spacer(Modifier.height(8.dp))
-    Column(Modifier.fillMaxWidth().alpha(if (enabled) 1f else .4f).testTag("repeat-options")) {
+    RepeatSwitchRow(Icons.Filled.ContentCopy, "유사 내용 반복 감지", "제목 또는 본문이 비슷한 글을 감지합니다.", settings.contentEnabled,
+        enabled, "repeat-content-enabled", colors) { save { putBoolean(REPEAT_CONTENT_ENABLED_KEY, it) } }
+    val contentActive = enabled && settings.contentEnabled
+    Column(Modifier.fillMaxWidth().alpha(if (contentActive) 1f else .4f).testTag("repeat-options")) {
         // What the current combination does, in one sentence.
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
@@ -102,7 +105,7 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (targets == null) {
-                Text("검사 대상이 모두 꺼져 있어 도배를 감지하지 않습니다.", color = colors.warningRed, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("검사 대상이 모두 꺼져 있어 반복 내용을 감지하지 않습니다.", color = colors.warningRed, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Text("아래 ‘검사 대상’에서 유동이나 깡계를 하나 이상 켜 주세요.", color = colors.text, fontSize = 13.sp)
             } else {
                 Text(repeatSpamSummary(settings, action), color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp)
@@ -114,22 +117,22 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
         RepeatSectionLabel("감지 기준", colors, trailing = {
             TextButton(onClick = {
                 save { putInt(REPEAT_WINDOW_KEY, defaults.windowMinutes).putInt(REPEAT_COUNT_KEY, defaults.count).putInt(REPEAT_SIMILARITY_KEY, defaults.similarityPercent).putInt(REPEAT_MIN_LENGTH_KEY, defaults.minimumLength) }
-            }, enabled = enabled && !isDefaultCriteria, modifier = Modifier.testTag("repeat-defaults")) {
-                Text("기본값으로", color = if (enabled && !isDefaultCriteria) colors.accent else colors.subText, fontSize = 13.sp)
+            }, enabled = contentActive && !isDefaultCriteria, modifier = Modifier.testTag("repeat-defaults")) {
+                Text("기본값으로", color = if (contentActive && !isDefaultCriteria) colors.accent else colors.subText, fontSize = 13.sp)
             }
         })
         SettingsGroup(colors) {
-            RepeatMinimumLengthRow(settings.minimumLength, enabled, colors) { editMinimum = true }
+            RepeatMinimumLengthRow(settings.minimumLength, contentActive, colors) { editMinimum = true }
             RepeatStepperRow(Icons.Filled.Schedule, "확인 시간", "이 시간 안의 글끼리 비교", "${settings.windowMinutes}분",
-                "repeat-minutes", enabled, settings.windowMinutes > 1, settings.windowMinutes < 60, colors,
+                "repeat-minutes", contentActive, settings.windowMinutes > 1, settings.windowMinutes < 60, colors,
                 onMinus = { save { putInt(REPEAT_WINDOW_KEY, repeatStep(settings.windowMinutes, REPEAT_MINUTE_STEPS, false)) } },
                 onPlus = { save { putInt(REPEAT_WINDOW_KEY, repeatStep(settings.windowMinutes, REPEAT_MINUTE_STEPS, true)) } })
             RepeatStepperRow(Icons.Filled.ContentCopy, "반복 횟수", "첫 글 포함, 이만큼이면 도배", "${settings.count}개",
-                "repeat-count", enabled, settings.count > 2, settings.count < 20, colors,
+                "repeat-count", contentActive, settings.count > 2, settings.count < 20, colors,
                 onMinus = { save { putInt(REPEAT_COUNT_KEY, repeatStep(settings.count, REPEAT_COUNT_STEPS, false)) } },
                 onPlus = { save { putInt(REPEAT_COUNT_KEY, repeatStep(settings.count, REPEAT_COUNT_STEPS, true)) } })
             RepeatStepperRow(Icons.Filled.Compare, "내용 비슷한 정도", repeatSimilarityMeaning(settings.similarityPercent), "${settings.similarityPercent}%",
-                "repeat-similarity", enabled, settings.similarityPercent > 85, settings.similarityPercent < 100, colors,
+                "repeat-similarity", contentActive, settings.similarityPercent > 85, settings.similarityPercent < 100, colors,
                 onMinus = { save { putInt(REPEAT_SIMILARITY_KEY, repeatStep(settings.similarityPercent, REPEAT_SIMILARITY_STEPS, false)) } },
                 onPlus = { save { putInt(REPEAT_SIMILARITY_KEY, repeatStep(settings.similarityPercent, REPEAT_SIMILARITY_STEPS, true)) } })
         }
@@ -138,17 +141,17 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
 
         RepeatSectionLabel("검사 대상", colors)
         SettingsGroup(colors) {
-            RepeatSwitchRow(Icons.Filled.Lock, "유동", "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.", settings.yudong, enabled, "repeat-yudong", colors) {
+            RepeatSwitchRow(Icons.Filled.Lock, "유동", "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.", settings.yudong, contentActive, "repeat-yudong", colors) {
                 save { putBoolean(REPEAT_YUDONG_KEY, it) }
             }
-            RepeatSwitchRow(Icons.Filled.Info, "깡계", "깡계 필터 기준을 따릅니다. (현재: ${kkangCriteria(p)})", settings.kkang, enabled, "repeat-kkang", colors) {
+            RepeatSwitchRow(Icons.Filled.Info, "깡계", "깡계 필터 기준을 따릅니다. (현재: ${kkangCriteria(p)})", settings.kkang, contentActive, "repeat-kkang", colors) {
                 save { putBoolean(REPEAT_KKANG_KEY, it) }
             }
         }
         Text("일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
             color = colors.subText, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 8.dp))
 
-        FilterActionSettingsSection(p, REPEAT_ACTION_PREFIX, "도배 방지", colors, enabled, customDefault = true,
+        FilterActionSettingsSection(p, REPEAT_ACTION_PREFIX, "유사 내용 반복 감지", colors, contentActive, customDefault = true,
             initialMode = repeatCustomProcessMode(p), onChanged = { refresh() }, editorTransform = { repeatSpamChanged() })
         Text(when (action.mode) {
                 "HOLD" -> "보류는 글을 그대로 두고 기록만 남깁니다. 같은 글이 다른 필터에도 걸리면 그 필터의 처리 방식을 따릅니다. 기준을 처음 정할 때 보류로 결과를 먼저 확인해 보세요."
@@ -162,6 +165,7 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
             ModernSettingItem("감지 방식과 주의사항", "어떤 글을 묶는지, 놓칠 수 있는 경우", Icons.Filled.HelpOutline, colors) { help = true }
         }
     }
+    PostingRateSettingsCard(p, colors, enabled)
     Spacer(Modifier.height(24.dp))
     if (editMinimum) RepeatMinimumLengthDialog(settings.minimumLength, colors, onDismiss = { editMinimum = false }) {
         save { putInt(REPEAT_MIN_LENGTH_KEY, it) }
@@ -169,7 +173,7 @@ internal fun RepeatSpamSettingsCard(p: SharedPreferences, colors: BotColorScheme
     }
     if (help) AlertDialog(onDismissRequest = { help = false }, modifier = Modifier.testTag("repeat-help-dialog"),
         containerColor = colors.dialogBg, titleContentColor = colors.text, textContentColor = colors.subText,
-        title = { Text("도배 방지 도움말") },
+        title = { Text("유사 내용 반복 감지 도움말") },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 HelpParagraph("어떤 글을 묶나요?", "같은 갤러리에서 회원은 같은 ID, 유동은 같은 표시 IP로 올린 게시글을 묶습니다. 정한 시간 안에 제목 또는 본문 중 어느 한쪽이 비슷한 글이 반복 횟수만큼 쌓이면 도배로 봅니다. 제목끼리, 본문끼리 따로 세며 둘 다 같을 필요는 없습니다.", colors)

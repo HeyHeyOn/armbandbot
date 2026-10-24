@@ -27,10 +27,11 @@ internal val EXPORTABLE_STRING_KEYS = listOf(
     "kkang_detection_mode",
     "pum_block_process_mode",
     "pum_block_reason_text",
-    REPEAT_PROCESS_MODE_KEY, REPEAT_REASON_KEY
+    REPEAT_PROCESS_MODE_KEY, REPEAT_REASON_KEY, RATE_MODE_KEY, RATE_REASON_KEY
 ) + ORDERED_MULTILINE_SETTING_KEYS.map(::orderedMultilineTextKey) + REMOTE_CHANNEL_EXPORT_STRING_KEYS
 
 internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
+    REPEAT_CONTENT_ENABLED_KEY, RATE_ENABLED_KEY, RATE_YUDONG_KEY, RATE_KKANG_KEY, RATE_CUSTOM_KEY, RATE_DELETE_KEY,
     REPEAT_ENABLED_KEY, REPEAT_OBSERVE_KEY, REPEAT_YUDONG_KEY, REPEAT_KKANG_KEY,
     REPEAT_CUSTOM_ACTION_KEY, REPEAT_DELETE_POST_KEY,
     WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY,
@@ -50,6 +51,7 @@ internal val EXPORTABLE_BOOLEAN_KEYS = listOf(
 
 internal val EXPORTABLE_INT_KEYS = listOf(
     RECOMMEND_GUARD_SECONDS, RECOMMEND_GUARD_COUNT,
+    RATE_IP_SECONDS_KEY, RATE_IP_COUNT_KEY, RATE_UID_SECONDS_KEY, RATE_UID_COUNT_KEY, RATE_DURATION_KEY,
     REPEAT_WINDOW_KEY, REPEAT_COUNT_KEY, REPEAT_SIMILARITY_KEY, REPEAT_MIN_LENGTH_KEY, REPEAT_DURATION_KEY,
     "block_duration_hours", "kkang_post_min", "kkang_comment_min", "kkang_total_min", "spam_code_length",
     "image_filter_threshold", "scan_page_count", "snapshot_keep_days", "pum_block_duration_hours",
@@ -57,7 +59,7 @@ internal val EXPORTABLE_INT_KEYS = listOf(
 ) + REMOTE_CHANNEL_EXPORT_INT_KEYS
 
 // Absence means inherit the bot's defaults; writing a fixed value changes future behaviour.
-private val INHERITED_ACTION_KEYS = setOf(REPEAT_DURATION_KEY, REPEAT_DELETE_POST_KEY)
+private val INHERITED_ACTION_KEYS = setOf(REPEAT_DURATION_KEY, REPEAT_DELETE_POST_KEY, RATE_DURATION_KEY, RATE_DELETE_KEY)
 
 internal val EXPORTABLE_FLOAT_KEYS = listOf(
     "delay_post_min_sec", "delay_post_max_sec", "delay_page_min_sec",
@@ -275,6 +277,7 @@ private inline fun <T> Iterable<String>.associateWithNotNull(valueSelector: (Str
     }
 
 internal fun defaultBooleanValue(key: String): Boolean = when (key) {
+    REPEAT_CONTENT_ENABLED_KEY, RATE_YUDONG_KEY, RATE_KKANG_KEY, RATE_CUSTOM_KEY, RATE_DELETE_KEY,
     REPEAT_YUDONG_KEY, REPEAT_KKANG_KEY, REPEAT_CUSTOM_ACTION_KEY, REPEAT_DELETE_POST_KEY -> true
     WORD_FILTER_ENABLED_KEY, YUDONG_FILTER_ENABLED_KEY -> true
     "noti_master", "noti_keyword", "noti_user", "noti_nickname", "noti_yudong", "noti_kkang",
@@ -284,11 +287,16 @@ internal fun defaultBooleanValue(key: String): Boolean = when (key) {
 }
 
 internal fun defaultStringValue(key: String): String? = when (key) {
+    RATE_MODE_KEY -> "HOLD"
     "pum_block_process_mode" -> "BLOCK"
     else -> null
 }
 
 internal fun defaultIntValue(key: String): Int = when (key) {
+    RATE_IP_SECONDS_KEY, RATE_UID_SECONDS_KEY -> 60
+    RATE_IP_COUNT_KEY -> 10
+    RATE_UID_COUNT_KEY -> 5
+    RATE_DURATION_KEY -> 6
     REPEAT_WINDOW_KEY -> 10
     REPEAT_COUNT_KEY -> 4
     REPEAT_SIMILARITY_KEY -> 85

@@ -52,11 +52,13 @@ internal fun repeatSpamSettings(p: SharedPreferences) = RepeatSpamSettings(
     // HOLD keeps the earlier "감지 기록만" semantics: another filter that acts on the same post wins.
     observeOnly = repeatActionView(p).mode == "HOLD",
     yudong = p.getBoolean(REPEAT_YUDONG_KEY, true), kkang = p.getBoolean(REPEAT_KKANG_KEY, true),
+    contentEnabled = p.getBoolean(REPEAT_CONTENT_ENABLED_KEY, true), postingRate = postingRateSettings(p),
 ).bounded()
 
 internal fun repeatSpamPolicyRevision(p: SharedPreferences): String = policyHash(listOf(
     repeatSpamSettings(p).toString(), p.getLong(REPEAT_REVISION_KEY, 0).toString(),
-    repeatActionView(p).toString(),
+    repeatActionView(p).toString(), postingRateActionView(p).toString(),
+    p.getString(RATE_REASON_KEY, "").orEmpty(), p.getString(REPEAT_REASON_KEY, "").orEmpty(),
     p.getString("target_urls", "").orEmpty(), userFilterPolicyRevision(p),
     effectiveRemoteLists(p)?.revision.orEmpty(), p.getString("kkang_detection_mode", "separate").orEmpty(),
     p.getInt("kkang_post_min", 5).toString(), p.getInt("kkang_comment_min", 10).toString(),
