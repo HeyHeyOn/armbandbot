@@ -52,6 +52,23 @@ class ConfirmedSpamBatchTest {
         }
     }
 
+    @Test fun longDetectionWindowDoesNotRenewExpiredConfirmedActions() {
+        for (kind in SpamMatchKind.entries) {
+            val t = RepeatSpamTracker().apply {
+                updatePolicy("one", RepeatSpamSettings(enabled = true, count = 3, windowMinutes = 60,
+                    contentEnabled = kind == SpamMatchKind.CONTENT,
+                    postingRate = PostingRateSettings(enabled = kind == SpamMatchKind.POSTING_RATE,
+                        ipCount = 3, ipSeconds = 3600)))
+            }
+            val posts = (1..3).map { post(it).copy(title = "반복되는 충분한 길이의 제목입니다") }
+            posts.forEach { t.observe(it, kind == SpamMatchKind.CONTENT, now, kind == SpamMatchKind.POSTING_RATE) }
+            assertTrue(t.canAct(posts.first().key, now))
+            val expired = now + CONFIRMED_SPAM_RETENTION_MS + 1
+            assertFalse(t.canAct(posts.first().key, expired))
+            posts.forEach { assertNull(t.observe(it, kind == SpamMatchKind.CONTENT, expired, kind == SpamMatchKind.POSTING_RATE)) }
+        }
+    }
+
     @Test fun completedPostsAreNotRepeatedButStillSupportRemainingEvidence() {
         val t = confirmed()
         t.complete(post(1).key, SpamMatchKind.POSTING_RATE, allKinds = true)

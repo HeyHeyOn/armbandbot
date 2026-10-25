@@ -161,6 +161,11 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
         lastEvaluatedAt = now
         if (!dirty && now < nextExpiryAt) return
         dirty = false
+        // A long user detection window must not immediately re-confirm a timed-out action.
+        // Keep the terminal marker while its unchanged evidence remains in this tracker.
+        confirmed.forEach { (key, value) ->
+            if (now - value.detectedAt > CONFIRMED_SPAM_RETENTION_MS) completed.add(key)
+        }
         confirmed.entries.removeAll { (key, value) ->
             key in completed || now < value.detectedAt || now - value.detectedAt > CONFIRMED_SPAM_RETENTION_MS
         }
