@@ -3,6 +3,7 @@
 - 도배로 감지한 글 중 첫 글만 처리되고 나머지 글이 남을 수 있던 문제를 수정했습니다.
 - 같은 페이지에서 감지된 남은 글을 이어서 처리하도록 개선했습니다.
 - [정식 APK](https://drive.google.com/file/d/1J7WrAa9HpH_KkeunXmijKQir5V_zYjzJ/view) · [공식 매뉴얼·패치노트](https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU) · [처음 사용 가이드](https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE)
+- [갤러리 패치 공지](https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=324) 게시·공개 확인 완료.
 - 배포·검증 기록: `releases/완장봇_v1.8.1_검증.json`.
 
 ---

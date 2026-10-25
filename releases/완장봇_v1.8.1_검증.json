@@ -2557,5 +2557,55 @@
       "guide": "https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE"
     },
     "nonfinal_render_attempt": "Initial QA helper incorrectly searched guide for patch heading; corrected anchor selection, full render completed. Document content did not need repair."
+  },
+  "announcement": {
+    "version": "1.8.1",
+    "post_id": 324,
+    "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=324",
+    "category": "[📝패치]",
+    "anonymous_author": "완갤러",
+    "author_uid_empty": true,
+    "body_exact_normalized": true,
+    "body_links": 0,
+    "logged_out": true,
+    "previous_patch_entries_preserved": true,
+    "previous_patch_count": 29,
+    "patch_count_after": 30,
+    "patch_added_ids": [
+      324
+    ],
+    "status": "completed",
+    "method": "anonymous_general_then_authenticated_official_category_handler",
+    "category_change": {
+      "post_id": 324,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=324",
+      "method": "official_category_handler_authenticated_http",
+      "before": "[💬일반]",
+      "attempted": true,
+      "started_at": "2026-10-25T08:11:53.717359+00:00",
+      "http_status": 200,
+      "result": "success",
+      "public_after": "[📝패치]",
+      "verified_patch": true,
+      "verified_at": "2026-10-25T08:11:53.946238+00:00"
+    },
+    "general_check": {
+      "version": "1.8.1",
+      "post_id": 324,
+      "url": "https://gall.dcinside.com/mini/board/view/?id=armbandbot&no=324",
+      "category": "[💬일반]",
+      "anonymous_author": "완갤러",
+      "author_uid_empty": true,
+      "body_exact_normalized": true,
+      "body_links": 0,
+      "logged_out": true
+    },
+    "screenshot": {
+      "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/announcement/public-announcement.png",
+      "sha256": "00adf69ec2490689c5a1125c16b6298b6312d1ae94bc706525fe900865857810"
+    },
+    "body_sha256": "41c70e290765fdc7b8854d54ce0e4632b2075cfca1b4d449744ecace4477c996",
+    "session_closed": true,
+    "completed_at": "2026-10-25T08:12:23.895615+00:00"
   }
 }
