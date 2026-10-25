@@ -1,3 +1,12 @@
+# 1.8.1-beta1 — 도배 감지 후 남은 글 처리 수정
+
+- 도배로 감지한 글 중 첫 글만 처리되고 나머지 글이 남을 수 있던 문제를 수정했습니다.
+- 같은 페이지에서 감지된 남은 글을 이어서 처리하도록 개선했습니다.
+- [베타 APK](https://drive.google.com/file/d/1EYbQQuu0d8_IrK9Jw_6qZN5x3S9r9ACM/view) · [사용 안내](https://drive.google.com/file/d/1DjDKpHEBaGLox7GVw0EZIGkYoezNz_Ub/view)
+- 배포·검증 기록: `releases/완장봇_v1.8.1-beta1_검증.json`.
+
+---
+
 # 1.8.0 정식 릴리즈
 
 - 제목과 본문을 매번 바꾸는 도배도 같은 표시 IP·깡계 계정의 작성 빈도로 감지하는 ‘연속 작성 감지’를 추가했습니다. 기존 유사 내용 반복 감지와 독립적으로 켜고 처리 방식을 정합니다.

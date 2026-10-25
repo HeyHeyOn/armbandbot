@@ -1,0 +1,1326 @@
+{
+  "artifact": {
+    "path": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.8.1-beta1.apk",
+    "size": 13535406,
+    "sha256": "050653d88ff722a2c2a041759c827b37eb398081eebb65b196d37bb320bd0a4c",
+    "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+    "version": "1.8.1-beta1",
+    "code": 198,
+    "package": "com.heyheyon.armbandbot"
+  },
+  "jvm": {
+    "Debug": {
+      "tests": 825,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 825,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "debug": {
+      "Fatal": 0,
+      "Error": 0,
+      "Warning": 52,
+      "Information": 29
+    },
+    "release": {
+      "Fatal": 0,
+      "Error": 0,
+      "Warning": 47,
+      "Information": 29
+    }
+  },
+  "version": "1.8.1-beta1",
+  "version_code": 198,
+  "release_date": "2026-10-25",
+  "previous_formal": "1.8.0/code197",
+  "source_review": {
+    "source_commit": "6328b8f5c95c13234bc0e091c46d54c0ed0a9399",
+    "reviewed_at": "2026-10-25T14:52:44.930038+09:00",
+    "report": 323,
+    "baseline": "1.8.0/ee77ec2",
+    "reproduced": "Newest-first scan handles oldest post on threshold, then next-cycle wait expires other confirmed posts",
+    "reporter_exact_cause_confirmed": false,
+    "changes": [
+      "Confirmed batches retain exact membership for fixed 15-minute completion window",
+      "Same-page pending targets revisit ordinary fetch/protection/work/claim and action gates",
+      "User detection thresholds unchanged; no expired/new-post recruitment",
+      "Settings/stop/protection/content changes cancel affected evidence; long detection window cannot renew expired action",
+      "No DB schema or settings migration; existing action-mode priority maintained"
+    ],
+    "tests_added": {
+      "jvm": 9,
+      "android_policy": 2,
+      "opt_in_owned_live": 1
+    },
+    "reviewer": "primary agent; no subagents",
+    "formal_help_refinement": "Existing content-help sentence says next scan; beta user guide describes actual same-page behavior. Align both help dialogs during formal promotion, then rerun full formal gates and inspect exact signed help dialogs.",
+    "built_product_source_commit": "c0d163d2e27320d00d8a1ef5ab866bfb72414dcc",
+    "test_only_correction": "Timestamp-prefixed live log assertion corrected from startsWith to contains; product APK unchanged; first attempt intentionally stopped in HOLD and all4 owned posts verified present."
+  },
+  "gallery_feedback": {
+    "status": "completed",
+    "post_id": 323,
+    "body": "제보 감사합니다. 삭제를 함께 선택했다면 조건에 해당한 글은 첫 글부터 모두 처리하는 것이 맞습니다. 확인해 보니 첫 글 처리 후 다음 검사까지 기다리는 동안 기준 시간이 지나면 나머지 글이 처리 대상에서 빠질 수 있는 문제를 재현했습니다. 확정된 도배 글 목록을 유지하고 남은 글도 이어서 처리하도록 1.8.1에서 수정·검증하겠습니다. 당시 상황을 더 정확히 확인할 수 있도록 공유 폴더의 버그 제보 폼으로 디버그 로그와 감지 시간·개수·처리 방식 설정도 보내주시면 감사하겠습니다.",
+    "author_uid": "optimist8781",
+    "existing_comments": 0,
+    "prepared_at": "2026-10-25T05:38:55.943Z",
+    "comment_id": 622,
+    "public_verified": true,
+    "logged_out": true,
+    "completed_at": "2026-10-25T05:39:11.447Z"
+  },
+  "android_instrumentation": {
+    "24": {
+      "api": "24",
+      "classes": "com.heyheyon.armbandbot.RepeatSpamUiTest,com.heyheyon.armbandbot.RepeatSpamBackupTest,com.heyheyon.armbandbot.UserFilterRecheckAndroidTest,com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.AppDatabaseMigration8To9Test,com.heyheyon.armbandbot.AppDatabaseV9DaoTest,com.heyheyon.armbandbot.RepeatSpamPolicyAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckUiTest,com.heyheyon.armbandbot.RecommendationGuardAndroidTest,com.heyheyon.armbandbot.RecommendationGuardUiTest,com.heyheyon.armbandbot.PostingRateUiTest",
+      "passed": true,
+      "declared": 52,
+      "completed": 52,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "c94155c590f821a2ebb904a91c5e188118d691d2a2d5ad7815a01241dd9e2851"
+    },
+    "35": {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.RepeatSpamUiTest,com.heyheyon.armbandbot.RepeatSpamBackupTest,com.heyheyon.armbandbot.UserFilterRecheckAndroidTest,com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.AppDatabaseMigration8To9Test,com.heyheyon.armbandbot.AppDatabaseV9DaoTest,com.heyheyon.armbandbot.RepeatSpamPolicyAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckUiTest,com.heyheyon.armbandbot.RecommendationGuardAndroidTest,com.heyheyon.armbandbot.RecommendationGuardUiTest,com.heyheyon.armbandbot.PostingRateUiTest",
+      "passed": true,
+      "declared": 52,
+      "completed": 52,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "c94155c590f821a2ebb904a91c5e188118d691d2a2d5ad7815a01241dd9e2851"
+    }
+  },
+  "signed_update_checks": {
+    "24": {
+      "api": "24",
+      "apk_sha256": "050653d88ff722a2c2a041759c827b37eb398081eebb65b196d37bb320bd0a4c",
+      "previous": "releases/완장봇_v1.8.0.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "exact_beta181_version",
+        "both_bots_preserved",
+        "existing_guard_enabled_and_criteria_retained",
+        "other_bot_default_retained",
+        "existing_guard_can_disable",
+        "enabled_from_detail",
+        "criteria_saved",
+        "cancel_preserves_criteria",
+        "retained_after_reentry",
+        "other_bot_remains_default",
+        "disabled_keeps_criteria",
+        "enabled_and_criteria_survive_restart",
+        "existing_recheck_options_preserved",
+        "repeat_spam_existing_minimum_preserved",
+        "beta_rate_and_criteria_preserved",
+        "beta_content_disabled_preserved",
+        "rate_enabled_dark",
+        "rate_seconds_saved_dark",
+        "rate_count_saved_dark",
+        "rate_cancel_preserves_dark",
+        "rate_enabled_light",
+        "rate_seconds_saved_light",
+        "rate_count_saved_light",
+        "rate_cancel_preserves_light",
+        "rate_restart_persistence",
+        "other_bot_rate_unchanged",
+        "scan_limits_and_delays_preserved",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "screenshots": [
+        {
+          "name": "before-upgrade",
+          "sha256": "ef8184d496ed0302425e6075be608b0fb7521250632ce9306f5ac275cfd8b749",
+          "text": [
+            "완장봇",
+            "버전 1.8.0",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "after-upgrade",
+          "sha256": "9a4d0d28675cd8e177cf068239399bf2f01a7b30482cb1b3dbe22cb5ec073884",
+          "text": [
+            "완장봇",
+            "버전 1.8.1-beta1",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "recommend-retained-light",
+          "sha256": "2f4376221b20cb2aba3c48b238d8578a0aa3850371fa4f40a6f4f1a97bfe119d",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-default-light",
+          "sha256": "2e343e2d9400a4ca1acec5c81d4879eb6a80c8114becc88b4163103abf6b5970",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-light",
+          "sha256": "2f4376221b20cb2aba3c48b238d8578a0aa3850371fa4f40a6f4f1a97bfe119d",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-light",
+          "sha256": "3cae82973790ff0a1622963a4087e80197872363dfe1e37c2540b7918bb6a9c8",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "75",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "14",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-saved-light",
+          "sha256": "60d65d70ae82be1b8621940ba5f6a815f9287e6febdd7c773e1e50c6fa0ff665",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-help-light",
+          "sha256": "99796c9af78d0d14610a73e6475d353c830dedf90b7192cbadfd8ad6c3337d87",
+          "text": [
+            "추천수 조작 방지 도움말",
+            "기준 시간 안에 관측한 추천 증가량으로 판단합니다. 예를 들어 3분·10개이면 2분 동안 10개가 늘어도 감지합니다. 4분 동안의 증가를 3분으로 환산하지 않습니다.\n\n처음 발견한 추천 수는 기준점으로만 사용합니다. 기준 시간을 넘긴 관측 공백, 추천 감소, 설정 변경 후에는 새로 관찰합니다.\n\n일반 글도 관찰하고, 감지 후 기준 시간 안에 개념글로 올라오면 해제합니다. 해제 성공한 글은 다시 해제하지 않으며, 결과 미확인 시 중복 요청을 보류합니다.\n\n봇의 계정·탐색 범위·운영 시간대를 공유합니다. 봇 중지나 기능 OFF 시 보조 작업도 멈춥니다. 개념글 전용 목록만 감시하면 진입 전 증가량은 알 수 없습니다.\n\n추천 급증만으로 조작을 확정할 수는 없습니다. 갤러리에 맞게 기준을 정하고 활동 로그에서 감지 근거와 해제 결과를 확인해 주세요.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "recommend-reentered-light",
+          "sha256": "60d65d70ae82be1b8621940ba5f6a815f9287e6febdd7c773e1e50c6fa0ff665",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-other-bot-light",
+          "sha256": "46b33ac8fadebe57801cee7f0d3e43bc4c5d5e1cec43bb5af76775d9b3563192",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-dark",
+          "sha256": "42a68f9b19606c9b9ee5997ecfbb8fd81d8a7215bd38f1d7b18977382b5c14e2",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-dark",
+          "sha256": "04d40cae7a346271573228019367f978d82d10398dff1a83a1537ce9773fc67a",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "125",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "23",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-disabled-dark",
+          "sha256": "f94b04c2fa198eb73ce89235abd0b2bcedfef42f70102cb2bd8cb88b252bc089",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-cold-restart-dark",
+          "sha256": "42a68f9b19606c9b9ee5997ecfbb8fd81d8a7215bd38f1d7b18977382b5c14e2",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "repeat-enabled-dark",
+          "sha256": "756b9ae0ddf5fa749d30459ab1d22b3ee2c240feceb46e1721f19e5df4934ee8",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계"
+          ]
+        },
+        {
+          "name": "rate-default-dark",
+          "sha256": "1b1497adb9021fb59ad1fd806c39d83b2242d68615d8f873c48b724b5b84b0e2",
+          "text": [
+            "도배 방지",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에"
+          ]
+        },
+        {
+          "name": "rate-number-dialog-dark",
+          "sha256": "4d0908e5a32a9c7e96b68f3c8aabed20af5a90e1533bf4c99cfdad9dc9ab398d",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-dark",
+          "sha256": "df273698525b907c2c8de99d9ff966505172eb88899b7179a485e56053f4bbd7",
+          "text": [
+            "도배 방지",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에",
+            "작성 개수",
+            "12개 이상",
+            "깡계 · 같은 계정",
+            "확인 시간",
+            "60초 안에",
+            "작성 개수",
+            "5개 이상",
+            "깡계는 깡계 필터의 판정 기준을 따릅니다. 같은 표시 IP여도 다른 사람일 수 있습니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다."
+          ]
+        },
+        {
+          "name": "rate-help-dark",
+          "sha256": "c661a56db13d4e941819e783f5a6b48f264e083da579d289182ffad0152c71dc",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "repeat-enabled-light",
+          "sha256": "d2ee5f0b9941ed76d81177171be72eb7541db6bc0ea006b7603d5357d376a261",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계"
+          ]
+        },
+        {
+          "name": "rate-default-light",
+          "sha256": "472bdaa7917ba753de7e2274f70f7203d30866d4709062f9206b1e0f5f73a0bd",
+          "text": [
+            "도배 방지",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다."
+          ]
+        },
+        {
+          "name": "rate-number-dialog-light",
+          "sha256": "d72f3f32cf15192e6b8058fbbc381e1c9caa377b94aabf9f09e7b23144b2c7df",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-light",
+          "sha256": "ce322509d2c36ee7a80436db60d98770cbf51975e1597459987f24bde2988317",
+          "text": [
+            "도배 방지",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "120초 안에",
+            "작성 개수",
+            "12개 이상",
+            "깡계 · 같은 계정",
+            "확인 시간",
+            "60초 안에",
+            "작성 개수",
+            "5개 이상"
+          ]
+        },
+        {
+          "name": "rate-help-light",
+          "sha256": "effe4f863b7f8d2164498bfe8e50f56f9d943ad0ddab641b84a0c68735423311",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        }
+      ],
+      "server_writes": 0,
+      "version": [
+        "versionCode=198 minSdk=24 targetSdk=35",
+        "versionName=1.8.1-beta1"
+      ],
+      "passed": true
+    },
+    "35": {
+      "api": "35",
+      "apk_sha256": "050653d88ff722a2c2a041759c827b37eb398081eebb65b196d37bb320bd0a4c",
+      "previous": "releases/완장봇_v1.8.0.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "exact_beta181_version",
+        "both_bots_preserved",
+        "existing_guard_enabled_and_criteria_retained",
+        "other_bot_default_retained",
+        "existing_guard_can_disable",
+        "enabled_from_detail",
+        "criteria_saved",
+        "cancel_preserves_criteria",
+        "retained_after_reentry",
+        "other_bot_remains_default",
+        "disabled_keeps_criteria",
+        "enabled_and_criteria_survive_restart",
+        "existing_recheck_options_preserved",
+        "repeat_spam_existing_minimum_preserved",
+        "beta_rate_and_criteria_preserved",
+        "beta_content_disabled_preserved",
+        "rate_enabled_dark",
+        "rate_seconds_saved_dark",
+        "rate_count_saved_dark",
+        "rate_cancel_preserves_dark",
+        "rate_enabled_light",
+        "rate_seconds_saved_light",
+        "rate_count_saved_light",
+        "rate_cancel_preserves_light",
+        "rate_restart_persistence",
+        "other_bot_rate_unchanged",
+        "scan_limits_and_delays_preserved",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "screenshots": [
+        {
+          "name": "before-upgrade",
+          "sha256": "d061056441b427803bb50b69a0e3d619a971cd162309609f41c3e8b0ab962fd2",
+          "text": [
+            "완장봇",
+            "버전 1.8.0",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "after-upgrade",
+          "sha256": "e40b95083b5c51e6603004611d2bb6481e47fcc857154e058b972aca2301cc82",
+          "text": [
+            "완장봇",
+            "버전 1.8.1-beta1",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "recommend-retained-light",
+          "sha256": "deef3f8c0680c628e320843c861ad4036e8f459fc227d741fb8980052de9f8a4",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-default-light",
+          "sha256": "ea8e2dc31675bcd80276d5020990140880db53d9e44e09d6e7951d1a99b3e20a",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-light",
+          "sha256": "f21fdc95a317baf6bca2d345101198b96f486b7d5c632365e93ffb77bcbe2bd3",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-light",
+          "sha256": "b36cf63bba223646064a65727fa350f9a481f1b35516234b827995232e1b7f3e",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "75",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "14",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-saved-light",
+          "sha256": "3994c122b01818d824ae9fb3cc2c49a6a0ae767ad180b48244da8ac506e1ff0d",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-help-light",
+          "sha256": "23b08908d746d3becb7104b87ab8ba80fcbcf5ba7225be9be17764a4e9b2d420",
+          "text": [
+            "추천수 조작 방지 도움말",
+            "기준 시간 안에 관측한 추천 증가량으로 판단합니다. 예를 들어 3분·10개이면 2분 동안 10개가 늘어도 감지합니다. 4분 동안의 증가를 3분으로 환산하지 않습니다.\n\n처음 발견한 추천 수는 기준점으로만 사용합니다. 기준 시간을 넘긴 관측 공백, 추천 감소, 설정 변경 후에는 새로 관찰합니다.\n\n일반 글도 관찰하고, 감지 후 기준 시간 안에 개념글로 올라오면 해제합니다. 해제 성공한 글은 다시 해제하지 않으며, 결과 미확인 시 중복 요청을 보류합니다.\n\n봇의 계정·탐색 범위·운영 시간대를 공유합니다. 봇 중지나 기능 OFF 시 보조 작업도 멈춥니다. 개념글 전용 목록만 감시하면 진입 전 증가량은 알 수 없습니다.\n\n추천 급증만으로 조작을 확정할 수는 없습니다. 갤러리에 맞게 기준을 정하고 활동 로그에서 감지 근거와 해제 결과를 확인해 주세요.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "recommend-reentered-light",
+          "sha256": "9ffae8d16de37405d67e0a6f832f3e3f46091a89ea45adc765e872049c830ef1",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-other-bot-light",
+          "sha256": "f14c676c6b8572935a1ec5e436b5ae5fb405a7ed292e40b75b94f4169542f184",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-dark",
+          "sha256": "19440c926ea6b85deff6f8b359809b3a2e72593077c133172dea11835e3aa756",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-dark",
+          "sha256": "06fc06619bad4278eb11e378c15f1421c0e2cb18e199bf5f67685e2e2c83daa8",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "125",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "23",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-disabled-dark",
+          "sha256": "fe7c738cdcb8e399b523b7668893addfdeed160985fe15956696ecfc3318bbb4",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-cold-restart-dark",
+          "sha256": "d8f951d887ee05e9aa066264961e663901d06af9d3e0c42f44b1aea2e74b9cb6",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "repeat-enabled-dark",
+          "sha256": "5faa0bc39654bb099e8a88ae1aaf83d0d1522a42a5d13d8034cb2406b95a8097",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)"
+          ]
+        },
+        {
+          "name": "rate-default-dark",
+          "sha256": "3b730e3f59fb2fd1d6793875d7e3e2077c6616fbc2ebc8eeefaacabf9cb88dad",
+          "text": [
+            "도배 방지",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다."
+          ]
+        },
+        {
+          "name": "rate-number-dialog-dark",
+          "sha256": "74d97454df107628145429d36470a37786f8fa7011f36b7436b7cadce1a9a949",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-dark",
+          "sha256": "902e72953d5aaca7027c444b870bf95547303cdffa932eedad029225ce647476",
+          "text": [
+            "도배 방지",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에",
+            "작성 개수",
+            "12개 이상",
+            "깡계 · 같은 계정",
+            "확인 시간",
+            "60초 안에",
+            "작성 개수",
+            "5개 이상",
+            "깡계는 깡계 필터의 판정 기준을 따릅니다. 같은 표시 IP여도 다른 사람일 수 있습니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "보류"
+          ]
+        },
+        {
+          "name": "rate-help-dark",
+          "sha256": "1d6d945cbc51c81d0fbb654640f42eb8070cdb4704a516554ab68bd1b7342266",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "repeat-enabled-light",
+          "sha256": "9ff73a12d5926c879f55722f1aecc7844b271e6b5eebd677dcd245b4b25c829b",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)"
+          ]
+        },
+        {
+          "name": "rate-default-light",
+          "sha256": "c7d4c62531830323c3d79a07007dad4138a6425b83a7e4736589bce2d8919ea1",
+          "text": [
+            "도배 방지",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에",
+            "작성 개수",
+            "12개 이상",
+            "깡계 · 같은 계정"
+          ]
+        },
+        {
+          "name": "rate-number-dialog-light",
+          "sha256": "58eee12cc4cfbd65768c32ec7ba0e80a2c3143935d04cd3eda7a4b038c8a0d80",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-light",
+          "sha256": "ec6eaa8c1114640c88da2d4ed8719666a9a390915e7b4b4912d8a700222b7246",
+          "text": [
+            "도배 방지",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "120초 안에",
+            "작성 개수",
+            "12개 이상",
+            "깡계 · 같은 계정"
+          ]
+        },
+        {
+          "name": "rate-help-light",
+          "sha256": "3d77a3e17117a4b0331400a2535b86dce4acc02021c88d0c5f7a1e316a618115",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        }
+      ],
+      "server_writes": 0,
+      "version": [
+        "versionCode=198 minSdk=24 targetSdk=35",
+        "versionName=1.8.1-beta1"
+      ],
+      "passed": true
+    }
+  },
+  "live_validation": {
+    "version": "1.8.1-beta1",
+    "real_service": true,
+    "scope": "laboratory1/Test/10",
+    "first_post": "2383",
+    "control_post": "2386",
+    "repeat_posts": [
+      "2383",
+      "2384",
+      "2385"
+    ],
+    "whitelist_protected_all": true,
+    "exempt_first_excluded_from_count": true,
+    "observe_only_includes_first_and_preserves_control": true,
+    "all_confirmed_posts_deleted_in_same_cycle": true,
+    "actual_delete_records": [
+      [
+        "2383",
+        "[삭제] 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+        "/data/user/0/com.heyheyon.armbandbot/cache/snapshots_v2_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931/laboratory1_2383_blocked_20261025_153400.html"
+      ],
+      [
+        "2385",
+        "[삭제] 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+        "/data/user/0/com.heyheyon.armbandbot/cache/snapshots_v2_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931/laboratory1_2385_blocked_20261025_153404.html"
+      ],
+      [
+        "2384",
+        "[삭제] 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+        "/data/user/0/com.heyheyon.armbandbot/cache/snapshots_v2_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931/laboratory1_2384_blocked_20261025_153408.html"
+      ]
+    ],
+    "first_deleted": true,
+    "control_preserved": true,
+    "cycles": 11,
+    "passed": true,
+    "validated_action_summary": {
+      "passed": true,
+      "actual_deletions": [
+        "[15:34:00] [도배 방지] 삭제 완료 / 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+        "[15:34:04] [도배 방지] 삭제 완료 / 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+        "[15:34:08] [도배 방지] 삭제 완료 / 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385"
+      ],
+      "first_post": "2383",
+      "control_post": "2386",
+      "same_cycle": true,
+      "control_preserved": true,
+      "recorded_history_rows": 3,
+      "source_product_commit": "c0d163d2e27320d00d8a1ef5ab866bfb72414dcc",
+      "test_commit": "6328b8f",
+      "debug_apk_sha256": "c94155c590f821a2ebb904a91c5e188118d691d2a2d5ad7815a01241dd9e2851"
+    },
+    "local_raw_evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/live35/screens/release181-live.json",
+    "artifact_type": "same-source Debug APK, real BotService",
+    "apk_sha256": "c94155c590f821a2ebb904a91c5e188118d691d2a2d5ad7815a01241dd9e2851",
+    "settings": "laboratory1 M/Test10, four owned posts, IP window3600s/count3, contentOFF/minLength10000, whitelist/exempt/HOLD before DELETE"
+  },
+  "live_cleanup": {
+    "scope": "laboratory1/Test10",
+    "checked_at": "2026-10-25T06:36:10.331038+00:00",
+    "posts": [
+      {
+        "id": "2383",
+        "already_gone": true
+      },
+      {
+        "id": "2384",
+        "already_gone": true
+      },
+      {
+        "id": "2385",
+        "already_gone": true
+      },
+      {
+        "id": "2386",
+        "attempted_at": "2026-10-25T06:36:16.202383+00:00",
+        "request_status": 200,
+        "response": "{\"result\":\"success\",\"msg\":\"\\uc0ad\\uc81c\\ub418\\uc5c8\\uc2b5\\ub2c8\\ub2e4.\"}",
+        "deleted": true,
+        "readback_status": 404
+      }
+    ],
+    "all_owned_gone": true
+  },
+  "live_private_cleanup": {
+    "private_fixture_deleted": true,
+    "one_time_password_deleted": true,
+    "live_guests_removed": true,
+    "original_admin_credential_preserved": true,
+    "at": "2026-10-25T15:36:45.494170+09:00"
+  },
+  "test_only_correction_verification": {
+    "product_source_commit": "c0d163d2e27320d00d8a1ef5ab866bfb72414dcc",
+    "test_source_commit": "6328b8f5c95c13234bc0e091c46d54c0ed0a9399",
+    "only_changed_paths": [
+      "app/src/androidTest/java/com/example/armbandbot/ConfirmedSpamLiveTest.kt"
+    ],
+    "product_inputs_unchanged": true,
+    "debug_apk_sha256": "c94155c590f821a2ebb904a91c5e188118d691d2a2d5ad7815a01241dd9e2851",
+    "android_test_apk_sha256": "04c291f28d94c6f65370eebac3a6847c3fb7b2fdef74867a4305bcb4e8fd5071"
+  },
+  "not_performed": [
+    "물리 Android 기기",
+    "장시간 상시 운영",
+    "실제 깡계 차단·이미 차단된 작성자의 반복 차단 서버 응답",
+    "실제 개념글 해제 성공"
+  ],
+  "limitations": [
+    "제보자의 정확한 설정·원문·로그는 미확보; 원본 코드에서 같은 누락 경로 재현",
+    "표시 IP 공유 가능",
+    "현재 탐색 범위에서 확인한 글만 집계; 감지 전 시간 범위를 벗어나면 누락 가능",
+    "확정 대상은 최대15분; 중지·관련 설정 변경 시 초기화",
+    "IP/계정을 바꾸는 도배를 동일 작성자로 통합하지 않음"
+  ],
+  "nonfinal_attempts": [
+    {
+      "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/investigation/baseline-test.xml",
+      "result": "Original1.8.0 intentional failing regression proves lost confirmed targets"
+    },
+    {
+      "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/targeted-tests.log",
+      "result": "Kotlin incremental cache unresolved references; full in-process compilation passed81 targeted tests"
+    },
+    {
+      "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/superseded-build",
+      "result": "Own build stopped before final artifact to add long-window expiry regression; all final gates rerun"
+    },
+    {
+      "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/live35-harness-interrupted",
+      "result": "Test-only timestamp-prefix assertion noticed before destructive stage. Explicitly force-stopped own test in HOLD, completed0; all4 posts verified present. Corrected test APK rebuilt; exact product APKs unchanged before fresh-guest retry."
+    }
+  ],
+  "visual_verification": {
+    "reviewed": [
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/signed-api24/rate-saved-dark.png",
+        "sha256": "df273698525b907c2c8de99d9ff966505172eb88899b7179a485e56053f4bbd7"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/signed-api24/rate-saved-light.png",
+        "sha256": "ce322509d2c36ee7a80436db60d98770cbf51975e1597459987f24bde2988317"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/signed-api24/rate-number-dialog-dark.png",
+        "sha256": "4d0908e5a32a9c7e96b68f3c8aabed20af5a90e1533bf4c99cfdad9dc9ab398d"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/signed-api35/repeat-enabled-dark.png",
+        "sha256": "5faa0bc39654bb099e8a88ae1aaf83d0d1522a42a5d13d8034cb2406b95a8097"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/signed-api35/rate-saved-dark.png",
+        "sha256": "902e72953d5aaca7027c444b870bf95547303cdffa932eedad029225ce647476"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/signed-api35/rate-saved-light.png",
+        "sha256": "ec6eaa8c1114640c88da2d4ed8719666a9a390915e7b4b4912d8a700222b7246"
+      }
+    ],
+    "findings": "Android7/15 signed beta dark/light: headers, spacing, labels, criteria, toggles and number dialog legible with no overlap or truncation. Inactive content controls are intentionally dimmed. Formal help text alignment separately planned.",
+    "passed": true,
+    "reviewed_at": "2026-10-25T16:03:55.606517+09:00"
+  },
+  "dex": {
+    "apk": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.8.1-beta1.apk",
+    "dex_count": 5,
+    "dex": [
+      {
+        "dex": "classes.dex",
+        "methods": 65466,
+        "method_headroom": 70,
+        "fields": 35009,
+        "field_headroom": 30527,
+        "classes": 17981,
+        "max_parameter_words": 175,
+        "max_words_with_receiver_upper_bound": 176,
+        "invoke_range_word_headroom_upper_bound": 79
+      },
+      {
+        "dex": "classes2.dex",
+        "methods": 15,
+        "method_headroom": 65521,
+        "fields": 0,
+        "field_headroom": 65536,
+        "classes": 14,
+        "max_parameter_words": 0,
+        "max_words_with_receiver_upper_bound": 1,
+        "invoke_range_word_headroom_upper_bound": 254
+      },
+      {
+        "dex": "classes3.dex",
+        "methods": 2145,
+        "method_headroom": 63391,
+        "fields": 547,
+        "field_headroom": 64989,
+        "classes": 175,
+        "max_parameter_words": 10,
+        "max_words_with_receiver_upper_bound": 11,
+        "invoke_range_word_headroom_upper_bound": 244
+      },
+      {
+        "dex": "classes4.dex",
+        "methods": 65322,
+        "method_headroom": 214,
+        "fields": 22885,
+        "field_headroom": 42651,
+        "classes": 8123,
+        "max_parameter_words": 239,
+        "max_words_with_receiver_upper_bound": 240,
+        "invoke_range_word_headroom_upper_bound": 15
+      },
+      {
+        "dex": "classes5.dex",
+        "methods": 14924,
+        "method_headroom": 50612,
+        "fields": 5005,
+        "field_headroom": 60531,
+        "classes": 1791,
+        "max_parameter_words": 22,
+        "max_words_with_receiver_upper_bound": 23,
+        "invoke_range_word_headroom_upper_bound": 232
+      }
+    ],
+    "minimum_method_headroom": 70,
+    "minimum_field_headroom": 30527,
+    "maximum_parameter_words": 239,
+    "maximum_words_with_receiver_upper_bound": 240
+  },
+  "drive": {
+    "apk": {
+      "metadata": {
+        "id": "1EYbQQuu0d8_IrK9Jw_6qZN5x3S9r9ACM",
+        "title": "완장봇_v1.8.1-beta1.apk",
+        "mime_type": "application/vnd.android.package-archive",
+        "size": "13535406",
+        "url": null,
+        "file_or_folder": "file",
+        "created_time": null,
+        "modified_time": null,
+        "parent_ids": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "drive_id": null,
+        "current_user_can_share": null,
+        "has_augmented_permissions": null,
+        "shared": null,
+        "permissions": null,
+        "source_visibility_status": "access_not_verified"
+      },
+      "size": 13535406,
+      "download_sha256": "050653d88ff722a2c2a041759c827b37eb398081eebb65b196d37bb320bd0a4c",
+      "download_sha_matches": true
+    },
+    "guide": {
+      "metadata": {
+        "id": "1DjDKpHEBaGLox7GVw0EZIGkYoezNz_Ub",
+        "title": "완장봇_v1.8.1-beta1_사용안내.txt",
+        "mime_type": "text/plain",
+        "size": "1233",
+        "url": null,
+        "file_or_folder": "file",
+        "created_time": null,
+        "modified_time": null,
+        "parent_ids": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "drive_id": null,
+        "current_user_can_share": null,
+        "has_augmented_permissions": null,
+        "shared": null,
+        "permissions": null,
+        "source_visibility_status": "access_not_verified"
+      },
+      "size": 1233,
+      "download_sha256": "db32c050039422afbe8c6982a025ce7dd8b645784997a3b7806a41fb06676cbc",
+      "download_sha_matches": true
+    },
+    "verified_at": "2026-10-25T16:05:24.812201+09:00"
+  }
+}
