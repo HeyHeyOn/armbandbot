@@ -131,7 +131,7 @@ class ConfirmedSpamLiveTest {
                 Thread.sleep(1500)
             }
             val deletionLogs = logs.drop(deletionLogStart)
-            val doneIndices = deletionLogs.indices.filter { deletionLogs[it].startsWith("[도배 방지] 삭제 완료") }
+            val doneIndices = deletionLogs.indices.filter { deletionLogs[it].contains("[도배 방지] 삭제 완료") }
             check(doneIndices.size == 3) { "Expected exactly three successful spam deletions" }
             check(deletionLogs.subList(doneIndices.first(), doneIndices.last()).none { it.contains("사이클 완료!") }) {
                 "Confirmed posts were deferred to another scan cycle"
