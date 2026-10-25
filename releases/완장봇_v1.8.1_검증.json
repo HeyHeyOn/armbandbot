@@ -1,0 +1,2561 @@
+{
+  "artifact": {
+    "path": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.8.1.apk",
+    "size": 13535394,
+    "sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+    "signer_sha256": "06fb3453e0f0d73a33dc8676cc118096d2c72e2d8d085635211c5371999deb7f",
+    "version": "1.8.1",
+    "code": 199,
+    "package": "com.heyheyon.armbandbot"
+  },
+  "jvm": {
+    "Debug": {
+      "tests": 825,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Release": {
+      "tests": 825,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "debug": {
+      "Fatal": 0,
+      "Error": 0,
+      "Warning": 52,
+      "Information": 29
+    },
+    "release": {
+      "Fatal": 0,
+      "Error": 0,
+      "Warning": 47,
+      "Information": 29
+    }
+  },
+  "version": "1.8.1",
+  "version_code": 199,
+  "release_date": "2026-10-25",
+  "previous_formal": "1.8.0/code197",
+  "last_beta": "1.8.1-beta1/code198",
+  "source_review": {
+    "source_commit": "1bf8c51e464ba9a8e4ae2a847c4d0fd72a713353",
+    "production_change_since_beta": "Version name/code plus two help descriptions aligned with same-page follow-up and fixed15-minute confirmation lifetime; detection/action implementation unchanged and entire beta history retained",
+    "master_is_ancestor": true,
+    "formal_source_verification": {
+      "source_commit": "1bf8c51e464ba9a8e4ae2a847c4d0fd72a713353",
+      "beta_complete_commit": "3bd11102cd5b19fb16893bfd4d0aa8c2b3c00701",
+      "changed_files": [
+        "app/build.gradle.kts",
+        "app/src/main/java/com/example/armbandbot/PostingRateSettingsCard.kt",
+        "app/src/main/java/com/example/armbandbot/RepeatSpamSettingsCard.kt"
+      ],
+      "beta_core_bytes_identical": {
+        "RepeatSpamPolicy.kt": "3e76d93ad18acb725e9e5e34f82c56b128fe27fd31a3f7a31f0aa4e501925646",
+        "BotService.kt": "a9007d115b53162cdde8650cb93ee18f45dfe9e014ed09d8e0adc70b0bc134e7"
+      },
+      "entire_beta_history_retained": true,
+      "reviewed_at": "2026-10-25T16:08:33.724559+09:00",
+      "scope": "Version/code and two help descriptions; no new live server actions needed after beta verification"
+    }
+  },
+  "android_instrumentation": {
+    "24": {
+      "api": "24",
+      "classes": "com.heyheyon.armbandbot.RepeatSpamUiTest,com.heyheyon.armbandbot.RepeatSpamBackupTest,com.heyheyon.armbandbot.UserFilterRecheckAndroidTest,com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.AppDatabaseMigration8To9Test,com.heyheyon.armbandbot.AppDatabaseV9DaoTest,com.heyheyon.armbandbot.RepeatSpamPolicyAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckUiTest,com.heyheyon.armbandbot.RecommendationGuardAndroidTest,com.heyheyon.armbandbot.RecommendationGuardUiTest,com.heyheyon.armbandbot.PostingRateUiTest",
+      "passed": true,
+      "declared": 52,
+      "completed": 52,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "0806aa21a74c5abd89dc3e3022b1463c60c264d22246f9b0a1c7048b0d5488c3"
+    },
+    "35": {
+      "api": "35",
+      "classes": "com.heyheyon.armbandbot.RepeatSpamUiTest,com.heyheyon.armbandbot.RepeatSpamBackupTest,com.heyheyon.armbandbot.UserFilterRecheckAndroidTest,com.heyheyon.armbandbot.BotRestartServiceTest,com.heyheyon.armbandbot.BotRunningStateUiTest,com.heyheyon.armbandbot.BotScheduleServiceWaitingTest,com.heyheyon.armbandbot.BotScheduleAndroidRuntimeTest,com.heyheyon.armbandbot.FilterMasterUiTest,com.heyheyon.armbandbot.AppDatabaseMigration8To9Test,com.heyheyon.armbandbot.AppDatabaseV9DaoTest,com.heyheyon.armbandbot.RepeatSpamPolicyAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckAndroidTest,com.heyheyon.armbandbot.AllPostsRecheckUiTest,com.heyheyon.armbandbot.RecommendationGuardAndroidTest,com.heyheyon.armbandbot.RecommendationGuardUiTest,com.heyheyon.armbandbot.PostingRateUiTest",
+      "passed": true,
+      "declared": 52,
+      "completed": 52,
+      "skipped": 0,
+      "failed": 0,
+      "require_all_tests": true,
+      "width": 432,
+      "font": "1.0",
+      "artifact": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "0806aa21a74c5abd89dc3e3022b1463c60c264d22246f9b0a1c7048b0d5488c3"
+    }
+  },
+  "signed_update_checks": {
+    "24": {
+      "api": "24",
+      "apk_sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+      "previous": "releases/완장봇_v1.8.0.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "exact_formal181_version",
+        "both_bots_preserved",
+        "existing_guard_enabled_and_criteria_retained",
+        "other_bot_default_retained",
+        "existing_guard_can_disable",
+        "enabled_from_detail",
+        "criteria_saved",
+        "cancel_preserves_criteria",
+        "retained_after_reentry",
+        "other_bot_remains_default",
+        "disabled_keeps_criteria",
+        "enabled_and_criteria_survive_restart",
+        "existing_recheck_options_preserved",
+        "repeat_spam_existing_minimum_preserved",
+        "beta_rate_and_criteria_preserved",
+        "beta_content_disabled_preserved",
+        "content_help_updated_dark",
+        "rate_enabled_dark",
+        "rate_seconds_saved_dark",
+        "rate_count_saved_dark",
+        "rate_cancel_preserves_dark",
+        "rate_help_updated_dark",
+        "content_help_updated_light",
+        "rate_enabled_light",
+        "rate_seconds_saved_light",
+        "rate_count_saved_light",
+        "rate_cancel_preserves_light",
+        "rate_help_updated_light",
+        "rate_restart_persistence",
+        "other_bot_rate_unchanged",
+        "scan_limits_and_delays_preserved",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "screenshots": [
+        {
+          "name": "before-upgrade",
+          "sha256": "6c1ff7ab03ab99a1da5a2c3db6e084c51cec7b2536122ad6ffd07622717f4455",
+          "text": [
+            "완장봇",
+            "버전 1.8.0",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "after-upgrade",
+          "sha256": "154f335d8dfbd03221b016c266067432c35db367afc2f0397689bfaa745f0575",
+          "text": [
+            "완장봇",
+            "버전 1.8.1",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "recommend-retained-light",
+          "sha256": "0a9e802578e721c8267e0462c688dde5531769e32aaed6d05120b8189442a4f4",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-default-light",
+          "sha256": "a0b64f01d7b66a476007df4bc7fe14216503633025ef9a6f27729f87b493fb1b",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-light",
+          "sha256": "c3a2287bd6a14bbc0b8049fa85cbe4fdd8dfbbd146c1906ff114da21b14639f3",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-light",
+          "sha256": "f39aba13c4c96f0e761c6f1a2ea1023465a62e16797606bd6c31a9afee632de9",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "75",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "14",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-saved-light",
+          "sha256": "bbf7010cce4c5c123ab75634bb8cf00d57957fe1a5eee40b1e36f35a6ccd1136",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-help-light",
+          "sha256": "f9f7818024df06d65dcd061554635610c125e311f95f6ee286187a79d0c1022e",
+          "text": [
+            "추천수 조작 방지 도움말",
+            "기준 시간 안에 관측한 추천 증가량으로 판단합니다. 예를 들어 3분·10개이면 2분 동안 10개가 늘어도 감지합니다. 4분 동안의 증가를 3분으로 환산하지 않습니다.\n\n처음 발견한 추천 수는 기준점으로만 사용합니다. 기준 시간을 넘긴 관측 공백, 추천 감소, 설정 변경 후에는 새로 관찰합니다.\n\n일반 글도 관찰하고, 감지 후 기준 시간 안에 개념글로 올라오면 해제합니다. 해제 성공한 글은 다시 해제하지 않으며, 결과 미확인 시 중복 요청을 보류합니다.\n\n봇의 계정·탐색 범위·운영 시간대를 공유합니다. 봇 중지나 기능 OFF 시 보조 작업도 멈춥니다. 개념글 전용 목록만 감시하면 진입 전 증가량은 알 수 없습니다.\n\n추천 급증만으로 조작을 확정할 수는 없습니다. 갤러리에 맞게 기준을 정하고 활동 로그에서 감지 근거와 해제 결과를 확인해 주세요.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "recommend-reentered-light",
+          "sha256": "bbf7010cce4c5c123ab75634bb8cf00d57957fe1a5eee40b1e36f35a6ccd1136",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-other-bot-light",
+          "sha256": "751735b58a867324edc9cc523b6d32ed8ae57e5a78a308bd4653c54ffd455029",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-dark",
+          "sha256": "5928819cb73d0f752dd4bff90319f972d0264df685f55629d94bbb1d899311a0",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-dark",
+          "sha256": "bfe47e8e97759c8a1d96a77b71b99528dd661131515010941d8acdcf7134394a",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "125",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "23",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-disabled-dark",
+          "sha256": "536a36007ffedcf885b07a43d9ce9ebc14e60a111d305c1a3a44c86bb7e6f624",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-cold-restart-dark",
+          "sha256": "5928819cb73d0f752dd4bff90319f972d0264df685f55629d94bbb1d899311a0",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "repeat-enabled-dark",
+          "sha256": "14ae6baab9283e17098224b0e0e5cc2d5909eaf25cf4e7b6abf57aadbdf07e9c",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계"
+          ]
+        },
+        {
+          "name": "repeat-help-dark",
+          "sha256": "0ff958dddebeacd743418fb4844729099f499c20386cc382e257ae006974868b",
+          "text": [
+            "유사 내용 반복 감지 도움말",
+            "어떤 글을 묶나요?",
+            "같은 갤러리에서 회원은 같은 ID, 유동은 같은 표시 IP로 올린 게시글을 묶습니다. 정한 시간 안에 제목 또는 본문 중 어느 한쪽이 비슷한 글이 반복 횟수만큼 쌓이면 도배로 봅니다. 제목끼리, 본문끼리 따로 세며 둘 다 같을 필요는 없습니다.",
+            "무엇을 하나요?",
+            "첫 글을 포함해 반복된 글을 ‘개별 차단 설정’의 처리 방식(처음에는 삭제)대로 처리합니다. 다른 필터처럼 삭제·차단·보류 중에서 고르고, 끄면 차단 기본 설정을 따릅니다. 같은 페이지에서 먼저 검사한 글도 이어서 확인합니다. 이미 감지된 글은 최대 15분 동안 처리 대상으로 유지하며, 봇을 끄거나 관련 설정을 바꾸면 초기화합니다.",
+            "비슷한 정도는 어떻게 보나요?",
+            "공백·기호·보이지 않는 문자를 정리한 뒤 비교합니다. 숫자나 ‘안·않·없’ 같은 부정 표현이 다르면 다른 글로 봅니다. 설정한 최소 글자 수는 제목과 본문에 각각 적용합니다. 짧은 글에도 선택한 유사도를 적용하고, 100%면 정리한 뒤 같아야 합니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "rate-default-dark",
+          "sha256": "fa6b2a3990c68d63a740e322de864f1f4512685a44f9d76f99c2dc92bd025f64",
+          "text": [
+            "도배 방지",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에",
+            "작성 개수",
+            "12개 이상"
+          ]
+        },
+        {
+          "name": "rate-number-dialog-dark",
+          "sha256": "127dfc1a67183e7061bbedc429a16f5cfdb809f552fb722ad6af4a03f76315ed",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-dark",
+          "sha256": "6594bc8af8a1e6203681b2dba15247ed9859e1b87c023d60bc364da5e1c38b07",
+          "text": [
+            "도배 방지",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에",
+            "작성 개수",
+            "12개 이상"
+          ]
+        },
+        {
+          "name": "rate-help-dark",
+          "sha256": "838013fdaf0f1f2a33324ab7b7381fa353b6b03d473950e9dad27bf9c3745dbe",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다. 같은 페이지의 남은 글은 이어서 확인하고, 이미 감지한 글은 최대 15분 동안 처리 대상으로 유지합니다. 봇을 끄거나 관련 설정을 바꾸면 대기 대상을 초기화합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "repeat-enabled-light",
+          "sha256": "a3159a56bff63f54445e7f133c31814b6bf1bbed4a02d9d169b799081c70a12f",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계"
+          ]
+        },
+        {
+          "name": "repeat-help-light",
+          "sha256": "9cb7c32663c35085db3ae5e563bd57c959b88f350729dc502574dd75361c7ff9",
+          "text": [
+            "유사 내용 반복 감지 도움말",
+            "어떤 글을 묶나요?",
+            "같은 갤러리에서 회원은 같은 ID, 유동은 같은 표시 IP로 올린 게시글을 묶습니다. 정한 시간 안에 제목 또는 본문 중 어느 한쪽이 비슷한 글이 반복 횟수만큼 쌓이면 도배로 봅니다. 제목끼리, 본문끼리 따로 세며 둘 다 같을 필요는 없습니다.",
+            "무엇을 하나요?",
+            "첫 글을 포함해 반복된 글을 ‘개별 차단 설정’의 처리 방식(처음에는 삭제)대로 처리합니다. 다른 필터처럼 삭제·차단·보류 중에서 고르고, 끄면 차단 기본 설정을 따릅니다. 같은 페이지에서 먼저 검사한 글도 이어서 확인합니다. 이미 감지된 글은 최대 15분 동안 처리 대상으로 유지하며, 봇을 끄거나 관련 설정을 바꾸면 초기화합니다.",
+            "비슷한 정도는 어떻게 보나요?",
+            "공백·기호·보이지 않는 문자를 정리한 뒤 비교합니다. 숫자나 ‘안·않·없’ 같은 부정 표현이 다르면 다른 글로 봅니다. 설정한 최소 글자 수는 제목과 본문에 각각 적용합니다. 짧은 글에도 선택한 유사도를 적용하고, 100%면 정리한 뒤 같아야 합니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "rate-default-light",
+          "sha256": "7604122b2efe86e58bf25b68abc93419c5b0ffac41282a14de5954e929183671",
+          "text": [
+            "도배 방지",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에"
+          ]
+        },
+        {
+          "name": "rate-number-dialog-light",
+          "sha256": "a18196c638f2e1971d65169ca615c253cc0e715e048a4adbef464737650f9c3c",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-light",
+          "sha256": "cb076d954b573612b5ac89468007a596c6e9167cdd92b981efe74cdc6ec4ebc9",
+          "text": [
+            "도배 방지",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "120초 안에",
+            "작성 개수",
+            "12개 이상",
+            "깡계 · 같은 계정",
+            "확인 시간",
+            "60초 안에",
+            "작성 개수",
+            "5개 이상",
+            "깡계는 깡계 필터의 판정 기준을 따릅니다. 같은 표시 IP여도 다른 사람일 수 있습니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다."
+          ]
+        },
+        {
+          "name": "rate-help-light",
+          "sha256": "970ad6417d3e295cd4b3d0a91be169c552ef193cf57018ded9d858efba158831",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다. 같은 페이지의 남은 글은 이어서 확인하고, 이미 감지한 글은 최대 15분 동안 처리 대상으로 유지합니다. 봇을 끄거나 관련 설정을 바꾸면 대기 대상을 초기화합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        }
+      ],
+      "server_writes": 0,
+      "version": [
+        "versionCode=199 minSdk=24 targetSdk=35",
+        "versionName=1.8.1"
+      ],
+      "passed": true
+    },
+    "35": {
+      "api": "35",
+      "apk_sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+      "previous": "releases/완장봇_v1.8.1-beta1.apk",
+      "checks": [
+        "upgrade_preferences_unchanged_before_launch",
+        "exact_signed_apk_installed",
+        "release_not_debuggable",
+        "exact_formal181_version",
+        "both_bots_preserved",
+        "existing_guard_enabled_and_criteria_retained",
+        "other_bot_default_retained",
+        "existing_guard_can_disable",
+        "enabled_from_detail",
+        "criteria_saved",
+        "cancel_preserves_criteria",
+        "retained_after_reentry",
+        "other_bot_remains_default",
+        "disabled_keeps_criteria",
+        "enabled_and_criteria_survive_restart",
+        "existing_recheck_options_preserved",
+        "repeat_spam_existing_minimum_preserved",
+        "beta_rate_and_criteria_preserved",
+        "beta_content_disabled_preserved",
+        "content_help_updated_dark",
+        "rate_enabled_dark",
+        "rate_seconds_saved_dark",
+        "rate_count_saved_dark",
+        "rate_cancel_preserves_dark",
+        "rate_help_updated_dark",
+        "content_help_updated_light",
+        "rate_enabled_light",
+        "rate_seconds_saved_light",
+        "rate_count_saved_light",
+        "rate_cancel_preserves_light",
+        "rate_help_updated_light",
+        "rate_restart_persistence",
+        "other_bot_rate_unchanged",
+        "scan_limits_and_delays_preserved",
+        "room_row_and_snapshot_path_preserved",
+        "snapshot_bytes_preserved",
+        "restart_a_inactive_filter_and_local_values_preserved",
+        "restart_b_inactive_filter_and_local_values_preserved",
+        "schedule_kept_tests_offline",
+        "no_app_crash"
+      ],
+      "screenshots": [
+        {
+          "name": "before-upgrade",
+          "sha256": "7d770023a1c51d0fc62c99c56b7b94eeb70701951dfa3341b743cc20dcad5770",
+          "text": [
+            "완장봇",
+            "버전 1.8.1-beta1",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "after-upgrade",
+          "sha256": "738d64deca399474896494eaaf2770587a01dd16f35672e715baff9f558e6205",
+          "text": [
+            "완장봇",
+            "버전 1.8.1",
+            "봇 2개 · 실행 중 0개",
+            "R",
+            "Restart A",
+            "중지됨",
+            "R",
+            "Restart B",
+            "중지됨",
+            "불러오기",
+            "DB 기록",
+            "봇 추가"
+          ]
+        },
+        {
+          "name": "recommend-retained-light",
+          "sha256": "c82d4a31ab20e387bb46dfde00514c3278b632c7af6efc82c3ac5cc25af4047b",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-default-light",
+          "sha256": "1fc3cbef7d7b5cad71b1ff3ce2a0a1e2f68b7ef93493767cc286a8e5083b1e18",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-light",
+          "sha256": "c82d4a31ab20e387bb46dfde00514c3278b632c7af6efc82c3ac5cc25af4047b",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "1분 15초 이내에 추천이 14개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 12초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-light",
+          "sha256": "f03d5f916f7d4e2319a1211e7c12c632452594940299135b53a0f2359bb81e3c",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "75",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "14",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-saved-light",
+          "sha256": "99c5a56ebe2b1a0bdd19df8b58e4f9cfff26e4860564e711b78d1f455276a953",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-help-light",
+          "sha256": "46c4609ba5befd7b90d6a507363d449076101c64b40f1395c3003d3fe514d913",
+          "text": [
+            "추천수 조작 방지 도움말",
+            "기준 시간 안에 관측한 추천 증가량으로 판단합니다. 예를 들어 3분·10개이면 2분 동안 10개가 늘어도 감지합니다. 4분 동안의 증가를 3분으로 환산하지 않습니다.\n\n처음 발견한 추천 수는 기준점으로만 사용합니다. 기준 시간을 넘긴 관측 공백, 추천 감소, 설정 변경 후에는 새로 관찰합니다.\n\n일반 글도 관찰하고, 감지 후 기준 시간 안에 개념글로 올라오면 해제합니다. 해제 성공한 글은 다시 해제하지 않으며, 결과 미확인 시 중복 요청을 보류합니다.\n\n봇의 계정·탐색 범위·운영 시간대를 공유합니다. 봇 중지나 기능 OFF 시 보조 작업도 멈춥니다. 개념글 전용 목록만 감시하면 진입 전 증가량은 알 수 없습니다.\n\n추천 급증만으로 조작을 확정할 수는 없습니다. 갤러리에 맞게 기준을 정하고 활동 로그에서 감지 근거와 해제 결과를 확인해 주세요.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "recommend-reentered-light",
+          "sha256": "8782045192044e4881fe5c945a9293839c003728d5452b4f13df14c1302a3133",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-other-bot-light",
+          "sha256": "8604cc47ef2cea50287bd626c50fe4d0ca21f5d087b256b40b12491d28ef94ca",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "3분 이내에 추천이 10개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 30초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-enabled-dark",
+          "sha256": "0ded1b26eeb357da2484eabadd0a45f8bf2470101fa9ef022985a0629ff3f8cc",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-dialog-dark",
+          "sha256": "3d89032752029a47ae6e8436d38af9849f331aa657966114f11356c02e6dd14f",
+          "text": [
+            "감지 기준 설정",
+            "기준 시간 안에 늘어난 추천 수를 비교합니다.",
+            "125",
+            "기준 시간 (초)",
+            "10~3,600초 · 180초 = 3분",
+            "23",
+            "추천 증가량 (개 이상)",
+            "1~1,000,000개",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "recommend-disabled-dark",
+          "sha256": "1a7296df9d8a9d1cdb023c78ae32ef2f3235979ae6a5f0955c2edfac013a3e95",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "recommend-cold-restart-dark",
+          "sha256": "1c65bf56e13f664dd60ec1d67f26a2c016088812ab7be2077b7975e6d2e2cebc",
+          "text": [
+            "추천수 조작 방지",
+            "추천수 조작 방지",
+            "추천 급증을 감지하면 개념글을 해제합니다.",
+            "2분 5초 이내에 추천이 23개 이상 늘면 감지",
+            "감지 기준 설정",
+            "추천 수는 약 20초 간격으로 별도 확인합니다.",
+            "탐색 범위가 넓거나 연결이 느리면 관측 간격이 길어질 수 있습니다. 실제 관측 시각으로 판단합니다.",
+            "현재 탐색 범위 · 기존 화이트리스트와 차단 예외 적용"
+          ]
+        },
+        {
+          "name": "repeat-enabled-dark",
+          "sha256": "36a48edbc24c8e78fe78cd8245a3f0e2b091f0f2a43199a32b47db1d2be4f848",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)"
+          ]
+        },
+        {
+          "name": "repeat-help-dark",
+          "sha256": "9629870622c713634fb6bc8a75d1947bfaf4f1124f32a9586c73aae5700712f3",
+          "text": [
+            "유사 내용 반복 감지 도움말",
+            "어떤 글을 묶나요?",
+            "같은 갤러리에서 회원은 같은 ID, 유동은 같은 표시 IP로 올린 게시글을 묶습니다. 정한 시간 안에 제목 또는 본문 중 어느 한쪽이 비슷한 글이 반복 횟수만큼 쌓이면 도배로 봅니다. 제목끼리, 본문끼리 따로 세며 둘 다 같을 필요는 없습니다.",
+            "무엇을 하나요?",
+            "첫 글을 포함해 반복된 글을 ‘개별 차단 설정’의 처리 방식(처음에는 삭제)대로 처리합니다. 다른 필터처럼 삭제·차단·보류 중에서 고르고, 끄면 차단 기본 설정을 따릅니다. 같은 페이지에서 먼저 검사한 글도 이어서 확인합니다. 이미 감지된 글은 최대 15분 동안 처리 대상으로 유지하며, 봇을 끄거나 관련 설정을 바꾸면 초기화합니다.",
+            "비슷한 정도는 어떻게 보나요?",
+            "공백·기호·보이지 않는 문자를 정리한 뒤 비교합니다. 숫자나 ‘안·않·없’ 같은 부정 표현이 다르면 다른 글로 봅니다. 설정한 최소 글자 수는 제목과 본문에 각각 적용합니다. 짧은 글에도 선택한 유사도를 적용하고, 100%면 정리한 뒤 같아야 합니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "rate-default-dark",
+          "sha256": "f0f3b6f04003e39d6c39976303148a6ff78c7daa8a7f2646de4af0845d4f2261",
+          "text": [
+            "도배 방지",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다."
+          ]
+        },
+        {
+          "name": "rate-number-dialog-dark",
+          "sha256": "54ba925263c066f066d5d897da4368dba528cd24e4c1895bb989174cc3b9aa3e",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-dark",
+          "sha256": "64157a0536cb751ff661cd681947e1eda14e0d448b51bd821f29754c1d472b2a",
+          "text": [
+            "도배 방지",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에",
+            "작성 개수",
+            "12개 이상",
+            "깡계 · 같은 계정",
+            "확인 시간",
+            "60초 안에",
+            "작성 개수",
+            "5개 이상",
+            "깡계는 깡계 필터의 판정 기준을 따릅니다. 같은 표시 IP여도 다른 사람일 수 있습니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "보류"
+          ]
+        },
+        {
+          "name": "rate-help-dark",
+          "sha256": "0fbc156b11044a9686d153182f1c331dd26d84d4ed86a4897a447030f7ecb1df",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다. 같은 페이지의 남은 글은 이어서 확인하고, 이미 감지한 글은 최대 15분 동안 처리 대상으로 유지합니다. 봇을 끄거나 관련 설정을 바꾸면 대기 대상을 초기화합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "repeat-enabled-light",
+          "sha256": "9017b82321efff62dad62698352602abe86560236d42fc23bcd048417f3caa01",
+          "text": [
+            "도배 방지",
+            "도배 방지 사용",
+            "끄면 설정을 보관하고 감지를 멈춥니다.",
+            "유사 내용 반복 감지",
+            "제목 또는 본문이 비슷한 글을 감지합니다.",
+            "같은 작성자가 10분 안에 제목이나 본문이 비슷한 글을 4개 이상 올리면 첫 글까지 모두 삭제합니다.",
+            "대상: 유동 · 깡계 · 내용 비슷한 정도 85% 이상",
+            "감지 기준",
+            "기본값으로",
+            "최소 글자 수",
+            "제목·본문 각각 적용 · 눌러서 입력",
+            "17자",
+            "확인 시간",
+            "이 시간 안의 글끼리 비교",
+            "10분",
+            "반복 횟수",
+            "첫 글 포함, 이만큼이면 도배",
+            "4개",
+            "내용 비슷한 정도",
+            "표현을 바꾼 글까지",
+            "85%",
+            "기본값: 최소 8자 · 10분 · 4개 · 85%. 바꾸면 바로 저장되고 그동안 모은 반복 기록은 새로 시작합니다.",
+            "검사 대상",
+            "유동",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)"
+          ]
+        },
+        {
+          "name": "repeat-help-light",
+          "sha256": "8688942db120313e9d61168b02db5edfa2cbf45c4cedc9be3f70e89138dbed69",
+          "text": [
+            "유사 내용 반복 감지 도움말",
+            "어떤 글을 묶나요?",
+            "같은 갤러리에서 회원은 같은 ID, 유동은 같은 표시 IP로 올린 게시글을 묶습니다. 정한 시간 안에 제목 또는 본문 중 어느 한쪽이 비슷한 글이 반복 횟수만큼 쌓이면 도배로 봅니다. 제목끼리, 본문끼리 따로 세며 둘 다 같을 필요는 없습니다.",
+            "무엇을 하나요?",
+            "첫 글을 포함해 반복된 글을 ‘개별 차단 설정’의 처리 방식(처음에는 삭제)대로 처리합니다. 다른 필터처럼 삭제·차단·보류 중에서 고르고, 끄면 차단 기본 설정을 따릅니다. 같은 페이지에서 먼저 검사한 글도 이어서 확인합니다. 이미 감지된 글은 최대 15분 동안 처리 대상으로 유지하며, 봇을 끄거나 관련 설정을 바꾸면 초기화합니다.",
+            "비슷한 정도는 어떻게 보나요?",
+            "공백·기호·보이지 않는 문자를 정리한 뒤 비교합니다. 숫자나 ‘안·않·없’ 같은 부정 표현이 다르면 다른 글로 봅니다. 설정한 최소 글자 수는 제목과 본문에 각각 적용합니다. 짧은 글에도 선택한 유사도를 적용하고, 100%면 정리한 뒤 같아야 합니다.",
+            "닫기"
+          ]
+        },
+        {
+          "name": "rate-default-light",
+          "sha256": "aaa388831b7918ccad36f79fd722a96e26558c199b8302b85f0d2d822e283416",
+          "text": [
+            "도배 방지",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "90초 안에",
+            "작성 개수",
+            "12개 이상"
+          ]
+        },
+        {
+          "name": "rate-number-dialog-light",
+          "sha256": "9252452867cc6a4b4e37f26aacb40d9b36e0f34b223815a5a9b0b341b62687ef",
+          "text": [
+            "유동 확인 시간",
+            "90",
+            "시간",
+            "초",
+            "10~3600초 · 검사 주기에 따라 감지가 늦을 수 있습니다.",
+            "취소",
+            "저장"
+          ]
+        },
+        {
+          "name": "rate-saved-light",
+          "sha256": "fbf366e48abf415055caee95e9e10f234833a1fecd61a9090e18770968d8d93d",
+          "text": [
+            "도배 방지",
+            "비로그인 작성자. 같은 표시 IP의 글을 묶어 비교합니다.",
+            "깡계",
+            "깡계 필터 기준을 따릅니다. (현재: 글 수 5 미만 또는 댓글 수 10 미만)",
+            "일반 회원의 글과 댓글은 검사하지 않습니다. 화이트리스트와 차단 예외 글도 제외합니다.",
+            "개별 차단 설정",
+            "개별 차단 설정 사용",
+            "끄면 기본 차단 설정을 따릅니다.",
+            "처리 방식",
+            "삭제",
+            "삭제는 작성자 차단 없이 글만 지웁니다. 삭제한 글은 되돌릴 수 없습니다.",
+            "감지 방식과 주의사항",
+            "어떤 글을 묶는지, 놓칠 수 있는 경우",
+            "연속 작성 감지",
+            "내용이 달라도 짧은 시간에 여러 글을 올리면 감지합니다.",
+            "기준을 넘으면 글은 그대로 두고 보류 기록을 남깁니다.",
+            "유동 · 같은 표시 IP",
+            "확인 시간",
+            "120초 안에",
+            "작성 개수",
+            "12개 이상"
+          ]
+        },
+        {
+          "name": "rate-help-light",
+          "sha256": "bc8f6e1effbc2c3cfdff0002b2b8b9be761e6b4750d4a6ecff976fa905063630",
+          "text": [
+            "연속 작성 감지",
+            "같은 갤러리에서 유동은 같은 표시 IP, 깡계는 같은 계정으로 작성한 글을 셉니다. 제목·본문·최소 글자 수와 관계없이 정한 시간 안의 서로 다른 글이 기준 개수에 도달하면 첫 글부터 처리합니다. 같은 페이지의 남은 글은 이어서 확인하고, 이미 감지한 글은 최대 15분 동안 처리 대상으로 유지합니다. 봇을 끄거나 관련 설정을 바꾸면 대기 대상을 초기화합니다.\n\n일반 회원, 댓글, 보호된 작성자와 차단 예외 글은 제외합니다. 같은 글을 재검사해도 한 개로 셉니다. 반복 내용 감지와 함께 걸리면 한 번만 처리하며 보류가 다른 삭제·차단을 막지 않습니다.\n\n표시 IP는 여러 사람이 공유할 수 있습니다. 봇이 실제로 탐색한 글만 세므로 검사 주기보다 빠른 감지를 보장하지 않습니다. IP·계정을 바꾸는 도배는 놓칠 수 있습니다.",
+            "닫기"
+          ]
+        }
+      ],
+      "server_writes": 0,
+      "version": [
+        "versionCode=199 minSdk=24 targetSdk=35",
+        "versionName=1.8.1"
+      ],
+      "passed": true
+    }
+  },
+  "live_validation": {
+    "new_formal_server_test_writes": 0,
+    "inherited_beta_source": "6328b8f5c95c13234bc0e091c46d54c0ed0a9399",
+    "inherited_beta_evidence": {
+      "version": "1.8.1-beta1",
+      "real_service": true,
+      "scope": "laboratory1/Test/10",
+      "first_post": "2383",
+      "control_post": "2386",
+      "repeat_posts": [
+        "2383",
+        "2384",
+        "2385"
+      ],
+      "whitelist_protected_all": true,
+      "exempt_first_excluded_from_count": true,
+      "observe_only_includes_first_and_preserves_control": true,
+      "all_confirmed_posts_deleted_in_same_cycle": true,
+      "actual_delete_records": [
+        [
+          "2383",
+          "[삭제] 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+          "/data/user/0/com.heyheyon.armbandbot/cache/snapshots_v2_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931/laboratory1_2383_blocked_20261025_153400.html"
+        ],
+        [
+          "2385",
+          "[삭제] 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+          "/data/user/0/com.heyheyon.armbandbot/cache/snapshots_v2_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931/laboratory1_2385_blocked_20261025_153404.html"
+        ],
+        [
+          "2384",
+          "[삭제] 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+          "/data/user/0/com.heyheyon.armbandbot/cache/snapshots_v2_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931_dd2beaf7726e385e536cc71f00062c13ffd75cf7a3f9be1dd49df2faefc7a931/laboratory1_2384_blocked_20261025_153408.html"
+        ]
+      ],
+      "first_deleted": true,
+      "control_preserved": true,
+      "cycles": 11,
+      "passed": true,
+      "validated_action_summary": {
+        "passed": true,
+        "actual_deletions": [
+          "[15:34:00] [도배 방지] 삭제 완료 / 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+          "[15:34:04] [도배 방지] 삭제 완료 / 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385",
+          "[15:34:08] [도배 방지] 삭제 완료 / 같은 작성자 정보의 연속 작성 3개 / 최근 3600초 / 글번호 2383,2384,2385"
+        ],
+        "first_post": "2383",
+        "control_post": "2386",
+        "same_cycle": true,
+        "control_preserved": true,
+        "recorded_history_rows": 3,
+        "source_product_commit": "c0d163d2e27320d00d8a1ef5ab866bfb72414dcc",
+        "test_commit": "6328b8f",
+        "debug_apk_sha256": "c94155c590f821a2ebb904a91c5e188118d691d2a2d5ad7815a01241dd9e2851"
+      },
+      "local_raw_evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1-beta1/live35/screens/release181-live.json",
+      "artifact_type": "same-source Debug APK, real BotService",
+      "apk_sha256": "c94155c590f821a2ebb904a91c5e188118d691d2a2d5ad7815a01241dd9e2851",
+      "settings": "laboratory1 M/Test10, four owned posts, IP window3600s/count3, contentOFF/minLength10000, whitelist/exempt/HOLD before DELETE"
+    },
+    "cleanup": {
+      "scope": "laboratory1/Test10",
+      "checked_at": "2026-10-25T06:36:10.331038+00:00",
+      "posts": [
+        {
+          "id": "2383",
+          "already_gone": true
+        },
+        {
+          "id": "2384",
+          "already_gone": true
+        },
+        {
+          "id": "2385",
+          "already_gone": true
+        },
+        {
+          "id": "2386",
+          "attempted_at": "2026-10-25T06:36:16.202383+00:00",
+          "request_status": 200,
+          "response": "{\"result\":\"success\",\"msg\":\"\\uc0ad\\uc81c\\ub418\\uc5c8\\uc2b5\\ub2c8\\ub2e4.\"}",
+          "deleted": true,
+          "readback_status": 404
+        }
+      ],
+      "all_owned_gone": true
+    },
+    "actual_recommendation_release_success_verified": false
+  },
+  "not_performed": [
+    "물리 Android 기기",
+    "장시간 상시 운영",
+    "실제 깡계 차단·이미 차단된 작성자의 반복 차단 서버 응답",
+    "실제 개념글 해제 성공",
+    "정식 APK의 추가 실서버 조치"
+  ],
+  "limitations": [
+    "제보자의 정확한 설정·원문·로그는 미확보; 원본 코드에서 같은 누락 경로 재현",
+    "표시 IP 공유 가능",
+    "현재 탐색 범위에서 확인한 글만 집계; 감지 전 시간 범위를 벗어나면 누락 가능",
+    "확정 대상은 최대15분; 중지·관련 설정 변경 시 초기화",
+    "IP/계정을 바꾸는 도배를 동일 작성자로 통합하지 않음"
+  ],
+  "dex": {
+    "apk": "/home/haeon/workhub-tasks/live/armbandbot-1.5.4-beta1/releases/완장봇_v1.8.1.apk",
+    "dex_count": 5,
+    "dex": [
+      {
+        "dex": "classes.dex",
+        "methods": 65466,
+        "method_headroom": 70,
+        "fields": 35009,
+        "field_headroom": 30527,
+        "classes": 17981,
+        "max_parameter_words": 175,
+        "max_words_with_receiver_upper_bound": 176,
+        "invoke_range_word_headroom_upper_bound": 79
+      },
+      {
+        "dex": "classes2.dex",
+        "methods": 15,
+        "method_headroom": 65521,
+        "fields": 0,
+        "field_headroom": 65536,
+        "classes": 14,
+        "max_parameter_words": 0,
+        "max_words_with_receiver_upper_bound": 1,
+        "invoke_range_word_headroom_upper_bound": 254
+      },
+      {
+        "dex": "classes3.dex",
+        "methods": 2145,
+        "method_headroom": 63391,
+        "fields": 547,
+        "field_headroom": 64989,
+        "classes": 175,
+        "max_parameter_words": 10,
+        "max_words_with_receiver_upper_bound": 11,
+        "invoke_range_word_headroom_upper_bound": 244
+      },
+      {
+        "dex": "classes4.dex",
+        "methods": 65322,
+        "method_headroom": 214,
+        "fields": 22885,
+        "field_headroom": 42651,
+        "classes": 8123,
+        "max_parameter_words": 239,
+        "max_words_with_receiver_upper_bound": 240,
+        "invoke_range_word_headroom_upper_bound": 15
+      },
+      {
+        "dex": "classes5.dex",
+        "methods": 14924,
+        "method_headroom": 50612,
+        "fields": 5005,
+        "field_headroom": 60531,
+        "classes": 1791,
+        "max_parameter_words": 22,
+        "max_words_with_receiver_upper_bound": 23,
+        "invoke_range_word_headroom_upper_bound": 232
+      }
+    ],
+    "minimum_method_headroom": 70,
+    "minimum_field_headroom": 30527,
+    "maximum_parameter_words": 239,
+    "maximum_words_with_receiver_upper_bound": 240
+  },
+  "visual_verification": {
+    "reviewed": [
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api24/after-upgrade.png",
+        "sha256": "154f335d8dfbd03221b016c266067432c35db367afc2f0397689bfaa745f0575"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api24/repeat-help-dark.png",
+        "sha256": "0ff958dddebeacd743418fb4844729099f499c20386cc382e257ae006974868b"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api24/rate-help-dark.png",
+        "sha256": "838013fdaf0f1f2a33324ab7b7381fa353b6b03d473950e9dad27bf9c3745dbe"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api24/repeat-help-light.png",
+        "sha256": "9cb7c32663c35085db3ae5e563bd57c959b88f350729dc502574dd75361c7ff9"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api24/rate-help-light.png",
+        "sha256": "970ad6417d3e295cd4b3d0a91be169c552ef193cf57018ded9d858efba158831"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api35/repeat-help-dark.png",
+        "sha256": "9629870622c713634fb6bc8a75d1947bfaf4f1124f32a9586c73aae5700712f3"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api35/rate-help-dark.png",
+        "sha256": "0fbc156b11044a9686d153182f1c331dd26d84d4ed86a4897a447030f7ecb1df"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api35/repeat-help-light.png",
+        "sha256": "8688942db120313e9d61168b02db5edfa2cbf45c4cedc9be3f70e89138dbed69"
+      },
+      {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api35/rate-help-light.png",
+        "sha256": "bc8f6e1effbc2c3cfdff0002b2b8b9be761e6b4750d4a6ecff976fa905063630"
+      }
+    ],
+    "findings": "Exact formal APK on Android7/15: both updated help dialogs reviewed in light/dark; new text legible, no overlap or cropped controls, scrollable content has visible close button. Home version1.8.1 and retained bots verified.",
+    "passed": true,
+    "reviewed_at": "2026-10-25T17:07:29.224063+09:00"
+  },
+  "nonfinal_attempts": [
+    {
+      "stage": "signed-api35 first attempt",
+      "result": "Failed exact installed APK byte-hash check before formal app launch; installed bytes/hash were not retained by the old harness, so cause cannot be determined from that attempt. No product failure asserted. Fresh guest retry uses saved install receipts, device SHA256, pulled APK and bounded exec-out read verification.",
+      "evidence": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/signed-api35-hash-check-failed",
+      "product_apk_unchanged": true,
+      "apk_sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+      "at": "2026-10-25T16:57:22.346533+09:00",
+      "fresh_guest_install_verification": "All three independent byte checks match exact formal APK; version199/1.8.1, streamed install Success, no read retry needed. Earlier discrepancy cause still indeterminate because old harness did not retain mismatched bytes.",
+      "resolved_installed_artifact_verified_at": "2026-10-25T17:00:22.785734+09:00"
+    }
+  ],
+  "independent_installed_byte_audit_api35": {
+    "expected_sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+    "device_sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+    "pulled_sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+    "pulled_bytes": 13535394,
+    "exec_out_reads": [
+      {
+        "sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+        "bytes": 13535394,
+        "stderr": ""
+      }
+    ]
+  },
+  "drive": {
+    "apk": {
+      "metadata": {
+        "id": "1J7WrAa9HpH_KkeunXmijKQir5V_zYjzJ",
+        "title": "완장봇_v1.8.1.apk",
+        "mime_type": "application/vnd.android.package-archive",
+        "size": "13535394",
+        "url": "https://drive.google.com/file/d/1J7WrAa9HpH_KkeunXmijKQir5V_zYjzJ/view?usp=drivesdk",
+        "display_url": "https://drive.google.com/file/d/1J7WrAa9HpH_KkeunXmijKQir5V_zYjzJ/view?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": "2026-10-25T08:09:11.309Z",
+        "modified_time": "2026-10-25T08:09:11.309Z",
+        "parent_ids": [
+          "1zyy7Yl8nmAge83JOaFBONm438432rxA3"
+        ],
+        "drive_id": null,
+        "current_user_can_share": true,
+        "has_augmented_permissions": null,
+        "shared": true,
+        "permissions": [
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "skt.lte.samsung@gmail.com",
+            "domain": null,
+            "displayName": "skt.lte.samsung",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "irisflower2002@gmail.com",
+            "domain": null,
+            "displayName": "irisflower2002",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "abc119368@gmail.com",
+            "domain": null,
+            "displayName": "abc119368",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yoonyoon12341234@gmail.com",
+            "domain": null,
+            "displayName": "yoonyoon12341234",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "rune7638@gmail.com",
+            "domain": null,
+            "displayName": "James Seo",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yyyqwe0781@gmail.com",
+            "domain": null,
+            "displayName": "yyyqwe0781",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "wnsgh851@gmail.com",
+            "domain": null,
+            "displayName": "wnsgh851",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "lellend7705@gmail.com",
+            "domain": null,
+            "displayName": "lellend7705",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "qortn13@gmail.com",
+            "domain": null,
+            "displayName": "qortn13",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "redbird040317@gmail.com",
+            "domain": null,
+            "displayName": "redbird040317",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "gimhodo068@gmail.com",
+            "domain": null,
+            "displayName": "gimhodo068",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "hcyoun00@gmail.com",
+            "domain": null,
+            "displayName": "hcyoun00",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "funkyshake7@gmail.com",
+            "domain": null,
+            "displayName": "funkyshake7",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dlatldkel7@gmail.com",
+            "domain": null,
+            "displayName": "dlatldkel7",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "onlyshare643@gmail.com",
+            "domain": null,
+            "displayName": "onlyshare643",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "chlgus9517@gmail.com",
+            "domain": null,
+            "displayName": "chlgus9517",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kns4670@gmail.com",
+            "domain": null,
+            "displayName": "kns4670",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "rjsdn0980@gmail.com",
+            "domain": null,
+            "displayName": "rjsdn0980",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dsxeno001@gmail.com",
+            "domain": null,
+            "displayName": "dsxeno001",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "aesparealitygallery@gmail.com",
+            "domain": null,
+            "displayName": "aesparealitygallery",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "donanya0101@gmail.com",
+            "domain": null,
+            "displayName": "donanya0101",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "57tempus@gmail.com",
+            "domain": null,
+            "displayName": "57tempus",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "wooonie39@gmail.com",
+            "domain": null,
+            "displayName": "wooonie39",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "vin25205@gmail.com",
+            "domain": null,
+            "displayName": "vin25205",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "vfrtyhnbgg@gmail.com",
+            "domain": null,
+            "displayName": "vfrtyhnbgg",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "jonghwan8654@gmail.com",
+            "domain": null,
+            "displayName": "jonghwan8654",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yoyoyoyo0401@gmail.com",
+            "domain": null,
+            "displayName": "yoyoyoyo0401",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "ajtwlswodbs12@gmail.com",
+            "domain": null,
+            "displayName": "ajtwlswodbs12",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "nguyenvanhao2847@gmail.com",
+            "domain": null,
+            "displayName": "nguyenvanhao2847",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "misa10032@gmail.com",
+            "domain": null,
+            "displayName": "misa10032",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "thepankr@gmail.com",
+            "domain": null,
+            "displayName": "thepankr",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "laciela1123@gmail.com",
+            "domain": null,
+            "displayName": "laciela1123",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "close11122@gmail.com",
+            "domain": null,
+            "displayName": "close11122",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "wonjyoo3@gmail.com",
+            "domain": null,
+            "displayName": "wonjyoo3",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dhfdjw714@gmail.com",
+            "domain": null,
+            "displayName": "dhfdjw714",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "sje34251172@gmail.com",
+            "domain": null,
+            "displayName": "sje34251172",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "gam3254@gmail.com",
+            "domain": null,
+            "displayName": "gam3254",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "armetahmah@gmail.com",
+            "domain": null,
+            "displayName": "armetahmah",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "zotledis@gmail.com",
+            "domain": null,
+            "displayName": "zotledis",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yeocj1027@gmail.com",
+            "domain": null,
+            "displayName": "yeocj1027",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "zszs1122n@gmail.com",
+            "domain": null,
+            "displayName": "zszs1122n",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "lechenaulti4@gmail.com",
+            "domain": null,
+            "displayName": "lechenaulti4",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "JeongChief@gmail.com",
+            "domain": null,
+            "displayName": "JeongChief",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "gisgin708@gmail.com",
+            "domain": null,
+            "displayName": "gisgin708",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kimmin080792@gmail.com",
+            "domain": null,
+            "displayName": "kimmin080792",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "smyoon0625@gmail.com",
+            "domain": null,
+            "displayName": "smyoon0625",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "sc2mg2020@gmail.com",
+            "domain": null,
+            "displayName": "sc2mg2020",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dnwms2631@gmail.com",
+            "domain": null,
+            "displayName": "dnwms2631",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "tlxmwjsdyd22@gmail.com",
+            "domain": null,
+            "displayName": "tlxmwjsdyd22",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "ddqq094@gmail.com",
+            "domain": null,
+            "displayName": "ddqq094",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "jeehwan.ahn@gmail.com",
+            "domain": null,
+            "displayName": "jeehwan.ahn",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "reinanalizzy@gmail.com",
+            "domain": null,
+            "displayName": "reinanalizzy",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kimzerah2@gmail.com",
+            "domain": null,
+            "displayName": "kimzerah2",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dkfvlfdydjqttmqslek@gmail.com",
+            "domain": null,
+            "displayName": "dkfvlfdydjqttmqslek",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kimtaeu2002@gmail.com",
+            "domain": null,
+            "displayName": "kimtaeu2002",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "link2557@gmail.com",
+            "domain": null,
+            "displayName": "link2557",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "zerosring00@gmail.com",
+            "domain": null,
+            "displayName": "zerosring00",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dololong3918@gmail.com",
+            "domain": null,
+            "displayName": "dololong3918",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "lost.blue.3210@gmail.com",
+            "domain": null,
+            "displayName": "lost.blue.3210",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "duwiine1234@gmail.com",
+            "domain": null,
+            "displayName": "duwiine1234",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "oyj1301@gmail.com",
+            "domain": null,
+            "displayName": "oyj1301",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "owner",
+            "emailAddress": "haeon0511@gmail.com",
+            "domain": null,
+            "displayName": "김해온",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "votehanda@gmail.com",
+            "domain": null,
+            "displayName": "votehanda",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "logeminiend@gmail.com",
+            "domain": null,
+            "displayName": "logeminiend",
+            "allowFileDiscovery": null
+          }
+        ],
+        "source_visibility_status": "permission_metadata_available"
+      },
+      "download_sha256": "ed2ec37f8f35c5425814b7ab247d7a7ac5627b519a105ecb00c3a0fd1cbaf5bd",
+      "download_sha_matches": true,
+      "size": 13535394,
+      "staging_metadata": {
+        "id": "1J7WrAa9HpH_KkeunXmijKQir5V_zYjzJ",
+        "title": "완장봇_v1.8.1.apk",
+        "mime_type": "application/vnd.android.package-archive",
+        "size": "13535394",
+        "url": "https://drive.google.com/file/d/1J7WrAa9HpH_KkeunXmijKQir5V_zYjzJ/view?usp=drivesdk",
+        "display_url": "https://drive.google.com/file/d/1J7WrAa9HpH_KkeunXmijKQir5V_zYjzJ/view?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": "2026-10-25T08:09:11.309Z",
+        "modified_time": "2026-10-25T08:09:11.309Z",
+        "parent_ids": [
+          "1D9_B1pr8qycWJkxuPIVgl1I6nib6ivi9"
+        ],
+        "drive_id": null,
+        "current_user_can_share": true,
+        "has_augmented_permissions": null,
+        "shared": true,
+        "permissions": [
+          {
+            "type": "user",
+            "role": "owner",
+            "emailAddress": "haeon0511@gmail.com",
+            "domain": null,
+            "displayName": "김해온",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "writer",
+            "emailAddress": "drive-uploader@armbandbot.iam.gserviceaccount.com",
+            "domain": null,
+            "displayName": "drive-uploader",
+            "allowFileDiscovery": null
+          }
+        ],
+        "source_visibility_status": "permission_metadata_available"
+      }
+    },
+    "verified_at": "2026-10-25T08:09:33.224243+00:00",
+    "previous_formal": {
+      "version": "1.8.0",
+      "metadata": {
+        "id": "1mjuC1Mh96uatGo2mJn-YFHKr5Hv1aWiE",
+        "title": "완장봇_v1.8.0.apk",
+        "mime_type": "application/vnd.android.package-archive",
+        "size": "13535394",
+        "url": "https://drive.google.com/file/d/1mjuC1Mh96uatGo2mJn-YFHKr5Hv1aWiE/view?usp=drivesdk",
+        "display_url": "https://drive.google.com/file/d/1mjuC1Mh96uatGo2mJn-YFHKr5Hv1aWiE/view?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": "2026-10-24T16:30:54.230Z",
+        "modified_time": "2026-10-24T16:30:54.230Z",
+        "parent_ids": [
+          "1yuw4n3wGyMcJxjq-S14z1HjaVQCK-Cj1"
+        ],
+        "drive_id": null,
+        "current_user_can_share": true,
+        "has_augmented_permissions": null,
+        "shared": true,
+        "permissions": [
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "skt.lte.samsung@gmail.com",
+            "domain": null,
+            "displayName": "skt.lte.samsung",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "irisflower2002@gmail.com",
+            "domain": null,
+            "displayName": "irisflower2002",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "abc119368@gmail.com",
+            "domain": null,
+            "displayName": "abc119368",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yoonyoon12341234@gmail.com",
+            "domain": null,
+            "displayName": "yoonyoon12341234",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "rune7638@gmail.com",
+            "domain": null,
+            "displayName": "James Seo",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yyyqwe0781@gmail.com",
+            "domain": null,
+            "displayName": "yyyqwe0781",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "wnsgh851@gmail.com",
+            "domain": null,
+            "displayName": "wnsgh851",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "lellend7705@gmail.com",
+            "domain": null,
+            "displayName": "lellend7705",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "qortn13@gmail.com",
+            "domain": null,
+            "displayName": "qortn13",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "redbird040317@gmail.com",
+            "domain": null,
+            "displayName": "redbird040317",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "gimhodo068@gmail.com",
+            "domain": null,
+            "displayName": "gimhodo068",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "hcyoun00@gmail.com",
+            "domain": null,
+            "displayName": "hcyoun00",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "funkyshake7@gmail.com",
+            "domain": null,
+            "displayName": "funkyshake7",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dlatldkel7@gmail.com",
+            "domain": null,
+            "displayName": "dlatldkel7",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "onlyshare643@gmail.com",
+            "domain": null,
+            "displayName": "onlyshare643",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "chlgus9517@gmail.com",
+            "domain": null,
+            "displayName": "chlgus9517",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kns4670@gmail.com",
+            "domain": null,
+            "displayName": "kns4670",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "rjsdn0980@gmail.com",
+            "domain": null,
+            "displayName": "rjsdn0980",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dsxeno001@gmail.com",
+            "domain": null,
+            "displayName": "dsxeno001",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "aesparealitygallery@gmail.com",
+            "domain": null,
+            "displayName": "aesparealitygallery",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "donanya0101@gmail.com",
+            "domain": null,
+            "displayName": "donanya0101",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "57tempus@gmail.com",
+            "domain": null,
+            "displayName": "57tempus",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "wooonie39@gmail.com",
+            "domain": null,
+            "displayName": "wooonie39",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "vin25205@gmail.com",
+            "domain": null,
+            "displayName": "vin25205",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "vfrtyhnbgg@gmail.com",
+            "domain": null,
+            "displayName": "vfrtyhnbgg",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "jonghwan8654@gmail.com",
+            "domain": null,
+            "displayName": "jonghwan8654",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yoyoyoyo0401@gmail.com",
+            "domain": null,
+            "displayName": "yoyoyoyo0401",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "ajtwlswodbs12@gmail.com",
+            "domain": null,
+            "displayName": "ajtwlswodbs12",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "nguyenvanhao2847@gmail.com",
+            "domain": null,
+            "displayName": "nguyenvanhao2847",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "misa10032@gmail.com",
+            "domain": null,
+            "displayName": "misa10032",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "thepankr@gmail.com",
+            "domain": null,
+            "displayName": "thepankr",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "laciela1123@gmail.com",
+            "domain": null,
+            "displayName": "laciela1123",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "close11122@gmail.com",
+            "domain": null,
+            "displayName": "close11122",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "wonjyoo3@gmail.com",
+            "domain": null,
+            "displayName": "wonjyoo3",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dhfdjw714@gmail.com",
+            "domain": null,
+            "displayName": "dhfdjw714",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "sje34251172@gmail.com",
+            "domain": null,
+            "displayName": "sje34251172",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "gam3254@gmail.com",
+            "domain": null,
+            "displayName": "gam3254",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "armetahmah@gmail.com",
+            "domain": null,
+            "displayName": "armetahmah",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "zotledis@gmail.com",
+            "domain": null,
+            "displayName": "zotledis",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "yeocj1027@gmail.com",
+            "domain": null,
+            "displayName": "yeocj1027",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "zszs1122n@gmail.com",
+            "domain": null,
+            "displayName": "zszs1122n",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "lechenaulti4@gmail.com",
+            "domain": null,
+            "displayName": "lechenaulti4",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "JeongChief@gmail.com",
+            "domain": null,
+            "displayName": "JeongChief",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "gisgin708@gmail.com",
+            "domain": null,
+            "displayName": "gisgin708",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kimmin080792@gmail.com",
+            "domain": null,
+            "displayName": "kimmin080792",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "smyoon0625@gmail.com",
+            "domain": null,
+            "displayName": "smyoon0625",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "sc2mg2020@gmail.com",
+            "domain": null,
+            "displayName": "sc2mg2020",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dnwms2631@gmail.com",
+            "domain": null,
+            "displayName": "dnwms2631",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "tlxmwjsdyd22@gmail.com",
+            "domain": null,
+            "displayName": "tlxmwjsdyd22",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "ddqq094@gmail.com",
+            "domain": null,
+            "displayName": "ddqq094",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "jeehwan.ahn@gmail.com",
+            "domain": null,
+            "displayName": "jeehwan.ahn",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "reinanalizzy@gmail.com",
+            "domain": null,
+            "displayName": "reinanalizzy",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kimzerah2@gmail.com",
+            "domain": null,
+            "displayName": "kimzerah2",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dkfvlfdydjqttmqslek@gmail.com",
+            "domain": null,
+            "displayName": "dkfvlfdydjqttmqslek",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "kimtaeu2002@gmail.com",
+            "domain": null,
+            "displayName": "kimtaeu2002",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "link2557@gmail.com",
+            "domain": null,
+            "displayName": "link2557",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "zerosring00@gmail.com",
+            "domain": null,
+            "displayName": "zerosring00",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "dololong3918@gmail.com",
+            "domain": null,
+            "displayName": "dololong3918",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "lost.blue.3210@gmail.com",
+            "domain": null,
+            "displayName": "lost.blue.3210",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "duwiine1234@gmail.com",
+            "domain": null,
+            "displayName": "duwiine1234",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "oyj1301@gmail.com",
+            "domain": null,
+            "displayName": "oyj1301",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "owner",
+            "emailAddress": "haeon0511@gmail.com",
+            "domain": null,
+            "displayName": "김해온",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "votehanda@gmail.com",
+            "domain": null,
+            "displayName": "votehanda",
+            "allowFileDiscovery": null
+          },
+          {
+            "type": "user",
+            "role": "reader",
+            "emailAddress": "logeminiend@gmail.com",
+            "domain": null,
+            "displayName": "logeminiend",
+            "allowFileDiscovery": null
+          }
+        ],
+        "source_visibility_status": "permission_metadata_available"
+      },
+      "archived": true
+    },
+    "promoted_at": "2026-10-25T08:10:38.537388+00:00"
+  },
+  "official_docs": {
+    "passed": true,
+    "verified_at": "2026-10-25T08:10:28.770009+00:00",
+    "native": {
+      "manual": {
+        "revision": "AHj4eMSvT7njpp46Trv5z57kNCbIKUIG2k1sOYRbYGFp2w2-vcNYg8Zm4GJFmbh5-RHK1uhoDzCSz9b4CEiOrCRHLddnejawyxBpXNjaX4Ts",
+        "checks": [
+          {
+            "tab": "t.0",
+            "paragraphs": 414,
+            "images": 20,
+            "unchanged_content_and_styles_preserved": true,
+            "blank_bullets": 0
+          },
+          {
+            "tab": "t.qvnp48gaes2n",
+            "paragraphs": 266,
+            "images": 0,
+            "unchanged_content_and_styles_preserved": true,
+            "blank_bullets": 0
+          }
+        ]
+      },
+      "guide": {
+        "revision": "AHj4eMSVT5NMppGzI3vTLNqzpZphtp3NtVhHhH0GbM1bv1BVikTJ2vPcRctwC3WrNI3dt8AG9BIhoA2iqrq47QFdOi2wYNLPWApa67HigTt1",
+        "checks": [
+          {
+            "tab": "t.0",
+            "paragraphs": 95,
+            "images": 7,
+            "unchanged_content_and_styles_preserved": true,
+            "blank_bullets": 0
+          }
+        ]
+      }
+    },
+    "pdfs": {
+      "manual": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/manual-after.pdf",
+        "size": 3058183,
+        "sha256": "8598a319453ae35c8c0698b669cd0deb0838e2b46ba8a9dfd33768378bf8affc"
+      },
+      "guide": {
+        "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/guide-after.pdf",
+        "size": 737474,
+        "sha256": "9157fdbb255556506cdf721f34ccc116a5c8803e10996759a9fc994c5754f7bd"
+      }
+    },
+    "rendered": {
+      "manual": {
+        "pdf_sha256": "8598a319453ae35c8c0698b669cd0deb0838e2b46ba8a9dfd33768378bf8affc",
+        "pages": 49,
+        "rendered": [
+          {
+            "page": 2,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/manual-p2.png",
+            "sha256": "fb3b9c238f6c0c57fb02581133b378776717fec5c40a9c18fba59aece527fbdf"
+          },
+          {
+            "page": 3,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/manual-p3.png",
+            "sha256": "b854e73373fa1920cef4d4a0fe0b5df9d7d37fbf16142ef1fb5c2829dba400f4"
+          },
+          {
+            "page": 19,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/manual-p19.png",
+            "sha256": "6c939db827df3d66aadbb871745d0e47b3e6ce384a52e2c7b7b04bb6bebec396"
+          },
+          {
+            "page": 20,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/manual-p20.png",
+            "sha256": "41ea52835a9ceee60b268f4907d1bc00b8612afb231168a2dcb865abc11c1159"
+          },
+          {
+            "page": 21,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/manual-p21.png",
+            "sha256": "4605dea6f726b6fee2c05fd3f1d1e6c88017d4585a82242d2b23bfbe1d26bbe7"
+          },
+          {
+            "page": 40,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/manual-p40.png",
+            "sha256": "4554d883c472c467316136f4c854aa9e870b7e6a451a6c90bedb191c5b4970c8"
+          },
+          {
+            "page": 41,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/manual-p41.png",
+            "sha256": "e66d72a2ece0ad099703d7419492a4a6b86ba3d80701fdbeeb2b0362667e0b21"
+          }
+        ]
+      },
+      "guide": {
+        "pdf_sha256": "9157fdbb255556506cdf721f34ccc116a5c8803e10996759a9fc994c5754f7bd",
+        "pages": 6,
+        "rendered": [
+          {
+            "page": 1,
+            "path": "/home/haeon/Documents/Codex/2026-10-05/default/armbandbot-1.8.1/docs/rendered/guide-p1.png",
+            "sha256": "ab020f630fc4660c150aba0f8b96f660880367c1bc131c75910dee596259e4cc"
+          }
+        ]
+      }
+    },
+    "visual_review": {
+      "passed": true,
+      "findings": "All eight rendered changed/adjacent pages reviewed. Text legible, new patch title/date and two bullets correct, headings/images/captions retained without overlap or clipping."
+    },
+    "urls": {
+      "manual": "https://docs.google.com/document/d/1AHVTh0MBFlqyCkFmPma0uYkU5k4g-hMTcOMmh6LGeGU",
+      "guide": "https://docs.google.com/document/d/1aJNupe_DjjzQy0DWMkbSe_p6S0-ilclpN5vbVFMiZvE"
+    },
+    "nonfinal_render_attempt": "Initial QA helper incorrectly searched guide for patch heading; corrected anchor selection, full render completed. Document content did not need repair."
+  }
+}
