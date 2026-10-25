@@ -39,10 +39,11 @@ class PostingRatePolicyTest {
         listOf(p(1),p(2,"ip:203.240"),p(3,"uid:203.239"),p(4,gall="other"),p(5,type="MI"))
             .forEach { assertNull(t.observe(it,false,now,true)) }
     }
-    @Test fun exactBoundaryExpiresWithoutAnotherObservation() {
+    @Test fun exactBoundaryConfirmsBeforeCandidateWindowCloses() {
         val t=tracker();val a=p(1,age=60_000)
         t.observe(a,false,now,true);assertNotNull(t.observe(p(2),false,now,true))
-        assertFalse(t.canAct(a.key,now+1));assertFalse(t.canAct(p(2).key,now+1))
+        assertTrue(t.canAct(a.key,now+1));assertTrue(t.canAct(p(2).key,now+1))
+        assertFalse(t.canAct(a.key,now+CONFIRMED_SPAM_RETENTION_MS+1))
     }
     @Test fun uidAndIpHaveIndependentThresholdsAndWindows() {
         val t=tracker(PostingRateSettings(enabled=true,ipSeconds=20,ipCount=3,uidSeconds=60,uidCount=2))
@@ -93,9 +94,9 @@ class PostingRatePolicyTest {
         t.observe(c,true,now,true)
         assertTrue(t.canAct(b.key,now,SpamMatchKind.CONTENT))
     }
-    @Test fun shorterRateWindowExpiresEvenWhenContentRetainsEvents() {
+    @Test fun confirmedRateBatchSurvivesShorterDetectionWindow() {
         val t=tracker(content=true);t.observe(p(1,age=60_000),true,now,true);t.observe(p(2),true,now,true)
-        assertTrue(t.canAct(p(2).key,now));assertFalse(t.canAct(p(2).key,now+1));assertEquals(2,t.size())
+        assertTrue(t.canAct(p(2).key,now));assertTrue(t.canAct(p(2).key,now+1));assertEquals(2,t.size())
     }
     @Test fun secondsAndCountsAreBoundedAndInputRejectsMalformedNumbers() {
         assertEquals(10,PostingRateSettings(ipSeconds=-1).bounded().ipSeconds)

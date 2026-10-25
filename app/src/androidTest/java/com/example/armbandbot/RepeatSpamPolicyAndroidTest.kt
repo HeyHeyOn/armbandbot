@@ -6,6 +6,34 @@ import org.junit.Test
 /** Run the real comparator/tracker with Android's Unicode normalization on API24 and API35. No network. */
 class RepeatSpamPolicyAndroidTest {
     private val now = 1_800_000_000_000L
+    @Test fun confirmedRateBatchSurvivesCycleDelayOnMinorAndMini() {
+        for (type in listOf("M", "MI")) for (author in listOf("ip:203.239", "uid:fixture")) {
+            val tracker = RepeatSpamTracker().apply {
+                updatePolicy("fixture", RepeatSpamSettings(enabled = true, contentEnabled = false,
+                    postingRate = PostingRateSettings(enabled = true, ipCount = 3, uidCount = 3)))
+            }
+            val posts = (1..3).map { RepeatSpamPost(PostKey(type, "fixture", "$it"), author,
+                now - (4 - it) * 15_000, "서로 다른 제목 $it", "서로 다른 본문 $it") }
+            posts.reversed().forEach { tracker.observe(it, false, now, true) }
+            tracker.complete(posts.first().key, SpamMatchKind.POSTING_RATE, true)
+            posts.drop(1).forEach {
+                assertTrue(tracker.needsRecheck(it.key, now + 120_000))
+                assertNotNull(tracker.observe(it, false, now + 120_000, true))
+                tracker.complete(it.key, SpamMatchKind.POSTING_RATE, true)
+                assertFalse(tracker.canAct(it.key, now + 120_000))
+            }
+        }
+    }
+
+    @Test fun confirmedBatchProtectionAndStopStillCancelActions() {
+        val tracker = RepeatSpamTracker().apply { updatePolicy("fixture", RepeatSpamSettings(enabled = true, count = 2)) }
+        val first = RepeatSpamPost(PostKey("M", "fixture", "1"), "ip:203.239", now, "충분히 긴 반복 제목입니다", "")
+        val second = first.copy(key = first.key.copy(postNo = "2"))
+        tracker.observe(first, true, now); tracker.observe(second, true, now)
+        tracker.observe(first, false, now + 120_000)
+        assertFalse(tracker.canAct(second.key, now + 120_000))
+        tracker.clear(); assertEquals(0, tracker.size())
+    }
     @Test fun minorAndMiniTitleOrBodyRepeatsIncludeFirstAndRespectProtection() {
         for (type in listOf("M", "MI")) for (title in listOf(true, false)) {
             val tracker = RepeatSpamTracker().apply {

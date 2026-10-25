@@ -50,9 +50,9 @@ class RepeatSpamPolicyTest {
         repeat(5) { assertNull(t.observe(post(it, author=""), true, now)) }
         assertEquals(0,t.size())
     }
-    @Test fun pendingExpiresUsingCreationTimeEvenIfJustObserved() {
+    @Test fun confirmedBatchExpiresAfterBoundedCompletionTime() {
         val t = tracker(); val p = fill(t)
-        assertFalse(t.canAct(p.first().key, now+241_000))
+        assertFalse(t.canAct(p.first().key, now+CONFIRMED_SPAM_RETENTION_MS+1))
     }
     @Test fun changingPolicyOrStoppingClearsAllEvidenceAndPending() {
         val t = tracker(); val posts = fill(t)
@@ -65,7 +65,7 @@ class RepeatSpamPolicyTest {
         val t = tracker(); val p = fill(t); p.forEach { t.complete(it.key) }
         p.forEach { assertFalse(t.needsRecheck(it.key,now)); assertNull(t.observe(it,true,now)) }
         assertNotNull(t.observe(post(5),true,now))
-        assertFalse(t.needsRecheck(post(5).key,now+601_000))
+        assertFalse(t.needsRecheck(post(5).key,now+CONFIRMED_SPAM_RETENTION_MS+1))
     }
     @Test fun editedNormalPostWithdrawsPendingAndOldEvidence() {
         val t = tracker(); val p = fill(t)

@@ -24,6 +24,8 @@ internal const val REPEAT_REVISION_KEY = "repeat_spam_settings_revision"
 internal const val REPEAT_ENABLED_KEY = "is_spam_burst_protection_enabled"
 internal const val REPEAT_YUDONG_KEY = "spam_burst_target_yudong"
 internal const val REPEAT_KKANG_KEY = "spam_burst_target_kkang"
+// Detection uses creation time; finishing an already confirmed batch has its own bounded lifetime.
+internal const val CONFIRMED_SPAM_RETENTION_MS = 15 * 60_000L
 
 internal fun shouldApplyRepeatSpamAction(hasMatch: Boolean, observeOnly: Boolean, otherFilterActs: Boolean) =
     hasMatch && (!observeOnly || !otherFilterActs)
@@ -101,6 +103,8 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
     private val contentEligible = mutableSetOf<PostKey>()
     private val rateEligible = mutableSetOf<PostKey>()
     private val pending = linkedMapOf<PostKey, RepeatSpamMatch>()
+    private data class Confirmation(val match: RepeatSpamMatch, val detectedAt: Long)
+    private val confirmed = linkedMapOf<Pair<PostKey, SpamMatchKind>, Confirmation>()
     private var dirty = true
     private var nextExpiryAt = Long.MAX_VALUE
     private var lastEvaluatedAt = Long.MIN_VALUE
@@ -110,11 +114,15 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
             clear(); revision = nextRevision; settings = nextSettings.bounded()
         }
     }
-    @Synchronized fun clear() { events.clear(); completed.clear(); pending.clear(); contentEligible.clear(); rateEligible.clear(); dirty = true; nextExpiryAt = Long.MAX_VALUE }
+    @Synchronized fun clear() { events.clear(); completed.clear(); pending.clear(); confirmed.clear(); contentEligible.clear(); rateEligible.clear(); dirty = true; nextExpiryAt = Long.MAX_VALUE; lastEvaluatedAt = Long.MIN_VALUE }
     @Synchronized fun size(): Int = events.size
-    @Synchronized fun forget(key: PostKey) { if (events.remove(key) != null) dirty = true; completed.removeAll { it.first == key }; pending.remove(key); contentEligible.remove(key); rateEligible.remove(key) }
+    private fun withdrawConfirmations(key: PostKey) {
+        if (confirmed.entries.removeAll { key in it.value.match.keys }) dirty = true
+    }
+    @Synchronized fun forget(key: PostKey) { withdrawConfirmations(key); if (events.remove(key) != null) dirty = true; completed.removeAll { it.first == key }; pending.remove(key); contentEligible.remove(key); rateEligible.remove(key) }
     @Synchronized fun complete(key: PostKey, kind: SpamMatchKind = SpamMatchKind.CONTENT, allKinds: Boolean = false) {
         if (allKinds) SpamMatchKind.entries.forEach { completed.add(key to it) } else completed.add(key to kind)
+        confirmed.keys.removeAll { it.first == key && (allKinds || it.second == kind) }
         pending.remove(key)
         // A completed HOLD must not suppress a different detector's later destructive decision.
         dirty = true
@@ -127,10 +135,16 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
         val rate = postingRateEligible && settings.postingRate.enabled && settings.postingRate.includes(post.author)
         val retention = maxOf(if (content) settings.windowMillis else 0L,
             if (rate) settings.postingRate.seconds(post.author) * 1000L else 0L)
-        if (!settings.enabled || (!content && !rate) || post.author.isBlank() || post.createdAt < 0 || post.createdAt > now || now - post.createdAt > retention) {
+        val unchanged = events[post.key] == post && (post.key in contentEligible) == content && (post.key in rateEligible) == rate
+        val awaitingConfirmedAction = unchanged && confirmed.values.any { value ->
+            post.key in value.match.keys && now >= value.detectedAt && now - value.detectedAt <= CONFIRMED_SPAM_RETENTION_MS
+        }
+        if (!settings.enabled || (!content && !rate) || post.author.isBlank() || post.createdAt < 0 || post.createdAt > now ||
+            (now - post.createdAt > retention && !awaitingConfirmedAction)) {
             forget(post.key); rebuild(now); return null
         }
-        if (events[post.key] != post || (post.key in contentEligible) != content || (post.key in rateEligible) != rate) {
+        if (!unchanged) {
+            withdrawConfirmations(post.key)
             completed.removeAll { it.first == post.key }; dirty = true
         }
         if (content) contentEligible.add(post.key) else contentEligible.remove(post.key)
@@ -143,17 +157,22 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
         rebuild(now); return pending[key]?.let { kind == null || kind == it.kind } == true
     }
     private fun rebuild(now: Long) {
-        if (now < lastEvaluatedAt) dirty = true
+        if (now < lastEvaluatedAt) clear()
         lastEvaluatedAt = now
         if (!dirty && now < nextExpiryAt) return
         dirty = false
+        confirmed.entries.removeAll { (key, value) ->
+            key in completed || now < value.detectedAt || now - value.detectedAt > CONFIRMED_SPAM_RETENTION_MS
+        }
+        val retainedEvidence = confirmed.values.flatMap { it.match.keys }.toSet()
         fun expires(post: RepeatSpamPost): Long = post.createdAt + maxOf(
             if (post.key in contentEligible) settings.windowMillis else 0L,
             if (post.key in rateEligible) settings.postingRate.seconds(post.author) * 1000L else 0L)
-        events.entries.removeAll { now < it.value.createdAt || now > expires(it.value) }
+        events.entries.removeAll { now < it.value.createdAt || (now > expires(it.value) && it.key !in retainedEvidence) }
         if (events.size > maxEvents) events.values.sortedByDescending { it.createdAt }.drop(maxEvents).forEach { events.remove(it.key) }
         completed.removeAll { it.first !in events }
         contentEligible.retainAll(events.keys); rateEligible.retainAll(events.keys)
+        confirmed.entries.removeAll { (_, value) -> value.match.keys.any { it !in events } }
         // Re-evaluate at either detector's boundary, even when the other retains the event longer.
         nextExpiryAt = events.values.flatMap { post -> listOfNotNull(
             (post.createdAt + settings.windowMillis + 1).takeIf { post.key in contentEligible && it > now },
@@ -177,7 +196,9 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
                 }
                 clusters.filter { it.size >= settings.count }.forEach { group ->
                     val match = RepeatSpamMatch(group.map { it.key }.toSet(), settings.windowMinutes)
-                    group.filterNot { (it.key to SpamMatchKind.CONTENT) in completed }.forEach { pending[it.key] = match }
+                    group.filterNot { (it.key to SpamMatchKind.CONTENT) in completed }.forEach {
+                        confirmed.putIfAbsent(it.key to SpamMatchKind.CONTENT, Confirmation(match, now))
+                    }
                 }
             }
             val author = sameAuthor.first().author
@@ -185,10 +206,18 @@ internal class RepeatSpamTracker(private val maxEvents: Int = 1000) {
             if (settings.postingRate.enabled && ratePosts.size >= settings.postingRate.count(author)) {
                 val match = RepeatSpamMatch(ratePosts.map { it.key }.toSet(), 0, SpamMatchKind.POSTING_RATE, settings.postingRate.seconds(author))
                 ratePosts.filterNot { (it.key to SpamMatchKind.POSTING_RATE) in completed }.forEach {
-                    // Existing content action wins ties. A HOLD never hides an active delete/block.
-                    if (it.key !in pending || (settings.observeOnly && !settings.postingRate.observeOnly)) pending[it.key] = match
+                    confirmed.putIfAbsent(it.key to SpamMatchKind.POSTING_RATE, Confirmation(match, now))
                 }
             }
         }
+        // Rechecking a page cannot renew a confirmation indefinitely or recruit expired/new posts.
+        confirmed.forEach { (key, value) ->
+            if (key.second == SpamMatchKind.CONTENT) pending[key.first] = value.match
+        }
+        confirmed.forEach { (key, value) ->
+            if (key.second == SpamMatchKind.POSTING_RATE &&
+                (key.first !in pending || (settings.observeOnly && !settings.postingRate.observeOnly))) pending[key.first] = value.match
+        }
+        nextExpiryAt = minOf(nextExpiryAt, confirmed.values.minOfOrNull { it.detectedAt + CONFIRMED_SPAM_RETENTION_MS + 1 } ?: Long.MAX_VALUE)
     }
 }

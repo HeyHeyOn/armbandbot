@@ -1785,185 +1785,192 @@ class BotService : Service() {
         var isPageEmpty = true
         var activationRecheckComplete = true
 
-        for (row in postRows) {
-            val hasDcMediaListMarker = DcMediaDetection.hasListMarker(row)
-            val titleElement = row.selectFirst(".gall_tit a:not(.reply_numbox)")
-            if (titleElement == null) {
-                if (shouldMarkDcMediaActivationRowIncomplete(
-                        config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending,
-                        hasDcMediaListMarker,
-                        rowParsed = false,
-                    )) activationRecheckComplete = false
-                continue
-            }
-            val text = titleElement.text()
-            val link = titleElement.attr("href")
-            val postNumStr = Regex("no=([0-9]+)").find(link)?.groupValues?.get(1)
-            val postNumber = postNumStr?.toIntOrNull()
-            if (text.isBlank() || postNumStr == null || postNumber == null || postNumber <= 0) {
-                if (shouldMarkDcMediaActivationRowIncomplete(
-                        config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending,
-                        hasDcMediaListMarker,
-                        rowParsed = false,
-                    )) activationRecheckComplete = false
-                continue
-            }
-            isPageEmpty = false
-            val writerElement = row.selectFirst(".gall_writer")
-            val postWriterHtml = writerElement?.outerHtml() ?: ""
-            val postUid = writerElement?.attr("data-uid") ?: ""
-            val postIp = writerElement?.attr("data-ip") ?: ""
-            val postNick = writerElement?.attr("data-nick") ?: ""
-            val postAuthor = postUid.ifEmpty { postIp }
-            val postDisplayAuthor = if (postAuthor.isNotEmpty()) "$postNick($postAuthor)" else postNick
-            val dateElement = row.selectFirst(".gall_date")
-            val rawPostDate = dateElement?.attr("title")?.takeIf { it.isNotBlank() } ?: dateElement?.text() ?: ""
-            val postDate = normalizeCreationDate(rawPostDate)
-            if (firstPostNumOfThisPage.isEmpty()) firstPostNumOfThisPage = postNumStr
-            val replyBox = row.selectFirst(".reply_numbox")
-            val currentCommentCount = replyBox?.text()?.split("/")?.firstOrNull()?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0
-            val savedPost = GlobalBotState.getSavedPost(config.scanScopeId, gallType, gallId, postNumStr)
-            val savedCommentCount = savedPost?.commentCount ?: -1
-            val savedTitle = savedPost?.title
-            val hasPumListMarker = PumParser.hasListMarker(titleElement)
-            val snapshotBackfillRequired = savedPost != null && config.isExpertMode && config.isSnapshotAll &&
-                savedPost.snapshotPath?.takeIf { it.isNotBlank() }?.let { File(it).isFile } != true
-            val interruptedAiRetry = aiBatchQueues[botId]?.needsInterruptedRetry(
-                PostKey(gallType, gallId, postNumStr)
-            ) == true
-            val automationRecheck = automationRechecks[botId]?.needs(PostKey(gallType, gallId, postNumStr)) == true ||
-                repeatSpamTrackers[botId]?.needsRecheck(PostKey(gallType, gallId, postNumStr), System.currentTimeMillis()) == true
-            if (!automationRecheck && !interruptedAiRetry && !shouldRecheckPost(
-                    savedCommentCount = savedCommentCount,
-                    currentCommentCount = currentCommentCount,
-                    savedTitle = savedTitle,
-                    currentTitle = text,
-                    isPumSourceFilterMode = config.isPumSourceFilterMode,
-                    pumBlockAllPosts = config.pumBlockAllPosts,
-                    pumRecheckEveryCycle = config.pumRecheckEveryCycle,
-                    hasPumListMarker = hasPumListMarker,
-                    snapshotBackfillRequired = snapshotBackfillRequired,
-                    yudongDcMediaActivationRecheckPending = config.yudongDcMediaActivationRecheckPending,
-                    kkangDcMediaActivationRecheckPending = config.kkangDcMediaActivationRecheckPending,
-                    hasDcMediaListMarker = hasDcMediaListMarker,
-                    allPostsRecheckEveryCycle = config.allPostsRecheckEveryCycle,
-                )) {
-                if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
-                continue
-            }
-            val rowUnchanged = savedPost != null &&
-                savedCommentCount == currentCommentCount &&
-                savedTitle?.trim().orEmpty() == text.trim() &&
-                !snapshotBackfillRequired
-            val pumBlockAllAction = if (config.pumBlockAllPosts && hasPumListMarker) {
-                val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-                resolveModerationActionConfig(
-                    baseConfig = resolveDefaultModerationActionConfig(config),
-                    override = loadModerationActionOverride(prefs, "pum"),
-                    sourceLabel = "pum_override",
-                )
-            } else {
-                null
-            }
-            val yudongDcMediaAction = if (
-                config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker && postUid.isBlank()
-            ) {
-                val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
-                resolveModerationActionConfig(
-                    baseConfig = resolveDefaultModerationActionConfig(config),
-                    override = loadModerationActionOverride(prefs, "yudong"),
-                    sourceLabel = "yudong_override",
-                )
-            } else {
-                null
-            }
-            if (shouldSkipYudongDcMediaHoldPreflight(
-                    activationRecheckPending = config.yudongDcMediaActivationRecheckPending,
-                    hasDcMediaListMarker = hasDcMediaListMarker,
-                    rowUnchanged = rowUnchanged,
-                    effectiveActionIsHold = yudongDcMediaAction?.mode == ModerationActionMode.HOLD,
-                    alreadyHeld = yudongDcMediaAction?.mode == ModerationActionMode.HOLD &&
-                        GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
-                    otherForcedRecheck = config.allPostsRecheckEveryCycle || automationRecheck || interruptedAiRetry || (hasPumListMarker && (config.pumBlockAllPosts || config.pumRecheckEveryCycle)),
-                )) {
-                if (config.isDebugMode) {
-                    sendLog("[디버그][유동 디시 동영상][보류중복] 변경 없는 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
+        for (confirmedOnly in listOf(false, true)) {
+            for (row in postRows) {
+                val hasDcMediaListMarker = DcMediaDetection.hasListMarker(row)
+                val titleElement = row.selectFirst(".gall_tit a:not(.reply_numbox)")
+                if (titleElement == null) {
+                    if (shouldMarkDcMediaActivationRowIncomplete(
+                            config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending,
+                            hasDcMediaListMarker,
+                            rowParsed = false,
+                        )) activationRecheckComplete = false
+                    continue
                 }
-                continue
-            }
-            if (shouldSkipPumHoldPreflight(
-                    isPumSourceFilterMode = config.isPumSourceFilterMode,
-                    pumBlockAllPosts = config.pumBlockAllPosts,
-                    hasPumListMarker = hasPumListMarker,
-                    rowUnchanged = rowUnchanged,
-                    effectiveActionIsHold = pumBlockAllAction?.mode == ModerationActionMode.HOLD,
-                    alreadyHeld = pumBlockAllAction?.mode == ModerationActionMode.HOLD &&
-                        GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
-                    otherForcedRecheck = config.allPostsRecheckEveryCycle || automationRecheck || interruptedAiRetry || ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker),
-                )) {
-                if (config.isDebugMode) {
-                    sendLog("[디버그][PUM][보류중복] 변경 없는 펌 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
+                val text = titleElement.text()
+                val link = titleElement.attr("href")
+                val postNumStr = Regex("no=([0-9]+)").find(link)?.groupValues?.get(1)
+                val postNumber = postNumStr?.toIntOrNull()
+                if (text.isBlank() || postNumStr == null || postNumber == null || postNumber <= 0) {
+                    if (shouldMarkDcMediaActivationRowIncomplete(
+                            config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending,
+                            hasDcMediaListMarker,
+                            rowParsed = false,
+                        )) activationRecheckComplete = false
+                    continue
                 }
-                continue
-            }
-            if (config.isDebugMode) {
-                val titleChanged = savedCommentCount != -1 && savedTitle?.trim().orEmpty() != text.trim()
-                val reason = when {
-                    savedCommentCount == -1 -> "신규 글"
-                    config.allPostsRecheckEveryCycle -> "모든 게시물 매 사이클 검사"
-                    savedCommentCount != currentCommentCount && titleChanged -> "댓글 수/제목 변경"
-                    savedCommentCount != currentCommentCount -> "댓글 수 변경"
-                    titleChanged -> "제목 변경"
-                    automationRecheck -> "필터·자동화 설정 재검사"
-                    snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
-                    config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker -> "유동 디시 동영상 필터 활성화 1회 재검사"
-                    config.kkangDcMediaActivationRecheckPending && hasDcMediaListMarker -> "깡계 디시 동영상 필터 활성화 1회 재검사"
-                    config.pumBlockAllPosts && hasPumListMarker -> "펌 게시글 모두 차단 확인"
-                    config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
-                    else -> "변경 감지"
+                // Newest-first scanning may confirm a group at its oldest row. Finish that page's
+                // exact pending rows before the next cycle, using the normal fetch/protection/claim gates.
+                if (confirmedOnly && repeatSpamTrackers[botId]?.needsRecheck(
+                        PostKey(gallType, gallId, postNumStr), System.currentTimeMillis()) != true) continue
+                isPageEmpty = false
+                val writerElement = row.selectFirst(".gall_writer")
+                val postWriterHtml = writerElement?.outerHtml() ?: ""
+                val postUid = writerElement?.attr("data-uid") ?: ""
+                val postIp = writerElement?.attr("data-ip") ?: ""
+                val postNick = writerElement?.attr("data-nick") ?: ""
+                val postAuthor = postUid.ifEmpty { postIp }
+                val postDisplayAuthor = if (postAuthor.isNotEmpty()) "$postNick($postAuthor)" else postNick
+                val dateElement = row.selectFirst(".gall_date")
+                val rawPostDate = dateElement?.attr("title")?.takeIf { it.isNotBlank() } ?: dateElement?.text() ?: ""
+                val postDate = normalizeCreationDate(rawPostDate)
+                if (firstPostNumOfThisPage.isEmpty()) firstPostNumOfThisPage = postNumStr
+                val replyBox = row.selectFirst(".reply_numbox")
+                val currentCommentCount = replyBox?.text()?.split("/")?.firstOrNull()?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0
+                val savedPost = GlobalBotState.getSavedPost(config.scanScopeId, gallType, gallId, postNumStr)
+                val savedCommentCount = savedPost?.commentCount ?: -1
+                val savedTitle = savedPost?.title
+                val hasPumListMarker = PumParser.hasListMarker(titleElement)
+                val snapshotBackfillRequired = savedPost != null && config.isExpertMode && config.isSnapshotAll &&
+                    savedPost.snapshotPath?.takeIf { it.isNotBlank() }?.let { File(it).isFile } != true
+                val interruptedAiRetry = aiBatchQueues[botId]?.needsInterruptedRetry(
+                    PostKey(gallType, gallId, postNumStr)
+                ) == true
+                val automationRecheck = automationRechecks[botId]?.needs(PostKey(gallType, gallId, postNumStr)) == true ||
+                    repeatSpamTrackers[botId]?.needsRecheck(PostKey(gallType, gallId, postNumStr), System.currentTimeMillis()) == true
+                if (!automationRecheck && !interruptedAiRetry && !shouldRecheckPost(
+                        savedCommentCount = savedCommentCount,
+                        currentCommentCount = currentCommentCount,
+                        savedTitle = savedTitle,
+                        currentTitle = text,
+                        isPumSourceFilterMode = config.isPumSourceFilterMode,
+                        pumBlockAllPosts = config.pumBlockAllPosts,
+                        pumRecheckEveryCycle = config.pumRecheckEveryCycle,
+                        hasPumListMarker = hasPumListMarker,
+                        snapshotBackfillRequired = snapshotBackfillRequired,
+                        yudongDcMediaActivationRecheckPending = config.yudongDcMediaActivationRecheckPending,
+                        kkangDcMediaActivationRecheckPending = config.kkangDcMediaActivationRecheckPending,
+                        hasDcMediaListMarker = hasDcMediaListMarker,
+                        allPostsRecheckEveryCycle = config.allPostsRecheckEveryCycle,
+                    )) {
+                    if (config.isDebugMode) sendLog("[디버그][페이지] 번호: $postNumStr / 댓글 수와 제목 변경 없음 (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 건너뜀", botId)
+                    continue
                 }
-                sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
-            }
-            try {
-                requireActiveScheduleForRequest(botId)
-                val postHandled = processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
-                RuntimeRequestGate.requireCurrent().check()
-                if (postHandled) automationRechecks[botId]?.mark(PostKey(gallType, gallId, postNumStr))
-                if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker && !postHandled) {
-                    activationRecheckComplete = false
-                }
-            } catch (paused: SchedulePausedException) {
-                throw paused
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (e: Exception) {
-                if (DeletedPostHandling.isDeletedOrUnavailablePost(e)) {
-                    RuntimeRequestGate.requireCurrent().check()
-                    automationRechecks[botId]?.mark(PostKey(gallType, gallId, postNumStr))
-                    GlobalBotState.savePost(
-                scopeId = config.scanScopeId,
-                        gallType = gallType,
-                        gallId = gallId,
-                        postNum = postNumStr,
-                        commentCount = currentCommentCount,
-                        title = text,
-                        author = postDisplayAuthor,
-                        isBlocked = false,
-                        blockReason = null,
-                        snapshotPath = null,
-                        creationDate = postDate
+                val rowUnchanged = savedPost != null &&
+                    savedCommentCount == currentCommentCount &&
+                    savedTitle?.trim().orEmpty() == text.trim() &&
+                    !snapshotBackfillRequired
+                val pumBlockAllAction = if (config.pumBlockAllPosts && hasPumListMarker) {
+                    val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                    resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(prefs, "pum"),
+                        sourceLabel = "pum_override",
                     )
-                    if (config.isDebugMode) {
-                        sendLog("[디버그][삭제/접근불가 글] 번호: $postNumStr / 상세 404 → 댓글 수 기준 저장 후 재처리 억제", botId)
-                    }
                 } else {
-                    if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker) {
+                    null
+                }
+                val yudongDcMediaAction = if (
+                    config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker && postUid.isBlank()
+                ) {
+                    val prefs = getSharedPreferences("bot_prefs_$botId", Context.MODE_PRIVATE)
+                    resolveModerationActionConfig(
+                        baseConfig = resolveDefaultModerationActionConfig(config),
+                        override = loadModerationActionOverride(prefs, "yudong"),
+                        sourceLabel = "yudong_override",
+                    )
+                } else {
+                    null
+                }
+                if (shouldSkipYudongDcMediaHoldPreflight(
+                        activationRecheckPending = config.yudongDcMediaActivationRecheckPending,
+                        hasDcMediaListMarker = hasDcMediaListMarker,
+                        rowUnchanged = rowUnchanged,
+                        effectiveActionIsHold = yudongDcMediaAction?.mode == ModerationActionMode.HOLD,
+                        alreadyHeld = yudongDcMediaAction?.mode == ModerationActionMode.HOLD &&
+                            GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
+                        otherForcedRecheck = config.allPostsRecheckEveryCycle || automationRecheck || interruptedAiRetry || (hasPumListMarker && (config.pumBlockAllPosts || config.pumRecheckEveryCycle)),
+                    )) {
+                    if (config.isDebugMode) {
+                        sendLog("[디버그][유동 디시 동영상][보류중복] 변경 없는 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
+                    }
+                    continue
+                }
+                if (shouldSkipPumHoldPreflight(
+                        isPumSourceFilterMode = config.isPumSourceFilterMode,
+                        pumBlockAllPosts = config.pumBlockAllPosts,
+                        hasPumListMarker = hasPumListMarker,
+                        rowUnchanged = rowUnchanged,
+                        effectiveActionIsHold = pumBlockAllAction?.mode == ModerationActionMode.HOLD,
+                        alreadyHeld = pumBlockAllAction?.mode == ModerationActionMode.HOLD &&
+                            GlobalBotState.hasHoldHistory(gallType, gallId, postNumStr, "POST", postNumStr),
+                        otherForcedRecheck = config.allPostsRecheckEveryCycle || automationRecheck || interruptedAiRetry || ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker),
+                    )) {
+                    if (config.isDebugMode) {
+                        sendLog("[디버그][PUM][보류중복] 변경 없는 펌 게시글의 기존 보류 기록 확인 → 상세 fetch 건너뜀 / 번호: $postNumStr", botId)
+                    }
+                    continue
+                }
+                if (config.isDebugMode) {
+                    val titleChanged = savedCommentCount != -1 && savedTitle?.trim().orEmpty() != text.trim()
+                    val reason = when {
+                        savedCommentCount == -1 -> "신규 글"
+                        config.allPostsRecheckEveryCycle -> "모든 게시물 매 사이클 검사"
+                        savedCommentCount != currentCommentCount && titleChanged -> "댓글 수/제목 변경"
+                        savedCommentCount != currentCommentCount -> "댓글 수 변경"
+                        titleChanged -> "제목 변경"
+                        automationRecheck -> "필터·자동화 설정 재검사"
+                        snapshotBackfillRequired -> "전체 스냅샷 파일 누락 재생성"
+                        config.yudongDcMediaActivationRecheckPending && hasDcMediaListMarker -> "유동 디시 동영상 필터 활성화 1회 재검사"
+                        config.kkangDcMediaActivationRecheckPending && hasDcMediaListMarker -> "깡계 디시 동영상 필터 활성화 1회 재검사"
+                        config.pumBlockAllPosts && hasPumListMarker -> "펌 게시글 모두 차단 확인"
+                        config.pumRecheckEveryCycle && hasPumListMarker -> "목록 펌 글 매 주기 재확인"
+                        else -> "변경 감지"
+                    }
+                    sendLog("[디버그][페이지] 번호: $postNumStr / $reason (댓글 저장: $savedCommentCount, 현재: $currentCommentCount) → 재확인 진행", botId)
+                }
+                try {
+                    requireActiveScheduleForRequest(botId)
+                    val postHandled = processSinglePost(config, botId, cookie, gallType, gallId, postNumStr, postNumber, text, postUid, postAuthor, postNick, postDisplayAuthor, postDate, currentCommentCount, ciToken, gallogCache, blockDuration, blockReason, delChk, postWriterHtml, pumSourceResolver, notifyIfEnabled)
+                    RuntimeRequestGate.requireCurrent().check()
+                    if (postHandled) automationRechecks[botId]?.mark(PostKey(gallType, gallId, postNumStr))
+                    if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker && !postHandled) {
                         activationRecheckComplete = false
                     }
-                    sendLog("[처리 오류] 번호: $postNumStr / ${e.javaClass.simpleName}: ${e.message ?: "원인 불명"}", botId)
+                } catch (paused: SchedulePausedException) {
+                    throw paused
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    if (DeletedPostHandling.isDeletedOrUnavailablePost(e)) {
+                        RuntimeRequestGate.requireCurrent().check()
+                        automationRechecks[botId]?.mark(PostKey(gallType, gallId, postNumStr))
+                        GlobalBotState.savePost(
+                    scopeId = config.scanScopeId,
+                            gallType = gallType,
+                            gallId = gallId,
+                            postNum = postNumStr,
+                            commentCount = currentCommentCount,
+                            title = text,
+                            author = postDisplayAuthor,
+                            isBlocked = false,
+                            blockReason = null,
+                            snapshotPath = null,
+                            creationDate = postDate
+                        )
+                        if (config.isDebugMode) {
+                            sendLog("[디버그][삭제/접근불가 글] 번호: $postNumStr / 상세 404 → 댓글 수 기준 저장 후 재처리 억제", botId)
+                        }
+                    } else {
+                        if ((config.yudongDcMediaActivationRecheckPending || config.kkangDcMediaActivationRecheckPending) && hasDcMediaListMarker) {
+                            activationRecheckComplete = false
+                        }
+                        sendLog("[처리 오류] 번호: $postNumStr / ${e.javaClass.simpleName}: ${e.message ?: "원인 불명"}", botId)
+                    }
                 }
+                delay(randomDelay(config.postMinMs, config.postMaxMs))
             }
-            delay(randomDelay(config.postMinMs, config.postMaxMs))
+
         }
 
         val searchNavigation = if (ciTokenFallbackAllowed && searchBaseUrl != null && searchKeyword != null) {
